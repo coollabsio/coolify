@@ -49,6 +49,7 @@ class Domains extends Component
     public ?int $pendingRedirectServiceApplicationId = null;
 
     /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public ?int $newServiceApplicationId = null;

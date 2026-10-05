@@ -8,6 +8,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 /**
@@ -124,7 +125,8 @@ class SecretManagerLinks extends Component
                 $this->settings = [];
             }
 
-            $settings = array_filter($this->settings, fn ($value) => filled($value));
+            $validated = $this->validate($this->tokenChangeRules());
+            $settings = array_filter(data_get($validated, 'settings', []), fn ($value) => filled($value));
 
             $this->resource->secretManagerLink()->updateOrCreate([], [
                 'integration_token_id' => $token->id,
@@ -138,9 +140,26 @@ class SecretManagerLinks extends Component
             $this->resetKeys();
             $this->loadData();
             $this->dispatch('success', 'Secret manager source saved. References resolve at the next deployment.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * The settings rules of the selected provider, with the fields still optional: a token is
+     * saved before the user fills in its settings.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function tokenChangeRules(): array
+    {
+        return collect($this->rules())
+            ->map(fn (array $rules, string $field): array => str_starts_with($field, 'settings.')
+                ? array_map(fn (string $rule): string => $rule === 'required' ? 'nullable' : $rule, $rules)
+                : $rules)
+            ->all();
     }
 
     /**
