@@ -3359,7 +3359,7 @@ paths:
                   description: 'Whether this is a directory mount (file only, default false).'
                 fs_path:
                   type: string
-                  description: 'Host directory path (required when is_directory is true).'
+                  description: 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'
               type: object
               additionalProperties: false
       responses:
@@ -3375,6 +3375,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission for a mount outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -3425,7 +3427,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages).'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -3441,6 +3443,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission to change the content of a file outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -6424,7 +6428,7 @@ paths:
                   description: 'Whether this is a directory mount (file only, default false).'
                 fs_path:
                   type: string
-                  description: 'Host directory path (required when is_directory is true).'
+                  description: 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'
               type: object
               additionalProperties: false
       responses:
@@ -6440,6 +6444,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission for a mount outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -6490,7 +6496,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages).'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -6506,6 +6512,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission to change the content of a file outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9356,6 +9364,7 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled.'
@@ -9460,6 +9469,7 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled.'
@@ -9592,6 +9602,7 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled.'
@@ -9696,6 +9707,7 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled.'
@@ -10837,15 +10849,18 @@ paths:
                   type: [string, 'null']
                 traffic_topn:
                   type: integer
+                  maximum: 1000
                   minimum: 1
                 traffic_sample_threshold:
                   type: integer
                   minimum: 0
                 traffic_retention_1h_days:
                   type: integer
+                  maximum: 365
                   minimum: 1
                 traffic_retention_1d_days:
                   type: integer
+                  maximum: 3650
                   minimum: 1
                 is_geoip_enabled:
                   type: boolean
@@ -12979,7 +12994,7 @@ paths:
                   description: 'Whether this is a directory mount (file only, default false).'
                 fs_path:
                   type: string
-                  description: 'Host directory path (required when is_directory is true).'
+                  description: 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'
               type: object
               additionalProperties: false
       responses:
@@ -12995,6 +13010,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission for a mount outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -13045,7 +13062,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages).'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -13061,6 +13078,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission to change the content of a file outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:

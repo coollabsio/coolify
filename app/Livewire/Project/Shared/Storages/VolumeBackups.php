@@ -100,8 +100,10 @@ class VolumeBackups extends Component
     public function mount(): void
     {
         $this->authorize('view', $this->resource);
-        $this->availableS3Storages = S3Storage::ownedByCurrentTeam()
+        $this->availableS3Storages = S3Storage::query()
+            ->where('team_id', $this->resourceTeamId())
             ->where('is_usable', true)
+            ->orderBy('name')
             ->get();
         $this->backup = $this->storage->scheduledBackups()->first();
         $server = $this->backup?->server() ?? data_get($this->resource, 'destination.server');
@@ -419,7 +421,7 @@ class VolumeBackups extends Component
     {
         $backup = $this->storage->scheduledBackups()->firstOrNew();
         $backup->fill([
-            'team_id' => $this->resource->environment->project->team_id,
+            'team_id' => $this->resourceTeamId(),
             'frequency' => $this->frequency,
             'enabled' => $enabled,
             'save_s3' => $this->saveToS3,
@@ -483,9 +485,14 @@ class VolumeBackups extends Component
         return $this->s3StorageId !== null
             && S3Storage::query()
                 ->whereKey($this->s3StorageId)
-                ->where('team_id', currentTeam()->id)
+                ->where('team_id', $this->resourceTeamId())
                 ->where('is_usable', true)
                 ->exists();
+    }
+
+    private function resourceTeamId(): int
+    {
+        return $this->resource->environment->project->team_id;
     }
 
     private function routeName(string $section): string

@@ -57,6 +57,14 @@ class DynamicConfigurations extends Component
         $files = collect(explode("\n", $files))->filter(fn ($file) => ! empty($file));
         $files = $files->map(fn ($file) => trim($file));
         $files = $files->sort();
+        if (! auth()->user()?->can('update', $this->server)) {
+            // Members see file names only; contents can hold credentials.
+            $this->contents = $files->take(self::MAX_CONFIGURATION_FILES)
+                ->mapWithKeys(fn ($file) => [str_replace('.', '|', $file) => null]);
+            $this->dispatch('$refresh');
+
+            return;
+        }
         $contents = collect([]);
         $skippedFiles = collect([]);
         $totalBytes = 0;
