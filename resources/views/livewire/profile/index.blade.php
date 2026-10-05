@@ -300,6 +300,51 @@
             </div>
         </section>
 
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Danger zone</h2>
+                    <p>Destructive actions for your account cannot be undone.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body">
+                <x-danger-zone title="Delete account">
+                    @if ($accountDeletionBlockers === [])
+                        <p>
+                            Permanently delete your account from Coolify. This action cannot be undone.
+                        </p>
+                        <ul class="space-y-1 text-xs">
+                            <li>• Teams where you are the only member are deleted.</li>
+                            <li>• You are removed from all other teams.</li>
+                            <li>• Your API tokens and sessions are revoked.</li>
+                        </ul>
+                    @else
+                        <p>Before you can delete your account:</p>
+                        <ul class="space-y-1">
+                            @foreach ($accountDeletionBlockers as $blocker)
+                                <li>• {{ $blocker }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <x-slot:action>
+                        @if ($accountDeletionBlockers === [])
+                            <x-modal-confirmation title="Confirm Account Deletion?" buttonTitle="Delete account"
+                                isErrorButton submitAction="deleteAccount"
+                                :actions="$accountDeletionActions"
+                                confirmationText="{{ $email }}"
+                                confirmationLabel="Enter your email address to confirm permanent deletion"
+                                shortConfirmationLabel="Email" step3ButtonText="Permanently Delete" />
+                        @else
+                            <x-forms.button isError disabled
+                                tooltip="Resolve the requirements shown before deleting your account.">
+                                Delete account
+                            </x-forms.button>
+                        @endif
+                    </x-slot:action>
+                </x-danger-zone>
+            </div>
+        </section>
+
         @if (session()->has('errors'))
             <x-callout type="danger" title="Profile update failed">
                 Something went wrong. Please review the fields and try again.

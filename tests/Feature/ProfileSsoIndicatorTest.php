@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Models\InstanceSettings;
 use App\Models\OauthIdentity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -8,6 +9,10 @@ use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+});
 
 it('shows when the profile user signed in with sso', function () {
     $user = User::factory()->create(['name' => 'Profile User']);
