@@ -124,24 +124,18 @@ function makeWebhookApplicationServerFunctional(Application $application): Appli
 }
 
 describe('Manual Webhook Failed Authentication Rate Limiting', function () {
-    test('a locked failure scope rejects deliveries before reading application secrets', function (string $provider, bool $validSignature) {
-        $application = createApplicationWithWebhook();
+    test('a locked failure scope rejects invalid deliveries', function (string $provider) {
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
 
         lockOutManualWebhookRepository($this, $provider, $application);
-        DB::enableQueryLog();
-        DB::flushQueryLog();
 
-        sendManualWebhookPush($this, $provider, $application, validSignature: $validSignature)
+        sendManualWebhookPush($this, $provider, $application, validSignature: false)
             ->assertStatus(429)
             ->assertHeader('Retry-After');
 
-        $applicationQueries = collect(DB::getQueryLog())
-            ->filter(fn (array $query): bool => str_contains($query['query'], '"applications"'));
-        DB::disableQueryLog();
-
-        expect($applicationQueries)->toBeEmpty();
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
-    })->with(['github', 'gitlab', 'bitbucket', 'gitea'])->with([false, true]);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
     test('valid signed deliveries do not consume the failure limit', function (string $provider) {
         $application = createApplicationWithWebhook();
@@ -156,20 +150,18 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         expect(RateLimiter::attempts(manualWebhookFailureKey($provider)))->toBe(0);
     })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
-    test('a signed delivery is blocked during lockout and processed after the failure window expires', function (string $provider) {
+    test('a signed delivery is processed while failed deliveries from the same proxy address lock the scope', function (string $provider) {
         Queue::fake();
         $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
+        // On self-hosted instances every delivery reaches PHP from the proxy container.
+        $proxyAddress = '10.0.1.5';
 
-        lockOutManualWebhookRepository($this, $provider, $application);
+        for ($i = 0; $i < 31; $i++) {
+            sendManualWebhookPush($this, $provider, $application, validSignature: false, ip: $proxyAddress, extraServer: ['HTTP_X_FORWARDED_FOR' => '198.51.100.66']);
+        }
+        sendManualWebhookPush($this, $provider, $application, validSignature: false, ip: $proxyAddress)->assertStatus(429);
 
-        sendManualWebhookPush($this, $provider, $application)
-            ->assertStatus(429)
-            ->assertHeader('Retry-After');
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
-
-        $this->travel(61)->seconds();
-
-        $response = sendManualWebhookPush($this, $provider, $application);
+        $response = sendManualWebhookPush($this, $provider, $application, ip: $proxyAddress, extraServer: ['HTTP_X_FORWARDED_FOR' => '140.82.115.1']);
 
         $response->assertOk();
         expect($response->getContent())->toContain('Deployment queued');
@@ -182,7 +174,7 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         lockOutManualWebhookRepository($this, $provider, $application);
         $attempts = RateLimiter::attempts(manualWebhookFailureKey($provider));
 
-        sendManualWebhookPush($this, $provider, $application)->assertStatus(429);
+        sendManualWebhookPush($this, $provider, $application)->assertOk();
         sendManualWebhookPush($this, $provider, $application, validSignature: false)
             ->assertStatus(429)
             ->assertHeader('Retry-After')
@@ -1353,8 +1345,7 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
 
-        sendManualWebhookPush($this, 'gitlab', $application)->assertStatus(429);
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+        sendManualWebhookPush($this, 'gitlab', $application)->assertOk()->assertSee('Deployment queued');
     });
 
     test('repeated tokens do not extend the guess limit', function () {
@@ -1435,8 +1426,7 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
         sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'guess-30')->assertStatus(429);
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
 
-        sendManualWebhookPush($this, $provider, $application)->assertStatus(429);
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+        sendManualWebhookPush($this, $provider, $application)->assertOk()->assertSee('Deployment queued');
     })->with(['github', 'bitbucket', 'gitea']);
 
     test('the same wrong signature for different payloads counts every payload', function (string $provider) {

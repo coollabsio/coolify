@@ -421,7 +421,7 @@ class VolumeBackups extends Component
     {
         $backup = $this->storage->scheduledBackups()->firstOrNew();
         $backup->fill([
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->resource->environment->project->team_id,
             'frequency' => $this->frequency,
             'enabled' => $enabled,
             'save_s3' => $this->saveToS3,

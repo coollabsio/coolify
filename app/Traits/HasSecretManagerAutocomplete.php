@@ -38,7 +38,8 @@ trait HasSecretManagerAutocomplete
             return [];
         }
 
-        $this->authorize('view', $link->resourceable);
+        // Same ability as SecretManagerLinks::loadKeys(): key names are for users who can manage the source.
+        $this->authorize('update', $link->resourceable);
 
         // Only key names are cached. Another token or other settings use another cache entry.
         $cacheKey = 'secret-manager-keys:'.$link->id.':'.hash('sha256', json_encode([

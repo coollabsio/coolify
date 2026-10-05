@@ -155,6 +155,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /** @var array<string, string>|null */
     private ?array $remote_secrets_cache = null;
 
+    private ?bool $has_secret_manager_source = null;
+
     private $env_nixpacks_args;
 
     private $env_railpack_args;
@@ -466,7 +468,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($mustBuildElsewhere && ! $this->restart_only) {
                 throw new DeploymentException("The deployment server ({$this->server->name}) is set to deployments only, and no usable build server was found. Add a build server or change the server role.");
             }
-            if (! $team->is_build_server_fallback_enabled) {
+            // A restart that has to rebuild selects again in should_skip_build().
+            if (! $team->is_build_server_fallback_enabled && ! $this->restart_only) {
                 throw new DeploymentException('No available dedicated build server was found. Enable a usable build server for this team or allow fallback to the deployment server in the team settings.');
             }
 
@@ -1484,6 +1487,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         if ($this->restart_only) {
             $this->restart_only = false;
+            if (! $this->use_build_server) {
+                // The restart skipped build server selection.
+                $this->selectBuildServer();
+                if ($this->use_build_server) {
+                    $this->detectBuildKitCapabilities();
+                }
+            }
             $this->decide_what_to_do();
         }
 
@@ -1498,8 +1508,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         return $environmentVariables
             ->where('is_buildtime', true)
-            ->get(['value'])
-            ->contains(fn (EnvironmentVariable $environmentVariable) => RemoteSecretReferences::containsReference($environmentVariable->value));
+            ->get(['value', 'is_literal'])
+            ->contains(fn (EnvironmentVariable $environmentVariable) => $this->uses_remote_secret_references($environmentVariable));
     }
 
     private function check_image_locally_or_remotely()
@@ -1555,6 +1565,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             throw new DeploymentException("Could not fetch secrets from {$provider}. The deployment was stopped so the application does not start with missing secrets.");
         }
 
+        $this->application_deployment_queue->redactRemoteSecrets($secrets);
         $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}).");
 
         return $this->remote_secrets_cache = $secrets;
@@ -1610,7 +1621,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $value = $env->get_real_environment_variables_with_server($env->value, $this->application, $this->mainServer);
 
+        if ($env->is_literal && ! $this->has_secret_manager_source()) {
+            return $value ?? '';
+        }
+
         return $this->substitute_remote_secrets($value ?? '', $env->key);
+    }
+
+    /**
+     * Without a source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
+     */
+    private function uses_remote_secret_references(EnvironmentVariable $env): bool
+    {
+        if (! RemoteSecretReferences::containsReference($env->value)) {
+            return false;
+        }
+
+        return ! $env->is_literal || $this->has_secret_manager_source();
+    }
+
+    private function has_secret_manager_source(): bool
+    {
+        return $this->has_secret_manager_source ??= $this->remote_secrets_cache !== null
+            || $this->application->secretManagerLink()->exists();
     }
 
     /**
@@ -1619,7 +1652,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function resolve_environment_variable(EnvironmentVariable $env): ?string
     {
-        if (! RemoteSecretReferences::containsReference($env->value)) {
+        if (! $this->uses_remote_secret_references($env)) {
             return $env->getResolvedValueWithServer($this->mainServer);
         }
 
@@ -2055,7 +2088,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     continue;
                 }
 
-                if (RemoteSecretReferences::containsReference($env->value)) {
+                if ($this->uses_remote_secret_references($env)) {
                     $envs_dict[$env->key] = escapeBashEnvValue($this->resolve_environment_variable_raw($env));
 
                     continue;
@@ -2113,7 +2146,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     continue;
                 }
 
-                if (RemoteSecretReferences::containsReference($env->value)) {
+                if ($this->uses_remote_secret_references($env)) {
                     $envs_dict[$env->key] = escapeBashEnvValue($this->resolve_environment_variable_raw($env));
 
                     continue;
@@ -3219,7 +3252,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function normalize_resolved_build_variable_value(EnvironmentVariable $environmentVariable): ?string
     {
-        if (RemoteSecretReferences::containsReference($environmentVariable->value)) {
+        if ($this->uses_remote_secret_references($environmentVariable)) {
             $resolved = $this->resolve_environment_variable_raw($environmentVariable);
 
             return $resolved === '' ? null : $resolved;
@@ -3772,7 +3805,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
-                $resolvedValue = RemoteSecretReferences::containsReference($env->value)
+                $resolvedValue = $this->uses_remote_secret_references($env)
                     ? $this->resolve_environment_variable_raw($env)
                     : $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue)) {
@@ -3790,7 +3823,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
-                $resolvedValue = RemoteSecretReferences::containsReference($env->value)
+                $resolvedValue = $this->uses_remote_secret_references($env)
                     ? $this->resolve_environment_variable_raw($env)
                     : $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue)) {

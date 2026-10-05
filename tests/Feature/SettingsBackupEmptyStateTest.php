@@ -2,6 +2,7 @@
 
 use App\Livewire\SettingsBackup;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -11,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 
@@ -160,4 +162,65 @@ test('configure backup creates only the missing schedule for an existing instanc
         ->and($backup->enabled)->toBeTruthy()
         ->and($backup->frequency)->toBe('0 0 * * *')
         ->and(ScheduledDatabaseBackup::query()->count())->toBe(1);
+});
+
+/**
+ * A team database that is also named coolify-db, but is not the instance database (id 0).
+ */
+function settingsBackupTenantDatabaseNamedCoolifyDb(): StandalonePostgresql
+{
+    $tenantTeam = Team::factory()->create();
+    $tenantServer = Server::factory()->create(['team_id' => $tenantTeam->id]);
+    $tenantDestination = StandaloneDocker::query()->where('server_id', $tenantServer->id)->firstOrFail();
+
+    $database = new StandalonePostgresql;
+    $database->forceFill([
+        'name' => 'coolify-db',
+        'postgres_user' => 'tenant',
+        'postgres_password' => 'tenant-secret',
+        'postgres_db' => 'tenant',
+        'status' => 'running',
+        'destination_type' => StandaloneDocker::class,
+        'destination_id' => $tenantDestination->id,
+    ]);
+    $database->save();
+
+    return $database;
+}
+
+test('instance backup settings ignore a team database named coolify-db', function () {
+    settingsBackupInstanceDatabaseWithoutSchedule()->delete();
+    $tenantDatabase = settingsBackupTenantDatabaseNamedCoolifyDb();
+
+    Livewire::test(SettingsBackup::class)
+        ->assertOk()
+        ->assertSet('database', null)
+        ->assertSee('Backup is not configured')
+        ->assertDontSee('tenant-secret');
+
+    expect($tenantDatabase->fresh()->scheduledBackups()->exists())->toBeFalse();
+});
+
+test('configure backup creates the instance database instead of using a team database named coolify-db', function () {
+    settingsBackupInstanceDatabaseWithoutSchedule()->forceDelete();
+    $tenantDatabase = settingsBackupTenantDatabaseNamedCoolifyDb();
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+    Server::query()->whereKey(0)->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => 0])->id]);
+    Server::flushIdentityMap();
+    Process::fake([
+        '*docker inspect coolify-db*' => Process::result(output: json_encode([[
+            'Config' => ['Env' => ['POSTGRES_USER=coolify', 'POSTGRES_PASSWORD=instance-secret', 'POSTGRES_DB=coolify']],
+        ]])),
+    ]);
+
+    Livewire::test(SettingsBackup::class)
+        ->call('addCoolifyDatabase')
+        ->assertHasNoErrors()
+        ->assertSet('postgres_password', 'instance-secret');
+
+    $instanceDatabase = StandalonePostgresql::query()->findOrFail(0);
+    expect($instanceDatabase->scheduledBackups()->sole()->team_id)->toBe(0)
+        ->and($tenantDatabase->fresh()->scheduledBackups()->exists())->toBeFalse()
+        ->and($tenantDatabase->fresh()->postgres_password)->toBe('tenant-secret');
 });

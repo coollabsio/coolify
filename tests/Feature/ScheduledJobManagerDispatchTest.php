@@ -29,6 +29,7 @@ use App\Notifications\Server\DockerCleanupFailed;
 use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -36,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -359,7 +361,7 @@ it('does not query relationships when constructing scheduled task jobs', functio
 
     expect(DB::getQueryLog())->toBeEmpty()
         ->and($job->queue)->toBe(crons_queue())
-        ->and($job->timeout)->toBe(300);
+        ->and($job->timeout)->toBe(300 + ScheduledTaskJob::WORKER_TIMEOUT_MARGIN_SECONDS);
 });
 
 it('reads current server settings in each queued manager run of the same worker', function () {
@@ -803,6 +805,40 @@ it('leaves recently enqueued occurrences alone', function () {
     expect($occurrence->fresh()->enqueued_at->toDateTimeString())->toBe('2026-09-17 11:01:00');
 });
 
+it('closes occurrences that an earlier release left enqueued without failed executions or notifications', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
+    $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => 'daily']);
+    $team = Team::find($task->team_id);
+    $team->emailNotificationSettings->update(['smtp_enabled' => true, 'scheduled_task_failure_email_notifications' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $server = $task->application->destination->server;
+    $backup = createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => 'daily']);
+
+    $legacy = [
+        createStaleEnqueuedOccurrence("scheduled-task:{$task->id}", 'scheduled-task', $task->id, Carbon::create(2026, 9, 10, 0, 0, 0, 'UTC'), minutesAgo: 7 * 24 * 60),
+        createStaleEnqueuedOccurrence("docker-cleanup:{$server->id}", 'docker-cleanup', $server->id, Carbon::create(2026, 9, 17, 9, 0, 0, 'UTC'), minutesAgo: 180),
+        createStaleEnqueuedOccurrence("scheduled-backup:{$backup->id}", 'database-backup', $backup->id, Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC')),
+    ];
+    // A recent job can still be waiting in the queue.
+    $recent = createStaleEnqueuedOccurrence("scheduled-task:{$task->id}", 'scheduled-task', $task->id, Carbon::create(2026, 9, 17, 11, 55, 0, 'UTC'), minutesAgo: 5);
+
+    (require database_path('migrations/2026_10_05_064841_close_legacy_enqueued_scheduled_job_deliveries.php'))->up();
+    (new ScheduledJobManager)->handle();
+
+    foreach ($legacy as $occurrence) {
+        expect($occurrence->fresh()->status)->toBe('skipped');
+    }
+    expect($recent->fresh()->status)->toBe('enqueued')
+        ->and(ScheduledTaskExecution::query()->exists())->toBeFalse()
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse();
+    Queue::assertNotPushed(DatabaseBackupJob::class);
+    Notification::assertNothingSent();
+});
+
 it('dispatches only the schedules of its own type', function (string $type, array $expected) {
     config(['constants.coolify.self_hosted' => true]);
     Carbon::setTestNow(Carbon::create(2026, 9, 17, 1, 0, 0, 'UTC'));
@@ -997,18 +1033,51 @@ it('does not run a scheduled task again when Redis hands it out after its worker
     expect(ScheduledTaskExecution::query()->where('scheduled_task_id', $task->id)->exists())->toBeFalse();
 });
 
-it('marks only the unfinished execution as failed when a scheduled task job fails without its execution id', function () {
+it('fails only its own execution and notifies the team when the worker timeout stops a scheduled task job', function () {
     InstanceSettings::forceCreate(['id' => 0]);
     Notification::fake();
-    $task = createScheduledApplicationTask(createScheduledTaskApplication());
-    $interrupted = ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'running', 'started_at' => now()->subHours(2)]);
-    $interrupted->forceFill(['created_at' => now()->subHours(2)])->save();
-    $later = ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'success', 'started_at' => now()->subHour(), 'finished_at' => now()->subMinutes(59)]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    $application = createScheduledTaskApplication();
+    $task = createScheduledApplicationTask($application, ['timeout' => 300]);
+    $team = Team::find($task->team_id);
+    $team->emailNotificationSettings->update(['smtp_enabled' => true, 'scheduled_task_failure_email_notifications' => true]);
+    $finished = ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'success', 'started_at' => now()->subHour(), 'finished_at' => now()->subMinutes(59)]);
+    $job = new ScheduledTaskJob($task);
+    // At the worker timeout, failed() runs on a copy rebuilt from the queued payload.
+    $queuedCopy = unserialize(serialize($job));
+    $commands = collect();
+    $atTimeout = null;
+    Process::fake(function ($process) use ($application, $task, $queuedCopy, $team, $commands, &$atTimeout) {
+        $commands->push($process->command);
+        if (str_contains($process->command, 'docker ps')) {
+            return Process::result(output: json_encode(['Names' => 'app-'.$application->uuid, 'Labels' => "coolify.applicationUuid={$application->uuid}", 'State' => 'running']));
+        }
+        if (str_contains($process->command, 'docker exec')) {
+            Carbon::setTestNow(now()->addMinute());
+            $newerRun = ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'running', 'started_at' => now()]);
+            $ownRun = ScheduledTaskExecution::query()->whereKeyNot([$newerRun->id])->where('status', 'running')->sole();
 
-    (new ScheduledTaskJob($task))->failed(new RuntimeException('worker killed'));
+            $queuedCopy->failed(new TimeoutExceededException('App\Jobs\ScheduledTaskJob has timed out.'));
 
-    expect($interrupted->fresh()->status)->toBe('failed')
-        ->and($later->fresh()->status)->toBe('success');
+            $atTimeout = [
+                'own' => $ownRun->fresh()->status,
+                'own_finished' => $ownRun->fresh()->finished_at !== null,
+                'newer' => $newerRun->fresh()->status,
+                'notifications' => Notification::sent($team, TaskFailed::class)->count(),
+            ];
+
+            throw new RuntimeException('The worker stopped the job.');
+        }
+
+        return Process::result(output: '');
+    });
+
+    expect(fn () => $job->handle())->toThrow(RuntimeException::class);
+
+    expect($atTimeout)->toBe(['own' => 'failed', 'own_finished' => true, 'newer' => 'running', 'notifications' => 1])
+        ->and($finished->fresh()->status)->toBe('success')
+        ->and($commands->first(fn (string $command) => str_contains($command, 'docker exec')))->toStartWith('timeout 300 ssh ')
+        ->and($job->timeout)->toBeGreaterThan(300);
 });
 
 it('runs a fixed-time schedule once when daylight saving time repeats its local time', function () {

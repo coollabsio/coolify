@@ -136,7 +136,7 @@ trait HasSecretManager
             return null;
         }
 
-        if (RemoteSecretReferences::containsReference($value)) {
+        if ($this->resolvesRemoteSecretReferences($environmentVariable, $value)) {
             $secrets = $this->secretManagerValues();
             $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
@@ -152,9 +152,24 @@ trait HasSecretManager
 
     public function environmentVariableUsesSecretManager(EnvironmentVariable $environmentVariable): bool
     {
-        return RemoteSecretReferences::containsReference(
+        return $this->resolvesRemoteSecretReferences(
+            $environmentVariable,
             $this->resolvedEnvironmentVariableValue($environmentVariable),
         );
+    }
+
+    /**
+     * Without a source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
+     */
+    private function resolvesRemoteSecretReferences(EnvironmentVariable $environmentVariable, ?string $value): bool
+    {
+        if (! RemoteSecretReferences::containsReference($value)) {
+            return false;
+        }
+
+        return ! $environmentVariable->is_literal
+            || $this->resolvedSecretManagerValues !== null
+            || $this->secretManagerLink()->exists();
     }
 
     private function resolvedEnvironmentVariableValue(EnvironmentVariable $environmentVariable): ?string

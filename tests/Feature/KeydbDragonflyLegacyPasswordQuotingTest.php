@@ -155,3 +155,43 @@ it('marks only databases that exist before the migration as legacy', function ()
         ->and($newKeydb->fresh()->legacy_password_quoting)->toBeFalse()
         ->and($newDragonfly->fresh()->legacy_password_quoting)->toBeFalse();
 });
+
+it('keeps the exact v4.3.23 start command when Docker Compose split or cut the unquoted legacy password', function (string $create, string $start, string $passwordColumn, string $commandFormat, string $password) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => $password]);
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+
+    $start::run($database->fresh(), new Activity);
+
+    expect(legacyPasswordQuotingStartedService($this->executor, $database->uuid)['command'])
+        ->toBe(sprintf($commandFormat, $password));
+})->with('legacy-password-quoting-engines')->with([
+    'semicolon' => 'ab;cd',
+    'space' => 'a b',
+    'tab' => "a\tb",
+    'pipe' => 'x|y',
+    'ampersand' => 'p&q',
+    'redirects' => 'a<b>',
+]);
+
+it('quotes a plain legacy password, which gives Docker Compose the same argument as v4.3.23', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'abc']);
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+
+    $start::run($database->fresh(), new Activity);
+
+    expect(legacyPasswordQuotingStartedService($this->executor, $database->uuid)['command'])
+        ->toBe(sprintf($commandFormat, "'abc'"));
+})->with('legacy-password-quoting-engines');
+
+it('quotes shell control characters in the password of a database created after the upgrade', function (string $create, string $start, string $passwordColumn, string $commandFormat, string $password) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => $password]);
+
+    $start::run($database->fresh(), new Activity);
+
+    expect(legacyPasswordQuotingStartedService($this->executor, $database->uuid)['command'])
+        ->toBe(sprintf($commandFormat, escapeshellarg($password)));
+})->with('legacy-password-quoting-engines')->with([
+    'semicolon' => 'ab;cd',
+    'space' => 'a b',
+    'pipe' => 'x|y',
+]);

@@ -6,10 +6,12 @@ use App\Data\Traffic\TrafficBreakdownData;
 use App\Data\Traffic\TrafficOverviewData;
 use App\Data\Traffic\TrafficPathData;
 use App\Data\Traffic\TrafficSeriesBucketData;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 
 class SentinelTrafficClient
 {
@@ -23,6 +25,17 @@ class SentinelTrafficClient
      * than the data cache: every probe on an older Sentinel costs one or two wasted execs.
      */
     public const RESOURCE_SCOPE_ABSENCE_TTL = 300;
+
+    /**
+     * Matches the "Live" poll interval, so a dead server costs at most one timed-out fetch per minute.
+     */
+    public const UNAVAILABLE_TTL = 60;
+
+    /** Upper bound in seconds of one SSH round-trip (connect, docker exec, every curl). */
+    private const REMOTE_TIMEOUT = 20;
+
+    /** Bounds each curl inside the Sentinel container, so a stuck Sentinel cannot hold the SSH session. */
+    private const CURL_TIMEOUT_OPTIONS = '--connect-timeout 3 --max-time 10';
 
     /** Path segment of the per-key routes: `/api/app/{key}/traffic/...`. */
     private const SCOPE_APP = 'app';
@@ -749,11 +762,12 @@ class SentinelTrafficClient
 
     protected function remoteFetch(string $url): string
     {
+        $this->ensureRemoteAvailable();
         $token = $this->server->settings->ensureValidSentinelToken();
 
         // Throw the real SSH/docker error (for example, an unreadable SSH key or a missing
-        // container). A literal "null" body comes back as null; guard() rejects the empty string.
-        return instant_remote_process([$this->buildFetchCommand($token, $url)], $this->server) ?? '';
+        // container). A literal "null" body comes back empty; guard() rejects the empty string.
+        return $this->runRemote($this->buildFetchCommand($token, $url));
     }
 
     /**
@@ -761,9 +775,55 @@ class SentinelTrafficClient
      */
     protected function batchRemoteFetch(array $urls): string
     {
+        $this->ensureRemoteAvailable();
         $token = $this->server->settings->ensureValidSentinelToken();
 
-        return instant_remote_process([$this->buildBatchCommand($token, $urls)], $this->server) ?? '';
+        return $this->runRemote($this->buildBatchCommand($token, $urls));
+    }
+
+    /**
+     * Page loads and "Live" polls must not wait on a dead server.
+     */
+    private function ensureRemoteAvailable(): void
+    {
+        if (Cache::get($this->unavailableKey()) === true) {
+            throw new \RuntimeException('Traffic analytics is temporarily unavailable on this server.');
+        }
+
+        if (! $this->server->isFunctional()) {
+            throw new \RuntimeException('Server is not reachable.');
+        }
+    }
+
+    /**
+     * Unlike instant_remote_process(), there are no SSH retries; a failure marks the server unavailable.
+     */
+    private function runRemote(string $command): string
+    {
+        $commands = $this->server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $this->server) : [$command];
+
+        try {
+            $process = Process::timeout(self::REMOTE_TIMEOUT)->run(
+                SshMultiplexingHelper::generateSshCommand($this->server, implode("\n", $commands), commandTimeout: self::REMOTE_TIMEOUT)
+            );
+
+            if ($process->exitCode() !== 0) {
+                excludeCertainErrors($process->errorOutput(), $process->exitCode());
+            }
+        } catch (\Throwable $e) {
+            Cache::put($this->unavailableKey(), true, self::UNAVAILABLE_TTL);
+
+            throw $e;
+        }
+
+        $output = trim($process->output());
+
+        return $output === 'null' ? '' : sanitize_utf8_text($output);
+    }
+
+    private function unavailableKey(): string
+    {
+        return 'traffic:unavailable:'.$this->server->uuid;
     }
 
     /**
@@ -777,7 +837,7 @@ class SentinelTrafficClient
      */
     protected function buildFetchCommand(string $token, string $url): string
     {
-        return "docker exec -i coolify-sentinel curl -sS -H @- \"{$url}\"".$this->authorizationHeredoc($token);
+        return 'docker exec -i coolify-sentinel curl -sS '.self::CURL_TIMEOUT_OPTIONS." -H @- \"{$url}\"".$this->authorizationHeredoc($token);
     }
 
     /**
@@ -791,7 +851,7 @@ class SentinelTrafficClient
     protected function buildBatchCommand(string $token, array $urls): string
     {
         $script = implode("\n", array_map(
-            fn ($url) => "curl -s -H @- \"{$url}\"".$this->authorizationHeredoc($token)."\nprintf '\\036'",
+            fn ($url) => 'curl -s '.self::CURL_TIMEOUT_OPTIONS." -H @- \"{$url}\"".$this->authorizationHeredoc($token)."\nprintf '\\036'",
             $urls
         ));
 

@@ -2476,7 +2476,7 @@ class ServicesController extends Controller
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
-                            'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. Coolify never deletes a path outside the resource directory.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -2605,9 +2605,9 @@ class ServicesController extends Controller
             }
 
             try {
-                $fsPath = confinePathToBase(service_configuration_dir().'/'.$service->uuid, $request->fs_path, 'storage source path');
+                $fsPath = LocalFileVolume::resolveHostPath(service_configuration_dir().'/'.$service->uuid, $request->fs_path, 'storage source path');
                 $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
-                LocalFileVolume::assertRemotePathIsConfined($service->workdir(), $fsPath, $service->server);
+                LocalFileVolume::assertHostPathOnServer(service_configuration_dir().'/'.$service->uuid, $fsPath, $service->server, isDirectory: true);
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -2659,11 +2659,24 @@ class ServicesController extends Controller
         } else {
             try {
                 $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
-                $fsPath = confineFileMountPath(service_configuration_dir().'/'.$service->uuid, $mountPath, 'file storage path');
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            try {
+                if ($request->filled('fs_path')) {
+                    $fsPath = LocalFileVolume::resolveHostPath(service_configuration_dir().'/'.$service->uuid, $request->fs_path, 'file storage source path');
+                    LocalFileVolume::assertHostPathOnServer(service_configuration_dir().'/'.$service->uuid, $fsPath, $service->server, isDirectory: false);
+                } else {
+                    $fsPath = confineFileMountPath(service_configuration_dir().'/'.$service->uuid, $mountPath, 'file storage path');
+                }
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
             }
 

@@ -10,7 +10,9 @@ use App\Services\TrafficAnalyticsAggregator;
 use App\Services\TrafficResource;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 
 /**
  * Traffic analytics tab of one resource (Application or Service). A resource can record
@@ -28,6 +30,7 @@ abstract class ResourceTrafficAnalytics extends Component
 
     public bool $enabled = false;
 
+    #[Locked]
     public ?string $analyticsServerUuid = null;
 
     // Realtime refresh. Off by default (click "Live" to arm it). Only meaningful on the
@@ -87,6 +90,14 @@ abstract class ResourceTrafficAnalytics extends Component
         if ($this->enabled) {
             $this->loadData();
         }
+    }
+
+    /**
+     * Subclasses redeclare $chartId, which drops #[Locked], so the lock is enforced here.
+     */
+    public function updatingChartId(): void
+    {
+        throw new CannotUpdateLockedPropertyException('chartId');
     }
 
     public function setRange(string $range): void

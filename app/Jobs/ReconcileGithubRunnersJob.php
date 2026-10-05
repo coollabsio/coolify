@@ -49,7 +49,20 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
             ->filter(fn (Server $server) => $server->isFunctional())
             ->each(fn (Server $server) => $this->reconcileServer($server));
 
+        $this->removeRunnersOfDeletedServers();
         $this->reconcileQueued();
+    }
+
+    /**
+     * Older versions left occupying executions of a deleted server active, which blocked deleting the App.
+     */
+    private function removeRunnersOfDeletedServers(): void
+    {
+        GithubRunnerExecution::deleteAndDeregister(
+            GithubRunnerExecution::query()
+                ->whereNull('server_id')
+                ->whereIn('status', GithubRunnerStatus::occupying())
+        );
     }
 
     private function reconcileServer(Server $server): void

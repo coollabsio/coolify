@@ -95,10 +95,6 @@ class Github extends Controller
                 default => $base_branch,
             };
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'github', $full_name, $matched_branch);
-            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
-                return $this->tooManyManualWebhookFailuresResponse($failure_key);
-            }
-
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
             $applications = Application::query();
@@ -276,6 +272,11 @@ class Github extends Controller
         if ($jobId <= 0) {
             return response('Nothing to do. No workflow job found.');
         }
+        // A public App can be installed by other accounts; only its own installation may use the runners.
+        $installationId = data_get($payload, 'installation.id');
+        if (blank($githubApp->installation_id) || ! is_numeric($installationId) || (int) $installationId !== (int) $githubApp->installation_id) {
+            return response('Nothing to do. The job belongs to another installation of the GitHub App.');
+        }
 
         $jobDetails = array_filter([
             'workflow_job_id' => $jobId,
@@ -294,13 +295,15 @@ class Github extends Controller
             if ($matchingConfigs->isEmpty()) {
                 return response('Nothing to do. No runner configuration matches the job labels.');
             }
-            if (! $matchingConfigs->contains('allow_pull_requests', true) && $this->isPullRequestWorkflowJob($githubApp, $payload)) {
+            $isPullRequest = $matchingConfigs->contains(fn (GithubRunnerConfig $config) => ! $config->allow_pull_requests)
+                && $this->isPullRequestWorkflowJob($githubApp, $payload);
+            if ($isPullRequest && ! $matchingConfigs->contains('allow_pull_requests', true)) {
                 return response('Nothing to do. The runner configuration does not allow pull request jobs.');
             }
 
             $execution = GithubRunnerExecution::createOrFirst(
                 ['github_app_id' => $githubApp->id, 'trigger_workflow_job_id' => $jobId],
-                [...$jobDetails, 'labels' => $labels, 'status' => GithubRunnerStatus::Queued, 'queued_at' => now()],
+                [...$jobDetails, 'labels' => $labels, 'is_pull_request' => $isPullRequest, 'status' => GithubRunnerStatus::Queued, 'queued_at' => now()],
             );
             if ($execution->wasRecentlyCreated) {
                 ProvisionGithubRunnerJob::dispatch($execution->id);

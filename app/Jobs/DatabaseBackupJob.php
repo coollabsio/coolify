@@ -32,6 +32,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Activity;
@@ -40,6 +41,11 @@ use Throwable;
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * Lets a backup that runs too long fail inside handle() before the worker times out.
+     */
+    public const WORKER_TIMEOUT_MARGIN_SECONDS = 120;
 
     public $maxExceptions = 1;
 
@@ -79,14 +85,20 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?S3Storage $s3 = null;
 
-    public $timeout = 3600;
+    public $timeout = 3600 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?string $backup_log_uuid = null;
+
+    /**
+     * Queued with the payload, so failed() finds this run's executions after a worker timeout.
+     */
+    public ?string $executionUuidPrefix = null;
 
     public function __construct(public ScheduledDatabaseBackup $backup, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
-        $this->timeout = $backup->timeout ?? 3600;
+        $this->timeout = ($backup->timeout ?? 3600) + self::WORKER_TIMEOUT_MARGIN_SECONDS;
+        $this->executionUuidPrefix = new_public_id(16);
     }
 
     public function middleware(): array
@@ -314,7 +326,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
                 do {
-                    $this->backup_log_uuid = new_public_id();
+                    $this->backup_log_uuid = $this->executionUuidPrefix === null ? new_public_id() : $this->executionUuidPrefix.new_public_id(8);
                     $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
                     $attempts++;
                     if ($attempts >= 3 && $exists) {
@@ -547,6 +559,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function commandTimeout(): int
+    {
+        return (int) ($this->backup->timeout ?? 3600);
+    }
+
     private function backupFilenamePart(string $database): string
     {
         return preg_replace('/[^A-Za-z0-9_.-]/', '-', $database);
@@ -617,7 +634,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -674,7 +691,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $commands[] = $backupCommand;
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -701,7 +718,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -728,7 +745,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -751,7 +768,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 backupDirectory: $this->backup_dir,
             );
 
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -775,7 +792,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' \'.timeout 10000\' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
             $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
             $commands[] = $this->buildCompressedDumpCommand($dumpCommand, escapeshellarg($this->backup_location));
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -865,7 +882,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
-            instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
 
             $this->s3_uploaded = true;
         } catch (Throwable $e) {
@@ -1016,29 +1033,32 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             'trace' => $exception?->getTraceAsString(),
         ]);
 
-        $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+        // After a worker timeout this runs on a fresh job copy without the state handle() set.
+        $this->team ??= Team::find($this->backup->team_id);
+        $executions = $this->executionsOfThisRun();
 
-        if ($log) {
-            // Don't overwrite a successful backup status — a post-backup error
-            // (e.g. notification failure) should not retroactively mark the backup
-            // as failed (see GitHub issue #9088)
-            if ($log->status !== 'success') {
-                $log->update([
-                    'status' => 'failed',
-                    'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
-                    'size' => 0,
-                    'filename' => null,
-                    'finished_at' => Carbon::now(),
-                ]);
-            }
+        // Don't overwrite a finished execution: handle() already reported it, and a post-backup
+        // error (e.g. notification failure) must not mark a successful backup as failed (#9088).
+        $unfinished = $executions->whereNotIn('status', ['success', 'failed']);
+        foreach ($unfinished as $execution) {
+            $execution->update([
+                'status' => 'failed',
+                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
+                'size' => 0,
+                'filename' => null,
+                'finished_at' => Carbon::now(),
+            ]);
         }
 
-        // Notify team about permanent failure (only if backup didn't already succeed)
-        if ($this->team && $log?->status !== 'success') {
-            $databaseName = $log?->database_name ?? 'unknown';
-            $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
+        if ($executions->isNotEmpty() && $unfinished->isEmpty()) {
+            return;
+        }
+
+        $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
+        $databaseNames = $unfinished->isEmpty() ? ['unknown'] : $unfinished->map(fn (ScheduledDatabaseBackupExecution $execution) => $execution->database_name ?? 'unknown');
+        foreach ($databaseNames as $databaseName) {
             try {
-                $this->team->notify(new BackupFailed($this->backup, $this->database, $output, $databaseName));
+                $this->team?->notify(new BackupFailed($this->backup, $this->backup->database, $output, $databaseName));
             } catch (Throwable $e) {
                 Log::channel('scheduled-errors')->warning('Failed to send backup permanent failure notification', [
                     'backup_id' => $this->backup->uuid,
@@ -1046,5 +1066,22 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    /**
+     * @return Collection<int, ScheduledDatabaseBackupExecution>
+     */
+    private function executionsOfThisRun(): Collection
+    {
+        if ($this->executionUuidPrefix === null && $this->backup_log_uuid === null) {
+            return collect();
+        }
+
+        return ScheduledDatabaseBackupExecution::query()
+            ->where('scheduled_database_backup_id', $this->backup->id)
+            ->where(fn ($query) => $query
+                ->when($this->executionUuidPrefix !== null, fn ($query) => $query->orWhere('uuid', 'like', $this->executionUuidPrefix.'%'))
+                ->when($this->backup_log_uuid !== null, fn ($query) => $query->orWhere('uuid', $this->backup_log_uuid)))
+            ->get();
     }
 }

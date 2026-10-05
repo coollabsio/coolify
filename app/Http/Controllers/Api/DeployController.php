@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
@@ -250,10 +251,6 @@ class DeployController extends Controller
         $deploymentServer = Server::whereTeamId($teamId)->find($deployment->server_id);
 
         try {
-            $deployment_uuid = $deployment->deployment_uuid;
-            $kill_command = "docker rm -f {$deployment_uuid}";
-            $build_server_id = $deployment->build_server_id ?? $deployment->server_id;
-
             // Mark deployment as cancelled
             $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
                 ->whereIn('status', $cancellableStatuses)
@@ -270,31 +267,9 @@ class DeployController extends Controller
             $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
             $cancelled = true;
 
-            // Get the server
-            $server = Server::whereTeamId($teamId)->find($build_server_id);
-
             try {
-                if ($server) {
-                    // Add cancellation log entry
-                    $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
-
-                    // Check if container exists and kill it
-                    $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
-                    $containerExists = instant_remote_process([$checkCommand], $server);
-
-                    if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                        instant_remote_process([$kill_command], $server);
-                        $deployment->addLogEntry('Deployment container stopped.');
-                    } else {
-                        $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
-                    }
-
-                    // Kill running process if process ID exists
-                    if ($deployment->current_process_id) {
-                        $processKillCommand = "kill -9 {$deployment->current_process_id}";
-                        instant_remote_process([$processKillCommand], $server);
-                    }
-                }
+                $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
+                CleanupCancelledDeployment::run($deployment, (int) $teamId);
             } catch (\Throwable $e) {
                 \Log::warning("Failed to clean up cancelled deployment {$deployment->id}: {$e->getMessage()}");
             }

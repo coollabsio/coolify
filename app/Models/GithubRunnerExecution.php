@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\GithubRunnerStatus;
+use App\Jobs\DeregisterGithubRunnerJob;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GithubRunnerExecution extends BaseModel
@@ -19,6 +21,7 @@ class GithubRunnerExecution extends BaseModel
         'job_name',
         'repository_full_name',
         'labels',
+        'is_pull_request',
         'runner_name',
         'runner_id',
         'conclusion',
@@ -39,6 +42,7 @@ class GithubRunnerExecution extends BaseModel
             'runner_id' => 'integer',
             'provision_attempts' => 'integer',
             'labels' => 'array',
+            'is_pull_request' => 'boolean',
             'queued_at' => 'datetime',
             'ready_at' => 'datetime',
             'started_at' => 'datetime',
@@ -59,6 +63,22 @@ class GithubRunnerExecution extends BaseModel
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * Deregistering the runners from GitHub is best effort and never blocks the deletion.
+     *
+     * @param  Builder<GithubRunnerExecution>  $query
+     */
+    public static function deleteAndDeregister(Builder $query): void
+    {
+        (clone $query)
+            ->whereIn('status', GithubRunnerStatus::occupying())
+            ->whereNotNull('runner_id')
+            ->get(['github_app_id', 'runner_id'])
+            ->each(fn (GithubRunnerExecution $execution) => DeregisterGithubRunnerJob::dispatch($execution->github_app_id, $execution->runner_id));
+
+        (clone $query)->delete();
     }
 
     public function isActive(): bool

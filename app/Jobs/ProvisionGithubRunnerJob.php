@@ -150,6 +150,15 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function stopIfFinished(GithubRunnerExecution $execution): bool
     {
+        // The execution is deleted together with its server.
+        if (! GithubRunnerExecution::query()->whereKey($execution->id)->exists()) {
+            if ($execution->runner_id) {
+                DeregisterGithubRunnerJob::dispatch($execution->github_app_id, $execution->runner_id);
+            }
+
+            return true;
+        }
+
         $execution->refresh();
         if ($execution->isActive()) {
             return false;
@@ -181,6 +190,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->get()
                 ->filter(fn (GithubRunnerConfig $config) => $config->server !== null
                     && $config->matchesLabels($execution->labels ?? [])
+                    && ($config->allow_pull_requests || ! $execution->is_pull_request)
                     && $config->server->isBuildServer()
                     && ! $config->server->isLocalhost()
                     && $config->server->isFunctional())

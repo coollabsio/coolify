@@ -9,6 +9,7 @@ use App\Actions\Service\StopService;
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
+use App\Exceptions\RemoteSecretException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\DatabaseStartJob;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
@@ -208,6 +209,28 @@ test('a service restart keeps the service running when remote secrets cannot be 
 
     expect(fn () => StartService::run($service, stopBeforeStart: true))
         ->toThrow(RuntimeException::class, 'Doppler is down');
+});
+
+test('a literal service variable keeps reference text when no secret manager source is configured', function () {
+    Http::fake();
+    $service = remoteSecretLifecycleService();
+    $service->secretManagerLink()->delete();
+    $service->environment_variables()->create(['key' => 'TEMPLATE', 'value' => 'Hello {{vault.NAME}}', 'is_literal' => true]);
+
+    $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
+
+    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain("TEMPLATE='Hello {{vault.NAME}}'");
+    Http::assertNothingSent();
+});
+
+test('a service start stops before the service when a non-literal variable references a secret without a source', function () {
+    StopService::shouldRun()->never();
+    $service = remoteSecretLifecycleService();
+    $service->secretManagerLink()->delete();
+    $service->environment_variables()->create(['key' => 'API_KEY', 'value' => '{{vault.API_KEY}}']);
+
+    expect(fn () => StartService::run($service, stopBeforeStart: true))
+        ->toThrow(RemoteSecretException::class, 'no secret manager source is configured');
 });
 
 test('a service restart fetches remote secrets only once', function () {

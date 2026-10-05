@@ -44,7 +44,7 @@ class EventServiceProvider extends ServiceProvider
         });
         Event::listen(Failed::class, function (Failed $event): void {
             auditLog('auth.user.login_failed', [
-                'attempted_email' => data_get($event->credentials, 'email'),
+                'attempted_email' => $this->attemptedEmailForAudit(data_get($event->credentials, 'email')),
                 'guard' => $event->guard,
             ], 'warning');
         });
@@ -72,6 +72,18 @@ class EventServiceProvider extends ServiceProvider
         Event::listen(RecoveryCodesGenerated::class, function (RecoveryCodesGenerated $event): void {
             auditLog('auth.user.recovery_codes_regenerated', $this->authContext($event->user));
         });
+    }
+
+    /**
+     * Users sometimes type a password into the email field, so only a valid email address is stored.
+     */
+    private function attemptedEmailForAudit(mixed $email): ?string
+    {
+        if (blank($email)) {
+            return null;
+        }
+
+        return is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : '[invalid]';
     }
 
     private function authContext(?object $user): array

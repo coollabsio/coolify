@@ -4290,7 +4290,7 @@ class DatabasesController extends Controller
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
-                            'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. Coolify never deletes a path outside the resource directory.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -4410,9 +4410,9 @@ class DatabasesController extends Controller
             }
 
             try {
-                $fsPath = confinePathToBase(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'storage source path');
+                $fsPath = LocalFileVolume::resolveHostPath(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'storage source path');
                 $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
-                LocalFileVolume::assertRemotePathIsConfined($database->workdir(), $fsPath, $database->destination->server);
+                LocalFileVolume::assertHostPathOnServer(database_configuration_dir().'/'.$database->uuid, $fsPath, $database->destination->server, isDirectory: true);
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -4464,11 +4464,24 @@ class DatabasesController extends Controller
         } else {
             try {
                 $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
-                $fsPath = confineFileMountPath(database_configuration_dir().'/'.$database->uuid, $mountPath, 'file storage path');
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            try {
+                if ($request->filled('fs_path')) {
+                    $fsPath = LocalFileVolume::resolveHostPath(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'file storage source path');
+                    LocalFileVolume::assertHostPathOnServer(database_configuration_dir().'/'.$database->uuid, $fsPath, $database->destination->server, isDirectory: false);
+                } else {
+                    $fsPath = confineFileMountPath(database_configuration_dir().'/'.$database->uuid, $mountPath, 'file storage path');
+                }
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
             }
 

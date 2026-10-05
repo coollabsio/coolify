@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
@@ -334,15 +335,48 @@ class EnvironmentVariable extends BaseModel
             $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
                 ? substr($value, 1, -1)
                 : $value;
-            $values[] = $unquoted;
-            $values[] = escapeBashEnvValue($unquoted);
-            $values[] = str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $unquoted);
-            if ($this->is_multiline) {
-                $values = array_merge($values, preg_split('/\r\n|\r|\n/', $unquoted) ?: []);
-            }
+            $values = array_merge($values, self::logRedactionVariants($unquoted, (bool) $this->is_multiline));
         }
 
         return array_values(array_unique(array_filter($values, static fn (string $item): bool => $item !== '')));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $secrets
+     * @return array<int, string>
+     */
+    public static function remoteSecretLogRedactionValues(array $secrets): array
+    {
+        return collect($secrets)
+            ->filter(static fn (mixed $secret): bool => is_string($secret) && $secret !== '')
+            ->flatMap(static fn (string $secret): array => [
+                ...self::logRedactionVariants($secret, preg_match('/\r|\n/', $secret) === 1),
+                RemoteSecretValueFormatter::composeFile($secret),
+            ])
+            ->filter(static fn (string $item): bool => $item !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Also covers the value inside a quoted argument such as 'KEY=value'.
+     *
+     * @return array<int, string>
+     */
+    private static function logRedactionVariants(string $value, bool $splitLines): array
+    {
+        $values = [
+            $value,
+            escapeBashEnvValue($value),
+            str_replace("'", "'\\''", $value),
+            str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $value),
+        ];
+        if ($splitLines) {
+            $values = array_merge($values, preg_split('/\r\n|\r|\n/', $value) ?: []);
+        }
+
+        return $values;
     }
 
     public function resolveReferencedValue(): ?string

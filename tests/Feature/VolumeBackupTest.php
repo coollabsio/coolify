@@ -209,6 +209,61 @@ it('shows readable service storage backup target labels', function () {
         ->assertSee('Directus: directus-templates');
 });
 
+it('assigns a new volume backup schedule to the team of its resource, not the current team', function (string $resourceType) {
+    $team = Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume, $server] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    if ($resourceType === 'service') {
+        $service = Service::factory()->create([
+            'server_id' => $server->id,
+            'environment_id' => $application->environment_id,
+            'destination_id' => $application->destination_id,
+            'destination_type' => $application->destination_type,
+        ]);
+        $serviceApplication = ServiceApplication::create(['uuid' => new_public_id(), 'name' => 'app', 'service_id' => $service->id]);
+        $volume = LocalPersistentVolume::create([
+            'name' => $service->uuid.'_app-data',
+            'mount_path' => '/data',
+            'resource_id' => $serviceApplication->id,
+            'resource_type' => $serviceApplication->getMorphClass(),
+        ]);
+        $component = Livewire::test(CreateServiceVolumeBackup::class, ['service' => $service, 'selectedTargetKey' => 'volume:'.$volume->id]);
+    } else {
+        $component = Livewire::test(CreateScheduledVolumeBackup::class, ['application' => $application, 'selectedTargetKey' => 'volume:'.$volume->id]);
+    }
+
+    $component->set('frequency', 'daily')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(ScheduledVolumeBackup::query()->sole()->team_id)->toBe($team->id);
+})->with(['application', 'service']);
+
+it('assigns a volume backup schedule saved from its settings page to the team of its resource, not the current team', function (bool $rootTeam) {
+    $team = $rootTeam ? Team::factory()->create(['id' => 0]) : Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('frequency', 'daily')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(ScheduledVolumeBackup::query()->sole()->team_id)->toBe($team->id);
+})->with([
+    'team' => [false],
+    'root team' => [true],
+]);
+
 it('handles scheduled backup persistence failures', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);

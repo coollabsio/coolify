@@ -236,6 +236,9 @@ class Server extends BaseModel
             $server->destinations()->each(function ($destination) {
                 $destination->delete();
             });
+            // Leftover active runner rows would block deleting the GitHub App.
+            GithubRunnerExecution::deleteAndDeregister(GithubRunnerExecution::query()->where('server_id', $server->id));
+            $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
