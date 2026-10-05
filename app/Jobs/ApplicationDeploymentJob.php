@@ -5667,7 +5667,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         try {
-            queue_next_deployment($this->application);
+            queue_next_deployment($this->application, $this->application_deployment_queue->server_id);
         } catch (Throwable $e) {
             $this->logStatusTransitionSideEffectFailure('Starting the next queued deployment failed', $e);
         }
