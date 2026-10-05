@@ -798,7 +798,7 @@ it('lists each cluster with its servers before servers without a cluster', funct
 
     Livewire::test(Index::class)
         ->assertSeeInOrder(['Index cluster', '1 server', 'Assigned node', 'Not in a cluster', 'Loose node'])
-        ->assertSee('203.0.113.10')
+        ->assertDontSee('203.0.113.10')
         ->assertSee('New cluster')
         ->assertSee('Pending')
         ->assertSee(route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]), escape: false)
