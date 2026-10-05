@@ -3364,6 +3364,10 @@ class DatabasesController extends Controller
                 response: 409,
                 description: 'Another start, restart or import of this database is already in progress.',
             ),
+            new OA\Response(
+                response: 422,
+                description: 'The database cannot start yet, for example because a CA certificate is missing.',
+            ),
         ]
     )]
     public function action_deploy(Request $request)
@@ -3385,6 +3389,10 @@ class DatabasesController extends Controller
 
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
+        }
+        $prerequisiteError = StartDatabase::prerequisiteError($database);
+        if ($prerequisiteError !== null) {
+            return response()->json(['message' => $prerequisiteError], 422);
         }
         $reservation = StartDatabase::reserveOperation($database);
         if ($reservation === null) {
@@ -3558,6 +3566,10 @@ class DatabasesController extends Controller
                 response: 409,
                 description: 'Another start, restart or import of this database is already in progress.',
             ),
+            new OA\Response(
+                response: 422,
+                description: 'The database cannot start yet, for example because a CA certificate is missing.',
+            ),
         ]
     )]
     public function action_restart(Request $request)
@@ -3577,6 +3589,10 @@ class DatabasesController extends Controller
 
         $this->authorize('manage', $database);
 
+        $prerequisiteError = StartDatabase::prerequisiteError($database);
+        if ($prerequisiteError !== null) {
+            return response()->json(['message' => $prerequisiteError], 422);
+        }
         $reservation = StartDatabase::reserveOperation($database);
         if ($reservation === null) {
             return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);

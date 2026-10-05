@@ -559,6 +559,11 @@ class DeployController extends Controller
                 } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to start this database.', 'deployment_uuid' => null];
                 }
+                $prerequisiteError = StartDatabase::prerequisiteError($resource);
+                if ($prerequisiteError !== null) {
+                    $message = $prerequisiteError;
+                    break;
+                }
                 $reservation = StartDatabase::reserveOperation($resource);
                 if ($reservation === null) {
                     $message = ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
