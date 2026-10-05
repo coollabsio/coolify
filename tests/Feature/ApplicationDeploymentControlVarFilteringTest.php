@@ -1326,7 +1326,7 @@ it('builds railpack variables from generic buildtime vars railpack vars and cool
     expect($variables->get('APP_ENV'))->toBe('production');
     expect($variables->get('RAILPACK_NODE_VERSION'))->toBe('20');
     expect($variables->get('RAILPACK_INSTALL_CMD'))->toBe('pnpm install --frozen-lockfile');
-    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('curl wget');
+    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('... curl wget');
     expect($variables->get('COOLIFY_RESOURCE_UUID'))->toBe($application->uuid);
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('RUNTIME_ONLY'))->toBeFalse();
@@ -1378,7 +1378,7 @@ it('builds preview railpack variables without leaking stale nixpacks vars', func
 
     expect($variables->get('PREVIEW_BUILD_FLAG'))->toBe('enabled');
     expect($variables->get('RAILPACK_NODE_VERSION'))->toBe('20');
-    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('curl wget');
+    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('... curl wget');
     expect($variables->get('COOLIFY_RESOURCE_UUID'))->toBe($application->uuid);
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('PREVIEW_RUNTIME_ONLY'))->toBeFalse();

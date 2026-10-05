@@ -2099,3 +2099,37 @@ function injectDockerComposeBuildArgs(string $command, string $buildArgsString):
 
     return $modifiedCommand ?? $command;
 }
+
+/**
+ * Run a command that uses the Railpack BuildKit builder, then stop the builder when no other
+ * process uses it. An idle buildkitd keeps the memory of earlier builds until it restarts.
+ *
+ * The lock file is in the buildx metadata directory, which all helper containers of a server share.
+ * The script has no `&&`, `||`, pipe, or `$(`, because the sudo parser would put sudo into it.
+ */
+function railpackBuilderLockedScript(string $command): string
+{
+    return 'exec 9>/root/.docker/buildx/coolify-railpack.lock; flock -s 9; '
+        ."{$command}; status=\$?; "
+        .'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi; '
+        .'exit $status';
+}
+
+/**
+ * The buildx metadata of a server, as the `docker run -v` source that the deployment helper uses.
+ */
+function railpackBuildxMetadataVolume(Server $server): string
+{
+    return isDev() && $server->isLocalhost() ? 'coolify-buildx' : '$HOME/.docker/buildx';
+}
+
+/**
+ * Run a command for the Railpack builder from a temporary helper container, then stop the builder
+ * when no build uses it.
+ */
+function railpackBuilderHelperCommand(string $buildxMetadataVolume, string $helperImage, string $command): string
+{
+    $script = railpackBuilderLockedScript($command);
+
+    return "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImage} bash -c '{$script}' 2>/dev/null || true";
+}
