@@ -2265,7 +2265,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function ensureRegistryImageForMultipleServers(): void
     {
-        if ($this->pull_request_id !== 0) {
+        if ($this->pull_request_id !== 0 || $this->application->build_pack === 'dockercompose') {
             return;
         }
         if ($this->application->additional_servers()->doesntExist()) {

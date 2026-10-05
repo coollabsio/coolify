@@ -316,10 +316,15 @@ class Github extends Controller
             ? GithubRunnerExecution::query()->where('github_app_id', $githubApp->id)->where('runner_name', $runnerName)->first()
             : null;
 
-        if ($action === 'in_progress' && $execution && in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
-            $execution->update([...$jobDetails, 'status' => GithubRunnerStatus::Running, 'started_at' => now()]);
-
-            return response('Runner marked running.');
+        // The completed hook can arrive before the in_progress hook.
+        if (in_array($action, ['in_progress', 'completed'], true) && $execution && in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
+            $replacement = $execution->assignJob($jobId, $jobDetails);
+            if ($replacement) {
+                ProvisionGithubRunnerJob::dispatch($replacement->id);
+            }
+            if ($action === 'in_progress') {
+                return response('Runner marked running.');
+            }
         }
 
         if ($action === 'completed') {

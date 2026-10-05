@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ServerStorageSaveJob;
 use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
@@ -70,7 +71,10 @@ function storageHostPathFakeServer(string $symlink = 'OK', string $exists = 'NOK
     }));
 }
 
-function storageHostPathToken(User $user): string
+/**
+ * @param  list<string>  $abilities
+ */
+function storageHostPathToken(User $user, array $abilities = ['*']): string
 {
     // A token request must not use the session user of the Livewire tests.
     auth()->forgetGuards();
@@ -78,7 +82,7 @@ function storageHostPathToken(User $user): string
     $token = $user->tokens()->create([
         'name' => 'host-path-token',
         'token' => hash('sha256', $plainTextToken),
-        'abilities' => ['*'],
+        'abilities' => $abilities,
         'team_id' => test()->team->id,
     ]);
 
@@ -363,3 +367,85 @@ test('relative host paths stay inside the resource directory', function () {
     Process::assertRan(fn ($process) => str_contains($process->command, 'readlink -f')
         && str_contains($process->command, "'{$workdir}' '{$workdir}/data/zz'"));
 });
+
+test('a token without deploy cannot create a mount outside the resource directory', function (string $resourceType, array $mount) {
+    [$url, $payload] = storageHostPathApiTarget($resourceType);
+
+    $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin, ['read', 'write'])])
+        ->postJson($url, [...$payload, 'type' => 'file', ...$mount])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Missing required permissions: deploy. A mount outside the resource directory needs a token with the deploy permission.');
+
+    expect(LocalFileVolume::query()->count())->toBe(0);
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    Process::assertNothingRan();
+})->with(['application', 'database', 'service'])->with([
+    'directory' => [['is_directory' => true, 'fs_path' => '/root/.ssh', 'mount_path' => '/data']],
+    'file with content' => [['fs_path' => '/root/.ssh/authorized_keys', 'mount_path' => '/etc/keys', 'content' => 'ssh-ed25519 AAAA']],
+    'empty file' => [['fs_path' => '/etc/zz/app.conf', 'mount_path' => '/etc/app.conf']],
+]);
+
+test('a deploy or root token creates a mount outside the resource directory', function (string $resourceType, array $abilities) {
+    [$url, $payload, $resource] = storageHostPathApiTarget($resourceType);
+    $token = storageHostPathToken($this->admin, $abilities);
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($url, [...$payload, 'type' => 'file', 'is_directory' => true, 'fs_path' => '/srv/zz', 'mount_path' => '/data'])
+        ->assertCreated();
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($url, [...$payload, 'type' => 'file', 'fs_path' => '/etc/zz/app.conf', 'mount_path' => '/etc/app.conf', 'content' => 'listen 8080;'])
+        ->assertCreated();
+
+    expect($resource->fileStorages()->orderBy('id')->pluck('fs_path')->all())->toBe(['/srv/zz', '/etc/zz/app.conf']);
+})->with(['application', 'database', 'service'])->with([
+    'deploy' => [['read', 'write', 'deploy']],
+    'root' => [['root']],
+]);
+
+test('a write token creates mounts inside the resource directory', function (string $resourceType) {
+    [$url, $payload, $resource] = storageHostPathApiTarget($resourceType);
+    $token = storageHostPathToken($this->admin, ['read', 'write']);
+    $workdir = $resource instanceof ServiceApplication ? $resource->service->workdir() : $resource->workdir();
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($url, [...$payload, 'type' => 'file', 'is_directory' => true, 'fs_path' => 'data/zz', 'mount_path' => '/data'])
+        ->assertCreated();
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($url, [...$payload, 'type' => 'file', 'fs_path' => $workdir.'/config/app.conf', 'mount_path' => '/etc/app.conf', 'content' => 'listen 8080;'])
+        ->assertCreated();
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($url, [...$payload, 'type' => 'file', 'mount_path' => '/etc/other.conf', 'content' => 'listen 8081;'])
+        ->assertCreated();
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($url, [...$payload, 'type' => 'file', 'is_host_file' => true, 'fs_path' => '/etc/hosts', 'mount_path' => '/etc/hosts'])
+        ->assertCreated();
+
+    expect($resource->fileStorages()->count())->toBe(4);
+})->with(['application', 'database', 'service']);
+
+test('changing the content of a mount outside the resource directory needs deploy', function (string $resourceType) {
+    [$url, , $resource] = storageHostPathApiTarget($resourceType);
+    $storage = LocalFileVolume::create([
+        'fs_path' => '/etc/zz/app.conf',
+        'mount_path' => '/etc/app.conf',
+        'content' => 'listen 8080;',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+
+    $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin, ['read', 'write'])])
+        ->patchJson($url, ['type' => 'file', 'uuid' => $storage->uuid, 'content' => 'ssh-ed25519 AAAA'])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Missing required permissions: deploy. A mount outside the resource directory needs a token with the deploy permission.');
+    expect($storage->fresh()->content)->toBe('listen 8080;');
+
+    $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin, ['read', 'write'])])
+        ->patchJson($url, ['type' => 'file', 'uuid' => $storage->uuid, 'mount_path' => '/etc/app2.conf', 'content' => 'listen 8080;'])
+        ->assertOk();
+    expect($storage->fresh()->mount_path)->toBe('/etc/app2.conf');
+
+    $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin, ['read', 'write', 'deploy'])])
+        ->patchJson($url, ['type' => 'file', 'uuid' => $storage->uuid, 'content' => 'listen 9090;'])
+        ->assertOk();
+    expect($storage->fresh()->content)->toBe('listen 9090;');
+})->with(['application', 'database', 'service']);

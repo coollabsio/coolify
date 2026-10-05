@@ -251,14 +251,21 @@ class StartKeydb
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->keydb_password;
         foreach ($this->database->runtime_environment_variables as $env) {
+            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+            if ($env->key === 'REDIS_PASSWORD' && ! $env->is_shared && ! $usesSecretManager) {
+                $env->update(['value' => $this->database->keydb_password]);
+            }
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             // Credentials below are placed directly in the compose file (healthcheck, command).
             $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
+                if ($env->is_shared && ! $usesSecretManager) {
+                    $this->database->update(['keydb_password' => $rawValue]);
+                }
                 $this->resolvedRedisPassword = $composeFileValue;
-                $this->redisPasswordFromSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+                $this->redisPasswordFromSecretManager = $usesSecretManager;
             }
         }
 

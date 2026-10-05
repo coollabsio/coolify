@@ -2676,6 +2676,7 @@ it('dispatches pending recovery for an execution at most once every five minutes
     Queue::fake();
     $team = Team::factory()->create();
     [$application, $volume] = createVolumeBackupApplication($team);
+    $application->destination->server->settings()->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
     $backup = $volume->scheduledBackups()->create([
         'team_id' => $team->id,
         'frequency' => 'daily',

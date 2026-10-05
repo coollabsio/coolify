@@ -4,8 +4,11 @@ namespace App\Models;
 
 use App\Enums\GithubRunnerStatus;
 use App\Jobs\DeregisterGithubRunnerJob;
+use App\Jobs\ProvisionGithubRunnerJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GithubRunnerExecution extends BaseModel
 {
@@ -79,6 +82,65 @@ class GithubRunnerExecution extends BaseModel
             ->each(fn (GithubRunnerExecution $execution) => DeregisterGithubRunnerJob::dispatch($execution->github_app_id, $execution->runner_id));
 
         (clone $query)->delete();
+    }
+
+    /**
+     * Marks the runner running. When a job without a pending runner took it, returns a new queued execution for the original job.
+     *
+     * @param  array<string, mixed>  $jobDetails
+     */
+    public function assignJob(int $jobId, array $jobDetails): ?self
+    {
+        $replacement = DB::transaction(function () use ($jobId, $jobDetails): ?self {
+            $execution = self::query()->whereKey($this->id)->lockForUpdate()->first();
+            if (! $execution || ! in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
+                return null;
+            }
+
+            $running = [...$jobDetails, 'workflow_job_id' => $jobId, 'status' => GithubRunnerStatus::Running, 'started_at' => now()];
+            $jobExecution = $execution->trigger_workflow_job_id === $jobId ? $execution : self::query()
+                ->where('github_app_id', $execution->github_app_id)
+                ->where('trigger_workflow_job_id', $jobId)
+                ->lockForUpdate()
+                ->first();
+            if ($jobExecution?->isActive()) {
+                $execution->update($running);
+
+                return null;
+            }
+
+            $replacement = [
+                ...$execution->only(['github_app_id', 'trigger_workflow_job_id', 'workflow_job_html_url', 'workflow_name', 'job_name', 'repository_full_name', 'labels', 'is_pull_request', 'provision_attempts']),
+                'workflow_job_id' => $execution->trigger_workflow_job_id,
+                'status' => GithubRunnerStatus::Queued,
+                'queued_at' => now(),
+            ];
+            $jobExecution?->delete();
+            $execution->update([...$running, 'trigger_workflow_job_id' => $jobId]);
+
+            if ($replacement['provision_attempts'] >= ProvisionGithubRunnerJob::MAX_ATTEMPTS) {
+                Log::warning('GitHub runner taken by another job too often; no new runner is started.', [
+                    'github_app_id' => $execution->github_app_id,
+                    'workflow_job_id' => $replacement['trigger_workflow_job_id'],
+                    'attempts' => $replacement['provision_attempts'],
+                ]);
+
+                return null;
+            }
+
+            $hasMatchingConfig = GithubRunnerConfig::query()
+                ->where('github_app_id', $execution->github_app_id)
+                ->where('is_enabled', true)
+                ->get()
+                ->contains(fn (GithubRunnerConfig $config) => $config->matchesLabels($replacement['labels'] ?? [])
+                    && ($config->allow_pull_requests || ! $replacement['is_pull_request']));
+
+            return $hasMatchingConfig ? self::create($replacement) : null;
+        });
+
+        $this->refresh();
+
+        return $replacement;
     }
 
     public function isActive(): bool

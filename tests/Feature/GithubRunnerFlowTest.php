@@ -270,6 +270,154 @@ describe('workflow_job webhook', function () {
             ->and($execution->started_at)->not->toBeNull();
     });
 
+    it('starts a new runner for the job whose runner another job took', function () {
+        $stolen = runnerTestExecution($this->githubApp, [
+            'trigger_workflow_job_id' => 5001,
+            'workflow_job_id' => 5001,
+            'job_name' => 'build',
+            'status' => GithubRunnerStatus::Idle,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-a',
+            'provision_attempts' => 1,
+        ]);
+
+        foreach ([1, 2] as $delivery) {
+            sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'in_progress', [
+                'id' => 6001,
+                'name' => 'pr-test',
+                'runner_name' => 'coolify-runner-a',
+            ])->assertOk();
+        }
+
+        $stolen->refresh();
+        $replacement = GithubRunnerExecution::query()->where('trigger_workflow_job_id', 5001)->sole();
+        expect($stolen->status)->toBe(GithubRunnerStatus::Running)
+            ->and($stolen->trigger_workflow_job_id)->toBe(6001)
+            ->and($stolen->workflow_job_id)->toBe(6001)
+            ->and($replacement->id)->not->toBe($stolen->id)
+            ->and($replacement->status)->toBe(GithubRunnerStatus::Queued)
+            ->and($replacement->job_name)->toBe('build')
+            ->and($replacement->labels)->toBe(['self-hosted', 'coolify'])
+            ->and($replacement->provision_attempts)->toBe(1);
+        Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
+        Queue::assertPushed(ProvisionGithubRunnerJob::class, fn ($job) => $job->executionId === $replacement->id);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'completed', [
+            'id' => 6001,
+            'runner_name' => 'coolify-runner-a',
+            'conclusion' => 'success',
+        ])->assertOk();
+
+        expect($stolen->fresh()->status)->toBe(GithubRunnerStatus::Completed)
+            ->and($replacement->fresh()->status)->toBe(GithubRunnerStatus::Queued);
+    });
+
+    it('starts a new runner when the completed hook of the other job arrives before its in_progress hook', function () {
+        $stolen = runnerTestExecution($this->githubApp, [
+            'trigger_workflow_job_id' => 5001,
+            'status' => GithubRunnerStatus::Idle,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-a',
+            'provision_attempts' => 1,
+        ]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'completed', [
+            'id' => 6001,
+            'runner_name' => 'coolify-runner-a',
+            'conclusion' => 'success',
+        ])->assertOk();
+
+        expect($stolen->fresh()->status)->toBe(GithubRunnerStatus::Completed)
+            ->and($stolen->fresh()->trigger_workflow_job_id)->toBe(6001)
+            ->and(GithubRunnerExecution::query()->where('trigger_workflow_job_id', 5001)->sole()->status)->toBe(GithubRunnerStatus::Queued);
+        Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
+    });
+
+    it('replaces a stale execution of the job that took the runner', function () {
+        $stale = runnerTestExecution($this->githubApp, ['trigger_workflow_job_id' => 6001, 'status' => GithubRunnerStatus::TimedOut]);
+        $stolen = runnerTestExecution($this->githubApp, [
+            'trigger_workflow_job_id' => 5001,
+            'status' => GithubRunnerStatus::Idle,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-a',
+            'provision_attempts' => 1,
+        ]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'in_progress', [
+            'id' => 6001,
+            'runner_name' => 'coolify-runner-a',
+        ])->assertOk();
+
+        expect($stale->fresh())->toBeNull()
+            ->and($stolen->fresh()->trigger_workflow_job_id)->toBe(6001)
+            ->and(GithubRunnerExecution::query()->where('trigger_workflow_job_id', 5001)->sole()->status)->toBe(GithubRunnerStatus::Queued);
+        Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
+    });
+
+    it('does not start a new runner when the runner took another job with its own pending runner', function () {
+        $first = runnerTestExecution($this->githubApp, [
+            'trigger_workflow_job_id' => 5001,
+            'status' => GithubRunnerStatus::Idle,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-a',
+        ]);
+        $second = runnerTestExecution($this->githubApp, ['trigger_workflow_job_id' => 6001]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'in_progress', [
+            'id' => 6001,
+            'runner_name' => 'coolify-runner-a',
+        ])->assertOk();
+
+        expect(GithubRunnerExecution::count())->toBe(2)
+            ->and($first->fresh()->status)->toBe(GithubRunnerStatus::Running)
+            ->and($first->fresh()->workflow_job_id)->toBe(6001)
+            ->and($second->fresh()->status)->toBe(GithubRunnerStatus::Queued);
+        Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
+    });
+
+    it('does not start a new runner for a job whose runner was taken', function (Closure $setup, array $attributes) {
+        $setup();
+        $stolen = runnerTestExecution($this->githubApp, [
+            'trigger_workflow_job_id' => 5001,
+            'status' => GithubRunnerStatus::Idle,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-a',
+            'provision_attempts' => 1,
+            ...$attributes,
+        ]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'in_progress', [
+            'id' => 6001,
+            'runner_name' => 'coolify-runner-a',
+        ])->assertOk();
+
+        expect(GithubRunnerExecution::count())->toBe(1)
+            ->and($stolen->fresh()->status)->toBe(GithubRunnerStatus::Running);
+        Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
+    })->with([
+        'runner limit of the job reached' => [fn () => null, ['provision_attempts' => ProvisionGithubRunnerJob::MAX_ATTEMPTS]],
+        'configuration disabled' => [fn () => GithubRunnerConfig::query()->update(['is_enabled' => false]), []],
+        'pull request job no longer allowed' => [fn () => null, ['is_pull_request' => true]],
+    ]);
+
+    it('marks the runner running without a new runner when it took the job it was started for', function () {
+        $execution = runnerTestExecution($this->githubApp, [
+            'trigger_workflow_job_id' => 5001,
+            'status' => GithubRunnerStatus::Idle,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-a',
+        ]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'in_progress', ['runner_name' => 'coolify-runner-a'])->assertOk();
+
+        $execution->refresh();
+        expect(GithubRunnerExecution::count())->toBe(1)
+            ->and($execution->status)->toBe(GithubRunnerStatus::Running)
+            ->and($execution->trigger_workflow_job_id)->toBe(5001)
+            ->and($execution->workflow_job_id)->toBe(5001);
+        Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
+    });
+
     it('completes the runner and queues its cleanup', function () {
         $execution = runnerTestExecution($this->githubApp, [
             'status' => GithubRunnerStatus::Running,
