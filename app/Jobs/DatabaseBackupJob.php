@@ -323,6 +323,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
             foreach ($databasesToBackup as $database) {
+                // Reset per-database state, so a failure before this database's execution exists
+                // does not mark the previous database's execution failed or delete its backup file.
+                $this->backup_log = null;
+                $this->backup_location = null;
+                $this->backup_output = null;
+                $this->error_output = null;
+
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
                 do {
