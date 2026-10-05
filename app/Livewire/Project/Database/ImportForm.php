@@ -216,7 +216,16 @@ class ImportForm extends Component
             return null;
         }
 
-        return Server::ownedByCurrentTeam()->find($this->serverId);
+        return Server::query()->where('team_id', $this->resourceTeamId())->find($this->serverId);
+    }
+
+    /**
+     * Team of the loaded database. The session team can differ: a user can switch teams in
+     * another tab while this form stays open.
+     */
+    private function resourceTeamId(): ?int
+    {
+        return $this->resource?->team()?->id;
     }
 
     protected $listeners = [
@@ -467,7 +476,7 @@ class ImportForm extends Component
             $source = Storage::exists("upload/{$this->resourceUuid}/restore")
                 ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers)
                 : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
-            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
@@ -497,7 +506,7 @@ class ImportForm extends Component
     public function loadAvailableS3Storages()
     {
         try {
-            $this->availableS3Storages = S3Storage::ownedByCurrentTeam(['id', 'name', 'description'])
+            $this->availableS3Storages = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId(), ['id', 'name', 'description'])
                 ->where('is_usable', true)
                 ->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description])
@@ -551,7 +560,7 @@ class ImportForm extends Component
         }
 
         try {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
+            $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
 
             // Validate bucket name early
             if (! $this->validateBucketName($s3Storage->bucket)) {
@@ -629,7 +638,7 @@ class ImportForm extends Component
         try {
             $this->importRunning = true;
             $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
-            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');

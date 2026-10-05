@@ -184,18 +184,20 @@ class ConnectApplication extends Component
     }
 
     /**
-     * Applications owned by the current team that run on the same server as the database.
+     * Applications of the database's team that run on the same server as the database. The session
+     * team can differ: a user can switch teams in another tab while this component is still open.
      *
      * @return Collection<int, Application>
      */
     private function connectableApplications(): Collection
     {
         $serverId = $this->database->destination?->server_id;
-        if ($serverId === null) {
+        $teamId = $this->database->team()?->id;
+        if ($serverId === null || $teamId === null) {
             return collect();
         }
 
-        return Application::ownedByCurrentTeam()
+        return Application::ownedByCurrentTeamAPI($teamId)
             ->with(['destination', 'environment.project'])
             ->get()
             ->filter(fn (Application $application) => $application->destination?->server_id === $serverId)

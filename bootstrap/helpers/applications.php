@@ -116,9 +116,15 @@ function queue_application_deployment(Application $application, string $deployme
     }
 
     if ($admission['started']) {
-        ApplicationDeploymentJob::dispatch(
-            application_deployment_queue_id: $deployment->id,
-        );
+        try {
+            ApplicationDeploymentJob::dispatch(
+                application_deployment_queue_id: $deployment->id,
+            );
+        } catch (Throwable $exception) {
+            fail_undispatchable_deployment($deployment, $exception);
+
+            throw $exception;
+        }
     }
 
     return [
@@ -136,10 +142,23 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment): bool
 {
     return start_queued_deployment($deployment, force: true);
 }
-function queue_next_deployment(Application $application)
+/**
+ * Start the queued deployments that can run now on the application's primary server, on the
+ * server of the deployment that just ended (an additional server), and on every other server
+ * with a queued deployment of this application, because those waited for this one to end.
+ */
+function queue_next_deployment(Application $application, ?int $finished_deployment_server_id = null)
 {
-    $server_id = $application->destination->server_id;
-    $queued_deployments = ApplicationDeploymentQueue::where('server_id', $server_id)
+    $application_queued_server_ids = ApplicationDeploymentQueue::where('application_id', $application->id)
+        ->where('status', ApplicationDeploymentStatus::QUEUED)
+        ->distinct()
+        ->pluck('server_id');
+    $server_ids = collect([$application->destination->server_id, $finished_deployment_server_id])
+        ->merge($application_queued_server_ids)
+        ->filter(fn ($server_id) => $server_id !== null)
+        ->unique()
+        ->values();
+    $queued_deployments = ApplicationDeploymentQueue::whereIn('server_id', $server_ids)
         ->where('status', ApplicationDeploymentStatus::QUEUED)
         ->get()
         ->sortBy('created_at');

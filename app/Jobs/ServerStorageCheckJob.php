@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Notifications\Server\HighDiskUsage;
 use Illuminate\Bus\Queueable;
@@ -59,6 +60,9 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
             if ($this->percentage > $serverDiskUsageNotificationThreshold) {
                 $team->notify(new HighDiskUsage($this->server, $this->percentage, $serverDiskUsageNotificationThreshold));
+            } else {
+                // Usage recovered: the next spike should alert again instead of waiting for the interval.
+                NotificationThrottle::release($this->server, HighDiskUsage::class);
             }
         } catch (\Throwable $e) {
             return handleError($e);

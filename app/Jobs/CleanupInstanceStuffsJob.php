@@ -23,6 +23,12 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
 
     public $timeout = 60;
 
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), so the next run every one or
+     * two minutes is not blocked until the queue retry_after.
+     */
+    public int $uniqueFor = 60;
+
     public function __construct() {}
 
     public function middleware(): array

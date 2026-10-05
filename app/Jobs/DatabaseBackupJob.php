@@ -323,6 +323,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
             foreach ($databasesToBackup as $database) {
+                // Reset per-database state, so a failure before this database's execution exists
+                // does not mark the previous database's execution failed or delete its backup file.
+                $this->backup_log = null;
+                $this->backup_location = null;
+                $this->backup_output = null;
+                $this->error_output = null;
+
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
                 do {
@@ -457,6 +464,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'size' => $size,
                             'filename' => null,
                             's3_uploaded' => null,
+                            'finished_at' => Carbon::now()->toImmutable(),
                         ]);
                     }
                     try {
@@ -505,6 +513,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         'size' => $size,
                         's3_uploaded' => $this->backup->save_s3 ? $this->s3_uploaded : null,
                         'local_storage_deleted' => $localStorageDeleted,
+                        'finished_at' => Carbon::now()->toImmutable(),
                     ]);
 
                     // Send appropriate notification (wrapped in try-catch so notification

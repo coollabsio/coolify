@@ -10,6 +10,7 @@ use App\Services\GithubRunner\GithubRunnerContainer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -42,8 +43,11 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+        // Disabling keeps running jobs, so a disabled server is reconciled until its last runner is done.
         Server::query()
-            ->whereHas('githubRunnerConfig')
+            ->where(fn (Builder $query) => $query
+                ->whereHas('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true))
+                ->orWhereHas('githubRunnerExecutions', fn (Builder $execution) => $execution->whereIn('status', GithubRunnerStatus::occupying())))
             ->with('settings')
             ->get()
             ->filter(fn (Server $server) => $server->isFunctional())

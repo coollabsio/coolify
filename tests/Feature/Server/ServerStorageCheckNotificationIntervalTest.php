@@ -67,6 +67,25 @@ it('sends one high disk usage notification per configured interval', function ()
     Notification::assertSentToTimes($server->team, HighDiskUsage::class, 2);
 });
 
+it('notifies again on a new spike after disk usage recovered within the interval', function () {
+    $server = diskUsageIntervalServer(intervalHours: 24);
+
+    runDiskUsageCheck($server, 93);
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 1);
+
+    Carbon::setTestNow(now()->addMinutes(10));
+    runDiskUsageCheck($server, 95);
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 1);
+
+    Carbon::setTestNow(now()->addHour());
+    runDiskUsageCheck($server, 40);
+    expect(NotificationThrottle::wasSent($server, HighDiskUsage::class))->toBeFalse();
+
+    Carbon::setTestNow(now()->addHour());
+    runDiskUsageCheck($server, 92);
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 2);
+});
+
 it('defaults to one notification per 24 hours', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
