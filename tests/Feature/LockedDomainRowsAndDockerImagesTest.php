@@ -1,7 +1,11 @@
 <?php
 
+use App\Livewire\Project\Application\Domains as ApplicationDomains;
+use App\Livewire\Project\Application\PreviewDomains;
 use App\Livewire\Project\Service\Domains;
 use App\Livewire\Server\DockerImages;
+use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -36,7 +40,7 @@ beforeEach(function () {
     $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
-it('rejects a client update of the service domain rows', function () {
+it('rejects a client update of the service domain state', function (string $property, mixed $value) {
     $destination = StandaloneDocker::withoutEvents(fn () => StandaloneDocker::firstOrCreate(
         ['server_id' => $this->server->id, 'network' => 'coolify'],
         ['uuid' => (string) Str::uuid(), 'name' => 'test-docker']
@@ -59,8 +63,11 @@ it('rejects a client update of the service domain rows', function () {
 
     Livewire::test(Domains::class, ['service' => $service->fresh(['applications', 'server'])])
         ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->all() === ['https://web.example.com'])
-        ->set('domainRows', [['url' => 'https://attacker.example.com']]);
-})->throws(CannotUpdateLockedPropertyException::class);
+        ->set($property, $value);
+})->with([
+    'domain rows' => ['domainRows', [['url' => 'https://attacker.example.com']]],
+    'dns validation' => ['dnsValidationEnabled', false],
+])->throws(CannotUpdateLockedPropertyException::class);
 
 it('rejects a client update of the docker image list', function () {
     $imageId = 'sha256:'.str_repeat('a', 64);
@@ -75,4 +82,49 @@ it('rejects a client update of the docker image list', function () {
         ->call('load')
         ->assertSet('images.0.containers', ['web'])
         ->set('images.0.containers', []);
+})->throws(CannotUpdateLockedPropertyException::class);
+
+function createLockedDomainRowsApplication(Server $server, Team $team): Application
+{
+    $destination = StandaloneDocker::withoutEvents(fn () => StandaloneDocker::firstOrCreate(
+        ['server_id' => $server->id, 'network' => 'coolify'],
+        ['uuid' => (string) Str::uuid(), 'name' => 'test-docker']
+    ));
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+
+    return Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app.example.com',
+        'build_pack' => 'nixpacks',
+        'ports_exposes' => '3000',
+    ]);
+}
+
+it('rejects a client update of the application domain rows', function (string $property, mixed $value) {
+    $application = createLockedDomainRowsApplication($this->server, $this->team);
+
+    Livewire::test(ApplicationDomains::class, ['application' => $application->fresh()])
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->where('is_suggested', false)->pluck('url')->all() === ['https://app.example.com'])
+        ->set($property, $value);
+})->with([
+    'domain rows' => ['domainRows', [['url' => 'https://app.example.com', 'service' => null, 'dns_status' => 'ok', 'dns_message' => 'faked', 'expected_ip' => null, 'needs_force_add' => true]]],
+    'one row flag' => ['domainRows.0.needs_force_add', true],
+    'forced suggestion index' => ['forceAddSuggestedIndex', 0],
+    'DNS validation flag' => ['dnsValidationEnabled', false],
+])->throws(CannotUpdateLockedPropertyException::class);
+
+it('rejects a client update of the preview domain rows', function () {
+    $application = createLockedDomainRowsApplication($this->server, $this->team);
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/7',
+        'fqdn' => 'https://pr-7.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->all() === ['https://pr-7.example.com'])
+        ->set('domainRows.0.dns_status', 'ok');
 })->throws(CannotUpdateLockedPropertyException::class);

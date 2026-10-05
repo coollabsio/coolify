@@ -110,6 +110,7 @@ class Domains extends Component
 
     public bool $isCheckingDns = false;
 
+    #[Locked]
     public bool $dnsValidationEnabled = true;
 
     #[Locked]
