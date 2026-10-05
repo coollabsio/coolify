@@ -16,6 +16,7 @@ use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -802,4 +803,56 @@ it('lists each cluster with its servers before servers without a cluster', funct
         ->assertSee('Pending')
         ->assertSee(route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]), escape: false)
         ->assertDontSeeHtml('>Dev<');
+});
+
+it('lists the applications of the cluster on the resources page', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Own');
+    $node = Node::factory()->create(['team_id' => $team->id, 'name' => 'Server A']);
+    AssignNodeToCluster::run($cluster, $node);
+    $project = Project::factory()->create(['team_id' => $team->id, 'name' => 'Shop']);
+    $environment = $project->environments()->where('name', 'production')->firstOrFail();
+    $workload = NodeWorkload::factory()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'name' => 'storefront',
+        'domains' => ['shop.example.com'],
+        'http_port' => 80,
+    ]);
+    $node->workloads()->attach($workload);
+    $other = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'billing-api']);
+    $node->workloads()->attach($other);
+    $otherCluster = CreateNodeCluster::run($team, $this->user, 'Other');
+    $otherNode = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $node->private_key_id]);
+    AssignNodeToCluster::run($otherCluster, $otherNode);
+    $otherNode->workloads()->attach(NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'elsewhere-app']));
+
+    $this->get(route('node-cluster.resources', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSeeInOrder(['billing-api', 'storefront'])
+        ->assertSee('Shop')
+        ->assertSee('production')
+        ->assertSee('Server A')
+        ->assertSee('http://shop.example.com', escape: false)
+        ->assertSee(route('project.cluster-application.show', [
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'workload_uuid' => $workload->uuid,
+        ]), escape: false)
+        ->assertDontSee('elsewhere-app');
+
+    $this->get(route('node-cluster.resources', ['cluster_uuid' => $cluster->uuid, 'search' => 'shop.example']))
+        ->assertSee('storefront')
+        ->assertDontSee('billing-api');
+    $this->get(route('node-cluster.resources', ['cluster_uuid' => $cluster->uuid, 'search' => 'nothing-matches']))
+        ->assertSee('No matching resources');
+});
+
+it('shows an empty resources page for a cluster without applications', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Empty');
+
+    $this->get(route('node-cluster.resources', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('No resources yet');
 });

@@ -396,6 +396,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/servers/new/cluster-server', NodeOnboarding::class)->name('node.onboarding');
     Route::prefix('cluster/{cluster_uuid}')->group(function () {
         Route::get('/', NodeClusterShow::class)->name('node-cluster.show');
+        Route::get('/resources', NodeClusterShow::class)->name('node-cluster.resources');
         Route::get('/servers', NodeClusterShow::class)->name('node-cluster.nodes');
         Route::get('/firewall', NodeClusterShow::class)->name('node-cluster.firewall');
         Route::get('/advanced', NodeClusterShow::class)->name('node-cluster.advanced');

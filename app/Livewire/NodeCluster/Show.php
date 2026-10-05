@@ -4,10 +4,12 @@ namespace App\Livewire\NodeCluster;
 
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\DeleteNodeCluster;
+use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpdateNodeCluster;
+use App\Enums\NodeWorkloadState;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Show extends Component
@@ -31,6 +34,7 @@ class Show extends Component
 
     private const SECTIONS_BY_ROUTE = [
         'node-cluster.show' => 'general',
+        'node-cluster.resources' => 'resources',
         'node-cluster.nodes' => 'nodes',
         'node-cluster.firewall' => 'firewall',
         'node-cluster.advanced' => 'advanced',
@@ -41,6 +45,9 @@ class Show extends Component
 
     #[Locked]
     public string $section = 'general';
+
+    #[Url(as: 'search', except: '')]
+    public string $resourceSearch = '';
 
     public string $name = '';
 
@@ -335,6 +342,7 @@ class Show extends Component
             'nodesNeedAttention' => $this->cluster->hasNodesNeedingAttention(),
             ...match ($this->section) {
                 'general' => $this->generalData(),
+                'resources' => $this->resourcesData(),
                 'nodes' => $this->nodesData(),
                 'firewall' => $this->firewallData(),
                 'advanced' => $this->advancedData(),
@@ -350,6 +358,55 @@ class Show extends Component
             'nodesCount' => $this->cluster->nodes()->count(),
             'readyNodesCount' => $this->cluster->nodes()->where('is_usable', true)->count(),
         ];
+    }
+
+    /**
+     * Cluster applications with their project, servers, domains, and observed state.
+     *
+     * @return array{resources: list<array{uuid: string, name: string, href: ?string, project: ?string, environment: ?string, image: ?string, servers: list<string>, domains: list<string>, status: string, statusType: string}>, resourcesTotal: int}
+     */
+    private function resourcesData(): array
+    {
+        $workloads = $this->meshWorkloads()
+            ->with([
+                'environment.project',
+                'revisions' => fn ($query) => $query->latest('id'),
+                'nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $this->cluster->id)->orderBy('name'),
+            ])
+            ->orderBy('name')
+            ->get();
+        $search = mb_strtolower(trim($this->resourceSearch));
+        $resources = $workloads
+            ->map(function (NodeWorkload $workload): array {
+                $states = $workload->nodes->map(fn (Node $node) => DetermineWorkloadState::run($node, $workload));
+                $state = $states->first(fn (NodeWorkloadState $state): bool => $state !== NodeWorkloadState::RUNNING)
+                    ?? $states->first()
+                    ?? NodeWorkloadState::UNKNOWN;
+                $project = $workload->environment?->project;
+
+                return [
+                    'uuid' => $workload->uuid,
+                    'name' => $workload->name,
+                    'href' => $project ? route('project.cluster-application.show', [
+                        'project_uuid' => $project->uuid,
+                        'environment_uuid' => $workload->environment->uuid,
+                        'workload_uuid' => $workload->uuid,
+                    ]) : null,
+                    'project' => $project?->name,
+                    'environment' => $workload->environment?->name,
+                    'image' => $workload->revisions->first()?->image,
+                    'servers' => $workload->nodes->pluck('name')->all(),
+                    'domains' => $workload->hasIngressRoutes() ? array_values($workload->domains) : [],
+                    'status' => str($state->value)->title()->toString(),
+                    'statusType' => $state->badgeType(),
+                ];
+            })
+            ->filter(fn (array $resource): bool => $search === '' || collect([$resource['name'], $resource['project'], $resource['environment'], $resource['image'], ...$resource['servers'], ...$resource['domains']])
+                ->contains(fn (?string $value): bool => str_contains(mb_strtolower((string) $value), $search)))
+            ->values()
+            ->all();
+
+        return ['resources' => $resources, 'resourcesTotal' => $workloads->count()];
     }
 
     /** @return array<string, mixed> */

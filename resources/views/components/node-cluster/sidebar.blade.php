@@ -18,6 +18,13 @@
             'group' => 'Settings',
         ],
         [
+            'label' => 'Resources',
+            'route' => 'node-cluster.resources',
+            'active' => $activeMenu === 'resources',
+            'icon' => 'projects',
+            'group' => 'Cluster',
+        ],
+        [
             'label' => 'Servers',
             'route' => 'node-cluster.nodes',
             'active' => $activeMenu === 'nodes',

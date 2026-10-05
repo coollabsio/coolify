@@ -1,6 +1,7 @@
 @php
     $sectionTitles = [
         'general' => 'General',
+        'resources' => 'Resources',
         'nodes' => 'Servers',
         'firewall' => 'Firewall',
         'advanced' => 'Advanced',
