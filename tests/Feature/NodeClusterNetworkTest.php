@@ -8,7 +8,6 @@ use App\Enums\NodeOperationStatus;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeFirewallRule;
-use App\Models\NodeIngressRule;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\User;
@@ -83,12 +82,6 @@ it('reconciles a complete full mesh through durable typed operations', function 
         'protocol' => 'icmp',
         'port' => 0,
     ]);
-    NodeIngressRule::factory()->create([
-        'node_cluster_id' => $cluster->id,
-        'destination_workload_id' => $destination->id,
-        'protocol' => 'tcp',
-        'port' => 8080,
-    ]);
 
     $requests = collect();
     Http::fake(function (Request $request) use ($requests) {
@@ -159,11 +152,7 @@ it('reconciles a complete full mesh through durable typed operations', function 
                 'port' => 0,
             ],
         ])
-        ->and($request['data']['ingress_rules'])->toBe([[
-            'destination_ip' => $destinationIp,
-            'protocol' => 'tcp',
-            'port' => 8080,
-        ]]));
+        ->and($request['data']['ingress_rules'])->toBe([]));
 });
 
 it('marks the cluster unhealthy when a staged host change fails on its only Node', function () {

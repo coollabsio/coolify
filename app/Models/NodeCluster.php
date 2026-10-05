@@ -55,11 +55,6 @@ class NodeCluster extends BaseModel
         return $this->hasMany(NodeFirewallRule::class);
     }
 
-    public function ingressRules(): HasMany
-    {
-        return $this->hasMany(NodeIngressRule::class);
-    }
-
     public function hasActivatedNetwork(): bool
     {
         return in_array($this->network_status, ['active', 'degraded'], true) || $this->last_reconciled_at !== null;

@@ -18,7 +18,6 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
-use App\Models\NodeIngressRule;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\Project;
@@ -276,14 +275,11 @@ describe('routes and firewall', function () {
         $second->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $api = routedWorkload($this->team);
         $first->workloads()->attach($api, ['container_ip' => '100.64.0.11']);
-        NodeIngressRule::factory()->create(['node_cluster_id' => $cluster->id, 'destination_workload_id' => $api->id, 'protocol' => 'udp', 'port' => 5353]);
-        NodeIngressRule::factory()->create(['node_cluster_id' => $cluster->id, 'destination_workload_id' => $shop->id, 'protocol' => 'tcp', 'port' => 8080]);
 
         ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
 
         $firewall = $this->requests->firstWhere('command', 'network.firewall.reconcile');
         expect($firewall['data']['ingress_rules'])->toEqualCanonicalizing([
-            ['destination_ip' => '100.64.0.11', 'protocol' => 'udp', 'port' => 5353],
             ['destination_ip' => '100.64.0.10', 'protocol' => 'tcp', 'port' => 8080],
             ['destination_ip' => '100.64.1.10', 'protocol' => 'tcp', 'port' => 8080],
         ]);

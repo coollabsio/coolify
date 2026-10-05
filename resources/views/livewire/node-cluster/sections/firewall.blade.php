@@ -93,87 +93,26 @@
     @endif
 </x-application.settings-section>
 
-<x-application.settings-section id="node-cluster-ingress-rules-section" title="Ingress rules"
-    helper="Allow a server process, unmanaged container, LAN host, proxy, or public port mapping to reach one application port. Traffic between applications still needs an application rule."
+<x-application.settings-section id="node-cluster-system-rules-section" title="System rules"
+    helper="Coolify adds these rules on every server so that the cluster can work. You cannot change them."
     flush>
-    @if ($canUpdateCluster && $workloads->isNotEmpty())
-        <x-slot:actions>
-            <x-modal-input title="Add ingress rule" :wireIgnore="false">
-                <x-slot:content>
-                    <button type="button" class="button">
-                        <x-reicon name="plus" class="size-3.5" />
-                        Add rule
-                    </button>
-                </x-slot:content>
-                <form wire:submit="addIngressRule" class="flex flex-col gap-4">
-                    <x-forms.listbox id="ingressDestinationUuid" label="Destination application"
-                        placeholder="Select an application" required portal :options="$workloadOptions" />
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <x-forms.listbox id="ingressProtocol" label="Protocol" required portal :options="[
-                            ['value' => 'tcp', 'label' => 'TCP'],
-                            ['value' => 'udp', 'label' => 'UDP'],
-                        ]" />
-                        <x-forms.input id="ingressPort" type="number" min="1" max="65535" label="Port" required />
-                    </div>
-                    <div class="flex justify-end">
-                        <x-forms.button type="submit" isHighlighted>Allow ingress</x-forms.button>
-                    </div>
-                </form>
-            </x-modal-input>
-        </x-slot:actions>
-    @endif
-
-    @if ($ingressRules->isEmpty())
-        <div class="p-4">
-            <x-empty size="sm" title="No ingress rules"
-                description="Connections from outside the cluster network are blocked." icon-name="shield-star" />
+    <x-slot:actions>
+        <span class="table-badge">Managed by Coolify</span>
+    </x-slot:actions>
+    <div class="overflow-x-auto">
+        <div
+            class="{{ $ruleGridClasses }} border-b border-neutral-200 bg-neutral-50 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+            <div>Rule</div>
+            <div>Traffic</div>
+            <div></div>
         </div>
-    @else
-        <div class="overflow-x-auto">
+        @foreach ($systemRules as $ruleName => $ruleTraffic)
             <div
-                class="{{ $ruleGridClasses }} border-b border-neutral-200 bg-neutral-50 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                <div>Destination</div>
-                <div>Protocol / port</div>
+                class="{{ $ruleGridClasses }} min-h-12 border-b border-neutral-200 py-2 text-[12px] last:border-b-0 dark:border-white/[0.07]">
+                <div class="min-w-0 truncate text-[13px] font-medium text-black dark:text-fg">{{ $ruleName }}</div>
+                <div class="font-mono text-[12px] text-neutral-600 uppercase dark:text-fg-dim">{{ $ruleTraffic }}</div>
                 <div></div>
             </div>
-            @foreach ($ingressRules as $rule)
-                <div wire:key="ingress-rule-{{ $rule->uuid }}"
-                    class="{{ $ruleGridClasses }} min-h-12 border-b border-neutral-200 py-2 text-[12px] last:border-b-0 dark:border-white/[0.07]">
-                    <div class="min-w-0 truncate text-[13px] font-medium text-black dark:text-fg">
-                        External sources → {{ $rule->destinationWorkload->name }}
-                    </div>
-                    <div class="font-mono text-[12px] text-neutral-600 uppercase dark:text-fg-dim">
-                        {{ $rule->protocol }} / {{ $rule->port }}
-                    </div>
-                    <div class="flex justify-end">
-                        @if ($canUpdateCluster)
-                            <x-forms.button wire:click="removeIngressRule('{{ $rule->uuid }}')"
-                                wire:confirm="Remove this ingress rule?">
-                                Remove
-                            </x-forms.button>
-                        @endif
-                    </div>
-                </div>
-            @endforeach
-        </div>
-    @endif
-</x-application.settings-section>
-
-<details class="group rounded-lg border border-neutral-200 dark:border-white/[0.08]">
-    <summary
-        class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-black dark:text-fg">
-        <span>System rules</span>
-        <span class="flex items-center gap-2 text-xs font-normal text-neutral-500 dark:text-fg-dim">
-            Managed by Coolify
-            <x-reicon name="chevron-down" class="size-3.5 transition-transform group-open:rotate-180" />
-        </span>
-    </summary>
-    <dl class="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-neutral-200 px-4 py-3 text-[13px] sm:grid-cols-2 dark:border-white/[0.08]">
-        @foreach ($systemRules as $ruleName => $ruleTraffic)
-            <div class="flex items-center justify-between gap-3">
-                <dt class="text-neutral-700 dark:text-fg">{{ $ruleName }}</dt>
-                <dd class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">{{ $ruleTraffic }}</dd>
-            </div>
         @endforeach
-    </dl>
-</details>
+    </div>
+</x-application.settings-section>

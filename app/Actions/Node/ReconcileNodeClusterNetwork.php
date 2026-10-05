@@ -6,7 +6,6 @@ use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
-use App\Models\NodeIngressRule;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\User;
@@ -401,14 +400,14 @@ class ReconcileNodeClusterNetwork
     }
 
     /**
-     * User-defined ingress rules plus one allow for each container that an ingress route reaches,
+     * One allow for each container that an ingress route reaches,
      * so Caddy on any ingress Node can connect to it.
      *
      * @return list<array{destination_ip: string, protocol: string, port: int}>
      */
     private function ingressRules(NodeCluster $cluster): array
     {
-        $routeAllows = BuildNodeClusterIngressRoutes::routedWorkloads($cluster)
+        return BuildNodeClusterIngressRoutes::routedWorkloads($cluster)
             ->flatMap(fn (NodeWorkload $workload) => $workload->nodes
                 ->pluck('pivot.container_ip')
                 ->filter()
@@ -416,31 +415,8 @@ class ReconcileNodeClusterNetwork
                     'destination_ip' => $destinationIp,
                     'protocol' => 'tcp',
                     'port' => $workload->http_port,
-                ]));
-
-        return collect($this->userIngressRules($cluster))
-            ->concat($routeAllows)
-            ->unique(fn (array $rule): string => "{$rule['destination_ip']}|{$rule['protocol']}|{$rule['port']}")
-            ->values()
-            ->all();
-    }
-
-    /** @return list<array{destination_ip: string, protocol: string, port: int}> */
-    private function userIngressRules(NodeCluster $cluster): array
-    {
-        return NodeIngressRule::query()
-            ->with('destinationWorkload.nodes')
-            ->where('node_cluster_id', $cluster->id)
-            ->get()
-            ->flatMap(fn (NodeIngressRule $rule) => $rule->destinationWorkload->nodes
-                ->where('node_cluster_id', $cluster->id)
-                ->pluck('pivot.container_ip')
-                ->filter()
-                ->map(fn (string $destinationIp): array => [
-                    'destination_ip' => $destinationIp,
-                    'protocol' => $rule->protocol,
-                    'port' => $rule->port,
                 ]))
+            ->unique(fn (array $rule): string => "{$rule['destination_ip']}|{$rule['protocol']}|{$rule['port']}")
             ->values()
             ->all();
     }

@@ -12,7 +12,6 @@ use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
-use App\Models\NodeIngressRule;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Rules\PrivateIpv4Cidr;
@@ -69,12 +68,6 @@ class Show extends Component
     public string $firewallProtocol = 'tcp';
 
     public int $firewallPort = 80;
-
-    public string $ingressDestinationUuid = '';
-
-    public string $ingressProtocol = 'tcp';
-
-    public int $ingressPort = 80;
 
     public function mount(string $cluster_uuid): void
     {
@@ -295,57 +288,6 @@ class Show extends Component
         $this->dispatch('success', 'Firewall rule removed and reconciliation queued.');
     }
 
-    public function addIngressRule(): void
-    {
-        $this->authorize('update', $this->cluster);
-        $validated = $this->validate([
-            'ingressDestinationUuid' => ['required', 'string'],
-            'ingressProtocol' => ['required', Rule::in(['tcp', 'udp'])],
-            'ingressPort' => ['required', 'integer', 'between:1,65535'],
-        ]);
-        $destination = $this->meshWorkloads()->where('uuid', $validated['ingressDestinationUuid'])->first();
-        if ($destination === null) {
-            $this->addError('ingressDestinationUuid', 'Select a workload from this mesh.');
-
-            return;
-        }
-
-        $created = DB::transaction(function () use ($validated, $destination): bool {
-            $rule = NodeIngressRule::query()->firstOrCreate([
-                'node_cluster_id' => $this->cluster->id,
-                'destination_workload_id' => $destination->id,
-                'protocol' => $validated['ingressProtocol'],
-                'port' => $validated['ingressPort'],
-            ]);
-            if ($rule->wasRecentlyCreated) {
-                $this->cluster->increment('desired_revision');
-            }
-
-            return $rule->wasRecentlyCreated;
-        });
-        if ($created) {
-            $this->queueNetworkReconciliation();
-        }
-        $this->reset('ingressDestinationUuid');
-        $this->dispatch('close-modal');
-        $this->dispatch('success', $created ? 'Ingress rule added and reconciliation queued.' : 'The ingress rule already exists.');
-    }
-
-    public function removeIngressRule(string $ruleUuid): void
-    {
-        $this->authorize('update', $this->cluster);
-        DB::transaction(function () use ($ruleUuid): void {
-            NodeIngressRule::query()
-                ->where('node_cluster_id', $this->cluster->id)
-                ->where('uuid', $ruleUuid)
-                ->firstOrFail()
-                ->delete();
-            $this->cluster->increment('desired_revision');
-        });
-        $this->queueNetworkReconciliation();
-        $this->dispatch('success', 'Ingress rule removed and reconciliation queued.');
-    }
-
     public function reconcileNetwork(): void
     {
         $this->authorize('update', $this->cluster);
@@ -418,11 +360,6 @@ class Show extends Component
             ->where('node_cluster_id', $this->cluster->id)
             ->orderBy('id')
             ->get();
-        $ingressRules = NodeIngressRule::query()
-            ->with('destinationWorkload')
-            ->where('node_cluster_id', $this->cluster->id)
-            ->orderBy('id')
-            ->get();
         $firewallCanvasNodes = $nodes->map(fn (Node $node): array => [
             'id' => 'node:'.$node->uuid,
             'type' => 'node',
@@ -449,7 +386,7 @@ class Show extends Component
             'port' => $rule->port,
         ])->values();
 
-        return compact('nodes', 'workloads', 'firewallRules', 'ingressRules', 'firewallCanvasNodes', 'firewallCanvasRules');
+        return compact('nodes', 'workloads', 'firewallRules', 'firewallCanvasNodes', 'firewallCanvasRules');
     }
 
     /** @return array<string, mixed> */
