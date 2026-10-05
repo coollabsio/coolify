@@ -143,12 +143,18 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment): bool
     return start_queued_deployment($deployment, force: true);
 }
 /**
- * Start the queued deployments that can run now on the application's primary server and on the
- * server of the deployment that just ended (an additional server).
+ * Start the queued deployments that can run now on the application's primary server, on the
+ * server of the deployment that just ended (an additional server), and on every other server
+ * with a queued deployment of this application, because those waited for this one to end.
  */
 function queue_next_deployment(Application $application, ?int $finished_deployment_server_id = null)
 {
+    $application_queued_server_ids = ApplicationDeploymentQueue::where('application_id', $application->id)
+        ->where('status', ApplicationDeploymentStatus::QUEUED)
+        ->distinct()
+        ->pluck('server_id');
     $server_ids = collect([$application->destination->server_id, $finished_deployment_server_id])
+        ->merge($application_queued_server_ids)
         ->filter(fn ($server_id) => $server_id !== null)
         ->unique()
         ->values();
