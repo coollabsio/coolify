@@ -223,39 +223,15 @@
                             </div>
 
                             @if (filled($dnsCopyText))
-                                <div class="flex flex-wrap items-center justify-between gap-2"
-                                    x-data="{
-                                        copied: false,
-                                        async copyAll(text) {
-                                            try {
-                                                if (navigator.clipboard?.writeText) {
-                                                    await navigator.clipboard.writeText(text);
-                                                } else {
-                                                    const el = document.createElement('textarea');
-                                                    el.value = text;
-                                                    el.setAttribute('readonly', '');
-                                                    el.style.position = 'fixed';
-                                                    el.style.left = '-9999px';
-                                                    document.body.appendChild(el);
-                                                    el.select();
-                                                    document.execCommand('copy');
-                                                    document.body.removeChild(el);
-                                                }
-                                                this.copied = true;
-                                                setTimeout(() => this.copied = false, 1000);
-                                            } catch (e) {
-                                                console.error('Copy failed', e);
-                                            }
-                                        }
-                                    }">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
                                     <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
                                         {{ count($dnsHints) }}
                                         {{ count($dnsHints) === 1 ? 'entry' : 'entries' }}
                                         · BIND zone format
                                     </p>
                                     <button type="button" class="button shrink-0"
-                                        title="Copy as BIND-compatible zone file"
-                                        @click.prevent="copyAll(@js($dnsCopyText))">
+                                        title="Copy as BIND-compatible zone file" x-data="copyButton"
+                                        @click.prevent="copy(@js($dnsCopyText))">
                                         <span x-text="copied ? 'Copied' : 'Copy all'"></span>
                                     </button>
                                 </div>
