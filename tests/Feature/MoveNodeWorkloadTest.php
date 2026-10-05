@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\AssignNodeToCluster;
+use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\CreateNodeCluster;
 use App\Enums\NodeOperationStatus;
@@ -17,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -186,4 +188,53 @@ it('checks the capabilities that a move uses instead of a move command capabilit
 
     expect($operation->command_type)->toBe('workload.move.v1')
         ->and($operation->status)->toBe(NodeOperationStatus::QUEUED);
+});
+
+it('waits for a deploy that is already active on the target instead of failing at once', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $key = PrivateKey::factory()->create(['team_id' => $team->id]);
+    $cluster = CreateNodeCluster::run($team, $user, 'Move mesh');
+    $source = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $key->id]);
+    $target = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $key->id,
+        'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => [
+            'cpu_usage_percent' => 10,
+            'memory_bytes' => 1_000,
+            'memory_used_bytes' => 100,
+            'disk_total_bytes' => 1_000,
+            'disk_available_bytes' => 900,
+            'collected_at' => now()->toIso8601String(),
+        ],
+    ]);
+    AssignNodeToCluster::run($cluster, $source);
+    AssignNodeToCluster::run($cluster, $target);
+    $cluster->update(['network_status' => 'active']);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $source->workloads()->attach($workload);
+    $target->workloads()->attach($workload);
+    $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
+    $operation = CreateMoveOperation::run($source, $target, $revision, $user);
+    // Another worker already queued a deploy on the target.
+    $activeDeploy = CreateDeploymentOperation::run($target, $revision, $user)['operation'];
+    Http::fake();
+    Sleep::fake();
+    Sleep::whenFakingSleep(function () use ($activeDeploy): void {
+        $activeDeploy->refresh();
+        if ($activeDeploy->status === NodeOperationStatus::QUEUED) {
+            $activeDeploy->update(['status' => NodeOperationStatus::FAILED, 'error' => 'The image could not be pulled.']);
+        }
+    });
+
+    (new MoveNodeWorkloadJob($operation->id))->handle();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
+        ->and($operation->error)->toContain('The image could not be pulled.')
+        ->and($source->workloads()->whereKey($workload->id)->exists())->toBeTrue();
+    Sleep::assertSleptTimes(1);
+    Http::assertNothingSent();
 });

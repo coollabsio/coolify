@@ -43,8 +43,10 @@ class SeedDevelopmentQemuServer
             throw new RuntimeException('Development private key 1 is missing. Run the development database seeders first.');
         }
 
-        if ($removeOtherServers) {
-            ($isNode ? Node::query() : Server::query())
+        // Worker Nodes form one cluster and keep their workloads and history across starts,
+        // so seeding a Node never removes the other Nodes.
+        if ($removeOtherServers && ! $isNode) {
+            Server::query()
                 ->where('uuid', 'like', 'development-qemu-%')
                 ->where('uuid', '!=', $profile['uuid'])
                 ->delete();

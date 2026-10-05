@@ -14,6 +14,7 @@ use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
+use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\PrivateKey;
@@ -64,6 +65,42 @@ it('redeploys a missing workload that should be running', function () {
     expect($operation->command_type)->toBe('workload.deploy.v1')
         ->and($operation->node_workload_revision_id)->toBe($this->revision->id);
     Queue::assertPushed(DeployNodeWorkloadJob::class, fn ($job) => $job->operationId === $operation->id);
+});
+
+it('does not deploy on a move target while the move runs', function () {
+    $source = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->node->private_key_id,
+        'node_cluster_id' => $this->node->node_cluster_id,
+    ]);
+    NodeOperation::factory()->create([
+        'node_id' => $source->id,
+        'node_workload_id' => $this->workload->id,
+        'node_workload_revision_id' => $this->revision->id,
+        'command_type' => 'workload.move.v1',
+        'status' => NodeOperationStatus::RUNNING,
+    ]);
+
+    expect(ReconcileNodeWorkloads::run($this->node))->toBe(0)
+        ->and($this->node->operations()->count())->toBe(0);
+    Queue::assertNotPushed(DeployNodeWorkloadJob::class);
+});
+
+it('deploys on the former move target after the move failed', function () {
+    $source = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->node->private_key_id,
+        'node_cluster_id' => $this->node->node_cluster_id,
+    ]);
+    NodeOperation::factory()->create([
+        'node_id' => $source->id,
+        'node_workload_id' => $this->workload->id,
+        'node_workload_revision_id' => $this->revision->id,
+        'command_type' => 'workload.move.v1',
+        'status' => NodeOperationStatus::FAILED,
+    ]);
+
+    expect(ReconcileNodeWorkloads::run($this->node))->toBe(1);
 });
 
 it('reconciles desired state after the scheduled inventory refresh', function () {

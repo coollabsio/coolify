@@ -33,6 +33,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
     /** How long the reachable Nodes may take to apply the network revision that allows the target. */
     public const NETWORK_WAIT_SECONDS = 120;
 
+    /** Longest wait for a target deployment that another worker runs. */
+    public const DEPLOYMENT_WAIT_SECONDS = 660;
+
     /**
      * How long the source keeps serving after the target became ready. The target Sentinel
      * publishes the endpoint to Corrosion at once, Corrosion replicates it to the other Nodes
@@ -85,7 +88,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             if ($deployment['created']) {
                 (new DeployNodeWorkloadJob($deployment['operation']->id))->handle();
             }
-            $deploymentOperation = $deployment['operation']->refresh();
+            $deploymentOperation = $this->waitForDeployment($deployment['operation']);
             if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
                 throw new RuntimeException('The workload did not become ready on the target Node. '.($deploymentOperation->error ?? ''));
             }
@@ -177,6 +180,23 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
         throw new RuntimeException('The cluster network did not allow the target within '.self::NETWORK_WAIT_SECONDS.' seconds. Waiting for: '
             .$pending->pluck('name')->implode(', ').'. The source remains active.');
+    }
+
+    /**
+     * Waits for a target deployment that another worker runs, for example a deploy that was
+     * already active on the target. A deployment can take up to the deploy command timeout.
+     */
+    private function waitForDeployment(NodeOperation $deployment): NodeOperation
+    {
+        for ($poll = 0; $poll < self::DEPLOYMENT_WAIT_SECONDS; $poll++) {
+            $deployment->refresh();
+            if ($deployment->status->isFinal()) {
+                return $deployment;
+            }
+            Sleep::for(1)->second();
+        }
+
+        return $deployment->refresh();
     }
 
     public function failed(?Throwable $exception): void

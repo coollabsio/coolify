@@ -40,7 +40,21 @@ class ReconcileNodeWorkloads
                 NodeOperationStatus::UNCERTAIN,
             ])
             ->distinct()
-            ->pluck('node_workload_id');
+            ->pluck('node_workload_id')
+            // A move assigns its target before it deploys there. The move is stored on the source
+            // Node, so it blocks the workload on every Node until it finishes.
+            ->merge(NodeOperation::query()
+                ->whereIn('node_workload_id', $workloads->modelKeys())
+                ->where('command_type', 'workload.move.v1')
+                ->whereIn('status', [
+                    NodeOperationStatus::QUEUED,
+                    NodeOperationStatus::DISPATCHED,
+                    NodeOperationStatus::RUNNING,
+                    NodeOperationStatus::VERIFYING,
+                    NodeOperationStatus::UNCERTAIN,
+                ])
+                ->distinct()
+                ->pluck('node_workload_id'));
         $operationCount = 0;
 
         foreach ($workloads as $workload) {

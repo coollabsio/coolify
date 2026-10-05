@@ -13,6 +13,7 @@ use App\Console\Commands\ManageDevelopmentQemuVmCommand;
 use App\Console\Commands\SeedDevelopmentQemuServerCommand;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Models\NodeWorkload;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
 use Database\Seeders\PrivateKeySeeder;
@@ -364,6 +365,18 @@ it('seeds the first node worker as a separate node with the host gateway endpoin
         ->and($node->sentinel_url)->toBe('http://192.168.122.1:8000')
         ->and($node->is_usable)->toBeFalse()
         ->and(Server::query()->where('uuid', $node->uuid)->exists())->toBeFalse();
+});
+
+it('keeps the other node workers and their history when a node worker is seeded again', function () {
+    SeedDevelopmentQemuServer::run('node-worker-a');
+    $nodeB = SeedDevelopmentQemuServer::run('node-worker-b', false);
+    $workload = NodeWorkload::factory()->create(['team_id' => 0]);
+    $nodeB->workloads()->attach($workload);
+
+    SeedDevelopmentQemuServer::run('node-worker-a');
+
+    expect(Node::query()->where('uuid', 'development-qemu-node-worker-b')->value('id'))->toBe($nodeB->id)
+        ->and($nodeB->workloads()->whereKey($workload->id)->exists())->toBeTrue();
 });
 
 it('starts and seeds both node workers together', function () {
