@@ -241,8 +241,22 @@ trait InteractsWithDnsProviders
         $this->persistDomainDnsStatuses();
     }
 
+    /**
+     * The payload comes from the browser; members without update access also receive it and are ignored.
+     */
     public function dnsRecordConfigurationFinished(array $event): void
     {
+        if (! auth()->user()?->can('update', $this->dnsResource())) {
+            return;
+        }
+
+        if (! is_string($event['hostname'] ?? null) || ! is_string($event['resourceType'] ?? null)
+            || ! is_scalar($event['resourceId'] ?? null) || ! is_bool($event['successful'] ?? null)
+            || ! is_string($event['credential'] ?? null) || ! is_string($event['message'] ?? null)
+            || ! is_numeric($event['teamId'] ?? null) || (int) $event['teamId'] !== $this->dnsTeamId()) {
+            return;
+        }
+
         $resource = $this->dnsResourceForHostname($event['hostname']);
         if ($resource === null || $resource->getMorphClass() !== $event['resourceType']
             || (string) $resource->getKey() !== (string) $event['resourceId']) {

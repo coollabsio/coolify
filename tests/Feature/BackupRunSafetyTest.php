@@ -20,11 +20,13 @@ use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Notifications\Database\BackupFailed;
 use App\Services\ScheduledJobDeliveryService;
 use App\Support\DatabaseOperationReservation;
 use App\Support\ResourceStartActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -273,6 +275,50 @@ it('stores service database backups in the folder of earlier releases', function
 
     expect(ScheduledDatabaseBackupExecution::query()->sole()->filename)
         ->toContain("/rallly-rallly_db-{$service->uuid}/pg-dump-rallly-");
+});
+
+// --- Worker timeout (M16) ---
+
+it('stops the backup command at the backup timeout, before the worker timeout', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, ['status' => 'running:healthy']);
+    $backup = backupRunSafetySchedule($database, $this->team, ['timeout' => 600]);
+    $commands = backupRunSafetyFakeRemoteCommands();
+    $job = new DatabaseBackupJob($backup);
+
+    $job->handle();
+
+    expect($commands->first(fn (string $command) => str_contains($command, 'pg_dump')))->toStartWith('timeout 600 ssh ')
+        ->and($job->timeout)->toBeGreaterThan(600);
+});
+
+it('fails the running backup execution and notifies the team when the worker timeout stops the job', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, ['status' => 'running:healthy']);
+    $backup = backupRunSafetySchedule($database, $this->team, ['timeout' => 600]);
+    $this->team->emailNotificationSettings->update(['smtp_enabled' => true, 'backup_failure_email_notifications' => true]);
+    $job = new DatabaseBackupJob($backup);
+    // At the worker timeout, failed() runs on a copy rebuilt from the queued payload.
+    $queuedCopy = unserialize(serialize($job));
+    $team = $this->team;
+    $atTimeout = null;
+    Process::fake(function ($process) use ($queuedCopy, $team, &$atTimeout) {
+        if (str_contains($process->command, 'pg_dump')) {
+            $queuedCopy->failed(new TimeoutExceededException('App\Jobs\DatabaseBackupJob has timed out.'));
+            $execution = ScheduledDatabaseBackupExecution::query()->sole();
+            $atTimeout = [
+                'status' => $execution->status,
+                'finished' => $execution->finished_at !== null,
+                'notifications' => Notification::sent($team, BackupFailed::class)->count(),
+            ];
+
+            throw new RuntimeException('The worker stopped the job.');
+        }
+
+        return Process::result(output: '');
+    });
+
+    $job->handle();
+
+    expect($atTimeout)->toBe(['status' => 'failed', 'finished' => true, 'notifications' => 1]);
 });
 
 function backupRunSafetyVolume(Environment $environment, StandaloneDocker $destination): LocalPersistentVolume

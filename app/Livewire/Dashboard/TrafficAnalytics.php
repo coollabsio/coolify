@@ -9,6 +9,7 @@ use App\Services\TrafficAnalyticsAggregator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 #[Lazy]
@@ -16,6 +17,7 @@ class TrafficAnalytics extends Component
 {
     use BuildsTrafficChartPayload;
 
+    #[Locked]
     public string $chartId = 'dashboard-traffic';
 
     public Collection $servers;

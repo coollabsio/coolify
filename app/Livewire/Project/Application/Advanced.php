@@ -15,6 +15,9 @@ class Advanced extends Component
 {
     use AuthorizesRequests;
 
+    /** The format that saveCustomNamePrefix() produces with str()->slug(). */
+    private const CONTAINER_NAME_PREFIX_PATTERN = '/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/';
+
     public Application $application;
 
     #[Validate(['boolean'])]
@@ -102,6 +105,7 @@ class Advanced extends Component
     {
         if ($toModel) {
             $this->validate();
+            $this->validateChangedContainerNamePrefix();
             $this->application->settings->is_force_https_enabled = $this->isForceHttpsEnabled;
             $this->application->settings->is_git_submodules_enabled = $this->isGitSubmodulesEnabled;
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
@@ -157,6 +161,29 @@ class Advanced extends Component
         // Load stop_grace_period separately since it has its own save handler
         // Convert null to empty string to prevent dirty detection issues
         $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
+    }
+
+    /**
+     * An unchanged stored prefix is skipped, so older values do not block other settings.
+     */
+    private function validateChangedContainerNamePrefix(): void
+    {
+        $prefix = $this->customContainerNamePrefix;
+        if (blank($prefix) || $prefix === $this->application->settings->custom_container_name_prefix) {
+            return;
+        }
+
+        if (preg_match(self::CONTAINER_NAME_PREFIX_PATTERN, $prefix) !== 1) {
+            throw ValidationException::withMessages([
+                'customContainerNamePrefix' => 'The container name prefix may only contain lowercase letters, numbers, and single hyphens between them.',
+            ]);
+        }
+
+        if (ApplicationSetting::isContainerNamePrefixInUse($prefix, $this->application->destination->server, $this->application->id)) {
+            throw ValidationException::withMessages([
+                'customContainerNamePrefix' => 'This container name prefix is already in use by another application on this Coolify instance.',
+            ]);
+        }
     }
 
     private function resetDefaultLabels()

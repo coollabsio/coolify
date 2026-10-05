@@ -112,6 +112,13 @@ describe('registry image guard', function () {
         callMultiServerDeploymentJob($job, 'ensureRegistryImageForMultipleServers');
     })->throwsNoExceptions();
 
+    test('allows docker compose applications, which build on each server', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        $job = makeMultiServerDeploymentJob(['application' => $this->application->fresh()]);
+
+        callMultiServerDeploymentJob($job, 'ensureRegistryImageForMultipleServers');
+    })->throwsNoExceptions();
+
     test('allows preview deployments, which run only on the main server', function () {
         $job = makeMultiServerDeploymentJob(['application' => $this->application, 'pull_request_id' => 7]);
 

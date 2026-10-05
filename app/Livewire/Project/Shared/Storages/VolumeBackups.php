@@ -316,8 +316,6 @@ class VolumeBackups extends Component
         }
 
         $execution->update([
-            'recovery_attempts' => 0,
-            'recovery_next_retry_at' => null,
             'recovery_needs_attention' => false,
         ]);
         Cache::forget(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id));
@@ -421,7 +419,7 @@ class VolumeBackups extends Component
     {
         $backup = $this->storage->scheduledBackups()->firstOrNew();
         $backup->fill([
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->resource->environment->project->team_id,
             'frequency' => $this->frequency,
             'enabled' => $enabled,
             'save_s3' => $this->saveToS3,

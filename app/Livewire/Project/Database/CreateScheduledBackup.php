@@ -69,7 +69,7 @@ class CreateScheduledBackup extends Component
                 's3_storage_id' => null,
                 'database_id' => $database->id,
                 'database_type' => $database->getMorphClass(),
-                'team_id' => currentTeam()->id,
+                'team_id' => $database->team()->id,
             ];
 
             if ($database->type() === 'standalone-postgresql') {

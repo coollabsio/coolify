@@ -182,3 +182,69 @@ it('saves a unique custom container name', function () {
 
     expect($application->settings()->first()->custom_internal_name)->toBe('unique-name');
 });
+
+it('rejects an invalid container name prefix on every save path', function (string $method, string $prefix) {
+    $application = createApplicationForContainerNamingTest();
+    $application->settings->update(['custom_container_name_prefix' => 'original-prefix']);
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->set('customContainerNamePrefix', $prefix)
+        ->call($method)
+        ->assertDispatched('error')
+        ->assertNotDispatched('success');
+
+    expect($application->settings()->first()->custom_container_name_prefix)->toBe('original-prefix');
+})->with([
+    'submit' => ['submit'],
+    'instant save' => ['instantSave'],
+])->with([
+    'shell characters' => ['Bad Name;id'],
+    'uppercase' => ['MyApp'],
+    'leading hyphen' => ['-api'],
+]);
+
+it('rejects a container name prefix already used on the server on every save path', function (string $method) {
+    $application = createApplicationForContainerNamingTest();
+    Application::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ])->settings->update(['custom_container_name_prefix' => 'shared-prefix']);
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->set('customContainerNamePrefix', 'shared-prefix')
+        ->call($method)
+        ->assertDispatched('error', 'This container name prefix is already in use by another application on this Coolify instance.')
+        ->assertNotDispatched('success');
+
+    expect($application->settings()->first()->custom_container_name_prefix)->toBeNull();
+})->with(['submit', 'instantSave']);
+
+it('saves a valid container name prefix on every save path', function (string $method) {
+    $application = createApplicationForContainerNamingTest();
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->set('customContainerNamePrefix', 'my-api-2')
+        ->call($method)
+        ->assertDispatched('success');
+
+    expect($application->settings()->first()->custom_container_name_prefix)->toBe('my-api-2');
+})->with(['submit', 'instantSave']);
+
+it('keeps saving other settings when a stored prefix predates the format rule', function () {
+    $application = createApplicationForContainerNamingTest();
+    $application->settings->update(['custom_container_name_prefix' => 'Legacy_Prefix']);
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->set('isGitLfsEnabled', true)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    $settings = $application->settings()->first();
+    expect($settings->is_git_lfs_enabled)->toBeTrue()
+        ->and($settings->custom_container_name_prefix)->toBe('Legacy_Prefix');
+});

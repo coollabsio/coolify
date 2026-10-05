@@ -10,6 +10,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
@@ -25,8 +26,9 @@ class ConnectApplication extends Component
     public string $mountPath = StandaloneSqlite::DATA_DIRECTORY;
 
     /**
-     * Docker volume that holds the database files.
+     * Docker volume that holds the database files. Set on the server only: it becomes a mount source.
      */
+    #[Locked]
     public string $volumeName = '';
 
     /**
@@ -73,9 +75,11 @@ class ConnectApplication extends Component
         $this->validate([
             'applicationUuid' => 'required|string',
             'mountPath' => ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+            'volumeName' => ValidationPatterns::volumeNameRules(),
         ], [
             'applicationUuid.required' => 'Select an application first.',
             'mountPath.regex' => 'Mount path must start with / and only contain safe path characters.',
+            ...ValidationPatterns::volumeNameMessages('volumeName'),
         ]);
 
         $application = $this->selectedApplication();

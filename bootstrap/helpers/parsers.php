@@ -87,9 +87,10 @@ function validateDockerComposeForInjection(string $composeYaml, ?string $resourc
         if (is_array($serviceConfig) && isset($serviceConfig['networks']) && is_array($serviceConfig['networks'])) {
             foreach ($serviceConfig['networks'] as $networkKey => $networkDetails) {
                 if (is_int($networkKey) && (is_string($networkDetails) || is_int($networkDetails))) {
-                    validateComposeNetworkName((string) $networkDetails, 'service network');
+                    validateComposeNetworkNameWithVariables((string) $networkDetails, 'service network', (string) $serviceName);
                 } elseif (is_string($networkKey) || is_int($networkKey)) {
-                    validateComposeNetworkName((string) $networkKey, 'service network');
+                    // Compose does not interpolate keys, so a key must be a plain network name.
+                    validateComposeNetworkName((string) $networkKey, 'service network', (string) $serviceName);
                 }
             }
         }
@@ -259,40 +260,44 @@ function ensureComposeNetworkNameVariables(Application|Service $resource, iterab
 }
 
 /**
- * A network `name:` may be such a variable: only Docker Compose reads this value and it never runs a
- * shell; Coolify's own network commands use the network keys. The default must still be a valid
- * network name, and nothing else is allowed around the variable.
+ * A network `name:` may contain variables: only Docker Compose reads this value and it never runs a
+ * shell; Coolify's own network commands use the network keys.
  *
- * @throws Exception If the value is not a valid network name or such a variable
+ * @throws Exception If the value is not a valid network name with safe variables
  */
 function validateComposeNetworkNameField(string $name): void
 {
+    validateComposeNetworkNameWithVariables($name, 'network name field');
+}
+
+/**
+ * Allows $VAR, ${VAR}, ${VAR:-default} and ${VAR-default} with safe defaults in a network value that Compose interpolates.
+ */
+function validateComposeNetworkNameWithVariables(string $name, string $context, ?string $serviceName = null): void
+{
     $variable = composeNetworkNameVariable($name);
     if ($variable !== null) {
-        if ($variable['default'] !== null) {
-            validateComposeNetworkName($variable['default'], 'network name field');
-        }
+        $isValid = $variable['default'] === null || ValidationPatterns::isValidDockerNetwork($variable['default']);
+    } else {
+        $hasSafeDefaults = true;
+        $withoutVariables = preg_replace_callback(
+            '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}|\$[A-Za-z_][A-Za-z0-9_]*/',
+            function (array $matches) use (&$hasSafeDefaults): string {
+                $default = $matches[2] ?? '';
+                if ($default !== '' && preg_match('/\A[A-Za-z0-9_.-]+\z/', $default) !== 1) {
+                    $hasSafeDefaults = false;
+                }
 
-        return;
+                return 'x';
+            },
+            $name,
+        );
+        $isValid = $hasSafeDefaults && $withoutVariables !== null && ValidationPatterns::isValidDockerNetwork($withoutVariables);
     }
 
-    // Compose also resolves variables inside a longer name, for example ${COMPOSE_PROJECT_NAME}_default.
-    // Each variable must be $VAR, ${VAR}, ${VAR:-default} or ${VAR-default} with a safe default; the name
-    // is then checked with each variable replaced, so no shell syntax can remain.
-    $withoutVariables = preg_replace_callback(
-        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}|\$[A-Za-z_][A-Za-z0-9_]*/',
-        function (array $matches): string {
-            $default = $matches[2] ?? '';
-            if ($default !== '' && preg_match('/\A[A-Za-z0-9_.-]+\z/', $default) !== 1) {
-                throw new Exception('Invalid Docker Compose network name field. Variable defaults may contain only alphanumeric characters, dots, hyphens, and underscores.');
-            }
-
-            return 'x';
-        },
-        $name,
-    );
-
-    validateComposeNetworkName($withoutVariables ?? $name, 'network name field');
+    if (! $isValid) {
+        throw invalidComposeNetworkNameException($name, $context, $serviceName, allowsVariables: true);
+    }
 }
 
 /**
@@ -300,14 +305,21 @@ function validateComposeNetworkNameField(string $name): void
  *
  * @throws Exception If the network name is not a valid Docker network identifier
  */
-function validateComposeNetworkName(string $networkName, string $context = 'network name'): void
+function validateComposeNetworkName(string $networkName, string $context = 'network name', ?string $serviceName = null): void
 {
     if ($networkName === '' || ! ValidationPatterns::isValidDockerNetwork($networkName)) {
-        throw new Exception(
-            'Invalid Docker Compose '.$context.
-            '. Network names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores.'
-        );
+        throw invalidComposeNetworkNameException($networkName, $context, $serviceName);
     }
+}
+
+function invalidComposeNetworkNameException(string $name, string $context, ?string $serviceName, bool $allowsVariables = false): Exception
+{
+    $location = $serviceName === null ? '' : " in service {$serviceName}";
+
+    return new Exception(
+        "Invalid Docker Compose {$context} \"{$name}\"{$location}. Network names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores"
+        .($allowsVariables ? ', and can use variables such as ${NETWORK:-default}.' : '.')
+    );
 }
 
 /**

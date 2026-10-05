@@ -113,7 +113,7 @@ class Create extends Component
         try {
             $backup = $target->scheduledBackups()->firstOrNew();
             $backup->fill([
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->application->environment->project->team_id,
                 'frequency' => $this->frequency,
                 'enabled' => true,
             ]);

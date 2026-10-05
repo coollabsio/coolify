@@ -430,3 +430,54 @@ test('additional servers that can build fail instead of building when the regist
     'deployments and builds, restart' => ['both', true],
     'builds only, deploy' => ['build', false],
 ]);
+
+test('strict teams restart on the deployment server when no build server is available', function (string $role, bool $buildServerEnabled) {
+    $team = Team::factory()->create(['is_build_server_fallback_enabled' => false]);
+    $deploymentServer = makeRoleServer($team, $role);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, buildServerEnabled: $buildServerEnabled, restartOnly: true);
+
+    $deploymentQueue->shouldNotReceive('setAttribute');
+    $deploymentQueue->shouldReceive('addLogEntry')->once()->with('No suitable build server found. Using the deployment server.');
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($deploymentServer))->toBeTrue()
+        ->and(usesRemoteBuildServer($job))->toBeFalse();
+})->with([
+    'deployments-only server' => ['deployment', false],
+    'application uses a build server' => ['both', true],
+]);
+
+test('strict teams restart on an available build server', function () {
+    $team = Team::factory()->create(['is_build_server_fallback_enabled' => false]);
+    $deploymentServer = makeRoleServer($team, 'deployment');
+    $buildServer = makeRoleServer($team, 'build');
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, buildServerEnabled: false, restartOnly: true);
+
+    $deploymentQueue->shouldReceive('setAttribute')->with('build_server_id', $buildServer->id)->once()->andReturnSelf();
+    $deploymentQueue->shouldReceive('addLogEntry')->once()->with("Found a suitable build server ({$buildServer->name}).");
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($buildServer))->toBeTrue()
+        ->and(usesRemoteBuildServer($job))->toBeTrue();
+});
+
+test('a restart that has to rebuild applies the build server rules again', function (string $role, bool $buildServerEnabled, string $message) {
+    $team = Team::factory()->create(['is_build_server_fallback_enabled' => false]);
+    $deploymentServer = makeRoleServer($team, $role);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, ['docker_registry_image_name' => 'ghcr.io/coollabsio/app'], buildServerEnabled: $buildServerEnabled, restartOnly: true);
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'is_this_additional_server'))->setValue($job, false);
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'saved_outputs'))->setValue($job, collect());
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'pull_request_id'))->setValue($job, 0);
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'production_image_name'))->setValue($job, 'ghcr.io/coollabsio/app:abc123');
+
+    $deploymentQueue->shouldReceive('addLogEntry');
+    invokeBuildServerSelection($job);
+
+    expect(fn () => (new ReflectionMethod(ApplicationDeploymentJob::class, 'should_skip_build'))->invoke($job))
+        ->toThrow(DeploymentException::class, $message);
+})->with([
+    'deployments-only server' => ['deployment', false, 'is set to deployments only, and no usable build server was found.'],
+    'application uses a build server' => ['both', true, 'No available dedicated build server was found.'],
+]);

@@ -2,7 +2,6 @@
 
 use App\Livewire\Analytics as GlobalAnalytics;
 use App\Livewire\Project\Application\Analytics as ApplicationAnalytics;
-use App\Livewire\Project\Application\TrafficOverview;
 use App\Livewire\Project\Service\Analytics as ServiceAnalytics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -369,29 +368,9 @@ it('falls back to the per-key merge with approximate badges when Sentinel lacks 
 
     // The absence is cached: a refresh within the ttl goes straight to the per-key path.
     $component->call('loadData')->assertSet('uniquesApproximate', true);
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $this->application]))->assertOk();
+    loadLazy(Livewire::test(ApplicationAnalytics::class, ['application' => $this->application]))->assertOk();
 
     expect(requestedResourceScopeUrls('/resource/'))->toHaveCount($probes);
-});
-
-it('shows the resource overview in the application traffic card', function () {
-    bindResourceScopeFake(resourceScopeResponses($this->application->uuid, resourceScopeOverview(4200, 33)));
-
-    $component = loadLazy(Livewire::test(TrafficOverview::class, ['application' => $this->application]))
-        ->assertOk()
-        ->assertSee('4,200');
-
-    expect($component->instance()->overview['uniqueVisitors'])->toBe(33)
-        ->and(requestedResourceScopeUrls('/resource/'))->toHaveCount(1)
-        ->and(requestedResourceScopeUrls('/traffic/dashboard'))->toBeEmpty();
-});
-
-it('sums the keys in the application traffic card when Sentinel lacks the resource routes', function () {
-    bindResourceScopeFake(perKeyFallbackResponses($this->application->uuid, $this->apiKey, $this->webKey));
-
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $this->application]))
-        ->assertOk()
-        ->assertSee('150');
 });
 
 it('uses the resource scope when the global analytics filter selects a resource', function () {

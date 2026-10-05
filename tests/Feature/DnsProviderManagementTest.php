@@ -21,6 +21,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Dns\CloudflareDnsProvider;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -825,3 +826,89 @@ function prepareManagedDnsApplication(): array
 
     return ['application' => $application, 'zone' => $zone];
 }
+
+function dnsRecordFinishedPayload(Model $resource, int $teamId, string $hostname = 'app.example.com'): array
+{
+    return [
+        'teamId' => $teamId,
+        'resourceType' => $resource->getMorphClass(),
+        'resourceId' => $resource->getKey(),
+        'hostname' => $hostname,
+        'successful' => true,
+        'credential' => 'Production DNS',
+        'message' => "DNS record added for {$hostname}.",
+    ];
+}
+
+function actingAsDnsTeamMember(Team $team): void
+{
+    $member = User::factory()->create();
+    $team->members()->attach($member->id, ['role' => 'member']);
+    test()->actingAs($member);
+    session(['currentTeam' => $team]);
+}
+
+test('a dns record completion event marks the domain managed for a team admin', function () {
+    ['application' => $application] = prepareManagedDnsApplication();
+    $teamId = $application->team()->id;
+
+    Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call('dnsRecordConfigurationFinished', dnsRecordFinishedPayload($application, $teamId))
+        ->assertDispatched('success', 'DNS record added for app.example.com.');
+
+    expect(collect($application->fresh()->domain_dns_statuses)->pluck('status')->all())->toContain('ok');
+});
+
+test('a team member cannot mark a domain managed with a forged dns completion event', function () {
+    ['application' => $application] = prepareManagedDnsApplication();
+    $teamId = $application->team()->id;
+    $before = $application->fresh()->domain_dns_statuses;
+    actingAsDnsTeamMember($application->team());
+
+    Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call('dnsRecordConfigurationFinished', dnsRecordFinishedPayload($application, $teamId))
+        ->assertNotDispatched('success');
+
+    expect($application->fresh()->domain_dns_statuses)->toBe($before);
+});
+
+test('a dns completion event of another team or a malformed event is ignored', function (string $case) {
+    ['application' => $application] = prepareManagedDnsApplication();
+    $before = $application->fresh()->domain_dns_statuses;
+    $payload = $case === 'other team'
+        ? dnsRecordFinishedPayload($application, Team::factory()->create()->id)
+        : ['hostname' => 'app.example.com', 'successful' => true];
+
+    Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call('dnsRecordConfigurationFinished', $payload)
+        ->assertNotDispatched('success');
+
+    expect($application->fresh()->domain_dns_statuses)->toBe($before);
+})->with(['other team', 'missing fields']);
+
+test('a team member cannot mark a service domain managed with a forged dns completion event', function () {
+    ['application' => $application] = prepareManagedDnsApplication();
+    $team = $application->team();
+    $service = Service::factory()->create([
+        'server_id' => $application->destination->server->id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+        'environment_id' => $application->environment_id,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+    ]);
+    $webApp = ServiceApplication::create([
+        'uuid' => (string) Str::uuid(),
+        'service_id' => $service->id,
+        'name' => 'web',
+        'human_name' => 'Web',
+        'image' => 'nginx:alpine',
+        'fqdn' => 'https://web.example.com',
+    ]);
+    actingAsDnsTeamMember($team);
+
+    Livewire::test(ServiceDomains::class, ['service' => $service->fresh(['applications', 'server'])])
+        ->call('dnsRecordConfigurationFinished', dnsRecordFinishedPayload($webApp, $team->id, 'web.example.com'))
+        ->assertNotDispatched('success');
+
+    expect($webApp->fresh()->domain_dns_statuses)->toBeEmpty();
+});

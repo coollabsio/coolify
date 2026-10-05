@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ScheduledVolumeBackupExecution;
+use App\Notifications\VolumeBackup\RecoveryFailed;
 use Aws\S3\Exception\S3Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -21,19 +22,13 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * ScheduledJobManager dispatches pending recovery again after a backoff, so this job does not retry by itself.
+     * ScheduledJobManager dispatches recovery again once an unreachable server is functional, so this job does not retry by itself.
      */
     public int $tries = 1;
 
     public int $timeout = 120;
 
     public int $uniqueFor = 300;
-
-    public const MAX_ATTEMPTS = 8;
-
-    public const BACKOFF_BASE_MINUTES = 5;
-
-    public const BACKOFF_CAP_MINUTES = 360;
 
     public const CATEGORY_S3_AUTH = 's3_auth';
 
@@ -86,8 +81,8 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
     }
 
     /**
-     * Runs one recovery attempt and records its outcome instead of throwing, so a persistent failure backs off
-     * and eventually needs attention rather than creating a failed job every few minutes.
+     * Runs one recovery attempt and records its outcome instead of throwing. An unreachable server waits for the
+     * server to be functional again; any other failure needs attention and notifies the team.
      */
     public static function recoverWithBounds(ScheduledVolumeBackupExecution $execution): void
     {
@@ -157,16 +152,6 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
         return $failure;
     }
 
-    /**
-     * Returns the minutes to wait before the next automatic attempt after the given number of failed attempts.
-     */
-    public static function backoffMinutes(int $attempts): int
-    {
-        $exponent = max(0, min($attempts - 1, 16));
-
-        return (int) min(self::BACKOFF_BASE_MINUTES * (2 ** $exponent), self::BACKOFF_CAP_MINUTES);
-    }
-
     public static function dispatchCacheKey(int $executionId): string
     {
         return "volume-backup-recovery-dispatched:{$executionId}";
@@ -175,9 +160,7 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
     private static function recordSuccess(ScheduledVolumeBackupExecution $execution): void
     {
         $execution->update([
-            'recovery_attempts' => 0,
             'recovery_last_attempt_at' => null,
-            'recovery_next_retry_at' => null,
             'recovery_error' => null,
             'recovery_needs_attention' => false,
         ]);
@@ -185,18 +168,18 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
 
     private static function recordFailure(ScheduledVolumeBackupExecution $execution, string $category): void
     {
-        $recorded = $execution->getConnection()->transaction(function () use ($execution, $category): ?ScheduledVolumeBackupExecution {
+        $needsAttention = $category !== self::CATEGORY_SERVER_UNREACHABLE;
+        $enteredNeedsAttention = false;
+
+        $recorded = $execution->getConnection()->transaction(function () use ($execution, $category, $needsAttention, &$enteredNeedsAttention): ?ScheduledVolumeBackupExecution {
             $current = ScheduledVolumeBackupExecution::query()->whereKey($execution->id)->lockForUpdate()->first();
             if (! $current) {
                 return null;
             }
 
-            $attempts = $current->recovery_attempts + 1;
-            $needsAttention = $attempts >= self::MAX_ATTEMPTS;
+            $enteredNeedsAttention = $needsAttention && ! $current->recovery_needs_attention;
             $current->update([
-                'recovery_attempts' => $attempts,
                 'recovery_last_attempt_at' => now(),
-                'recovery_next_retry_at' => $needsAttention ? null : now()->addMinutes(self::backoffMinutes($attempts)),
                 'recovery_error' => $category,
                 'recovery_needs_attention' => $needsAttention,
             ]);
@@ -214,10 +197,25 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
             'execution_id' => $recorded->id,
             'execution_uuid' => $recorded->uuid,
             'category' => $category,
-            'attempts' => $recorded->recovery_attempts,
             'needs_attention' => $recorded->recovery_needs_attention,
-            'next_retry_at' => $recorded->recovery_next_retry_at?->toIso8601String(),
         ]);
+
+        if ($enteredNeedsAttention) {
+            self::notifyTeam($recorded);
+        }
+    }
+
+    private static function notifyTeam(ScheduledVolumeBackupExecution $execution): void
+    {
+        try {
+            $execution->loadMissing('scheduledVolumeBackup.team');
+            $execution->scheduledVolumeBackup?->team?->notify(new RecoveryFailed($execution));
+        } catch (Throwable $exception) {
+            Log::channel('scheduled-errors')->error('Failed to send volume backup recovery notification', [
+                'execution_id' => $execution->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private static function categorizeS3Failure(Throwable $exception): string

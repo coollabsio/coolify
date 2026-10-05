@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Js;
@@ -381,6 +382,35 @@ test('the edit modal value autocomplete offers the vault scope with lazy key fet
 
     expect($component->instance()->fetchSecretManagerKeys())->toBe(['DB_PASSWORD']);
 });
+
+test('the value autocomplete lists secret manager keys only for users who can update the resource', function (string $role, bool $allowed) {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'DB_PASSWORD' => 'super-secret-value',
+        ]),
+    ]);
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+    $env = $this->application->environment_variables()->create(['key' => 'MY_VAR', 'value' => 'plain']);
+
+    $user = User::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => $role]);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application']);
+
+    if ($allowed) {
+        expect($component->instance()->fetchSecretManagerKeys())->toBe(['DB_PASSWORD']);
+
+        return;
+    }
+
+    expect(fn () => $component->instance()->fetchSecretManagerKeys())->toThrow(AuthorizationException::class);
+    Http::assertNothingSent();
+})->with([
+    'member' => ['member', false],
+    'admin' => ['admin', true],
+]);
 
 test('the edit modal value autocomplete reports secret provider failures', function () {
     Http::fake([

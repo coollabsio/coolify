@@ -41,6 +41,7 @@ use Symfony\Component\Yaml\Yaml;
 class ApplicationsController extends Controller
 {
     use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployForOutsideHostPaths;
 
     private const APPLICATION_SETTING_FIELDS = [
         'is_git_submodules_enabled',
@@ -5086,7 +5087,7 @@ class ApplicationsController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -5110,6 +5111,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy permission to change the content of a file outside the resource directory.',
             ),
             new OA\Response(
                 response: 422,
@@ -5217,6 +5222,10 @@ class ApplicationsController extends Controller
             }
         }
 
+        if (! $isReadOnly && ($forbidden = $this->outsideContentChangeForbiddenResponse($request, $storage))) {
+            return $forbidden;
+        }
+
         // Always allowed
         if ($request->has('is_preview_suffix_enabled')) {
             $storage->is_preview_suffix_enabled = $request->is_preview_suffix_enabled;
@@ -5287,7 +5296,7 @@ class ApplicationsController extends Controller
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
-                            'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -5303,6 +5312,7 @@ class ApplicationsController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -5411,9 +5421,18 @@ class ApplicationsController extends Controller
             }
 
             try {
-                $fsPath = confinePathToBase(application_configuration_dir().'/'.$application->uuid, $request->fs_path, 'storage source path');
+                $fsPath = LocalFileVolume::resolveHostPath(application_configuration_dir().'/'.$application->uuid, $request->fs_path, 'storage source path');
                 $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
-                LocalFileVolume::assertRemotePathIsConfined($application->workdir(), $fsPath, $application->destination->server);
+                $forbidden = $this->outsideHostPathForbiddenResponse($request, new LocalFileVolume([
+                    'fs_path' => $fsPath,
+                    'is_directory' => true,
+                    'resource_id' => $application->id,
+                    'resource_type' => get_class($application),
+                ]));
+                if ($forbidden) {
+                    return $forbidden;
+                }
+                LocalFileVolume::assertHostPathOnServer(application_configuration_dir().'/'.$application->uuid, $fsPath, $application->destination->server, isDirectory: true);
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -5465,11 +5484,32 @@ class ApplicationsController extends Controller
         } else {
             try {
                 $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
-                $fsPath = confineFileMountPath(application_configuration_dir().'/'.$application->uuid, $mountPath, 'file storage path');
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            try {
+                if ($request->filled('fs_path')) {
+                    $fsPath = LocalFileVolume::resolveHostPath(application_configuration_dir().'/'.$application->uuid, $request->fs_path, 'file storage source path');
+                    $forbidden = $this->outsideHostPathForbiddenResponse($request, new LocalFileVolume([
+                        'fs_path' => $fsPath,
+                        'resource_id' => $application->id,
+                        'resource_type' => get_class($application),
+                    ]));
+                    if ($forbidden) {
+                        return $forbidden;
+                    }
+                    LocalFileVolume::assertHostPathOnServer(application_configuration_dir().'/'.$application->uuid, $fsPath, $application->destination->server, isDirectory: false);
+                } else {
+                    $fsPath = confineFileMountPath(application_configuration_dir().'/'.$application->uuid, $mountPath, 'file storage path');
+                }
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
             }
 

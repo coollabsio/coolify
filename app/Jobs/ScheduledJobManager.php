@@ -497,13 +497,15 @@ class ScheduledJobManager implements ShouldQueue
                 ->where('stop_recovery_pending', true)
                 ->orWhere('s3_cleanup_pending', true))
             ->where('recovery_needs_attention', false)
-            ->where(fn (Builder $query) => $query
-                ->whereNull('recovery_next_retry_at')
-                ->orWhere('recovery_next_retry_at', '<=', now()))
+            ->with('scheduledVolumeBackup.backupable.resource')
             ->chunkById(self::CHUNK_SIZE, function ($executions) use (&$dispatched): bool {
                 foreach ($executions as $execution) {
                     if ($dispatched >= self::VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES) {
                         return false;
+                    }
+
+                    if ($execution->stop_recovery_pending && $execution->scheduledVolumeBackup?->server()?->isFunctional() === false) {
+                        continue;
                     }
 
                     if (Cache::add(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id), true, now()->addMinutes(self::VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES))) {

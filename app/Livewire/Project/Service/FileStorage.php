@@ -247,9 +247,9 @@ class FileStorage extends Component
             } elseif ($this->fileStorage->is_host_file) {
                 $message = 'Host file mount removed.';
             }
-            $deletedFromServer = $this->permanently_delete && ! $this->fileStorage->is_host_file;
+            $deletedFromServer = $this->canDeleteFromServer() && in_array('permanently_delete', $selectedActions, true);
             if ($deletedFromServer) {
-                $message = 'Directory deleted from the server.';
+                $message = $this->fileStorage->is_directory ? 'Directory deleted from the server.' : 'File deleted from the server.';
                 $this->fileStorage->deleteStorageOnServer();
             }
             $this->fileStorage->delete();
@@ -340,18 +340,38 @@ class FileStorage extends Component
         ], fn ($value) => $value !== null));
     }
 
+    /**
+     * Only mounts inside the resource directory are ever deleted on the server.
+     */
+    private function canDeleteFromServer(): bool
+    {
+        return ! $this->fileStorage->is_host_file && ! $this->fileStorage->isOutsideResourceDirectory();
+    }
+
     public function render()
     {
+        $kind = $this->fileStorage->is_directory ? 'directory' : 'file';
+        $deletionActions = [
+            $this->fileStorage->is_host_file
+                ? 'The mount will be removed from the container.'
+                : "The selected {$kind} will be permanently deleted from the container.",
+        ];
+        $deletionCheckboxes = [];
+
+        if ($this->canDeleteFromServer()) {
+            $deletionCheckboxes[] = [
+                'id' => 'permanently_delete',
+                'label' => $this->fileStorage->is_directory
+                    ? 'The selected directory and all its contents will be permanently deleted from the server.'
+                    : 'The selected file will be permanently deleted from the server.',
+            ];
+        } else {
+            $deletionActions[] = "Only the mount configuration will be removed. The {$kind} at {$this->fileStorage->fs_path} is not deleted on the server.";
+        }
+
         return view('livewire.project.service.file-storage', [
-            'directoryDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permanently deleted from the server.'],
-            ],
-            'fileDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted from the server.'],
-            ],
-            'hostFileDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'Only the mount configuration will be removed. The host file will not be deleted.'],
-            ],
+            'deletionCheckboxes' => $deletionCheckboxes,
+            'deletionActions' => $deletionActions,
         ]);
     }
 }

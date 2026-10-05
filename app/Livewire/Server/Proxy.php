@@ -220,9 +220,18 @@ class Proxy extends Component
         }
     }
 
+    /**
+     * The file can hold secrets; non-editors get no content instead of a 403 because x-init calls this.
+     */
     public function loadProxyConfiguration()
     {
         try {
+            if (! auth()->user()?->can('update', $this->server)) {
+                $this->proxySettings = null;
+
+                return;
+            }
+
             $this->proxySettings = GetProxyConfiguration::run($this->server);
             $this->clearAppliedTraefikBranchWarning();
         } catch (\Throwable $e) {

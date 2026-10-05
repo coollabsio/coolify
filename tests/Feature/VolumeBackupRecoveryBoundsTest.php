@@ -17,12 +17,15 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\VolumeBackup\RecoveryFailed;
 use Aws\Command;
 use Aws\S3\Exception\S3Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +36,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Server::flushIdentityMap();
+    Notification::fake();
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 });
@@ -130,9 +134,22 @@ function makeRecoveryBoundsServerFunctional(Server $server): void
     ]);
 }
 
-it('doubles the recovery backoff and caps it at six hours', function () {
-    expect(collect(range(1, 9))->map(fn (int $attempts) => VolumeBackupRecoveryJob::backoffMinutes($attempts))->all())
-        ->toBe([5, 10, 20, 40, 80, 160, 320, 360, 360]);
+it('notifies the team once when recovery needs attention', function () {
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_failure_discord_notifications' => true]);
+    $team->webhookNotificationSettings()->update(['webhook_enabled' => true, 'backup_failure_webhook_notifications' => false]);
+    [, , , $backup] = createRecoveryBoundsBackup($team);
+    $execution = createRecoveryBoundsExecution($backup);
+    failRecoveryBoundsS3Delete('AccessDenied');
+
+    VolumeBackupRecoveryJob::recoverWithBounds($execution);
+    VolumeBackupRecoveryJob::recoverWithBounds($execution);
+
+    Notification::assertSentToTimes($team, RecoveryFailed::class, 1);
+    Notification::assertSentTo($team, RecoveryFailed::class, fn (RecoveryFailed $notification, array $channels) => $notification->execution->is($execution)
+        && $channels === [DiscordChannel::class]
+        && str_contains($notification->toDiscord()->description, 'S3 credentials were rejected')
+        && str_contains((string) $notification->toMail()->render(), 'S3 credentials were rejected'));
 });
 
 it('records a categorized S3 cleanup failure without throwing or leaking the S3 message', function () {
@@ -148,11 +165,9 @@ it('records a categorized S3 cleanup failure without throwing or leaking the S3 
     $execution->refresh();
     expect($execution->s3_cleanup_pending)->toBeTrue()
         ->and($execution->s3_storage_deleted)->toBeFalse()
-        ->and($execution->recovery_attempts)->toBe(1)
         ->and($execution->recovery_error)->toBe('s3_auth')
         ->and($execution->recovery_last_attempt_at->equalTo(now()))->toBeTrue()
-        ->and($execution->recovery_next_retry_at->equalTo(now()->addMinutes(5)))->toBeTrue()
-        ->and($execution->recovery_needs_attention)->toBeFalse()
+        ->and($execution->recovery_needs_attention)->toBeTrue()
         ->and($execution->message)->toBe('Worker timed out');
     $logger->shouldHaveReceived('warning')->once()->with(
         'Volume backup recovery failed',
@@ -162,38 +177,37 @@ it('records a categorized S3 cleanup failure without throwing or leaking the S3 
     );
 });
 
-it('categorizes a missing S3 bucket and grows the backoff on each failure', function () {
+it('categorizes a missing S3 bucket and does not try again after the first failure', function () {
     Carbon::setTestNow('2026-10-03 12:00:00');
     [, , , $backup] = createRecoveryBoundsBackup(Team::factory()->create());
     $execution = createRecoveryBoundsExecution($backup);
-    failRecoveryBoundsS3Delete('NoSuchBucket');
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->andThrow(UnableToDeleteFile::atLocation('partial.tar.gz', '', new S3Exception(
+        'The specified bucket does not exist',
+        new Command('DeleteObject'),
+        ['code' => 'NoSuchBucket'],
+    )));
+    Storage::shouldReceive('build')->once()->andReturn($disk);
 
     VolumeBackupRecoveryJob::recoverWithBounds($execution);
     VolumeBackupRecoveryJob::recoverWithBounds($execution);
 
     $execution->refresh();
     expect($execution->recovery_error)->toBe('s3_bucket')
-        ->and($execution->recovery_attempts)->toBe(2)
-        ->and($execution->recovery_next_retry_at->equalTo(now()->addMinutes(10)))->toBeTrue();
+        ->and($execution->recovery_needs_attention)->toBeTrue();
 });
 
-it('needs attention after the maximum attempts and stops automatic recovery', function () {
+it('stops automatic recovery after the first failure that is not an unreachable server', function () {
     Carbon::setTestNow('2026-10-03 12:00:00');
     config(['constants.coolify.self_hosted' => true]);
     Queue::fake();
     [, , , $backup] = createRecoveryBoundsBackup(Team::factory()->create());
-    $execution = createRecoveryBoundsExecution($backup, [
-        'recovery_attempts' => VolumeBackupRecoveryJob::MAX_ATTEMPTS - 1,
-    ]);
+    $execution = createRecoveryBoundsExecution($backup);
     failRecoveryBoundsS3Delete('AccessDenied');
 
     VolumeBackupRecoveryJob::recoverWithBounds($execution);
-    VolumeBackupRecoveryJob::recoverWithBounds($execution);
 
-    $execution->refresh();
-    expect($execution->recovery_needs_attention)->toBeTrue()
-        ->and($execution->recovery_attempts)->toBe(VolumeBackupRecoveryJob::MAX_ATTEMPTS)
-        ->and($execution->recovery_next_retry_at)->toBeNull();
+    expect($execution->fresh()->recovery_needs_attention)->toBeTrue();
 
     Carbon::setTestNow('2026-10-04 12:00:00');
     (new ScheduledJobManager)->handle();
@@ -201,20 +215,27 @@ it('needs attention after the maximum attempts and stops automatic recovery', fu
     Queue::assertNotPushed(VolumeBackupRecoveryJob::class);
 });
 
-it('waits for the backoff before dispatching recovery again', function () {
+it('dispatches container recovery again only when the server is functional, once per execution', function () {
     Carbon::setTestNow('2026-10-03 12:00:00');
     config(['constants.coolify.self_hosted' => true]);
+    Storage::fake('ssh-mux');
     Queue::fake();
-    [, , , $backup] = createRecoveryBoundsBackup(Team::factory()->create());
+    [, , $server, $backup] = createRecoveryBoundsBackup(Team::factory()->create());
+    $server->settings()->update(['is_reachable' => false]);
     createRecoveryBoundsExecution($backup, [
-        'recovery_attempts' => 3,
-        'recovery_next_retry_at' => now()->addMinutes(20),
+        'stop_recovery_pending' => true,
+        'recovery_error' => 'server_unreachable',
+        'recovery_last_attempt_at' => now(),
     ]);
 
     (new ScheduledJobManager)->handle();
+    Carbon::setTestNow('2026-10-04 12:00:00');
+    (new ScheduledJobManager)->handle();
     Queue::assertNotPushed(VolumeBackupRecoveryJob::class);
 
-    Carbon::setTestNow('2026-10-03 12:20:00');
+    makeRecoveryBoundsServerFunctional($server);
+    Server::flushIdentityMap();
+    (new ScheduledJobManager)->handle();
     (new ScheduledJobManager)->handle();
     Queue::assertPushed(VolumeBackupRecoveryJob::class, 1);
 });
@@ -242,16 +263,15 @@ it('cleans the S3 upload even when container recovery fails', function () {
         ->and($execution->s3_cleanup_pending)->toBeFalse()
         ->and($execution->s3_storage_deleted)->toBeTrue()
         ->and($execution->recovery_error)->toBe('server_unreachable')
-        ->and($execution->recovery_attempts)->toBe(1);
+        ->and($execution->recovery_needs_attention)->toBeFalse();
+    Notification::assertNothingSent();
 });
 
 it('resets the recovery state after a successful attempt', function () {
     [, , , $backup] = createRecoveryBoundsBackup(Team::factory()->create());
     $execution = createRecoveryBoundsExecution($backup, [
-        'recovery_attempts' => 4,
-        'recovery_error' => 's3_auth',
+        'recovery_error' => 'server_unreachable',
         'recovery_last_attempt_at' => now()->subHour(),
-        'recovery_next_retry_at' => now()->subMinute(),
     ]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->andReturnTrue();
@@ -262,9 +282,9 @@ it('resets the recovery state after a successful attempt', function () {
     $execution->refresh();
     expect($execution->s3_cleanup_pending)->toBeFalse()
         ->and($execution->s3_storage_deleted)->toBeTrue()
-        ->and($execution->recovery_attempts)->toBe(0)
         ->and($execution->recovery_error)->toBeNull()
-        ->and($execution->recovery_next_retry_at)->toBeNull();
+        ->and($execution->recovery_last_attempt_at)->toBeNull()
+        ->and($execution->recovery_needs_attention)->toBeFalse();
 });
 
 it('only blocks new scheduled backups while stopped containers await recovery', function (array $pending, bool $dispatched) {
@@ -340,7 +360,6 @@ it('shows the recovery state and retries recovery manually', function () {
     signInForRecoveryBounds($this, $team);
     [$application, $volume, , $backup] = createRecoveryBoundsBackup($team);
     $execution = createRecoveryBoundsExecution($backup, [
-        'recovery_attempts' => VolumeBackupRecoveryJob::MAX_ATTEMPTS,
         'recovery_error' => 's3_auth',
         'recovery_needs_attention' => true,
     ]);
@@ -354,10 +373,9 @@ it('shows the recovery state and retries recovery manually', function () {
         ->assertSee('Recovery pending');
 
     $execution->refresh();
-    expect($execution->recovery_attempts)->toBe(0)
-        ->and($execution->recovery_needs_attention)->toBeFalse()
-        ->and($execution->recovery_next_retry_at)->toBeNull()
+    expect($execution->recovery_needs_attention)->toBeFalse()
         ->and(Cache::has(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id)))->toBeFalse();
+    Queue::assertPushed(VolumeBackupRecoveryJob::class, 1);
     Queue::assertPushed(VolumeBackupRecoveryJob::class, fn (VolumeBackupRecoveryJob $job) => $job->execution->is($execution));
 });
 
@@ -365,7 +383,6 @@ it('prevents another team from retrying recovery', function () {
     Queue::fake();
     [$application, $volume, , $backup] = createRecoveryBoundsBackup(Team::factory()->create());
     $execution = createRecoveryBoundsExecution($backup, [
-        'recovery_attempts' => VolumeBackupRecoveryJob::MAX_ATTEMPTS,
         'recovery_needs_attention' => true,
     ]);
     $otherTeam = Team::factory()->create();
@@ -378,7 +395,6 @@ it('prevents another team from retrying recovery', function () {
         ->call('retryRecovery', $execution->id)
         ->assertDispatched('error');
 
-    expect($execution->fresh()->recovery_needs_attention)->toBeTrue()
-        ->and($execution->fresh()->recovery_attempts)->toBe(VolumeBackupRecoveryJob::MAX_ATTEMPTS);
+    expect($execution->fresh()->recovery_needs_attention)->toBeTrue();
     Queue::assertNotPushed(VolumeBackupRecoveryJob::class);
 });

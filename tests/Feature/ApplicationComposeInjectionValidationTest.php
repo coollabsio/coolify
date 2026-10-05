@@ -356,3 +356,24 @@ test('the Compose deployment validates the repository file before any command us
         ->and($loadPosition)->toBeLessThan(strpos($body, 'base64 -d'))
         ->and($body)->toContain('"stat -c \'%F\' ".escapeshellarg($realPathInGit)');
 });
+
+test('loading a Compose file with a variable service network saves it', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - \${NET:-proxy}\nnetworks:\n  proxy:\n    external: true\n";
+    fakeRepositoryCompose($compose);
+
+    $this->application->loadComposeFile();
+
+    expect($this->application->fresh()->docker_compose_raw)->toBe(trim($compose));
+});
+
+test('the deployment log names the service and network that failed validation', function () {
+    fakeRepositoryCompose("services:\n  web:\n    image: nginx\n    networks:\n      - '\$(id)'\n");
+    $logEntries = [];
+    $job = composeDeploymentJob($this->application, 0, $logEntries);
+
+    expect(fn () => (new ReflectionMethod(ApplicationDeploymentJob::class, 'loadComposeFileForDeployment'))->invoke($job))
+        ->toThrow(DeploymentException::class);
+
+    expect(collect($logEntries)->pluck(0)->implode("\n"))
+        ->toContain('Invalid Docker Compose service network "$(id)" in service web.');
+});

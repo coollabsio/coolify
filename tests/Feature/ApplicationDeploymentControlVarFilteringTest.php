@@ -181,6 +181,18 @@ it('keeps deployment logging available if value formatting fails', function () {
         ->toBe(REDACTED);
 });
 
+it('redacts shell-escaped remote secrets from command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['DB_PASS' => "s3cr'et-value"],
+    ]);
+
+    $redacted = invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', "docker build --build-arg DB_PASS='s3cr'\\''et-value' --env 'DB_PASS=s3cr'\\''et-value' .");
+
+    expect($redacted)->not->toContain('s3cr')
+        ->toContain('--build-arg DB_PASS='.REDACTED);
+});
+
 it('ignores empty and non-string remote secrets when redacting command output', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [

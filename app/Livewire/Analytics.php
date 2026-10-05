@@ -13,6 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -22,8 +23,10 @@ class Analytics extends Component
 {
     use BuildsTrafficChartPayload;
 
+    #[Locked]
     public string $chartId = 'global-analytics';
 
+    #[Locked]
     public ?string $scopedServerUuid = null;
 
     /** Traffic-enabled servers owned by the current team. */

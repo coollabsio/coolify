@@ -248,7 +248,7 @@ test('converting and deleting a file storage records storage events', function (
     ]);
 
     Livewire::test(FileStorage::class, ['fileStorage' => $file->fresh()])
-        ->call('delete', 'password')
+        ->call('delete', 'password', ['permanently_delete'])
         ->assertDispatched('success');
 
     expect($file->fresh())->toBeNull()

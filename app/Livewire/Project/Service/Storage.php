@@ -7,6 +7,7 @@ use App\Livewire\Project\Shared\Storages\All as StorageList;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
@@ -34,6 +35,11 @@ class Storage extends Component
     public string $mount_path = '';
 
     public string $file_storage_path = '';
+
+    /**
+     * Optional host path of a new file mount; empty means the resource directory.
+     */
+    public string $file_storage_source = '';
 
     public ?string $file_storage_content = null;
 
@@ -311,12 +317,18 @@ class Storage extends Component
 
             $this->validate([
                 'file_storage_path' => 'required|string',
+                'file_storage_source' => 'nullable|string',
                 'file_storage_content' => 'nullable|string',
             ]);
 
             $this->file_storage_path = validateFileMountPath($this->file_storage_path, 'file storage path');
 
-            $fs_path = confineFileMountPath($this->fileStorageHostPath(), $this->file_storage_path, 'file storage path');
+            if (filled($this->file_storage_source)) {
+                $fs_path = LocalFileVolume::resolveHostPath($this->fileStorageHostPath(), $this->file_storage_source, 'file storage source path');
+                LocalFileVolume::assertHostPathOnServer($this->fileStorageHostPath(), $fs_path, $this->storageServer(), isDirectory: false);
+            } else {
+                $fs_path = confineFileMountPath($this->fileStorageHostPath(), $this->file_storage_path, 'file storage path');
+            }
 
             $fileVolume = LocalFileVolume::create([
                 'fs_path' => $fs_path,
@@ -384,7 +396,7 @@ class Storage extends Component
                 'file_storage_directory_destination' => 'required|string',
             ]);
 
-            $this->file_storage_directory_source = confinePathToBase(
+            $this->file_storage_directory_source = LocalFileVolume::resolveHostPath(
                 $this->fileStorageHostPath(),
                 $this->file_storage_directory_source,
                 'storage source path'
@@ -393,8 +405,7 @@ class Storage extends Component
                 $this->file_storage_directory_destination,
                 'storage destination path'
             );
-            $server = $this->resource->service?->server ?? $this->resource->destination->server;
-            LocalFileVolume::assertRemotePathIsConfined($this->fileStorageHostPath(), $this->file_storage_directory_source, $server);
+            LocalFileVolume::assertHostPathOnServer($this->fileStorageHostPath(), $this->file_storage_directory_source, $this->storageServer(), isDirectory: true);
 
             $directoryVolume = LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
@@ -421,6 +432,7 @@ class Storage extends Component
         $this->name = $this->generateDefaultVolumeName();
         $this->mount_path = '';
         $this->file_storage_path = '';
+        $this->file_storage_source = '';
         $this->file_storage_content = null;
         $this->file_storage_directory_destination = '';
         $this->host_file_storage_source = '';
@@ -457,8 +469,18 @@ class Storage extends Component
         return ($name ?: 'volume').'-data';
     }
 
+    private function storageServer(): Server
+    {
+        return $this->resource->service?->server ?? $this->resource->destination->server;
+    }
+
     public function fileStoragePreviewPath(): string
     {
+        $source = str($this->file_storage_source)->trim();
+        if ($source->isNotEmpty()) {
+            return $source->startsWith('/') ? $source->value() : $this->fileStorageHostPath().'/'.preg_replace('#^\./#', '', $source->value());
+        }
+
         $path = str($this->file_storage_path)->trim();
 
         if ($path->isEmpty()) {

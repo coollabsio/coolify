@@ -251,14 +251,21 @@ class StartKeydb
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->keydb_password;
         foreach ($this->database->runtime_environment_variables as $env) {
+            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+            if ($env->key === 'REDIS_PASSWORD' && ! $env->is_shared && ! $usesSecretManager) {
+                $env->update(['value' => $this->database->keydb_password]);
+            }
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             // Credentials below are placed directly in the compose file (healthcheck, command).
             $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
+                if ($env->is_shared && ! $usesSecretManager) {
+                    $this->database->update(['keydb_password' => $rawValue]);
+                }
                 $this->resolvedRedisPassword = $composeFileValue;
-                $this->redisPasswordFromSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+                $this->redisPasswordFromSecretManager = $usesSecretManager;
             }
         }
 
@@ -318,14 +325,14 @@ class StartKeydb
     /**
      * The password argument of the start command. Docker Compose splits the command like a shell, so the
      * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
-     * quoting would change the password the server receives (backslashes and quotes), so their server
-     * password stays the same.
+     * quoting would change it (quotes, backslashes, whitespace, ; & | < >): Compose splits or cuts the old
+     * command there, so quoting now would change the password or options and can lose data.
      */
     private function requirePassArgument(): string
     {
         $keepsUnquotedPassword = $this->database->legacy_password_quoting
             && ! $this->redisPasswordFromSecretManager
-            && strpbrk($this->resolvedRedisPassword, '\\\'"') !== false;
+            && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
 
         return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }

@@ -53,7 +53,8 @@ class SettingsBackup extends Component
         }
         $settings = instanceSettings();
         $this->server = Server::findOrFail(0);
-        $this->database = StandalonePostgresql::whereName('coolify-db')->first();
+        // The instance database is always id 0; a team database can also be named coolify-db.
+        $this->database = StandalonePostgresql::find(0);
         $s3s = S3Storage::whereTeamId(0)->get() ?? [];
         if ($this->database) {
             $this->uuid = $this->database->uuid;
@@ -81,7 +82,7 @@ class SettingsBackup extends Component
     {
         try {
             $this->authorize('update', $this->settings);
-            $this->database = StandalonePostgresql::whereName('coolify-db')->first();
+            $this->database = StandalonePostgresql::find(0);
             if (! $this->database) {
                 $server = Server::findOrFail(0);
                 $out = instant_remote_process(['docker inspect coolify-db'], $server);

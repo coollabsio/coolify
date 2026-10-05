@@ -182,7 +182,12 @@
                                                 x-data="{
                                                     hostPath: @js($this->fileStorageHostPath()),
                                                     filePath: @entangle('file_storage_path'),
+                                                    sourcePath: @entangle('file_storage_source'),
                                                     previewPath() {
+                                                        const source = (this.sourcePath || '').trim();
+                                                        if (source !== '') {
+                                                            return source.startsWith('/') ? source : `${this.hostPath}/${source.replace(/^\.\//, '')}`;
+                                                        }
                                                         const path = (this.filePath || '').trim();
 
                                                         return this.hostPath + (path === '' ? '/' : (path.startsWith('/') ? path : `/${path}`));
@@ -202,6 +207,11 @@
                                                         label="Destination Path" required
                                                         x-on:input="filePath = $event.target.value"
                                                         helper="File location inside the container" />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/srv/config/app.conf" id="file_storage_source"
+                                                        label="Source Path"
+                                                        x-on:input="sourcePath = $event.target.value"
+                                                        helper="Optional. File location on the host: an absolute path anywhere on the host, or a path relative to the resource directory. Empty: Coolify keeps the file in the resource directory. Coolify never deletes a file outside the resource directory." />
                                                     <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
                                                         id="file_storage_content"></x-forms.textarea>
                                                     <div class="flex justify-end pt-2">
@@ -326,7 +336,7 @@
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="{{ application_configuration_dir() }}/{{ $resource->uuid }}/etc/nginx"
                                                         id="file_storage_directory_source" label="Source Directory"
-                                                        required helper="Directory on the host system." />
+                                                        required helper="Directory on the host: an absolute path anywhere on the host, or a path relative to the resource directory. Coolify creates it when it is missing, and never deletes a directory outside the resource directory." />
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx" id="file_storage_directory_destination"
                                                         label="Destination Directory" required

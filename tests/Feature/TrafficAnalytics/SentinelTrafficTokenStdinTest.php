@@ -25,6 +25,8 @@ beforeEach(function () {
         'team_id' => $team->id,
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
     ]);
+    // Only a functional server is queried.
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
     $this->client = new class($this->server) extends SentinelTrafficClient
     {

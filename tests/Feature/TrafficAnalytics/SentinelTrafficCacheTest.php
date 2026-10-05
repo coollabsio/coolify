@@ -42,6 +42,8 @@ it('surfaces the real remote error instead of a TypeError when the fetch fails',
         'team_id' => $team->id,
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
     ]);
+    // Only a functional server is queried.
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
     expect(fn () => (new SentinelTrafficClient($server))->overview('app', 'a', 'b'))
         ->toThrow(RuntimeException::class, $message);
