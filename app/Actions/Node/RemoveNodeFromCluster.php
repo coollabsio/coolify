@@ -68,6 +68,7 @@ class RemoveNodeFromCluster
                 'network_attempts' => 0,
                 'network_next_attempt_at' => null,
                 'network_pending_leave' => $leaveDeferred ? $leaveRequest : $node->network_pending_leave,
+                'is_ingress' => false,
             ]);
             $cluster->increment('desired_revision');
             $cluster->update(['network_status' => $cluster->nodes()->exists() ? 'reconciling' : 'pending']);

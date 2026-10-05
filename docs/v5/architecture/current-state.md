@@ -330,8 +330,8 @@ released; they are not a temporary compatibility mode.
 
 The accepted target supports combined, control-plane-only, and worker modes.
 Fresh installations can use the Node host stack. The full installer, complete
-application orchestration, volumes, secrets, ingress, and placement flows are
-not implemented in this slice.
+application orchestration, volumes, secrets, HTTPS ingress, and placement flows
+are not implemented in this slice.
 
 ### Coolify Cloud
 
@@ -375,6 +375,11 @@ cross-instance command routing are not implemented yet.
 - pinned host-native Corrosion, Sentinel-published owned and expiring endpoint
   snapshots, cluster membership observation, and private internal workload DNS;
 - explicit two-QEMU-Node development topology for cross-Node network tests.
+- HTTP ingress: ingress Nodes run Caddy on port 80, managed by their Sentinel
+  with `ingress.reconcile.v1`. Coolify stores the domains and port of each
+  cluster application and sends the route list as the last network step.
+  Caddy routes to healthy containers from Corrosion. See
+  [decision 0005](../decisions/0005-node-ingress.md).
 
 ### Not implemented
 
@@ -383,7 +388,8 @@ cross-instance command routing are not implemented yet.
 - complete application deployment orchestration, volumes, secrets, networks,
   proxy configuration, health gates, rollback, and placement;
 - scheduled recovery of stale Node operations. Recovery is manual for now;
-- the remaining Podman volume, secret, network, ingress, and builder
+- HTTPS for ingress Nodes;
+- the remaining Podman volume, secret, network, and builder
   capabilities that will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
 - retirement of the existing Sentinel container.

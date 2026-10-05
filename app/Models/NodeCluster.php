@@ -108,6 +108,24 @@ class NodeCluster extends BaseModel
                 : 'pending';
     }
 
+    /**
+     * The ingress state of one member Node: `active` when Sentinel runs Caddy with the desired
+     * revision, `pending` while the Node still has to apply it.
+     *
+     * @return 'off'|'active'|'pending'
+     */
+    public function nodeIngressState(Node $node): string
+    {
+        if (! $node->is_ingress) {
+            return 'off';
+        }
+
+        return data_get($node->metadata, 'ingress_active') === true
+            && (int) data_get($node->metadata, 'ingress_applied_revision') === $this->desired_revision
+                ? 'active'
+                : 'pending';
+    }
+
     public function isNodeNetworkInSync(Node $node): bool
     {
         return $this->nodeNetworkState($node) === 'converged';

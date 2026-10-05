@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Node\FetchLatestSentinelRelease;
+use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeRole;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -39,6 +41,7 @@ class Node extends BaseModel
             'network_attempts' => 'integer',
             'network_next_attempt_at' => 'datetime',
             'network_pending_leave' => 'array',
+            'is_ingress' => 'boolean',
         ];
     }
 
@@ -172,6 +175,47 @@ class Node extends BaseModel
         }
 
         return in_array($capability, $capabilities, true);
+    }
+
+    /**
+     * Merges keys into `metadata` under a row lock. Flux refreshes and network reconciliation write
+     * different keys concurrently; writing back a whole copy loaded earlier would drop the other
+     * writer's keys, such as the ingress state recorded while a `system.info` request was waiting.
+     *
+     * @param  array<string, mixed>  $values  Metadata keys to set.
+     * @param  array<string, mixed>  $attributes  Other columns to update in the same write.
+     */
+    public function mergeMetadata(array $values, array $attributes = []): void
+    {
+        $saved = DB::transaction(function () use ($values, $attributes): self {
+            $locked = static::query()->lockForUpdate()->findOrFail($this->getKey());
+            $metadata = is_array($locked->metadata) ? $locked->metadata : [];
+            $locked->forceFill([...$attributes, 'metadata' => [...$metadata, ...$values]])->save();
+
+            return $locked;
+        });
+        $columns = ['metadata', 'updated_at', ...array_keys($attributes)];
+        foreach ($columns as $column) {
+            $this->setAttribute($column, $saved->getAttribute($column));
+        }
+        $this->syncOriginalAttributes($columns);
+    }
+
+    /** Whether Sentinel on this Node reported that it can run the ingress proxy. */
+    /**
+     * Whether a network run applied this revision or a newer one up to its last step: the
+     * firewall, and ingress on Nodes that get the ingress command.
+     */
+    public function hasAppliedNetworkRevision(int $revision): bool
+    {
+        return (int) $this->network_applied_revision >= $revision
+            && (int) data_get($this->metadata, 'firewall_applied_revision') >= $revision
+            && (! ($this->is_ingress || $this->supportsIngress()) || (int) data_get($this->metadata, 'ingress_applied_revision') >= $revision);
+    }
+
+    public function supportsIngress(): bool
+    {
+        return $this->supportsCapability(ReconcileNodeClusterNetwork::INGRESS_CAPABILITY) === true;
     }
 
     public function ensureCapability(string $capability): void

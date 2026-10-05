@@ -65,9 +65,8 @@ class FetchFluxNodeInformation
             $information['operating_system_version'] ?? null,
         ])));
         $observedAt = Carbon::createFromTimestampMs($information['observed_at_unix_ms']);
-        $metadata = is_array($node->metadata) ? $node->metadata : [];
-        $metadata = [
-            ...$metadata,
+        // Merged under a row lock: a network command may record its own keys while this request waits.
+        $node->mergeMetadata([
             'hostname' => $information['hostname'] ?? null,
             'os' => $operatingSystem !== '' ? $operatingSystem : 'Unknown',
             'arch' => $information['architecture'] ?? 'Unknown',
@@ -93,9 +92,7 @@ class FetchFluxNodeInformation
             ],
             'collected_at' => $observedAt->toIso8601String(),
             'source' => 'flux',
-        ];
-
-        $node->update(['metadata' => $metadata, 'sentinel_version' => mb_substr($information['sentinel_version'], 0, 100)]);
+        ], ['sentinel_version' => mb_substr($information['sentinel_version'], 0, 100)]);
 
         return $information;
     }

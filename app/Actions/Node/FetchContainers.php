@@ -76,13 +76,7 @@ class FetchContainers
         ])->all();
 
         ReconcileContainers::run($node, $containers);
-        $node->refresh();
-        $node->forceFill([
-            'metadata' => [
-                ...($node->metadata ?? []),
-                'container_inventory_observed_at' => $observedAt,
-            ],
-        ])->save();
+        $node->mergeMetadata(['container_inventory_observed_at' => $observedAt]);
 
         return count($containers);
     }

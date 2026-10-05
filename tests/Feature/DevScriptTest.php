@@ -286,6 +286,25 @@ it('layers the node-dev overlay and skips qemu worker nodes without kvm', functi
         ->not->toContain('dev:qemu');
 });
 
+it('keeps the local flux image of scripts/node-e2e on start and removes it on destroy', function () {
+    copy(base_path('docker-compose.node-dev.yml'), $this->devRoot.'/main/docker-compose.node-dev.yml');
+    runDevScript('main', ['start']);
+    $override = $this->devRoot.'/main/.dev-instances/main-flux-override.yml';
+    file_put_contents($override, "services:\n  flux:\n    image: flux:main-dev\n");
+    file_put_contents($this->devLog, '');
+
+    $process = runDevScript('main', ['start']);
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(devScriptLog())
+        ->toContain("-f docker-compose.dev-multi.yml -f docker-compose.node-dev.yml -f {$override} --env-file .env");
+
+    $process = runDevScript('main', ['destroy', 'main']);
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and($override)->not->toBeFile();
+});
+
 it('starts and bootstraps the qemu worker nodes after the kvm localhost', function () {
     if (! function_exists('posix_geteuid') || posix_geteuid() !== 0 || ! file_exists('/dev/kvm') || filetype('/dev/kvm') !== 'char' || ! is_readable('/dev/kvm') || ! is_writable('/dev/kvm')) {
         $this->markTestSkipped('KVM and root access are required for this launcher branch.');

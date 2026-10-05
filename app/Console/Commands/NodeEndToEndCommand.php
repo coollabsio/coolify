@@ -8,6 +8,8 @@ use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\RemoveNodeFromCluster;
+use App\Actions\Node\SetNodeIngress;
+use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Sentinel\PingFluxConnection;
 use App\Actions\Sentinel\RotateFluxCertificateAuthority;
 use App\Enums\NodeOperationStatus;
@@ -43,12 +45,14 @@ class NodeEndToEndCommand extends Command
 
     private const ACTIONS = [
         'status', 'deploy', 'lifecycle', 'operation', 'await-operation', 'firewall-add', 'firewall-remove', 'reconcile',
-        'ping', 'ca-start', 'ca-continue', 'ca-cancel', 'ca-status', 'remove-node', 'add-node',
+        'ping', 'ca-start', 'ca-continue', 'ca-cancel', 'ca-status', 'remove-node', 'add-node', 'ingress', 'domains',
     ];
 
     protected $signature = 'dev:node-e2e
-        {action : One of status, deploy, lifecycle, operation, await-operation, firewall-add, firewall-remove, reconcile, ping, ca-start, ca-continue, ca-cancel, ca-status, remove-node, add-node}
-        {argument? : Node (a, b, or a UUID), lifecycle action (start or stop), or operation UUID}
+        {action : One of status, deploy, lifecycle, operation, await-operation, firewall-add, firewall-remove, reconcile, ping, ca-start, ca-continue, ca-cancel, ca-status, remove-node, add-node, ingress, domains}
+        {argument? : Node (a, b, or a UUID), lifecycle action (start or stop), operation UUID, or the workload domains (comma separated, empty to remove them)}
+        {value? : on or off for ingress}
+        {--http-port= : Container HTTP port for domains}
         {--pull=missing : Image pull policy for deploy (missing or newer)}
         {--port=65000 : TCP port of the end-to-end firewall rule}
         {--force : Force the next CA rotation step}';
@@ -86,6 +90,8 @@ class NodeEndToEndCommand extends Command
                 'ca-status' => RotateFluxCertificateAuthority::make()->status(),
                 'remove-node' => $this->removeNode(),
                 'add-node' => $this->addNode(),
+                'ingress' => $this->setIngress(),
+                'domains' => $this->setDomains(),
             };
         } catch (Throwable $exception) {
             $this->line(json_encode(['error' => $exception->getMessage()], JSON_UNESCAPED_SLASHES));
@@ -137,6 +143,8 @@ class NodeEndToEndCommand extends Command
                 'unreachable_notified_at' => $node->unreachable_notified_at,
                 'flux_trust_bundle_version' => $node->flux_trust_bundle_version,
                 'flux_trust_bundle_error' => $node->flux_trust_bundle_error,
+                'is_ingress' => (bool) $node->is_ingress,
+                'ingress_state' => $node->node_cluster_id === $cluster->id ? $cluster->nodeIngressState($node) : null,
             ]])->all(),
             'workload' => $workload === null ? null : [
                 'uuid' => $workload->uuid,
@@ -145,6 +153,8 @@ class NodeEndToEndCommand extends Command
                 'desired_state' => $workload->desired_state?->value,
                 'node_uuids' => $workload->nodes()->pluck('nodes.uuid')->all(),
                 'container_ips' => $workload->nodes()->get()->pluck('pivot.container_ip')->filter()->values()->all(),
+                'domains' => $workload->domains ?? [],
+                'http_port' => $workload->http_port,
                 'active_operations' => NodeOperation::query()
                     ->where('node_workload_id', $workload->id)
                     ->whereIn('status', [NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED, NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING, NodeOperationStatus::UNCERTAIN])
@@ -278,6 +288,28 @@ class NodeEndToEndCommand extends Command
         $operations = ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user());
 
         return ['operations' => count($operations), 'network_status' => $cluster->refresh()->network_status];
+    }
+
+    /** Turns ingress on or off for a Node the way the cluster Nodes page does. */
+    private function setIngress(): array
+    {
+        $enabled = match ((string) $this->argument('value')) {
+            'on' => true,
+            'off' => false,
+            default => throw new RuntimeException('Use on or off.'),
+        };
+        $node = SetNodeIngress::run($this->cluster(), $this->node(), $enabled, $this->user());
+
+        return ['node' => $node->uuid, 'is_ingress' => $node->is_ingress, 'desired_revision' => $this->cluster()->desired_revision];
+    }
+
+    /** Saves the domains and HTTP port of the end-to-end workload the way the application page does. */
+    private function setDomains(): array
+    {
+        $workload = $this->workload() ?? throw new RuntimeException('The cluster has no workload.');
+        $workload = UpdateNodeWorkloadDomains::run($workload, (string) $this->argument('argument'), $this->option('http-port'), $this->user());
+
+        return ['domains' => $workload->domains ?? [], 'http_port' => $workload->http_port, 'desired_revision' => $this->cluster()->desired_revision];
     }
 
     /** @param \Closure(RotateFluxCertificateAuthority): mixed $step */

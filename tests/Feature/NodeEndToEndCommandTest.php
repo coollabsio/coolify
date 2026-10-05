@@ -12,6 +12,7 @@ use Database\Seeders\UserSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -82,6 +83,62 @@ it('adds and removes the end-to-end firewall rule with a new revision and a queu
 
     expect($removed)->toBe(['removed' => 1, 'desired_revision' => 6])
         ->and(NodeFirewallRule::query()->exists())->toBeFalse();
+});
+
+it('turns ingress on and off for a Node with a new revision', function () {
+    Cache::put($this->nodes['a']->cacheKey(), [
+        'status' => 'connected',
+        'last_heartbeat_at' => now()->toIso8601String(),
+        'capabilities' => ['ingress.reconcile.v1'],
+    ]);
+
+    [$exitCode, $enabled] = nodeEndToEnd(['action' => 'ingress', 'argument' => 'a', 'value' => 'on']);
+    [, $status] = nodeEndToEnd(['action' => 'status']);
+
+    expect($exitCode)->toBe(Command::SUCCESS)
+        ->and($enabled)->toBe(['node' => 'development-qemu-node-worker-a', 'is_ingress' => true, 'desired_revision' => 5])
+        ->and($status['nodes']['a']['is_ingress'])->toBeTrue()
+        ->and($status['nodes']['a']['ingress_state'])->toBe('pending')
+        ->and($status['nodes']['b']['ingress_state'])->toBe('off');
+
+    [, $disabled] = nodeEndToEnd(['action' => 'ingress', 'argument' => 'a', 'value' => 'off']);
+
+    expect($disabled['is_ingress'])->toBeFalse()
+        ->and($this->nodes['a']->refresh()->is_ingress)->toBeFalse();
+});
+
+it('refuses ingress on a Node without the capability and rejects other values', function () {
+    [$exitCode, $result] = nodeEndToEnd(['action' => 'ingress', 'argument' => 'b', 'value' => 'on']);
+    [$invalidExitCode] = nodeEndToEnd(['action' => 'ingress', 'argument' => 'b', 'value' => 'maybe']);
+
+    expect($exitCode)->toBe(Command::FAILURE)
+        ->and($result['error'])->toContain('Upgrade Sentinel')
+        ->and($invalidExitCode)->toBe(Command::FAILURE)
+        ->and($this->nodes['b']->refresh()->is_ingress)->toBeFalse();
+});
+
+it('sets and removes the domains of the end-to-end workload', function () {
+    [$exitCode, $set] = nodeEndToEnd(['action' => 'domains', 'argument' => 'whoami.node-e2e.test', '--http-port' => '80']);
+    [, $status] = nodeEndToEnd(['action' => 'status']);
+
+    expect($exitCode)->toBe(Command::SUCCESS)
+        ->and($set['domains'])->toBe(['whoami.node-e2e.test'])
+        ->and($set['http_port'])->toBe(80)
+        ->and($status['workload']['domains'])->toBe(['whoami.node-e2e.test'])
+        ->and($status['workload']['http_port'])->toBe(80);
+
+    [, $removed] = nodeEndToEnd(['action' => 'domains', 'argument' => '', '--http-port' => '']);
+
+    expect($removed['domains'])->toBe([])
+        ->and($removed['http_port'])->toBeNull()
+        ->and($this->workload->refresh()->domains)->toBeNull();
+});
+
+it('reports invalid domains as a failure', function () {
+    [$exitCode, $result] = nodeEndToEnd(['action' => 'domains', 'argument' => 'http://whoami.node-e2e.test', '--http-port' => '80']);
+
+    expect($exitCode)->toBe(Command::FAILURE)
+        ->and($result['error'])->toContain('without http://');
 });
 
 it('reports a failed action as JSON with a failure exit code', function () {

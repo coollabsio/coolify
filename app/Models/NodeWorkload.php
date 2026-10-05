@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -18,9 +19,48 @@ class NodeWorkload extends BaseModel
 
     protected $guarded = [];
 
+    /** @var list<int> Clusters that routed this workload before it was deleted. */
+    private array $ingressClusterIdsBeforeDelete = [];
+
     protected function casts(): array
     {
-        return ['desired_state' => NodeWorkloadDesiredState::class];
+        return [
+            'desired_state' => NodeWorkloadDesiredState::class,
+            'domains' => 'array',
+            'http_port' => 'integer',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (NodeWorkload $workload): void {
+            $workload->ingressClusterIdsBeforeDelete = $workload->hasIngressRoutes() ? $workload->clusterIds() : [];
+        });
+        static::deleted(function (NodeWorkload $workload): void {
+            // The routes of a deleted workload must disappear from every ingress Node.
+            NodeCluster::query()
+                ->whereKey($workload->ingressClusterIdsBeforeDelete)
+                ->get()
+                ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster));
+        });
+    }
+
+    /** Whether ingress Nodes route public HTTP traffic to this workload. */
+    public function hasIngressRoutes(): bool
+    {
+        return is_array($this->domains) && $this->domains !== [] && $this->http_port !== null;
+    }
+
+    /** @return list<int> The clusters of the Nodes that run this workload. */
+    public function clusterIds(): array
+    {
+        return $this->nodes()
+            ->whereNotNull('nodes.node_cluster_id')
+            ->pluck('nodes.node_cluster_id')
+            ->unique()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeIngressRule;
 use App\Models\NodeOperation;
+use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Collection;
@@ -24,6 +25,12 @@ class ReconcileNodeClusterNetwork
     use AsAction;
 
     public const CORROSION_VERSION = 'v1.0.0';
+
+    /** The Caddy release that Sentinel runs on ingress Nodes. */
+    public const CADDY_VERSION = 'v2.11.7';
+
+    /** Optional: only ingress Nodes need it, and other Nodes keep the old path without it. */
+    public const INGRESS_CAPABILITY = 'ingress.reconcile.v1';
 
     public const REQUIRED_CAPABILITIES = [
         'network.wireguard.key.ensure.v1',
@@ -187,6 +194,13 @@ class ReconcileNodeClusterNetwork
             $firewallRules = $this->firewallRules($cluster);
             $ingressRules = $this->ingressRules($cluster);
             $workloadCidrs = $members->pluck('workload_cidr')->filter()->values()->all();
+            $ingressRoutes = [];
+            $ingressRoutesError = null;
+            try {
+                $ingressRoutes = BuildNodeClusterIngressRoutes::run($cluster);
+            } catch (RuntimeException $exception) {
+                $ingressRoutesError = $exception->getMessage();
+            }
 
             /** @var array<int, Node> $applied */
             $applied = [];
@@ -269,6 +283,19 @@ class ReconcileNodeClusterNetwork
                 unset($applied[$nodeId]);
             }
 
+            // Ingress is the last step: Caddy reads its routes and endpoints from a converged Corrosion.
+            foreach ($applied as $nodeId => $node) {
+                try {
+                    $operation = $this->reconcileIngress($cluster, $node->refresh(), $user, $attempt, $ingressRoutes, $ingressRoutesError);
+                    if ($operation !== null) {
+                        $operations[] = $operation;
+                    }
+                } catch (Throwable $exception) {
+                    $failures[$nodeId] = $exception->getMessage();
+                    unset($applied[$nodeId]);
+                }
+            }
+
             foreach ($applied as $node) {
                 $node->refresh()->update([
                     'network_status' => 'converged',
@@ -296,6 +323,38 @@ class ReconcileNodeClusterNetwork
             }
             throw $exception;
         }
+    }
+
+    /**
+     * Ingress Nodes get the full route list. Other Nodes that support ingress get `enabled: false`,
+     * so a Node that served ingress before removes Caddy. Older Sentinels are left alone.
+     *
+     * @param  list<array{host: string, workload_id: string, namespace: string, port: int}>  $routes
+     */
+    private function reconcileIngress(NodeCluster $cluster, Node $node, User $user, string $attempt, array $routes, ?string $routesError): ?NodeOperation
+    {
+        if ($node->is_ingress) {
+            if ($routesError !== null) {
+                throw new RuntimeException($routesError);
+            }
+
+            return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, [
+                'enabled' => true,
+                'caddy_version' => self::CADDY_VERSION,
+                'revision' => $cluster->desired_revision,
+                'routes' => $routes,
+            ]);
+        }
+        if (! $node->supportsIngress()) {
+            return null;
+        }
+
+        return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, [
+            'enabled' => false,
+            'caddy_version' => self::CADDY_VERSION,
+            'revision' => $cluster->desired_revision,
+            'routes' => [],
+        ]);
     }
 
     private function markPending(NodeCluster $cluster, Node $node): void
@@ -341,8 +400,33 @@ class ReconcileNodeClusterNetwork
             ->all();
     }
 
-    /** @return list<array{destination_ip: string, protocol: string, port: int}> */
+    /**
+     * User-defined ingress rules plus one allow for each container that an ingress route reaches,
+     * so Caddy on any ingress Node can connect to it.
+     *
+     * @return list<array{destination_ip: string, protocol: string, port: int}>
+     */
     private function ingressRules(NodeCluster $cluster): array
+    {
+        $routeAllows = BuildNodeClusterIngressRoutes::routedWorkloads($cluster)
+            ->flatMap(fn (NodeWorkload $workload) => $workload->nodes
+                ->pluck('pivot.container_ip')
+                ->filter()
+                ->map(fn (string $destinationIp): array => [
+                    'destination_ip' => $destinationIp,
+                    'protocol' => 'tcp',
+                    'port' => $workload->http_port,
+                ]));
+
+        return collect($this->userIngressRules($cluster))
+            ->concat($routeAllows)
+            ->unique(fn (array $rule): string => "{$rule['destination_ip']}|{$rule['protocol']}|{$rule['port']}")
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{destination_ip: string, protocol: string, port: int}> */
+    private function userIngressRules(NodeCluster $cluster): array
     {
         return NodeIngressRule::query()
             ->with('destinationWorkload.nodes')
@@ -446,6 +530,10 @@ class ReconcileNodeClusterNetwork
             'discovery.corrosion.inspect.v1' => data_get($result, 'version') === self::CORROSION_VERSION
                 && in_array(data_get($result, 'member_state'), ['joining', 'converged'], true)
                 && is_numeric(data_get($result, 'endpoint_count')),
+            self::INGRESS_CAPABILITY => data_get($result, 'enabled') === data_get($operation->request, 'enabled')
+                && data_get($result, 'revision') === data_get($operation->request, 'revision')
+                && data_get($result, 'route_count') === count(data_get($operation->request, 'routes', []))
+                && (data_get($operation->request, 'enabled') !== true || data_get($result, 'active') === true),
             default => false,
         };
 
@@ -467,21 +555,23 @@ class ReconcileNodeClusterNetwork
                     ? now()->setTimestamp((int) collect(data_get($result, 'peers', []))->max('latest_handshake_unix_seconds'))
                     : null,
             ]),
-            'discovery.corrosion.reconcile.v1', 'discovery.corrosion.inspect.v1' => $node->update([
+            'discovery.corrosion.reconcile.v1', 'discovery.corrosion.inspect.v1' => $node->mergeMetadata([
+                'corrosion_endpoint_count' => (int) data_get($result, 'endpoint_count', 0),
+                'corrosion_last_convergence_unix_seconds' => data_get($result, 'last_convergence_unix_seconds'),
+            ], [
                 'corrosion_status' => data_get($result, 'member_state'),
                 'corrosion_version' => data_get($result, 'version'),
-                'metadata' => [
-                    ...($node->fresh()->metadata ?? []),
-                    'corrosion_endpoint_count' => (int) data_get($result, 'endpoint_count', 0),
-                    'corrosion_last_convergence_unix_seconds' => data_get($result, 'last_convergence_unix_seconds'),
-                ],
             ]),
-            'network.firewall.reconcile.v1' => $node->update([
-                'metadata' => [
-                    ...($node->fresh()->metadata ?? []),
-                    'firewall_applied_revision' => data_get($result, 'applied_revision'),
-                    'firewall_configuration_hash' => data_get($result, 'configuration_hash'),
-                ],
+            'network.firewall.reconcile.v1' => $node->mergeMetadata([
+                'firewall_applied_revision' => data_get($result, 'applied_revision'),
+                'firewall_configuration_hash' => data_get($result, 'configuration_hash'),
+            ]),
+            self::INGRESS_CAPABILITY => $node->mergeMetadata([
+                'ingress_enabled' => data_get($result, 'enabled'),
+                'ingress_active' => data_get($result, 'active'),
+                'ingress_applied_revision' => data_get($result, 'revision'),
+                'ingress_route_count' => data_get($result, 'route_count'),
+                'ingress_caddy_version' => data_get($result, 'caddy_version'),
             ]),
             default => null,
         };

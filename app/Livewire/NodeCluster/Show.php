@@ -6,6 +6,7 @@ use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
+use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpdateNodeCluster;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
@@ -149,6 +150,21 @@ class Show extends Component
         RemoveNodeFromCluster::run($this->cluster, $node, auth()->user());
         $this->cluster->refresh();
         $this->dispatch('success', 'Node removed from the cluster.');
+    }
+
+    public function setIngress(string $nodeUuid, bool $enabled): void
+    {
+        $this->authorize('update', $this->cluster);
+        $node = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
+        try {
+            SetNodeIngress::run($this->cluster, $node, $enabled, auth()->user());
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
+        $this->cluster->refresh();
+        $this->dispatch('success', $enabled ? "Ingress turned on for {$node->name}." : "Ingress turned off for {$node->name}.");
     }
 
     public function deleteCluster(mixed $password = null): bool|string

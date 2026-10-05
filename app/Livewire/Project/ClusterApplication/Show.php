@@ -7,6 +7,7 @@ use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
+use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
@@ -15,12 +16,14 @@ use App\Jobs\ManageNodeWorkloadJob;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Environment;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -67,6 +70,10 @@ class Show extends Component
 
     public string $startCommand = '';
 
+    public string $domains = '';
+
+    public string $httpPort = '';
+
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null): void
     {
         $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
@@ -82,6 +89,7 @@ class Show extends Component
         $this->loadData();
         $this->loadResourceSettings();
         $this->loadConfiguration();
+        $this->loadDomains();
     }
 
     public function deploy(): void
@@ -167,6 +175,23 @@ class Show extends Component
         $this->dispatch('success', 'Configuration saved. Redeploy the application to apply it.');
     }
 
+    public function saveDomains(): void
+    {
+        $this->authorize('update', $this->workload);
+        try {
+            $this->workload = UpdateNodeWorkloadDomains::run($this->workload, $this->domains, $this->httpPort, auth()->user());
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($key === 'http_port' ? 'httpPort' : 'domains', $messages[0]);
+            }
+
+            return;
+        }
+        $this->loadData();
+        $this->loadDomains();
+        $this->dispatch('success', 'Domains saved. Ingress Nodes apply them without a redeploy.');
+    }
+
     public function manage(string $actionValue): void
     {
         try {
@@ -207,6 +232,7 @@ class Show extends Component
             'internalHostname' => $this->workload->internal_dns_name
                 ? $this->workload->internal_dns_name.'.default.coolify.internal'
                 : null,
+            ...($this->section === 'general' ? $this->ingressData() : []),
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
             'selectedDeployment' => $this->section === 'deployment' ? $this->selectedDeployment() : null,
             'routeParameters' => [
@@ -215,6 +241,26 @@ class Show extends Component
                 'workload_uuid' => $this->workload->uuid,
             ],
         ]);
+    }
+
+    /** @return array{publicUrls: list<string>, ingressAddresses: list<string>, ingressCluster: ?NodeCluster} */
+    private function ingressData(): array
+    {
+        $cluster = $this->node->cluster;
+
+        return [
+            'publicUrls' => collect($this->workload->domains ?? [])->map(fn (string $domain): string => 'http://'.$domain)->all(),
+            'ingressAddresses' => $cluster === null ? [] : Node::query()
+                ->where('team_id', $this->workload->team_id)
+                ->where('node_cluster_id', $cluster->id)
+                ->where('is_ingress', true)
+                ->orderBy('name')
+                ->pluck('ip')
+                ->filter()
+                ->values()
+                ->all(),
+            'ingressCluster' => $cluster,
+        ];
     }
 
     /** @return array{rows: list<array<string, mixed>>, total: int, currentPage: int, lastPage: int, from: int, to: int} */
@@ -433,6 +479,12 @@ class Show extends Component
         }
 
         return $command;
+    }
+
+    private function loadDomains(): void
+    {
+        $this->domains = implode("\n", $this->workload->domains ?? []);
+        $this->httpPort = $this->workload->http_port === null ? '' : (string) $this->workload->http_port;
     }
 
     private function loadResourceSettings(): void

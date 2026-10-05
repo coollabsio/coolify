@@ -99,3 +99,34 @@ it('rejects an invalid Flux server information response', function () {
     expect(fn () => FetchFluxNodeInformation::run($node))
         ->toThrow(RuntimeException::class, 'Flux returned an invalid server information response.');
 });
+
+it('keeps metadata that another writer stored while the request was in flight', function () {
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'internal-secret');
+    $node = Node::factory()->create([
+        'team_id' => Team::factory(),
+        'metadata' => ['ingress_active' => false, 'ingress_applied_revision' => 49],
+    ]);
+    // Sentinel answers system.info after an ingress command that Coolify records meanwhile.
+    Http::fake(function () use ($node) {
+        $concurrent = Node::query()->findOrFail($node->id);
+        $concurrent->update(['metadata' => [...$concurrent->metadata, 'ingress_active' => true, 'ingress_applied_revision' => 50]]);
+
+        return Http::response([
+            'command_id' => 'command-1',
+            'observed_at_unix_ms' => 1_789_140_000_000,
+            'sentinel_version' => '1.0.1',
+            'cpu_count' => 2,
+        ]);
+    });
+
+    FetchFluxNodeInformation::run($node);
+
+    expect($node->fresh()->metadata)->toMatchArray([
+        'ingress_active' => true,
+        'ingress_applied_revision' => 50,
+        'cpus' => 2,
+        'source' => 'flux',
+    ])->and($node->metadata['ingress_applied_revision'])->toBe(50)
+        ->and($node->sentinel_version)->toBe('1.0.1');
+});

@@ -33,6 +33,7 @@ class RecoverStaleOperations
         'network.wireguard.reconcile.v1',
         'network.firewall.reconcile.v1',
         'discovery.corrosion.reconcile.v1',
+        'ingress.reconcile.v1',
     ];
 
     private const COORDINATED_ERRORS = [

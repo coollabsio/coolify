@@ -10,7 +10,7 @@
 #
 # Runs every scenario except offline-removal, which is destructive and runs only when named
 # with --only. Each scenario prints PASS or FAIL with the reason and restores what it changed
-# (Coolify, VMs, workload, firewall rule, CA rotation), also when it fails. Exits non-zero
+# (Coolify, VMs, workload, firewall rule, CA rotation, ingress), also when it fails. Exits non-zero
 # when a scenario fails.
 #
 # Needs the instance of this checkout (./scripts/dev start) with the KVM workers node-worker-a
@@ -26,11 +26,12 @@ set -o errtrace
 cd "$(dirname "$0")/.."
 ROOT="$(pwd -P)"
 
-SCENARIOS=(preflight coolify-down-dns reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline offline-removal)
-DEFAULT_SCENARIOS=(preflight coolify-down-dns reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline)
+SCENARIOS=(preflight coolify-down-dns ingress reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline offline-removal)
+DEFAULT_SCENARIOS=(preflight coolify-down-dns ingress reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline)
 declare -A DESCRIPTIONS=(
   [preflight]='stack up, both Nodes connected, cluster active, workload running, DNS on both Nodes'
   [coolify-down-dns]='Coolify down for 150 s: DNS keeps resolving and endpoint expiry keeps moving'
+  [ingress]='HTTP ingress on both Nodes: domain served, stop gives 502, start serves, Coolify down 150 s still serves'
   [reboot-recovery]='Coolify down, reboot both VMs: network, Corrosion, DNS, and workload come back'
   [stop-marker]='a stopped workload stays stopped across a reboot; a started one comes back'
   [flux-restart]='restart Flux during a deployment: no operation stays active, workload runs'
@@ -370,6 +371,82 @@ scenario_coolify_down_dns() {
     fail "endpoint expiry did not move: A $before_a -> $after_a, B $before_b -> $after_b"
   (($(node_ssh a 'date +%s') < after_a)) || fail 'endpoint expired'
   note "expires_at A +$((after_a - before_a))s, B +$((after_b - before_b))s while Coolify was down 150s"
+  coolify_start || fail 'Coolify did not start again'
+  wait_until 180 'Nodes reconnect after Coolify start' nodes_reachable
+}
+
+# ---------------------------------------------------------------------------
+# Ingress: requests go to the Node address with the domain in the Host header, so no DNS is needed.
+
+INGRESS_DOMAIN='whoami.node-e2e.test'
+
+# ingress_code <node> [host]: HTTP status of a request through the ingress of a Node (000 without an answer).
+ingress_code() {
+  curl -s -o /dev/null -m 10 -w '%{http_code}' -H "Host: ${2:-$INGRESS_DOMAIN}" "http://${NODE_IP[$1]}/" 2>/dev/null || true
+}
+
+# ingress_serves <node>: the whoami workload answers through the ingress of the Node.
+ingress_serves() {
+  curl -fsS -m 10 -H "Host: $INGRESS_DOMAIN" "http://${NODE_IP[$1]}/" 2>/dev/null | grep -q "^IP: $WORKLOAD_IP\$"
+}
+
+ingress_serves_everywhere() { ingress_serves a && ingress_serves b; }
+
+ingress_no_upstream_everywhere() { [[ "$(ingress_code a)" == 502 && "$(ingress_code b)" == 502 ]]; }
+
+caddy_active_everywhere() {
+  node_ssh a 'systemctl is-active --quiet coolify-ingress' && node_ssh b 'systemctl is-active --quiet coolify-ingress'
+}
+
+ingress_active_everywhere() { st_is '[.nodes.a.ingress_state, .nodes.b.ingress_state] | join(",")' active,active; }
+
+# restore_ingress <domains> <port> <a on|off> <b on|off>: the workload domains and the ingress setting of both Nodes.
+restore_ingress() {
+  local result
+  result="$(artisan domains "$1" --http-port="$2")" || log "restoring the workload domains failed: $result"
+  result="$(artisan ingress a "$3")" || log "restoring ingress on worker A failed: $result"
+  result="$(artisan ingress b "$4")" || log "restoring ingress on worker B failed: $result"
+}
+
+scenario_ingress() {
+  local status result started domains port ingress_a ingress_b
+  status="$(status_json)"
+  # The original state, restored also after a failure.
+  domains="$(jq -r '.workload.domains | join(",")' <<<"$status")"
+  port="$(jq -r '.workload.http_port // ""' <<<"$status")"
+  ingress_a="$(jq -r 'if .nodes.a.is_ingress then "on" else "off" end' <<<"$status")"
+  ingress_b="$(jq -r 'if .nodes.b.is_ingress then "on" else "off" end' <<<"$status")"
+  on_exit "restore_ingress '$domains' '$port' $ingress_a $ingress_b"
+  started=$SECONDS
+  result="$(artisan ingress a on)" || fail "turning on ingress on worker A failed: $result"
+  result="$(artisan ingress b on)" || fail "turning on ingress on worker B failed: $result"
+  result="$(artisan domains "$INGRESS_DOMAIN" --http-port=80)" || fail "setting the domain failed: $result"
+  wait_until 180 'Caddy active on both Nodes' caddy_active_everywhere
+  wait_until 180 'the domain is served through both Nodes' ingress_serves_everywhere
+  note "served through A (local) and B (over WireGuard) $((SECONDS - started))s after the domain was set"
+  [[ "$(ingress_code a unknown.node-e2e.test)/$(ingress_code b unknown.node-e2e.test)" == 404/404 ]] || fail 'an unknown host is not answered with 404'
+  wait_until 180 'Coolify shows ingress active on both Nodes' ingress_active_everywhere
+
+  result="$(artisan lifecycle stop)" || fail "stop failed: $result"
+  [[ "$(jq -r .status <<<"$result")" == succeeded ]] || fail "stop operation: $result"
+  started=$SECONDS
+  wait_until 60 'both Nodes answer 502 after the stop' ingress_no_upstream_everywhere
+  note "502 on both Nodes $((SECONDS - started))s after the stop"
+  result="$(artisan lifecycle start)" || fail "start failed: $result"
+  [[ "$(jq -r .status <<<"$result")" == succeeded ]] || fail "start operation: $result"
+  started=$SECONDS
+  wait_until 60 'served through both Nodes after the start' ingress_serves_everywhere
+  note "served again $((SECONDS - started))s after the start"
+
+  on_exit coolify_start
+  coolify_stop
+  started=$SECONDS
+  while ((SECONDS - started < 150)); do
+    sleep 30
+    ingress_serves a || fail "worker A stopped serving after $((SECONDS - started))s without Coolify (HTTP $(ingress_code a))"
+    ingress_serves b || fail "worker B stopped serving after $((SECONDS - started))s without Coolify (HTTP $(ingress_code b))"
+  done
+  note 'served through both Nodes while Coolify was down 150s'
   coolify_start || fail 'Coolify did not start again'
   wait_until 180 'Nodes reconnect after Coolify start' nodes_reachable
 }

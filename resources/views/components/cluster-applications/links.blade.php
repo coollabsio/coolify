@@ -52,11 +52,20 @@
                 <span class="text-neutral-500 dark:text-fg-dim">Pending</span>
             </div>
         @endif
-        <div class="{{ $linkItemClasses }} cursor-default!" aria-disabled="true">
-            <span class="shrink-0 rounded-md bg-neutral-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 ring-1 ring-neutral-500/20">
-                External
-            </span>
-            <span class="text-neutral-500 dark:text-fg-dim">Not available yet</span>
-        </div>
+        @forelse ($workload->domains ?? [] as $domain)
+            <a class="{{ $linkItemClasses }}" target="_blank" rel="noopener noreferrer" href="http://{{ $domain }}">
+                <span class="shrink-0 rounded-md bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success ring-1 ring-success/20">
+                    External
+                </span>
+                <span class="min-w-0 truncate">http://{{ $domain }}</span>
+            </a>
+        @empty
+            <div class="{{ $linkItemClasses }} cursor-default!" aria-disabled="true">
+                <span class="shrink-0 rounded-md bg-neutral-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 ring-1 ring-neutral-500/20">
+                    External
+                </span>
+                <span class="text-neutral-500 dark:text-fg-dim">Not available yet</span>
+            </div>
+        @endforelse
     </div>
 </div>

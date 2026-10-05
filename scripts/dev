@@ -70,6 +70,8 @@ current_instance() {
 
 project_name() { echo "coolify-dev-$1"; }
 env_file() { echo "$ENV_DIR/$1.env"; }
+# Flux image override written by scripts/node-e2e --build.
+flux_override_file() { echo "$ENV_DIR/$1-flux-override.yml"; }
 env_value() { grep -E "^$2=" "$(env_file "$1")" | cut -d= -f2-; }
 
 # Lowest free slot (1..254), stable per instance name. It selects the port block
@@ -178,6 +180,10 @@ compose() {
   fi
   if [[ -f "$NODE_COMPOSE_FILE" ]]; then
     overlay+=(-f "$NODE_COMPOSE_FILE")
+    # Written by scripts/node-e2e --build: keeps the locally built Flux image on every start.
+    if [[ -f "$(flux_override_file "$name")" ]]; then
+      overlay+=(-f "$(flux_override_file "$name")")
+    fi
   fi
   docker compose -p "$(project_name "$name")" -f "$COMPOSE_FILE" "${overlay[@]}" \
     "${env_files[@]}" --env-file "$(env_file "$name")" "${profiles[@]}" "$@"
@@ -371,7 +377,7 @@ cmd_destroy() {
       "${privileged[@]}" iptables -D LIBVIRT_FWI -s "$subnet" -d "10.221.${slot}.0/24" -o "cdevbr${slot}" -j ACCEPT >/dev/null 2>&1 || true
     fi
   fi
-  rm -f "$(env_file "$name")" "$ENV_DIR/$name.appkey"
+  rm -f "$(env_file "$name")" "$ENV_DIR/$name.appkey" "$(flux_override_file "$name")"
   awk -v n="$name" '$1 != n' "$SLOTS_FILE" >"$SLOTS_FILE.tmp"
   mv "$SLOTS_FILE.tmp" "$SLOTS_FILE"
 }

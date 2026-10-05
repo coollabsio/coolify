@@ -30,6 +30,8 @@ services:
     env_file:
       - .env
     environment:
+      # Same key as the coolify service; env_file alone would use the checkout .env key under scripts/dev.
+      APP_KEY: "${APP_KEY:-}"
       BASE_CONFIG_PATH: /data/coolify
       SENTINEL_HOST_ENABLED: "true"
       DB_HOST: postgres

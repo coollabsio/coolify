@@ -34,9 +34,14 @@ class DispatchWorkloadDeployment
         $resources = $configuration['resources'] ?? [];
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
+            $hadAddress = filled($operation->node->workloads()->whereKey($operation->workload->id)->first()?->pivot->container_ip);
             $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload);
             EnsureNodeWorkloadDnsNames::run($operation->node);
             $operation->workload->refresh();
+            if (! $hadAddress && $operation->workload->hasIngressRoutes() && $operation->node->cluster !== null) {
+                // A new placement: ingress Nodes need the route and the firewall allow for this container.
+                QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
+            }
         }
         $name = 'coolify-'.$operation->workload->uuid.'-main';
         $response = Http::withToken($token)

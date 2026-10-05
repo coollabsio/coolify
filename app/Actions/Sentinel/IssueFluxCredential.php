@@ -40,6 +40,7 @@ class IssueFluxCredential
             'network.firewall.reconcile.v1',
             'discovery.corrosion.inspect.v1',
             'discovery.corrosion.reconcile.v1',
+            'ingress.reconcile.v1',
             'logs.read.v1',
             'trust.bundle.update.v1',
         ], $capabilities));

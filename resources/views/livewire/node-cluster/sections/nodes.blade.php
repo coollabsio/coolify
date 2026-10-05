@@ -1,7 +1,7 @@
 @php
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $canCreateNode = auth()->user()->can('create', App\Models\Node::class);
-    $nodeGridClasses = 'grid min-w-[560px] grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_5rem] items-center gap-3 px-4';
+    $nodeGridClasses = 'grid min-w-[760px] grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_6rem_13rem] items-center gap-3 px-4';
 @endphp
 
 <x-application.settings-section id="node-cluster-nodes-section" title="Nodes"
@@ -56,11 +56,13 @@
                 <div>Private IP</div>
                 <div>Status</div>
                 <div>Network</div>
+                <div>Ingress</div>
                 <div></div>
             </div>
             @foreach ($nodes as $node)
                 @php
                     $networkState = $cluster->nodeNetworkState($node);
+                    $ingressState = $cluster->nodeIngressState($node);
                 @endphp
                 <div wire:key="cluster-node-{{ $node->uuid }}"
                     class="{{ $nodeGridClasses }} min-h-14 border-b border-neutral-200 py-2.5 text-[12px] last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
@@ -102,8 +104,27 @@
                             </p>
                         @endif
                     </div>
-                    <div class="flex justify-end">
+                    <div class="min-w-0">
+                        <x-status-badge :status="match ($ingressState) {
+                            'active' => 'Active',
+                            'pending' => 'Pending',
+                            default => 'Off',
+                        }" :type="match ($ingressState) {
+                            'active' => 'success',
+                            'pending' => 'warning',
+                            default => 'neutral',
+                        }" />
+                        @if ($ingressState === 'active')
+                            <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->ip }}</p>
+                        @endif
+                    </div>
+                    <div class="flex justify-end gap-2">
                         @if ($canUpdateCluster)
+                            <x-forms.button wire:click="setIngress('{{ $node->uuid }}', {{ $node->is_ingress ? 'false' : 'true' }})"
+                                wire:loading.attr="disabled" wire:target="setIngress"
+                                title="{{ $node->is_ingress ? 'Stop serving public HTTP traffic on this Node.' : 'Serve public HTTP traffic for cluster applications on port 80 of this Node.' }}">
+                                {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
+                            </x-forms.button>
                             <x-forms.button wire:click="removeNode('{{ $node->uuid }}')"
                                 wire:confirm="Remove {{ $node->name }} from this cluster? Its private network configuration will be removed, or when it is offline, as soon as it reconnects."
                                 wire:loading.attr="disabled" wire:target="removeNode('{{ $node->uuid }}')">
