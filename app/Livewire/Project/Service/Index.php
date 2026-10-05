@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\DeleteService;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -128,7 +129,7 @@ class Index extends Component
                 $this->serviceApplication = null;
                 $this->resourceType = 'database';
                 $this->initializeDatabaseProperties();
-                $this->s3s = currentTeam()->s3s;
+                $this->s3s = $this->serviceTeamS3Storages();
 
                 return;
             }
@@ -146,7 +147,7 @@ class Index extends Component
                 $this->serviceApplication = $serviceApplication;
                 $this->resourceType = 'application';
                 $this->initializeApplicationProperties();
-                $this->s3s = currentTeam()->s3s;
+                $this->s3s = $this->serviceTeamS3Storages();
 
                 return;
             }
@@ -189,10 +190,18 @@ class Index extends Component
                 $this->serviceDatabase->getFilesFromServer();
                 $this->initializeDatabaseProperties();
             }
-            $this->s3s = currentTeam()->s3s;
+            $this->s3s = $this->serviceTeamS3Storages();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function serviceTeamS3Storages(): Collection
+    {
+        return S3Storage::query()
+            ->where('team_id', $this->service->team()->id)
+            ->where('is_usable', true)
+            ->get();
     }
 
     private function initializeDatabaseProperties(): void
@@ -661,7 +670,7 @@ class Index extends Component
             $this->serviceApplication->save();
             $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->serviceApplication->refresh();
-            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, currentTeam()->id);
+            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, $this->service->team()->id);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {

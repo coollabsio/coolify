@@ -397,7 +397,7 @@ class Change extends Component
                 return;
             }
 
-            if (! PrivateKey::ownedByCurrentTeam()->find($this->privateKeyId)) {
+            if (! PrivateKey::where('team_id', $this->github_app->team_id)->find($this->privateKeyId)) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;

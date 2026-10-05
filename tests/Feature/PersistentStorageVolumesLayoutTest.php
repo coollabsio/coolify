@@ -191,7 +191,7 @@ it('does not show a source path or removal action for a named volume', function 
 
     Livewire::test(All::class, ['resource' => $application])
         ->assertDontSee('Directory mount')
-        ->assertSee('Volume mount')
+        ->assertDontSee('Volume mount')
         ->assertDontSee('Remove Source Path');
 });
 

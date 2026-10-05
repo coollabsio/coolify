@@ -69,19 +69,22 @@ class DeploymentNavbar extends Component
 
     public function copyLogsToClipboard(): string
     {
+        $this->authorize('view', $this->application);
+
         $logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
 
         if (! $logs) {
             return '';
         }
 
-        $isMember = auth()->user()->isMember();
+        $teamId = $this->application->team()?->id;
+        $hideDebugLines = is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId);
 
         $markdown = "# Deployment Logs\n\n";
         $markdown .= "```\n";
 
         foreach ($logs as $log) {
-            if ($isMember && ! empty($log['hidden'])) {
+            if ($hideDebugLines && ! empty($log['hidden'])) {
                 continue;
             }
             if (isset($log['output'])) {
@@ -101,8 +104,9 @@ class DeploymentNavbar extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+        $teamId = $this->application->team()->id;
         $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
-        $server = Server::ownedByCurrentTeam()->find($server_id);
+        $server = Server::where('team_id', $teamId)->find($server_id);
 
         // First, mark the deployment as cancelled to prevent further processing
         $this->application_deployment_queue->update([
@@ -110,7 +114,7 @@ class DeploymentNavbar extends Component
         ]);
         try {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user.', 'stderr');
-            CleanupCancelledDeployment::run($this->application_deployment_queue, currentTeam()->id);
+            CleanupCancelledDeployment::run($this->application_deployment_queue, $teamId);
         } catch (\Throwable $e) {
             // Still mark as cancelled even if cleanup fails
             return handleError($e, $this);

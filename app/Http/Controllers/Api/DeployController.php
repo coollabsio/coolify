@@ -459,8 +459,8 @@ class DeployController extends Controller
                 // $message->push("Tag {$tag} not found.");
                 continue;
             }
-            $applications = $found_tag->applications()->get();
-            $services = $found_tag->services()->get();
+            $applications = $found_tag->applications()->whereRelation('environment.project', 'team_id', $team_id)->get();
+            $services = $found_tag->services()->whereRelation('environment.project', 'team_id', $team_id)->get();
             if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
 

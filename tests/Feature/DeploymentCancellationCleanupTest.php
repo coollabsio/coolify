@@ -154,3 +154,28 @@ test('cancelling does not touch servers of another team', function () {
     expect(cancelCleanupCommandsOn($this->remoteCommands, '203.0.113.30', 'docker'))->toBeEmpty()
         ->and($this->deployment->fresh()->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
 });
+
+test('cancelling after switching to another team still cleans up and starts the next queued deployment', function () {
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    $nextApplication = Application::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $queued = ApplicationDeploymentQueue::create([
+        'application_id' => $nextApplication->id,
+        'deployment_uuid' => 'cancel-cleanup-next',
+        'server_id' => $this->server->id,
+        'destination_id' => $this->application->destination_id,
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+    ]);
+    $this->actingAs($this->user);
+
+    $component = Livewire::test(DeploymentNavbar::class, ['application_deployment_queue' => $this->deployment]);
+    session(['currentTeam' => $otherTeam]);
+    $component->call('cancel');
+
+    assertCancelCleanupRanCorrectly($this->remoteCommands, $this->deployment);
+    expect($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
+});

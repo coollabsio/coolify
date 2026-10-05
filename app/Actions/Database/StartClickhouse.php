@@ -84,13 +84,23 @@ class StartClickhouse
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
         }
+
+        $docker_compose['services'][$container_name]['volumes'] ??= [];
+
         if (count($persistent_storages) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $persistent_storages
+            );
         }
+
         if (count($persistent_file_volumes) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
-                return "$item->fs_path:$item->mount_path";
-            })->toArray();
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $persistent_file_volumes->map(function ($item) {
+                    return "$item->fs_path:$item->mount_path";
+                })->toArray()
+            );
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;

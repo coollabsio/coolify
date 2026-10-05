@@ -268,7 +268,7 @@
                                 default => 'neutral',
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
-                            $databaseS3 = $databaseBackup->s3?->team_id === currentTeam()->id ? $databaseBackup->s3 : null;
+                            $databaseS3 = $databaseBackup->s3?->team_id === $serviceTeamId ? $databaseBackup->s3 : null;
                             $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3 ? 'S3 storage: '.$databaseS3->name.' (bucket: '.$databaseS3->bucket.')' : 'S3 storage: Unavailable');
                         @endphp
                         <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
@@ -308,7 +308,7 @@
                     @foreach ($backups as $backup)
                         @php
                             $latestExecution = $backup->latestExecution;
-                            $volumeS3 = $backup->s3?->team_id === currentTeam()->id ? $backup->s3 : null;
+                            $volumeS3 = $backup->s3?->team_id === $serviceTeamId ? $backup->s3 : null;
                             $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3 ? 'S3 storage: '.$volumeS3->name.' (bucket: '.$volumeS3->bucket.')' : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {

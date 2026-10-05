@@ -29,8 +29,8 @@ class Destinations extends Component
 
     public function add($name)
     {
+        $this->authorize('update', $this->server);
         if ($this->server->isSwarm()) {
-            $this->authorize('create', SwarmDocker::class);
             $found = $this->server->swarmDockers()->where('network', $name)->first();
             if ($found) {
                 $this->dispatch('error', 'Network already added to this server.');
@@ -45,7 +45,6 @@ class Destinations extends Component
                 $this->auditDestinationCreated($destination, 'swarm');
             }
         } else {
-            $this->authorize('create', StandaloneDocker::class);
             $found = $this->server->standaloneDockers()->where('network', $name)->first();
             if ($found) {
                 $this->dispatch('error', 'Network already added to this server.');

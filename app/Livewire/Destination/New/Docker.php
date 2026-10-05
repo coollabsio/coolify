@@ -72,7 +72,7 @@ class Docker extends Component
     {
         try {
             $isSwarm = $this->selectedServer->isSwarm();
-            $this->authorize('create', $isSwarm ? SwarmDocker::class : StandaloneDocker::class);
+            $this->authorize('update', $this->selectedServer);
             $this->validate();
             if ($isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();
