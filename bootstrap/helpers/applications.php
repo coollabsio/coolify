@@ -116,9 +116,15 @@ function queue_application_deployment(Application $application, string $deployme
     }
 
     if ($admission['started']) {
-        ApplicationDeploymentJob::dispatch(
-            application_deployment_queue_id: $deployment->id,
-        );
+        try {
+            ApplicationDeploymentJob::dispatch(
+                application_deployment_queue_id: $deployment->id,
+            );
+        } catch (Throwable $exception) {
+            fail_undispatchable_deployment($deployment, $exception);
+
+            throw $exception;
+        }
     }
 
     return [
