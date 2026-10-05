@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\CleanupDocker;
+use App\Events\DockerCleanupDone;
 use App\Jobs\DockerCleanupJob;
 use App\Models\Application;
 use App\Models\DockerCleanupExecution;
@@ -16,13 +17,18 @@ use App\Models\User;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Services\ScheduledJobDeliveryService;
 use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 
@@ -183,18 +189,87 @@ it('skips a scheduled cleanup occurrence while another cleanup holds the server 
     Notification::assertNotSentTo($server->team, DockerCleanupFailed::class);
 });
 
-it('drops a manual cleanup while another cleanup holds the server lock without touching occurrences', function () {
+function dockerCleanupDatabaseQueue(): void
+{
+    Schema::create('jobs', function (Blueprint $table) {
+        $table->id();
+        $table->string('queue')->index();
+        $table->longText('payload');
+        $table->unsignedTinyInteger('attempts');
+        $table->unsignedInteger('reserved_at')->nullable();
+        $table->unsignedInteger('available_at');
+        $table->unsignedInteger('created_at');
+    });
+    config(['queue.default' => 'database']);
+}
+
+function dockerCleanupWorkOnce(): void
+{
+    Artisan::call('queue:work', ['connection' => 'database', '--once' => true, '--queue' => maintenance_queue(), '--sleep' => 0]);
+}
+
+it('runs a manual cleanup after another cleanup releases the server lock instead of dropping it', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    dockerCleanupDatabaseQueue();
     $server = dockerCleanupReachableServer();
-    $job = new DockerCleanupJob($server, true);
-    $runningCleanupLock = Cache::lock($job->middleware()[0]->getLockKey($job), 3600);
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
     $runningCleanupLock->get();
     $commands = dockerCleanupFakeProcesses();
 
-    dispatch_sync($job);
+    DockerCleanupJob::dispatch($server, true);
+    dockerCleanupWorkOnce();
+
+    expect(DB::table('jobs')->count())->toBe(1)
+        ->and(DB::table('jobs')->value('available_at'))->toBe(now()->addSeconds(DockerCleanupJob::MANUAL_RELEASE_DELAY)->getTimestamp())
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
+        ->and($commands)->toBeEmpty();
+
+    $runningCleanupLock->release();
+    Carbon::setTestNow(now()->addSeconds(DockerCleanupJob::MANUAL_RELEASE_DELAY + 1));
+    dockerCleanupWorkOnce();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
+        ->and(DockerCleanupExecution::query()->sole()->status)->toBe('success')
+        ->and(ScheduledJobDelivery::query()->exists())->toBeFalse();
+});
+
+it('fails a waiting manual cleanup instead of running it after its wait window', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+    dockerCleanupDatabaseQueue();
+    $server = dockerCleanupReachableServer();
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    DockerCleanupJob::dispatch($server, true);
+    dockerCleanupWorkOnce();
+    $runningCleanupLock->release();
+    Carbon::setTestNow(now()->addDay());
+    dockerCleanupWorkOnce();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(1)
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
+        ->and($commands)->toBeEmpty();
+});
+
+it('drops a stop-triggered cleanup and a scheduled run while another cleanup holds the server lock', function () {
+    dockerCleanupDatabaseQueue();
+    $server = dockerCleanupReachableServer();
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    DockerCleanupJob::dispatch($server);
+    dockerCleanupWorkOnce();
     $runningCleanupLock->release();
 
-    expect(DockerCleanupExecution::query()->exists())->toBeFalse()
-        ->and(ScheduledJobDelivery::query()->exists())->toBeFalse()
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
         ->and($commands)->toBeEmpty();
 });
 

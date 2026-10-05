@@ -27,22 +27,50 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $usageBefore = null;
 
+    /**
+     * A manual run waits for a running cleanup (released and tried again), so its exceptions must not
+     * count as reasons to try again.
+     */
+    public $maxExceptions = 1;
+
+    /**
+     * Seconds a manual run waits before it tries again while another cleanup holds the server lock.
+     */
+    public const MANUAL_RELEASE_DELAY = 60;
+
     public ?DockerCleanupExecution $execution_log = null;
 
     /**
      * Shares the per-server lock with queued CleanupDocker runs, so two cleanups never run on
      * one server at once. A scheduled run that finds the lock held marks its occurrence
-     * skipped (not missed); a manual run is dropped as before. The lock outlives the job
+     * skipped (not missed); a stop-triggered run is dropped. A manual run is released and tried
+     * again until the running cleanup finishes (see retryUntil()). The lock outlives the job
      * timeout, so a new run cannot start while a timed-out run is still finishing.
      */
     public function middleware(): array
     {
+        $withoutOverlapping = ScheduledJobDeliveryService::withoutOverlapping(CleanupDocker::overlapLockKey($this->server), $this->occurrenceUuid)
+            ->shared()
+            ->expireAfter(CleanupDocker::overlapLockExpiresAfter());
+
         return [
-            ScheduledJobDeliveryService::withoutOverlapping(CleanupDocker::overlapLockKey($this->server), $this->occurrenceUuid)
-                ->shared()
-                ->expireAfter(CleanupDocker::overlapLockExpiresAfter())
-                ->dontRelease(),
+            $this->manualCleanup
+                ? $withoutOverlapping->releaseAfter(self::MANUAL_RELEASE_DELAY)
+                : $withoutOverlapping->dontRelease(),
         ];
+    }
+
+    /**
+     * A manual run may wait for one full cleanup that holds the lock. Fixed at dispatch, so a manual run of a
+     * killed worker, which comes back after retry_after, fails instead of running late. Other runs try once.
+     */
+    public function retryUntil(): ?\DateTimeInterface
+    {
+        if (! $this->manualCleanup) {
+            return null;
+        }
+
+        return now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() + self::MANUAL_RELEASE_DELAY * 2);
     }
 
     public function __construct(
