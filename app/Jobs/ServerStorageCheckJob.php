@@ -60,7 +60,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
             if ($this->percentage > $serverDiskUsageNotificationThreshold) {
                 $team->notify(new HighDiskUsage($this->server, $this->percentage, $serverDiskUsageNotificationThreshold));
-            } else {
+            } elseif (HighDiskUsage::hasRecovered($this->percentage, $serverDiskUsageNotificationThreshold)) {
                 // Usage recovered: the next spike should alert again instead of waiting for the interval.
                 NotificationThrottle::release($this->server, HighDiskUsage::class);
             }
