@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -8,6 +9,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->user = User::factory()->create(['name' => 'Profile User', 'email' => 'old@example.com']);
     $this->user->forceFill([
         'pending_email' => 'new@example.com',

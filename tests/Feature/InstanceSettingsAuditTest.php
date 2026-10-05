@@ -247,6 +247,26 @@ describe('subscription changes', function () {
         expect(instanceSettingsAuditEvents('ui.subscription.refunded')->sole()->team_id)->toBe($this->team->id);
     });
 
+    test('immediate refund is audited only when it succeeds', function (bool $success) {
+        $subscription = createInstanceSettingsAuditSubscription($this->team);
+        $refund = Mockery::mock(RefundSubscription::class);
+        $refund->shouldReceive('execute')->once()->andReturn(['success' => $success, 'error' => null]);
+        app()->instance(RefundSubscription::class, $refund);
+
+        Livewire::test(SubscriptionActions::class)
+            ->call('cancelImmediately', 'password', ['refundLatestPayment'])
+            ->assertDispatched($success ? 'success' : 'error');
+
+        $events = instanceSettingsAuditEvents('ui.subscription.refunded');
+
+        if ($success) {
+            expect($events->sole()->team_id)->toBe($this->team->id)
+                ->and($events->sole()->metadata['subscription_id'])->toBe($subscription->id);
+        } else {
+            expect($events)->toBeEmpty();
+        }
+    })->with([true, false]);
+
     test('server limit change is audited', function () {
         Bus::fake();
         createInstanceSettingsAuditSubscription($this->team);
