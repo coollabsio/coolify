@@ -1220,6 +1220,43 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->and($backup->save_s3)->toBeFalse();
 });
 
+it('lists and accepts only S3 storages of the resource team when the session team differs', function (bool $rootTeam) {
+    $team = $rootTeam ? Team::factory()->create(['id' => 0]) : Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    $s3Attributes = ['region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret', 'bucket' => 'bucket', 'endpoint' => 'https://s3.example.com', 'is_usable' => true];
+    $resourceTeamStorage = S3Storage::create([...$s3Attributes, 'name' => 'Resource team S3', 'team_id' => $team->id]);
+    $otherTeamStorage = S3Storage::create([...$s3Attributes, 'name' => 'Other team S3', 'team_id' => $otherTeam->id]);
+    session(['currentTeam' => $otherTeam]);
+
+    $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application]);
+
+    expect($component->get('availableS3Storages')->pluck('id')->all())->toBe([$resourceTeamStorage->id])
+        ->and($component->get('s3StorageId'))->toBe($resourceTeamStorage->id);
+
+    $component->set('frequency', 'daily')
+        ->set('saveToS3', true)
+        ->set('s3StorageId', $otherTeamStorage->id)
+        ->assertHasErrors('s3StorageId')
+        ->call('save')
+        ->assertHasErrors('s3StorageId');
+
+    expect(ScheduledVolumeBackup::query()->count())->toBe(0);
+
+    $component->set('s3StorageId', $resourceTeamStorage->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(ScheduledVolumeBackup::query()->sole())
+        ->s3_storage_id->toBe($resourceTeamStorage->id)
+        ->save_s3->toBeTrue();
+})->with([
+    'team' => [false],
+    'root team' => [true],
+]);
+
 it('only accepts a usable S3 storage owned by the current team', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
