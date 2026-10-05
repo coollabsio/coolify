@@ -207,6 +207,8 @@ class ServerSetting extends Model
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('is_metrics_enabled') ||
+                $settings->wasChanged('is_sentinel_debug_enabled') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
                 $settings->wasChanged('sentinel_push_interval_seconds') ||

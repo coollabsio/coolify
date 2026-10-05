@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Server\StartSentinel;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\InstanceSettings;
@@ -8,6 +9,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 
 uses(RefreshDatabase::class);
 
@@ -201,12 +203,12 @@ describe('Log drains API', function () {
 
 describe('Sentinel API', function () {
     test('GET returns sentinel settings without token without read:sensitive', function () {
-        // Avoid fields that trigger restartSentinel() on save (token/url/metrics timing).
-        $this->server->settings->update([
+        // Saved quietly: a metrics change restarts Sentinel, which needs SSH.
+        $this->server->settings->forceFill([
             'is_sentinel_enabled' => true,
             'is_metrics_enabled' => true,
             'is_sentinel_debug_enabled' => false,
-        ]);
+        ])->saveQuietly();
 
         $readToken = $this->user->createToken('server-subsystems-read', ['read'])->plainTextToken;
 
@@ -225,8 +227,9 @@ describe('Sentinel API', function () {
             ->and($response->json())->not->toHaveKey('sentinel_custom_url');
     });
 
-    test('PATCH updates sentinel settings for own team server', function () {
-        // Only toggle fields that do not restart Sentinel (avoids remote StartSentinel on sync queue).
+    test('PATCH updates sentinel settings for own team server and restarts Sentinel once', function () {
+        Queue::fake();
+
         $this->withHeaders(serverSubsystemsHeaders())
             ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
                 'is_metrics_enabled' => true,
@@ -239,6 +242,9 @@ describe('Sentinel API', function () {
         $settings = $this->server->settings->fresh();
         expect((bool) $settings->is_metrics_enabled)->toBeTrue()
             ->and((bool) $settings->is_sentinel_debug_enabled)->toBeTrue();
+        // Sentinel reads both settings from its environment, so it must be recreated.
+        expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
+            ->toHaveCount(1);
     });
 
     test('PATCH rejects disabling mandatory Sentinel', function () {
