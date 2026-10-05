@@ -6,7 +6,6 @@ use App\Data\Traffic\TrafficPathData;
 use App\Data\Traffic\TrafficSeriesBucketData;
 use App\Livewire\Analytics as GlobalAnalytics;
 use App\Livewire\Project\Application\Analytics as ApplicationAnalytics;
-use App\Livewire\Project\Application\TrafficOverview;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\PrivateKey;
@@ -286,7 +285,7 @@ it('shows a compose application with the data of all its compose service keys', 
         ->and($paths['/checkout']['domain'])->toBe('www.shop.test');
 });
 
-it('sums every compose key in the application traffic card', function () {
+it('sums every compose key on the application analytics page', function () {
     $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
@@ -297,7 +296,7 @@ it('sums every compose key in the application traffic card', function () {
         "/app/{$webKey}/traffic/overview" => resourceKeysOverview(200),
     ]);
 
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $application]))
+    loadLazy(Livewire::test(ApplicationAnalytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('4,200');
 });
