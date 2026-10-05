@@ -464,6 +464,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'size' => $size,
                             'filename' => null,
                             's3_uploaded' => null,
+                            'finished_at' => Carbon::now()->toImmutable(),
                         ]);
                     }
                     try {
@@ -512,6 +513,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         'size' => $size,
                         's3_uploaded' => $this->backup->save_s3 ? $this->s3_uploaded : null,
                         'local_storage_deleted' => $localStorageDeleted,
+                        'finished_at' => Carbon::now()->toImmutable(),
                     ]);
 
                     // Send appropriate notification (wrapped in try-catch so notification
