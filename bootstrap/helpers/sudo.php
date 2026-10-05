@@ -31,6 +31,25 @@ function ownershipCommand(string $path, Server $server): string
 }
 
 /**
+ * Adds the ownership step right after `sudo mkdir -p <path>`. When more commands follow on the line
+ * (`&& ...` or `; ...`), they stay unchanged after the ownership step. Other forms (redirects, `||`,
+ * pipes, several paths) are left as they are.
+ */
+function addOwnershipAfterMkdir(string $line, Server $server): string
+{
+    if (! preg_match('/^(sudo mkdir -p ([^\s;&|<>]+))(\s*(?:(?:&&|;).*)?)$/s', $line, $matches)) {
+        return $line;
+    }
+    $path = $matches[2];
+    if (! shouldChangeOwnership($path)) {
+        return $line;
+    }
+
+    // No sudo here: the && rule adds it. `sudo sudo` fails where root is not in sudoers (Alpine).
+    return "{$matches[1]} && ".ownershipCommand($path, $server).($matches[3] ?? '');
+}
+
+/**
  * A line that is one `sudo sh -c '...'` call already runs completely as root. Adding sudo inside the script
  * fails where root is not in sudoers (Alpine), and wrapping it again in `bash -c` needs bash.
  */
@@ -135,17 +154,7 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
     });
 
     $commands = $commands->map(function ($line) use ($server) {
-        if (Str::startsWith($line, 'sudo mkdir -p')) {
-            $path = trim(Str::after($line, 'sudo mkdir -p'));
-            if (shouldChangeOwnership($path)) {
-                // No sudo here: the && rule below adds it. `sudo sudo` fails where root is not in sudoers (Alpine).
-                return "$line && ".ownershipCommand($path, $server);
-            }
-
-            return $line;
-        }
-
-        return $line;
+        return addOwnershipAfterMkdir($line, $server);
     });
 
     $commands = $commands->map(function ($line) {
@@ -197,13 +206,7 @@ function parseLineForSudo(string $command, Server $server): string
     if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
         $command = "sudo $command";
     }
-    if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $path = trim(Str::after($command, 'sudo mkdir -p'));
-        if (shouldChangeOwnership($path)) {
-            // No sudo here: the && rule below adds it.
-            $command = "$command && ".ownershipCommand($path, $server);
-        }
-    }
+    $command = addOwnershipAfterMkdir($command, $server);
     if (isSingleSudoShellScript($command)) {
         return $command;
     }
