@@ -949,7 +949,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Requires is_consistent_container_name_enabled to be true."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -1540,7 +1540,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Requires is_consistent_container_name_enabled to be true."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -2131,7 +2131,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Requires is_consistent_container_name_enabled to be true."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -2617,7 +2617,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Requires is_consistent_container_name_enabled to be true."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -3083,7 +3083,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Requires is_consistent_container_name_enabled to be true."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -3794,7 +3794,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Requires is_consistent_container_name_enabled to be true."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",

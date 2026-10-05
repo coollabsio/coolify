@@ -183,6 +183,26 @@ class ApplicationsController extends Controller
         ], 422);
     }
 
+    /**
+     * Container names honor custom_internal_name only with consistent container naming, so reject a name that would be ignored.
+     */
+    private function customInternalNameValidationResponse(array $settings, ?Application $application = null): ?JsonResponse
+    {
+        if (! filled($settings['custom_internal_name'] ?? null)) {
+            return null;
+        }
+        $consistentNaming = $settings['is_consistent_container_name_enabled']
+            ?? (bool) $application?->settings?->is_consistent_container_name_enabled;
+        if ($consistentNaming) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['custom_internal_name' => ['Set is_consistent_container_name_enabled to true to use custom_internal_name. Coolify ignores the custom internal name while consistent container naming is turned off.']],
+        ], 422);
+    }
+
     private function applyApplicationSettings(Application $application, array $settings): void
     {
         if ($settings === []) {
@@ -419,7 +439,7 @@ class ApplicationsController extends Controller
                             'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
-                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
                             'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
@@ -614,7 +634,7 @@ class ApplicationsController extends Controller
                             'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
-                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
                             'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
@@ -809,7 +829,7 @@ class ApplicationsController extends Controller
                             'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
-                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
                             'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
@@ -975,7 +995,7 @@ class ApplicationsController extends Controller
                             'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
-                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
                             'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
@@ -1137,7 +1157,7 @@ class ApplicationsController extends Controller
                             'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
-                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
                             'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
@@ -1390,6 +1410,9 @@ class ApplicationsController extends Controller
         }
         if ($prefixValidation = $this->containerNamePrefixValidationResponse($applicationSettings, $destination->server)) {
             return $prefixValidation;
+        }
+        if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
+            return $internalNameValidation;
         }
         if ($type === 'public') {
             $validationRules = [
@@ -3128,7 +3151,7 @@ class ApplicationsController extends Controller
                             'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
-                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
                             'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
@@ -3311,6 +3334,9 @@ class ApplicationsController extends Controller
         $applicationSettings = $this->applicationSettingsFromRequest($request);
         if ($prefixValidation = $this->containerNamePrefixValidationResponse($applicationSettings, $application->destination->server, $application)) {
             return $prefixValidation;
+        }
+        if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings, $application)) {
+            return $internalNameValidation;
         }
         $requestedBuildPack = $request->input('build_pack', $application->build_pack);
         if (($applicationSettings['is_raw_compose_deployment_enabled'] ?? false) && $requestedBuildPack !== 'dockercompose') {
