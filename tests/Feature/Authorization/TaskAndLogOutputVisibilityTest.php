@@ -136,3 +136,16 @@ it('shows task commands and task output to an owner in the ui', function () {
     Livewire::test(GetLogs::class, ['server' => $this->server, 'resource' => $this->application, 'container' => 'app-container'])
         ->assertDontSee('Hidden (only admins can view)');
 });
+
+it('renders logs inside one root element so the parent can re-render it', function (string $role) {
+    $this->actingAs($role === 'owner' ? $this->owner : $this->member);
+    session(['currentTeam' => $this->team]);
+
+    $html = Livewire::test(GetLogs::class, ['server' => $this->server, 'resource' => $this->application, 'container' => 'app-container'])
+        ->html();
+
+    // Livewire reuses the first tag name as the placeholder for kept children; a leading comment gives an empty tag.
+    preg_match('/<([a-zA-Z0-9\-]*)/', $html, $matches);
+
+    expect($matches[1])->toBe('div');
+})->with(['owner', 'member']);
