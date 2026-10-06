@@ -146,8 +146,33 @@ function force_start_deployment(ApplicationDeploymentQueue $deployment): bool
  * Start the queued deployments that can run now on the application's primary server, on the
  * server of the deployment that just ended (an additional server), and on every other server
  * with a queued deployment of this application, because those waited for this one to end.
+ *
+ * A deployment that fails to dispatch advances the queue again. A call made while the queue
+ * is already advancing is run after the current pass instead of recursing. Each such call
+ * needs a deployment that moved from queued to failed, so the loop ends.
  */
 function queue_next_deployment(Application $application, ?int $finished_deployment_server_id = null)
+{
+    static $advancing = false;
+    static $pending = [];
+
+    $pending[] = [$application, $finished_deployment_server_id];
+    if ($advancing) {
+        return;
+    }
+
+    $advancing = true;
+    try {
+        while ($next = array_shift($pending)) {
+            start_next_queued_deployments(...$next);
+        }
+    } finally {
+        $advancing = false;
+        $pending = [];
+    }
+}
+
+function start_next_queued_deployments(Application $application, ?int $finished_deployment_server_id = null): void
 {
     $application_queued_server_ids = ApplicationDeploymentQueue::where('application_id', $application->id)
         ->where('status', ApplicationDeploymentStatus::QUEUED)
@@ -240,17 +265,27 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
     $deployment->addLogEntry("Deployment could not be started: {$exception->getMessage()}", 'stderr');
     $deployment->addLogEntry('========================================', 'stderr');
 
+    $application = Application::query()->find($deployment->application_id);
+    if (! $application) {
+        return;
+    }
+
     try {
-        $application = Application::query()->find($deployment->application_id);
-        if (! $application || filled($deployment->parent_deployment_uuid)) {
-            return;
+        if (blank($deployment->parent_deployment_uuid)) {
+            $preview = $deployment->pull_request_id !== 0
+                ? ApplicationPreview::findPreviewByApplicationAndPullId($application->id, $deployment->pull_request_id)
+                : null;
+            $application->environment?->project?->team?->notify(new DeploymentFailed($application, $deployment->deployment_uuid, $preview));
         }
-        $preview = $deployment->pull_request_id !== 0
-            ? ApplicationPreview::findPreviewByApplicationAndPullId($application->id, $deployment->pull_request_id)
-            : null;
-        $application->environment?->project?->team?->notify(new DeploymentFailed($application, $deployment->deployment_uuid, $preview));
     } catch (Throwable $notificationException) {
         Log::warning("Failed to send the failure notification for deployment {$deployment->deployment_uuid}: {$notificationException->getMessage()}");
+    }
+
+    // The failed deployment no longer holds its build slot, so the deployments it blocked can start.
+    try {
+        queue_next_deployment($application, $deployment->server_id);
+    } catch (Throwable $queueException) {
+        Log::warning("Starting the next queued deployment after {$deployment->deployment_uuid} failed: {$queueException->getMessage()}");
     }
 }
 
