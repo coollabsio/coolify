@@ -283,6 +283,17 @@ action opens a two-card choice between a cluster server and a Docker server.
 In UI copy a `Node` is always a "server"; say "cluster server" and "Docker
 server" where both kinds appear together.
 
+The Applications page of a cluster server lists one row per application:
+name, status badge, the compact `x-cluster-applications.links` dropdown, and
+one muted line with its latest operation on this server ("Deployed 15 hours
+ago", errors in the error tone, deployments linking to their log). Row actions
+reuse `x-cluster-applications.deployment-actions` (Deploy plus a menu with
+Restart/Stop or Remove container) and append server-only items such as Move to
+another server and Edit internal DNS name. Each row renders its own hidden
+confirmation triggers, keyed by the workload uuid and state. The full operation
+history lives on the server's Activity page as a paginated dense table with a
+Status/Application multi-select filter.
+
 Top-level settings families such as Team, Notifications, Keys & Tokens, and
 instance Settings use a compact header followed by a small route-derived tab
 strip. The active tab uses the same purple-light/yellow-dark tint as resource

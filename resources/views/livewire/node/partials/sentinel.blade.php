@@ -30,107 +30,90 @@
     $connectionDetails = [
         'Last heartbeat' => $lastHeartbeatLabel ?? 'Waiting for heartbeat',
         'Transport' => $fluxConnection ? strtoupper(data_get($fluxConnection, 'transport', 'unknown')) : 'Not connected',
-        'Sentinel version' => $sentinelVersion ?? 'Unknown',
+        'Running version' => $sentinelVersion ?? 'Unknown',
     ];
 @endphp
 
-<x-application.settings-section id="node-sentinel-connection-section" title="Connection"
+<x-application.settings-section id="node-sentinel-connection-section" title="Sentinel"
     helper="Sentinel runs on the server as a systemd service and keeps a secure control connection to Coolify.">
     <x-slot:actions>
         @can('manageSentinel', $node)
             <x-forms.button wire:click="testFluxConnection">Test connection</x-forms.button>
         @endcan
-        <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshFluxConnection"
-            title="Refresh connection state">
+        <x-forms.button type="button" wire:click="refreshFluxConnection" title="Read the connection state again">
             <x-reicon name="refresh" class="size-3.5" />
+            Refresh status
         </x-forms.button>
     </x-slot:actions>
 
-    <dl class="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-            <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Status</dt>
-            <dd class="mt-1">
-                <x-status-badge :status="$isConnected ? 'Connected' : 'Disconnected'"
-                    :type="$isConnected ? 'success' : 'warning'" />
-            </dd>
-        </div>
-        @foreach ($connectionDetails as $detailLabel => $detailValue)
-            <div class="min-w-0">
-                <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">{{ $detailLabel }}</dt>
-                <dd class="mt-1 truncate text-sm font-medium text-neutral-950 dark:text-fg"
-                    @if ($detailLabel === 'Last heartbeat' && is_string($lastHeartbeat)) title="{{ $lastHeartbeat }}" @endif>
-                    {{ $detailValue }}
+    <div @if ($sentinelUpgradeActive) wire:poll.5s="pollSentinelUpgrade" @endif class="flex flex-col gap-5">
+        <dl class="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+                <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Connection</dt>
+                <dd class="mt-1">
+                    <x-status-badge :status="$isConnected ? 'Connected' : 'Disconnected'"
+                        :type="$isConnected ? 'success' : 'warning'" />
                 </dd>
             </div>
-        @endforeach
-    </dl>
+            @foreach ($connectionDetails as $detailLabel => $detailValue)
+                <div class="min-w-0">
+                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">{{ $detailLabel }}</dt>
+                    <dd class="mt-1 truncate text-sm font-medium text-neutral-950 dark:text-fg"
+                        @if ($detailLabel === 'Last heartbeat' && is_string($lastHeartbeat)) title="{{ $lastHeartbeat }}" @endif>
+                        {{ $detailValue }}
+                    </dd>
+                </div>
+            @endforeach
+            <div class="min-w-0">
+                <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Latest version</dt>
+                <dd class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                    <span class="truncate text-sm font-medium text-neutral-950 dark:text-fg">{{ $latestSentinelVersion ?? 'Unavailable' }}</span>
+                    @if ($sentinelUpgradeActive)
+                        <x-status-badge :status="'Upgrade '.strtolower($sentinelUpgradeStatusLabel)" type="warning" />
+                    @elseif ($sentinelUpgradeAvailable)
+                        <x-status-badge status="Upgrade available" type="warning" />
+                    @elseif ($latestSentinelVersion !== null && $sentinelVersion !== null)
+                        <x-status-badge status="Up to date" type="success" />
+                    @endif
+                </dd>
+            </div>
+        </dl>
+
+        @can('manageSentinel', $node)
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                    Upgrades and updates install Sentinel over SSH and restart the service. If Sentinel does not reconnect within 60 seconds after an upgrade, the previous version is restored.
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
+                        <x-modal-confirmation title="Upgrade Sentinel?" buttonTitle="Upgrade Sentinel"
+                            submitAction="upgradeSentinel" :actions="[
+                                'Sentinel ' . $latestSentinelVersion . ' is installed on this server over SSH and the service restarts.',
+                                'The control connection drops briefly while Sentinel restarts.',
+                                'If Sentinel does not reconnect within 60 seconds, the previous version is restored.',
+                            ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel" />
+                    @endif
+                    <x-forms.button wire:click="installSentinel">Update Sentinel</x-forms.button>
+                    <x-modal-confirmation title="Restart Sentinel?" buttonTitle="Restart" submitAction="restartSentinel"
+                        :actions="['Sentinel restarts on this server.']" :confirmWithText="false"
+                        :confirmWithPassword="false" warningMessage="The control connection drops briefly."
+                        step2ButtonText="Restart Sentinel" />
+                </div>
+            </div>
+            @if ($sentinelUpgrade !== null)
+                <div class="flex flex-wrap items-center gap-2 text-[12px] text-neutral-600 dark:text-fg-dim">
+                    <span>Last upgrade to {{ data_get($sentinelUpgrade, 'version') ?? 'unknown' }}</span>
+                    <x-status-badge :status="$sentinelUpgradeStatusLabel" :type="$sentinelUpgradeStatusType" />
+                    @if (filled(data_get($sentinelUpgrade, 'error')))
+                        <p class="w-full text-red-600 dark:text-red-400">{{ data_get($sentinelUpgrade, 'error') }}</p>
+                    @endif
+                </div>
+            @endif
+        @endcan
+    </div>
 </x-application.settings-section>
 
 @can('manageSentinel', $node)
-    <x-application.settings-section id="node-sentinel-version-section" title="Version"
-        helper="Upgrades install the latest Sentinel release over SSH. If Sentinel does not reconnect within 60 seconds, the previous version is restored.">
-        <div @if ($sentinelUpgradeActive) wire:poll.5s="pollSentinelUpgrade" @endif
-            class="flex flex-wrap items-center justify-between gap-3">
-            <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                <div class="min-w-0">
-                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Running version</dt>
-                    <dd class="mt-1 truncate text-sm font-medium text-neutral-950 dark:text-fg">{{ $sentinelVersion ?? 'Unknown' }}</dd>
-                </div>
-                <div class="min-w-0">
-                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Latest version</dt>
-                    <dd class="mt-1 truncate text-sm font-medium text-neutral-950 dark:text-fg">{{ $latestSentinelVersion ?? 'Unavailable' }}</dd>
-                </div>
-                <div class="min-w-0">
-                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Status</dt>
-                    <dd class="mt-1">
-                        @if ($sentinelUpgradeActive)
-                            <x-status-badge :status="'Upgrade '.strtolower($sentinelUpgradeStatusLabel)" type="warning" />
-                        @elseif ($sentinelUpgradeAvailable)
-                            <x-status-badge status="Upgrade available" type="warning" />
-                        @elseif ($latestSentinelVersion !== null && $sentinelVersion !== null)
-                            <x-status-badge status="Up to date" type="success" />
-                        @else
-                            <x-status-badge status="Unknown" type="neutral" />
-                        @endif
-                    </dd>
-                </div>
-            </dl>
-            @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
-                <x-modal-confirmation title="Upgrade Sentinel?" buttonTitle="Upgrade Sentinel"
-                    submitAction="upgradeSentinel" :actions="[
-                        'Sentinel ' . $latestSentinelVersion . ' is installed on this server over SSH and the service restarts.',
-                        'The control connection drops briefly while Sentinel restarts.',
-                        'If Sentinel does not reconnect within 60 seconds, the previous version is restored.',
-                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel" />
-            @endif
-        </div>
-        @if ($sentinelUpgrade !== null)
-            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-4 text-[12px] text-neutral-600 dark:border-white/[0.07] dark:text-fg-dim">
-                <span>Last upgrade to {{ data_get($sentinelUpgrade, 'version') ?? 'unknown' }}</span>
-                <x-status-badge :status="$sentinelUpgradeStatusLabel" :type="$sentinelUpgradeStatusType" />
-                @if (filled(data_get($sentinelUpgrade, 'error')))
-                    <p class="w-full text-red-600 dark:text-red-400">{{ data_get($sentinelUpgrade, 'error') }}</p>
-                @endif
-            </div>
-        @endif
-    </x-application.settings-section>
-
-    <x-application.settings-section id="node-sentinel-service-section" title="Sentinel service"
-        helper="Install the latest Sentinel release on this server or restart the service.">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <p class="text-[13px] text-neutral-600 dark:text-fg-dim">
-                Updating installs the latest Sentinel release over SSH and restarts the service.
-            </p>
-            <div class="flex flex-wrap items-center gap-2">
-                <x-forms.button wire:click="installSentinel">Update Sentinel</x-forms.button>
-                <x-modal-confirmation title="Restart Sentinel?" buttonTitle="Restart" submitAction="restartSentinel"
-                    :actions="['Sentinel restarts on this server.']" :confirmWithText="false"
-                    :confirmWithPassword="false" warningMessage="The control connection drops briefly."
-                    step2ButtonText="Restart Sentinel" />
-            </div>
-        </div>
-    </x-application.settings-section>
-
     <x-application.settings-section id="node-sentinel-troubleshooting-section" title="Troubleshooting"
         helper="Use these actions when the server is not ready or Sentinel cannot connect.">
         <div class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.07]">

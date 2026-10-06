@@ -42,6 +42,13 @@
             'warning' => $sentinelNeedsAttention,
         ],
         [
+            'label' => 'Activity',
+            'route' => 'node.activity',
+            'active' => $activeMenu === 'activity',
+            'icon' => 'time-back',
+            'group' => 'Operations',
+        ],
+        [
             'label' => 'Logs',
             'route' => 'node.logs',
             'active' => $activeMenu === 'logs',

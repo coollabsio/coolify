@@ -57,7 +57,7 @@ it('renders each Node section route with the grouped sidebar', function (string 
         ->assertSee($sectionText)
         ->assertSee('menu-item-active', false);
 
-    foreach (['node.show', 'node.workloads', 'node.containers', 'node.internal-dns', 'node.sentinel'] as $linkedRoute) {
+    foreach (['node.show', 'node.workloads', 'node.containers', 'node.internal-dns', 'node.sentinel', 'node.activity'] as $linkedRoute) {
         $response->assertSee(route($linkedRoute, $this->node->uuid), false);
     }
     foreach (['Settings', 'Applications', 'Networking', 'Operations', $activeLabel] as $label) {
@@ -65,9 +65,10 @@ it('renders each Node section route with the grouped sidebar', function (string 
     }
 })->with([
     'general' => ['node.show', 'General', 'Resource usage'],
-    'workloads' => ['node.workloads', 'Applications', 'Recent activity'],
+    'workloads' => ['node.workloads', 'Applications', 'No applications on this server'],
     'containers' => ['node.containers', 'Containers', 'No containers found'],
     'sentinel' => ['node.sentinel', 'Sentinel', 'Troubleshooting'],
+    'activity' => ['node.activity', 'Activity', 'No activity yet'],
 ]);
 
 it('derives the Node section from the route name', function () {
@@ -90,7 +91,7 @@ it('keeps every Node section route team scoped', function (string $routeName) {
     ]);
 
     $this->get(route($routeName, $foreignNode->uuid))->assertNotFound();
-})->with(['node.show', 'node.workloads', 'node.containers', 'node.sentinel']);
+})->with(['node.show', 'node.workloads', 'node.containers', 'node.sentinel', 'node.activity']);
 
 it('shows the Sentinel warning in the sidebar while Sentinel is disconnected', function () {
     $this->get(route('node.show', $this->node->uuid))

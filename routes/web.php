@@ -14,6 +14,7 @@ use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\Node\Activity as NodeActivity;
 use App\Livewire\Node\InternalDns as NodeInternalDns;
 use App\Livewire\Node\Logs as NodeLogs;
 use App\Livewire\Node\Onboarding as NodeOnboarding;
@@ -410,6 +411,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/containers', NodeShow::class)->name('node.containers');
         Route::get('/sentinel', NodeShow::class)->name('node.sentinel');
         Route::get('/internal-dns', NodeInternalDns::class)->name('node.internal-dns');
+        Route::get('/activity', NodeActivity::class)->name('node.activity');
         Route::get('/logs', NodeLogs::class)->name('node.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('node.command')->middleware('can.access.terminal');
     });

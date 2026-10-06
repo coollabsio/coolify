@@ -45,6 +45,8 @@ class User extends Authenticatable implements SendsEmail
 {
     use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
+    private ?bool $hasSsoIdentityCache = null;
+
     protected $fillable = [
         'name',
         'email',
@@ -563,9 +565,13 @@ class User extends Authenticatable implements SendsEmail
         return $this->hasMany(OauthIdentity::class);
     }
 
+    /**
+     * Pages render one confirmation modal per row, and each modal asks this. Remember the
+     * answer for this model instance so a list does not query once per modal.
+     */
     public function hasSsoIdentity(): bool
     {
-        return $this->oauthIdentities()->exists();
+        return $this->hasSsoIdentityCache ??= $this->oauthIdentities()->exists();
     }
 
     /**

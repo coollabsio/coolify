@@ -1,9 +1,9 @@
 <x-application.settings-section id="node-containers-section" title="Containers" flush
     helper="Read-only Podman inventory that Sentinel reports. Managed containers belong to Coolify workloads; external containers were started outside Coolify.">
     <x-slot:actions>
-        <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshContainers"
-            title="Refresh container inventory">
+        <x-forms.button type="button" wire:click="refreshContainers" title="Refresh container inventory">
             <x-reicon name="refresh" class="size-3.5" />
+            Refresh
         </x-forms.button>
     </x-slot:actions>
 

@@ -13,10 +13,11 @@
             <x-application.settings-section title="Logs" flush
                 helper="Recent events from the services that run on this server. Logs are read on demand through Flux. When the server cannot answer through Flux, Coolify reads the system journal over SSH.">
                 <x-slot:actions>
-                    <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshLogs"
+                    <x-forms.button type="button" wire:click="refreshLogs"
                         title="Refresh logs">
                         <x-reicon name="refresh" class="size-3.5" wire:loading.class="animate-spin"
                             wire:target="refreshLogs" />
+                        Refresh
                     </x-forms.button>
                 </x-slot:actions>
 

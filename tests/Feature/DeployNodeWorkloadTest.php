@@ -7,6 +7,7 @@ use App\Actions\Node\CreateOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Enums\NodeOperationStatus;
 use App\Jobs\DeployNodeWorkloadJob;
+use App\Livewire\Node\Activity;
 use App\Livewire\Node\Show;
 use App\Models\InstanceSettings;
 use App\Models\Node;
@@ -384,7 +385,7 @@ it('queues an assigned revision from the Node page without storing environment v
         ->assertSee('Workloads')
         ->assertSee('Unknown')
         ->assertSee('Deploy')
-        ->assertSee('Recent activity')
+        ->assertDontSee('Recent activity')
         ->call('deployRevision', $revision->uuid)
         ->assertDispatched('success');
 
@@ -439,7 +440,7 @@ it('queues an uncertain deployment again with the same operation identity', func
     session(['currentTeam' => $team]);
     Queue::fake();
 
-    Livewire::test(Show::class, ['node_uuid' => $node->uuid])
+    Livewire::test(Activity::class, ['node_uuid' => $node->uuid])
         ->call('retryOperation', $operation->uuid)
         ->assertDispatched('success');
 

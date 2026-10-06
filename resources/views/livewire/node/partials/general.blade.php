@@ -1,13 +1,11 @@
 @php
     $metadata = $node->metadata ?? [];
-    $sshAddress = $node->user.'@'.$node->ip.':'.$node->port;
     $runtime = data_get($metadata, 'container_runtime');
     $overviewDetails = [
-        'Public IP' => ['value' => $node->ip, 'mono' => true, 'copy' => true],
-        'SSH' => ['value' => $sshAddress, 'mono' => true, 'copy' => true],
+        'Public IP' => ['value' => $node->ip, 'mono' => true, 'copy' => true, 'hidden' => true],
     ];
     if (filled($node->wireguard_ip)) {
-        $overviewDetails['Private IP'] = ['value' => $node->wireguard_ip, 'mono' => true, 'copy' => true];
+        $overviewDetails['Private IP'] = ['value' => $node->wireguard_ip, 'mono' => true, 'copy' => true, 'hidden' => true];
     }
     $overviewDetails += [
         'Hostname' => ['value' => data_get($metadata, 'hostname', 'Unknown')],
@@ -62,9 +60,10 @@
     helper="Connection details and host information that Sentinel reports.">
     <x-slot:actions>
         @can('manageSentinel', $node)
-            <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshInformation"
+            <x-forms.button type="button" wire:click="refreshInformation"
                 title="Refresh server information">
                 <x-reicon name="refresh" class="size-3.5" />
+                Refresh
             </x-forms.button>
         @endcan
     </x-slot:actions>
@@ -102,7 +101,21 @@
                     'mt-1 flex min-w-0 items-center gap-1.5 text-sm font-medium text-neutral-950 dark:text-fg',
                     'font-mono text-[13px]' => $detail['mono'] ?? false,
                 ])>
-                    <span class="truncate">{{ $detail['value'] }}</span>
+                    @if ($detail['hidden'] ?? false)
+                        {{-- Addresses stay hidden until the user shows them; copy works without showing. --}}
+                        <span x-data="{ shown: false }" class="flex min-w-0 items-center gap-1.5">
+                            <span x-show="shown" x-cloak class="truncate">{{ $detail['value'] }}</span>
+                            <span x-show="!shown" class="truncate tracking-widest text-neutral-400 dark:text-fg-faint" aria-hidden="true">••••••••</span>
+                            <button type="button" class="icon-button size-6!" x-on:click="shown = !shown"
+                                x-bind:aria-label="shown ? 'Hide {{ strtolower($detailLabel) }}' : 'Show {{ strtolower($detailLabel) }}'"
+                                x-bind:title="shown ? 'Hide' : 'Show'">
+                                <x-reicon name="eye" x-show="!shown" class="size-3.5" />
+                                <x-reicon name="eye-off2" x-show="shown" x-cloak class="size-3.5" />
+                            </button>
+                        </span>
+                    @else
+                        <span class="truncate">{{ $detail['value'] }}</span>
+                    @endif
                     @if ($detail['copy'] ?? false)
                         <x-copy-button :value="$detail['value']" :label="'Copy '.strtolower($detailLabel)" />
                     @endif

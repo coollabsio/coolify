@@ -18,6 +18,7 @@ use App\Actions\Sentinel\PingFluxConnection;
 use App\Actions\Sentinel\RenewFluxCertificate;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
+use App\Enums\NodeWorkloadState;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\MoveNodeWorkloadJob;
@@ -56,9 +57,6 @@ class Show extends Component
     /** @var array{uuid: string, status: string, version: ?string, error: ?string, updated_at: ?string}|null */
     #[Locked]
     public ?array $sentinelUpgrade = null;
-
-    /** @var array<string, array{status: string, type: string}> */
-    public array $workloadStates = [];
 
     /** @var array<string, string> */
     public array $dnsNames = [];
@@ -164,41 +162,29 @@ class Show extends Component
         }
     }
 
-    public function retryOperation(string $operationUuid): void
-    {
-        try {
-            $this->authorize('update', $this->node);
-            $operation = NodeOperation::query()
-                ->where('node_id', $this->node->id)
-                ->where('uuid', $operationUuid)
-                ->whereIn('command_type', ['workload.deploy.v1', 'workload.lifecycle.v1'])
-                ->where('status', NodeOperationStatus::UNCERTAIN)
-                ->firstOrFail();
-            match ($operation->command_type) {
-                'workload.deploy.v1' => DeployNodeWorkloadJob::dispatch($operation->id),
-                'workload.lifecycle.v1' => ManageNodeWorkloadJob::dispatch($operation->id),
-            };
-            $this->dispatch('success', 'Operation recovery queued.');
-        } catch (\Throwable $e) {
-            handleError($e, $this);
-        }
-    }
-
-    public function manageWorkload(string $actionValue, string $revisionUuid): void
+    /**
+     * Restarts, stops, starts, or removes the container of an application on this server only.
+     * The confirmation modals of each row call it with the workload uuid.
+     */
+    public function manageWorkload(string $actionValue, string $workloadUuid): void
     {
         try {
             $this->authorize('update', $this->node);
             $action = NodeWorkloadAction::from($actionValue);
             $revision = NodeWorkloadRevision::query()
-                ->with('workload')
-                ->where('uuid', $revisionUuid)
                 ->whereHas('workload', fn ($query) => $query
+                    ->where('uuid', $workloadUuid)
                     ->where('team_id', $this->node->team_id)
                     ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($this->node->id)))
+                ->latest('id')
                 ->firstOrFail();
             $operation = CreateLifecycleOperation::run($this->node, $revision, $action, auth()->user());
             ManageNodeWorkloadJob::dispatch($operation->id);
-            $this->dispatch('success', str($action->value)->title().' command queued.');
+            match ($action) {
+                NodeWorkloadAction::STOP => $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.'),
+                NodeWorkloadAction::REMOVE => $this->dispatch('info', 'Removing the application container.'),
+                default => $this->dispatch('success', str($action->value)->title().' command queued.'),
+            };
             $this->loadNodeData();
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -209,7 +195,7 @@ class Show extends Component
     {
         $this->authorize('view', $this->node);
         $this->loadNodeData();
-        $this->dispatch('info', 'Workload state refreshed.');
+        $this->dispatch('info', 'Application state refreshed.');
     }
 
     public function saveWorkloadDnsName(string $workloadUuid): void
@@ -326,7 +312,96 @@ class Show extends Component
 
     public function render(): View
     {
-        return view('livewire.node.show');
+        return view('livewire.node.show', $this->section === 'workloads' ? $this->workloadsViewData() : []);
+    }
+
+    /**
+     * Builds the Applications rows with a fixed number of queries, however many applications run here.
+     *
+     * @return array{workloadRows: list<array<string, mixed>>, moveTargetOptions: list<array{value: string, label: string}>}
+     */
+    private function workloadsViewData(): array
+    {
+        $workloads = $this->node->workloads()
+            ->where('node_workloads.team_id', $this->node->team_id)
+            ->with([
+                'environment.project',
+                'revisions' => fn ($query) => $query->latest('id')->limit(1),
+                'containers' => fn ($query) => $query->where('node_id', $this->node->id)->where('is_managed', true),
+            ])
+            ->orderBy('node_workloads.name')
+            ->get();
+        $latestOperations = $workloads->isEmpty() ? collect() : NodeOperation::query()
+            ->whereIn('id', NodeOperation::query()
+                ->selectRaw('max(id)')
+                ->where('node_id', $this->node->id)
+                ->whereIn('node_workload_id', $workloads->modelKeys())
+                ->groupBy('node_workload_id'))
+            ->get()
+            ->keyBy('node_workload_id');
+
+        $workloadRows = $workloads->map(function (NodeWorkload $workload) use ($latestOperations): array {
+            $state = DetermineWorkloadState::make()->fromInventory(
+                $this->node,
+                fn () => $workload->revisions->first(),
+                fn () => $workload->containers,
+            );
+            $project = $workload->environment?->project;
+            $routeParameters = $project ? [
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $workload->environment->uuid,
+                'workload_uuid' => $workload->uuid,
+            ] : null;
+
+            return [
+                'workload' => $workload,
+                'revision' => $workload->revisions->first(),
+                'status' => str($state->value)->title()->toString(),
+                'statusType' => $state->badgeType(),
+                'isRunning' => $state === NodeWorkloadState::RUNNING,
+                'containerPresent' => $workload->containers->isNotEmpty(),
+                'href' => $routeParameters ? route('project.cluster-application.show', $routeParameters) : null,
+                'lastActivity' => $this->lastActivity($latestOperations->get($workload->id), $routeParameters),
+            ];
+        })->values()->all();
+
+        $moveTargetOptions = $this->node->node_cluster_id === null ? [] : Node::query()
+            ->where('team_id', $this->node->team_id)
+            ->where('node_cluster_id', $this->node->node_cluster_id)
+            ->whereKeyNot($this->node->id)
+            ->orderBy('name')
+            ->get(['uuid', 'name'])
+            ->map(fn (Node $target): array => ['value' => $target->uuid, 'label' => $target->name])
+            ->all();
+
+        return compact('workloadRows', 'moveTargetOptions');
+    }
+
+    /**
+     * @param  array{project_uuid: string, environment_uuid: string, workload_uuid: string}|null  $routeParameters
+     * @return array{text: string, tone: string, time: string, timestamp: string, href: ?string}|null
+     */
+    private function lastActivity(?NodeOperation $operation, ?array $routeParameters): ?array
+    {
+        if ($operation === null) {
+            return null;
+        }
+        $summary = $operation->activitySummary();
+
+        return [
+            'text' => $summary['text'],
+            'tone' => $summary['tone'],
+            'time' => $summary['at']->diffForHumans(),
+            'timestamp' => $summary['at']->toIso8601String(),
+            'href' => match (true) {
+                $operation->isDeployment() && $routeParameters !== null => route(
+                    'project.cluster-application.deployment.show',
+                    [...$routeParameters, 'deployment_uuid' => $operation->uuid],
+                ),
+                $operation->status === NodeOperationStatus::UNCERTAIN => route('node.activity', ['node_uuid' => $this->node->uuid]),
+                default => null,
+            },
+        ];
     }
 
     private function resolveSection(?string $section): string
@@ -382,28 +457,14 @@ class Show extends Component
             return;
         }
 
-        $this->node->load([
-            'cluster.nodes',
-            'workloads' => fn ($query) => $query->with([
-                'environment.project',
-                'revisions' => fn ($revisions) => $revisions->latest('id')->limit(1),
-            ]),
-            'operations' => fn ($query) => $query->with('workload')->whereNotNull('node_workload_id')->latest('id')->limit(10),
-        ]);
-        $this->workloadStates = $this->node->workloads
-            ->mapWithKeys(function ($workload): array {
-                $state = DetermineWorkloadState::run($this->node, $workload);
-
-                return [$workload->uuid => [
-                    'status' => str($state->value)->title()->toString(),
-                    'type' => $state->badgeType(),
-                ]];
-            })
+        // Rows are built in render(). Only the editable form state is kept here.
+        $workloads = $this->node->workloads()
+            ->where('node_workloads.team_id', $this->node->team_id)
+            ->get(['node_workloads.id', 'node_workloads.uuid', 'node_workloads.internal_dns_name']);
+        $this->dnsNames = $workloads
+            ->mapWithKeys(fn (NodeWorkload $workload): array => [$workload->uuid => $workload->internal_dns_name ?? ''])
             ->all();
-        $this->dnsNames = $this->node->workloads
-            ->mapWithKeys(fn ($workload): array => [$workload->uuid => $workload->internal_dns_name ?? ''])
-            ->all();
-        foreach ($this->node->workloads as $workload) {
+        foreach ($workloads as $workload) {
             $this->moveTargets[$workload->uuid] ??= '';
         }
     }

@@ -5,6 +5,7 @@ use App\Enums\NodeContainerManagementState;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\ManageNodeWorkloadJob;
+use App\Livewire\Node\Activity;
 use App\Livewire\Node\Show;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -241,8 +242,8 @@ it('queues an authorized lifecycle action from the Node page', function () {
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
         ->assertSee('Stop')
         ->assertSee('Restart')
-        ->assertSee('Remove')
-        ->call('manageWorkload', 'restart', $this->revision->uuid)
+        ->assertDontSee('Remove container')
+        ->call('manageWorkload', 'restart', $this->workload->uuid)
         ->assertDispatched('success');
 
     $operation = $this->node->operations()->firstOrFail();
@@ -341,7 +342,7 @@ it('does not let members or cross-team identifiers change workload dns names', f
     expect($foreignWorkload->refresh()->internal_dns_name)->toBe('foreign-app');
 });
 
-it('links workloads to their application page and labels recent activity', function () {
+it('links workloads to their application page and shows the latest operation', function () {
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);
     $user = User::factory()->create();
@@ -365,12 +366,13 @@ it('links workloads to their application page and labels recent activity', funct
             'environment_uuid' => $environment->uuid,
             'workload_uuid' => $this->workload->uuid,
         ]), false)
-        ->assertSee('docker.io/library/alpine:latest')
-        ->assertSee('example-app.default.coolify.internal')
-        ->assertSee('Restart Example App')
-        ->assertSee('Recover')
+        ->assertDontSee('docker.io/library/alpine:latest')
+        ->assertSee('Restart result uncertain')
+        ->assertSee(route('node.activity', ['node_uuid' => $this->node->uuid]), false)
+        ->assertDontSee('Recent activity')
+        ->assertDontSee('Recover')
         ->assertDontSee('workload.lifecycle.v1')
-        ->assertDontSee('Network firewall inspect');
+        ->assertDontSee('Inspect firewall');
 });
 
 it('hides workload mutations from team members', function () {
@@ -388,7 +390,7 @@ it('hides workload mutations from team members', function () {
         ->assertDontSeeHtml('deployRevision(');
 });
 
-it('queues lifecycle recovery from the Node page', function () {
+it('queues lifecycle recovery from the server Activity page', function () {
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);
     $user = User::factory()->create();
@@ -399,7 +401,7 @@ it('queues lifecycle recovery from the Node page', function () {
     $operation->update(['status' => NodeOperationStatus::UNCERTAIN]);
     Queue::fake();
 
-    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+    Livewire::test(Activity::class, ['node_uuid' => $this->node->uuid])
         ->call('retryOperation', $operation->uuid)
         ->assertDispatched('success');
 
@@ -418,7 +420,7 @@ it('cannot manage a workload that is not assigned to the Node', function () {
     Queue::fake();
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->call('manageWorkload', 'stop', $revision->uuid);
+        ->call('manageWorkload', 'stop', $unassigned->uuid);
 
     expect($this->node->operations()->count())->toBe(0);
     Queue::assertNothingPushed();
@@ -434,7 +436,7 @@ it('rejects invalid lifecycle actions', function () {
     Queue::fake();
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->call('manageWorkload', 'destroy-host', $this->revision->uuid);
+        ->call('manageWorkload', 'destroy-host', $this->workload->uuid);
 
     expect($this->node->operations()->count())->toBe(0);
     Queue::assertNothingPushed();

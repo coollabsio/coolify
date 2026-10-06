@@ -41,7 +41,9 @@ it('shows and runs node Sentinel controls in development', function () {
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
         ->assertSet('section', 'general')
-        ->assertSee($this->node->user.'@'.$this->node->ip.':'.$this->node->port)
+        ->assertDontSee($this->node->user.'@'.$this->node->ip.':'.$this->node->port)
+        ->assertSee('Show public ip')
+        ->assertSeeHtml('x-show="shown"')
         ->assertDontSee('{{ $node->ip }}', escape: false)
         ->assertDontSee('Update Sentinel');
 

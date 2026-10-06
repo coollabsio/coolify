@@ -3154,6 +3154,16 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+.node-activity-table-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@media (min-width: 768px) {
+    .node-activity-table-grid {
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(7.5rem, auto) minmax(0, 0.8fr) 7.5rem;
+    }
+}
+
 .dashboard-deployment-table-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
 }

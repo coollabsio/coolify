@@ -39,7 +39,7 @@ class Show extends Component
     public const SECTIONS = ['general', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'logs', 'danger'];
 
     /** @var list<string> */
-    public const DEPLOYMENT_COMMAND_TYPES = ['workload.deploy.v1', 'workload.move.v1'];
+    public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
 
     public const DEPLOYMENTS_PER_PAGE = 10;
 
@@ -377,8 +377,8 @@ class Show extends Component
                     'workload_uuid' => $this->workload->uuid,
                     'deployment_uuid' => $operation->uuid,
                 ]),
-                'status' => $this->deploymentStatusLabel($operation->status),
-                'statusType' => $this->deploymentStatusType($operation->status),
+                'status' => $operation->status->label(),
+                'statusType' => $operation->status->badgeType(),
                 'source' => match (true) {
                     $operation->command_type === 'workload.move.v1' => 'Move',
                     $operation->requested_by_id !== null => 'Manual',
@@ -417,14 +417,9 @@ class Show extends Component
 
         return [
             'uuid' => $operation->uuid,
-            'status' => $this->deploymentStatusLabel($operation->status),
-            'statusType' => $this->deploymentStatusType($operation->status),
-            'isActive' => in_array($operation->status, [
-                NodeOperationStatus::QUEUED,
-                NodeOperationStatus::DISPATCHED,
-                NodeOperationStatus::RUNNING,
-                NodeOperationStatus::VERIFYING,
-            ], true),
+            'status' => $operation->status->label(),
+            'statusType' => $operation->status->badgeType(),
+            'isActive' => $operation->status->isActive(),
             'lines' => $this->deploymentLogLines($operation),
         ];
     }
@@ -483,7 +478,7 @@ class Show extends Component
             NodeOperationStatus::SUCCEEDED => $add($finishedAt, 'Deployment finished successfully.'),
             NodeOperationStatus::FAILED => $add($finishedAt, 'Deployment failed.', true),
             NodeOperationStatus::TIMED_OUT => $add($finishedAt, 'Sentinel did not report a result in time.', true),
-            NodeOperationStatus::UNCERTAIN => $add($finishedAt, 'The result is uncertain. Recover the operation from the Applications page of the server.', true),
+            NodeOperationStatus::UNCERTAIN => $add($finishedAt, 'The result is uncertain. Recover the operation from the Activity page of the server.', true),
             NodeOperationStatus::CANCELLED => $add($finishedAt, 'Deployment cancelled.'),
             default => null,
         };
@@ -501,29 +496,6 @@ class Show extends Component
         return NodeOperation::query()
             ->where('node_workload_id', $this->workload->id)
             ->whereIn('command_type', self::DEPLOYMENT_COMMAND_TYPES);
-    }
-
-    private function deploymentStatusLabel(NodeOperationStatus $status): string
-    {
-        return match ($status) {
-            NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED => 'Queued',
-            NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING => 'In progress',
-            NodeOperationStatus::SUCCEEDED => 'Success',
-            NodeOperationStatus::FAILED => 'Failed',
-            NodeOperationStatus::TIMED_OUT => 'Timed out',
-            NodeOperationStatus::UNCERTAIN => 'Uncertain',
-            NodeOperationStatus::CANCELLED => 'Cancelled',
-        };
-    }
-
-    private function deploymentStatusType(NodeOperationStatus $status): string
-    {
-        return match ($status) {
-            NodeOperationStatus::SUCCEEDED => 'success',
-            NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT => 'error',
-            NodeOperationStatus::CANCELLED => 'neutral',
-            default => 'warning',
-        };
     }
 
     private function resolveSection(?string $routeName): string

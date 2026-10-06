@@ -19,6 +19,35 @@ enum NodeOperationStatus: string
         return in_array($this, [self::SUCCEEDED, self::FAILED, self::TIMED_OUT, self::CANCELLED], true);
     }
 
+    /** Whether Coolify is still waiting for the operation to finish. */
+    public function isActive(): bool
+    {
+        return in_array($this, [self::QUEUED, self::DISPATCHED, self::RUNNING, self::VERIFYING], true);
+    }
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::QUEUED, self::DISPATCHED => 'Queued',
+            self::RUNNING, self::VERIFYING => 'In progress',
+            self::SUCCEEDED => 'Success',
+            self::FAILED => 'Failed',
+            self::TIMED_OUT => 'Timed out',
+            self::UNCERTAIN => 'Uncertain',
+            self::CANCELLED => 'Cancelled',
+        };
+    }
+
+    public function badgeType(): string
+    {
+        return match ($this) {
+            self::SUCCEEDED => 'success',
+            self::FAILED, self::TIMED_OUT => 'error',
+            self::CANCELLED => 'neutral',
+            default => 'warning',
+        };
+    }
+
     public function canTransitionTo(self $status): bool
     {
         return match ($this) {

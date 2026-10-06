@@ -13,9 +13,9 @@
             <x-application.settings-section title="Internal DNS" flush
                 helper="Private hostnames that workloads in this cluster use to reach each other. Records are shared by every server in the cluster.">
                 <x-slot:actions>
-                    <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshEndpoints"
-                        title="Refresh DNS records">
+                    <x-forms.button type="button" wire:click="refreshEndpoints" title="Refresh DNS records">
                         <x-reicon name="refresh" class="size-3.5" />
+                        Refresh
                     </x-forms.button>
                 </x-slot:actions>
 
