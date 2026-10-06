@@ -385,13 +385,26 @@ class StandaloneRedis extends BaseModel
     }
 
     /**
+     * Uses the loaded runtime_environment_variables relation when present, so lists that eager
+     * load it do not run a query per database.
+     */
+    private function runtimeEnvironmentVariable(string $key): ?EnvironmentVariable
+    {
+        if ($this->relationLoaded('runtime_environment_variables')) {
+            return $this->runtime_environment_variables->firstWhere('key', $key);
+        }
+
+        return $this->runtime_environment_variables()->where('key', $key)->first();
+    }
+
+    /**
      * The REDIS_PASSWORD variable whose resolved value sets the server password. Databases created
      * before this release (legacy_password_quoting) keep their v4.3.23 server password, the stored
      * value as it is, unless the variable reads a remote secret.
      */
     public function serverPasswordEnvironmentVariable(): ?EnvironmentVariable
     {
-        $environmentVariable = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+        $environmentVariable = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
 
         if (! $environmentVariable) {
             return null;
@@ -444,7 +457,7 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $password = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+                $password = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
                 if (! $password) {
                     return null;
                 }
@@ -459,7 +472,9 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
+                // A loaded relation does not hold a variable created by an earlier read, so check the table before creating one.
+                $username = $this->runtimeEnvironmentVariable('REDIS_USERNAME')
+                    ?? $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
                     $this->runtime_environment_variables()->create([
                         'key' => 'REDIS_USERNAME',

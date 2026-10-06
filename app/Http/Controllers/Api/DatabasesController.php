@@ -20,11 +20,15 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -275,6 +279,14 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases($databaseRelations));
         }
 
+        if ($request->attributes->get('can_read_sensitive', false) === true) {
+            // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
+            $databases
+                ->filter(fn ($database) => $database instanceof StandaloneRedis || $database instanceof StandaloneKeydb || $database instanceof StandaloneDragonfly)
+                ->groupBy(fn ($database) => $database::class)
+                ->each(fn ($group) => (new EloquentCollection($group->all()))->load('runtime_environment_variables'));
+        }
+
         $databaseIds = $databases->pluck('id')->toArray();
 
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
@@ -284,6 +296,7 @@ class DatabasesController extends Controller
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
             $database->backup_configs = $backupConfigs->get($database->getMorphClass().':'.$database->id, collect())->values();
+            $database->makeHidden('runtime_environment_variables');
 
             return $this->removeSensitiveData($database);
         });
