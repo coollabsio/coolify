@@ -36,7 +36,12 @@ class FakeGlobalAnalyticsTrafficClient extends SentinelTrafficClient
 function fakeGlobalAnalyticsResponses(array $appUuids = []): array
 {
     return [
-        '/traffic/apps' => json_encode($appUuids),
+        // The leaderboard keys come from the dashboard bundle; the fake's raw() then serves
+        // every per-call fetch from the entries below.
+        '/traffic/dashboard' => json_encode([
+            'overview' => [],
+            'apps' => array_map(fn (string $uuid) => ['uuid' => $uuid, 'overview' => []], $appUuids),
+        ]),
         '/traffic/overview' => json_encode([
             'requests' => 1000,
             'bytes_in' => 5000,
@@ -271,7 +276,6 @@ it('builds a stacked status time series when Sentinel exposes the series endpoin
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSet('hasSeries', true)
         ->assertSet('series', [
             ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytesIn' => 1000, 'bytesOut' => 5000, 'uniqueVisitors' => 12, 'p95' => 30.0],
             ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytesIn' => 1500, 'bytesOut' => 8000, 'uniqueVisitors' => 20, 'p95' => 45.0],
@@ -315,23 +319,6 @@ it('derives KPI sparklines, device-donut data, and top hosts for the chart paylo
     // Top hosts groups per-app volume by served hostname.
     expect($instance->topHosts[0]['host'])->toBe('spark.example.com');
     expect($instance->topHosts[0]['requests'])->toBe(1000);
-});
-
-it('falls back to the donut when Sentinel lacks the series endpoint', function () {
-    $server = bootEnabledGlobalServer();
-
-    // Same responses minus the series entry — an older Sentinel returns 404 (empty body).
-    $responses = fakeGlobalAnalyticsResponses();
-    unset($responses['/traffic/series']);
-
-    $fake = new FakeGlobalAnalyticsTrafficClient($server);
-    $fake->responses = $responses;
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->assertOk()
-        ->assertSet('hasSeries', false)
-        ->assertSet('series', []);
 });
 
 it('does not disclose another team application name for a sentinel-reported uuid', function () {

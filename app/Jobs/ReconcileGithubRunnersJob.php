@@ -58,7 +58,8 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Older versions left occupying executions of a deleted server active, which blocked deleting the App.
+     * Removes executions that still occupy a runner of a deleted server (for example a server deleted
+     * without model events), because they block deleting the GitHub App.
      */
     private function removeRunnersOfDeletedServers(): void
     {
