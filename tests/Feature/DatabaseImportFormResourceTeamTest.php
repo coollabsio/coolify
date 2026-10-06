@@ -73,6 +73,11 @@ class ImportFormResourceTeamTestComponent extends ImportForm
         $this->loadAvailableS3Storages();
     }
 
+    protected function serverFileExists(string $path): bool
+    {
+        return true;
+    }
+
     public function render()
     {
         return view('livewire.project.database.import-form');
@@ -106,7 +111,8 @@ test('a file import started after a session team switch runs for the database te
         ->andReturn(fakeStartedDatabaseImport());
 
     importFormAfterTeamSwitch()
-        ->set('filename', 'backup.dump')
+        ->set('customLocation', '/backups/backup.dump')
+        ->call('checkFile')
         ->call('runImport')
         ->assertNotDispatched('error')
         ->assertDispatched('databaserestore');
