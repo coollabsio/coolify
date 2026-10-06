@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Jobs\DeleteNodeWorkloadJob;
 use App\Jobs\DeleteResourceJob;
+use App\Models\Node;
+use App\Models\NodeWorkload;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -57,6 +60,11 @@ class Danger extends Component
             return;
         }
 
+        if ($this->resource instanceof NodeWorkload) {
+            $this->projectUuid ??= $this->resource->project?->uuid;
+            $this->environmentUuid ??= $this->resource->environment?->uuid;
+        }
+
         if (! method_exists($this->resource, 'type')) {
             $this->resourceName = 'Unknown Resource';
 
@@ -76,6 +84,7 @@ class Danger extends Component
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',
             'service-database' => $this->resource->name ?? 'Service Database',
+            'cluster-application' => $this->resource->name ?? 'Application',
             default => 'Unknown Resource',
         };
 
@@ -106,6 +115,15 @@ class Danger extends Component
 
         try {
             $this->authorize('delete', $this->resource);
+            if ($this->resource instanceof NodeWorkload) {
+                // Removing the container waits for Sentinel on every server, so it runs on the queue.
+                DeleteNodeWorkloadJob::dispatch($this->resource->id, auth()->id());
+
+                return redirectRoute($this, 'project.resource.index', [
+                    'project_uuid' => $this->projectUuid,
+                    'environment_uuid' => $this->environmentUuid,
+                ]);
+            }
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,
@@ -129,12 +147,20 @@ class Danger extends Component
             return 'The provided password is incorrect.';
         }
 
-        if (! $this->resource instanceof Service) {
+        if (! $this->resource instanceof Service && ! $this->resource instanceof NodeWorkload) {
             return 'Service not found.';
         }
 
         try {
             $this->authorize('delete', $this->resource);
+            if ($this->resource instanceof NodeWorkload) {
+                DeleteNodeWorkloadJob::dispatch($this->resource->id, auth()->id(), deleteFromCoolifyOnly: true);
+
+                return redirectRoute($this, 'project.resource.index', [
+                    'project_uuid' => $this->projectUuid,
+                    'environment_uuid' => $this->environmentUuid,
+                ]);
+            }
             DeleteResourceJob::dispatch(
                 resource: $this->resource,
                 deleteFromCoolifyOnly: true,
@@ -151,7 +177,21 @@ class Danger extends Component
 
     public function render()
     {
+        if ($this->resource instanceof NodeWorkload) {
+            // A cluster application has no Docker volumes, networks, or configuration files to choose from.
+            return view('livewire.project.shared.danger', [
+                'checkboxes' => [],
+                'unreachableServers' => $this->resource->nodes()
+                    ->orderBy('name')
+                    ->get()
+                    ->reject(fn (Node $node): bool => $node->hasRecentFluxHeartbeat())
+                    ->pluck('name')
+                    ->all(),
+            ]);
+        }
+
         return view('livewire.project.shared.danger', [
+            'unreachableServers' => [],
             'checkboxes' => [
                 ['id' => 'delete_volumes', 'label' => __('resource.delete_volumes')],
                 ['id' => 'delete_connected_networks', 'label' => __('resource.delete_connected_networks')],

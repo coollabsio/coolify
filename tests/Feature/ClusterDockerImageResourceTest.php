@@ -379,7 +379,7 @@ it('offers the legacy application lifecycle actions for cluster applications', f
     ])
         ->assertSee('Restart')
         ->assertSee('Stop')
-        ->call('manage', 'restart')
+        ->call('restart')
         ->assertDispatched('success', 'Restart command queued.');
 
     $operation = $deployment['workload']->operations()->latest('id')->firstOrFail();
@@ -858,6 +858,8 @@ it('renders every cluster application section as its own page', function (string
         'project.cluster-application.environment-variables',
         'project.cluster-application.resource-limits',
         'project.cluster-application.deployments',
+        'project.cluster-application.logs',
+        'project.cluster-application.danger',
     ] as $sidebarRoute) {
         $response->assertSee('href="'.route($sidebarRoute, $routeParameters).'"', false);
     }
@@ -874,6 +876,8 @@ it('renders every cluster application section as its own page', function (string
     'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'Developer view']],
     'resource limits' => ['project.cluster-application.resource-limits', 'resource-limits', ['CPU limit (cores)', 'Memory reservation (MiB)']],
     'deployments' => ['project.cluster-application.deployments', 'deployments', ['Deployment history', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
+    'logs' => ['project.cluster-application.logs', 'logs', ['Runtime Logs', 'Find in logs']],
+    'danger' => ['project.cluster-application.danger', 'danger', ['Danger zone', 'Delete application']],
 ]);
 
 it('only renders the form that belongs to the current section', function () {
@@ -1104,6 +1108,8 @@ it('does not expose any cluster application section to another team', function (
     'project.cluster-application.environment-variables',
     'project.cluster-application.resource-limits',
     'project.cluster-application.deployments',
+    'project.cluster-application.logs',
+    'project.cluster-application.danger',
 ]);
 
 it('does not expose deployment logs to another team', function () {

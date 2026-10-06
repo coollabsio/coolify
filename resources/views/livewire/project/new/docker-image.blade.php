@@ -35,6 +35,10 @@
                         placeholder="59e02939b1bf39f16c93138a28727aec…"
                         helper="Use the 64-character digest without the sha256: prefix." />
                 </div>
+                <div x-cloak x-show="/^(cluster|node):/.test($wire.deploymentTarget ?? '')">
+                    <x-forms.input id="name" label="Name" placeholder="Defaults to the image name, for example nginx"
+                        helper="Leave empty to name the application after the image." />
+                </div>
             </div>
         </section>
     </form>

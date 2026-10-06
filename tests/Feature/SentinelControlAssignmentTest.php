@@ -100,6 +100,17 @@ it('grants the log read capability to Nodes that advertise it', function () {
     expect($claims['caps'])->toBe(['system.ping.v1', 'logs.read.v1']);
 });
 
+it('grants the container log capability to Nodes that advertise it', function () {
+    $assignment = requestSentinelAssignment($this->token, [
+        'capabilities' => ['system.ping.v1', 'container.logs.v1'],
+    ])
+        ->assertOk()
+        ->json();
+
+    $claims = (array) JWT::decode($assignment['credential'], new Key(config('constants.flux.signing_public_key'), 'EdDSA'));
+    expect($claims['caps'])->toBe(['system.ping.v1', 'container.logs.v1']);
+});
+
 it('rejects a plaintext Flux endpoint without the development override', function () {
     config()->set('constants.flux.development_allow_plaintext', false);
 

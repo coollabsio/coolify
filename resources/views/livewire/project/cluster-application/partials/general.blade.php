@@ -2,6 +2,20 @@
     $latestDeployment = $workload->operations->firstWhere('command_type', 'workload.deploy.v1');
 @endphp
 
+<form wire:submit="saveDetails" class="flex flex-col gap-6">
+    @can('update', $workload)
+        <x-unsaved-bar action="saveDetails" targets="name,description" />
+    @endcan
+
+    <x-application.settings-section id="cluster-application-details" title="Application details"
+        helper="Name the application. Renaming it does not change its internal hostname.">
+        <div class="grid gap-4">
+            <x-forms.input id="name" label="Name" required canGate="update" :canResource="$workload" />
+            <x-forms.input id="description" label="Description" canGate="update" :canResource="$workload" />
+        </div>
+    </x-application.settings-section>
+</form>
+
 <x-application.settings-section id="cluster-application-overview" title="Overview"
     helper="Where this application runs and how other workloads in the cluster reach it.">
     <dl class="grid gap-x-6 gap-y-5 text-sm sm:grid-cols-2">
@@ -30,13 +44,16 @@
             </dd>
         </div>
         <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Server</dt>
-            <dd class="mt-1">
-                <a class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
-                    {{ wireNavigate() }}
-                    href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}">
-                    {{ $node->name }}
-                </a>
+            <dt class="text-neutral-500 dark:text-fg-dim">{{ $servers->count() > 1 ? 'Servers' : 'Server' }}</dt>
+            <dd class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                @foreach ($servers as $server)
+                    <a wire:key="cluster-application-server-{{ $server->uuid }}"
+                        class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
+                        {{ wireNavigate() }}
+                        href="{{ route('node.show', ['node_uuid' => $server->uuid]) }}">
+                        {{ $server->name }}
+                    </a>
+                @endforeach
             </dd>
         </div>
         <div class="min-w-0">

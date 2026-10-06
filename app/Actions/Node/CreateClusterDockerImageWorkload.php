@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeRole;
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -27,8 +28,10 @@ class CreateClusterDockerImageWorkload
         string $image,
         User $requestedBy,
         ?Node $targetNode = null,
+        ?string $name = null,
     ): array {
         $image = $this->qualifiedImage($image);
+        $name = filled($name) ? trim($name) : null;
         if ($environment->project_id !== $project->id) {
             throw new RuntimeException('The environment does not belong to this project.');
         }
@@ -42,7 +45,7 @@ class CreateClusterDockerImageWorkload
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        return DB::transaction(function () use ($project, $environment, $cluster, $image, $requestedBy, $targetNode): array {
+        return DB::transaction(function () use ($project, $environment, $cluster, $image, $requestedBy, $targetNode, $name): array {
             $availableNodes = $cluster->nodes()
                 ->where('is_usable', true)
                 ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
@@ -73,7 +76,7 @@ class CreateClusterDockerImageWorkload
                 'team_id' => $project->team_id,
                 'project_id' => $project->id,
                 'environment_id' => $environment->id,
-                'name' => 'docker-image-'.new_public_id(),
+                'name' => $name ?? self::uniqueName($environment, self::defaultName($image)),
             ]);
             $revision = $workload->createRevision($image, ['restart_policy' => 'unless-stopped']);
             $workload->nodes()->attach($node);
@@ -86,6 +89,50 @@ class CreateClusterDockerImageWorkload
                 'operation' => $deployment['operation'],
             ];
         });
+    }
+
+    /**
+     * A readable application name from an image reference: the repository basename without
+     * registry, tag, or digest. `ghcr.io/acme/api@sha256:…` becomes `api`.
+     */
+    public static function defaultName(string $image): string
+    {
+        $repository = str(trim($image))->before('@')->toString();
+        $lastSlash = strrpos($repository, '/');
+        $lastColon = strrpos($repository, ':');
+        if ($lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash)) {
+            $repository = substr($repository, 0, $lastColon);
+        }
+        $name = strtolower((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', str($repository)->afterLast('/')->toString()));
+        $name = trim($name, '-._');
+        if ($name === '') {
+            return 'application';
+        }
+
+        // Application names need at least three characters, like v4 application names.
+        return mb_strlen($name) < 3 ? $name.'-app' : mb_substr($name, 0, 200);
+    }
+
+    /** Adds `-2`, `-3`, … while another application in the environment uses the name. */
+    public static function uniqueName(Environment $environment, string $name): string
+    {
+        $usedNames = NodeWorkload::query()
+            ->where('environment_id', $environment->id)
+            ->where('name', 'like', $name.'%')
+            ->pluck('name')
+            ->merge(Application::query()
+                ->where('environment_id', $environment->id)
+                ->where('name', 'like', $name.'%')
+                ->pluck('name'))
+            ->map(fn (string $usedName): string => mb_strtolower($usedName))
+            ->flip();
+
+        $candidate = $name;
+        for ($suffix = 2; $usedNames->has(mb_strtolower($candidate)); $suffix++) {
+            $candidate = $name.'-'.$suffix;
+        }
+
+        return $candidate;
     }
 
     private function qualifiedImage(string $image): string

@@ -18,6 +18,13 @@
             'group' => 'Settings',
         ],
         [
+            'key' => 'logs',
+            'label' => 'Runtime Logs',
+            'route' => 'project.cluster-application.logs',
+            'icon' => 'unordered-list',
+            'group' => 'Observe & troubleshoot',
+        ],
+        [
             'key' => 'deployments',
             'label' => 'Deployment Logs',
             'route' => 'project.cluster-application.deployments',
@@ -29,6 +36,13 @@
             'label' => 'Resource Limits',
             'route' => 'project.cluster-application.resource-limits',
             'icon' => 'cpu',
+            'group' => 'Operations',
+        ],
+        [
+            'key' => 'danger',
+            'label' => 'Danger Zone',
+            'route' => 'project.cluster-application.danger',
+            'icon' => 'shield-alert',
             'group' => 'Operations',
         ],
     ]);

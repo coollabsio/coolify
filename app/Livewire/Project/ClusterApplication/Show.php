@@ -11,15 +11,18 @@ use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
+use App\Enums\NodeWorkloadState;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\Project;
+use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
@@ -33,7 +36,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'environment-variables', 'resource-limits', 'deployments', 'deployment'];
+    public const SECTIONS = ['general', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'logs', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = ['workload.deploy.v1', 'workload.move.v1'];
@@ -59,6 +62,13 @@ class Show extends Component
     public string $status = 'Unknown';
 
     public string $statusType = 'neutral';
+
+    /** Whether any server still has a container of this application, like v4 `container_present`. */
+    public bool $containerPresent = false;
+
+    public string $name = '';
+
+    public ?string $description = null;
 
     public string $cpuLimit = '';
 
@@ -87,26 +97,38 @@ class Show extends Component
             $this->deploymentUuid = $this->deploymentQuery()->where('uuid', $deployment_uuid)->firstOrFail()->uuid;
         }
         $this->loadData();
+        $this->loadDetails();
         $this->loadResourceSettings();
         $this->loadConfiguration();
         $this->loadDomains();
     }
 
+    /**
+     * Deploys the latest configuration on every server of the application and opens the
+     * deployment log, like the v4 application heading.
+     */
     public function deploy(): void
     {
+        $operation = null;
         try {
             $this->authorize('update', $this->workload);
             $revision = PrepareNodeWorkloadRevision::run($this->workload);
-            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer');
+            foreach ($this->workload->nodes()->orderBy('nodes.id')->get() as $node) {
+                $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer');
+                if ($deployment['created']) {
+                    DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+                    $operation ??= $deployment['operation'];
+                } elseif (in_array($deployment['operation']->command_type, self::DEPLOYMENT_COMMAND_TYPES, true)) {
+                    $operation ??= $deployment['operation'];
+                }
+            }
         } catch (\Throwable $exception) {
             handleError($exception, $this);
+            $this->loadData();
 
             return;
         }
-        $operation = $deployment['operation'];
-        if ($deployment['created']) {
-            DeployNodeWorkloadJob::dispatch($operation->id);
-        } elseif (! in_array($operation->command_type, self::DEPLOYMENT_COMMAND_TYPES, true)) {
+        if ($operation === null) {
             $this->dispatch('info', 'This application already has an active operation.');
             $this->loadData();
 
@@ -192,22 +214,60 @@ class Show extends Component
         $this->dispatch('success', 'Domains saved. Ingress servers apply them without a redeploy.');
     }
 
-    public function manage(string $actionValue): void
+    public function saveDetails(): void
     {
-        try {
-            $this->authorize('update', $this->workload);
-            $action = NodeWorkloadAction::from($actionValue);
-            if (! in_array($action, [NodeWorkloadAction::RESTART, NodeWorkloadAction::STOP], true)) {
-                abort(404);
-            }
-            $revision = $this->workload->revisions()->latest('id')->firstOrFail();
-            $operation = CreateLifecycleOperation::run($this->node, $revision, $action, auth()->user());
-            ManageNodeWorkloadJob::dispatch($operation->id);
-            $this->dispatch('success', str($action->value)->title().' command queued.');
-            $this->loadData();
-        } catch (\Throwable $exception) {
-            handleError($exception, $this);
-        }
+        $this->authorize('update', $this->workload);
+        $validated = $this->validate([
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+        ], ValidationPatterns::combinedMessages());
+
+        // The internal DNS name is allocated once, so renaming keeps the internal hostname stable.
+        $this->workload->update([
+            'name' => trim($validated['name']),
+            'description' => filled($validated['description']) ? trim($validated['description']) : null,
+        ]);
+        $this->loadDetails();
+        $this->dispatch('success', 'Application updated.');
+    }
+
+    public function restart(): void
+    {
+        $this->queueLifecycle(NodeWorkloadAction::RESTART);
+    }
+
+    public function stop(): void
+    {
+        $this->queueLifecycle(NodeWorkloadAction::STOP);
+    }
+
+    /** Removes the exited container on every server. The application stays placed on its servers. */
+    public function removeContainer(): void
+    {
+        $this->queueLifecycle(NodeWorkloadAction::REMOVE);
+    }
+
+    /**
+     * The deployment log of an active deployment, for the "Deploying… View log" indicator.
+     */
+    public function getRunningDeploymentUrlProperty(): ?string
+    {
+        $uuid = $this->deploymentQuery()
+            ->whereIn('status', [
+                NodeOperationStatus::QUEUED,
+                NodeOperationStatus::DISPATCHED,
+                NodeOperationStatus::RUNNING,
+                NodeOperationStatus::VERIFYING,
+            ])
+            ->latest('id')
+            ->value('uuid');
+
+        return $uuid === null ? null : route('project.cluster-application.deployment.show', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'workload_uuid' => $this->workload->uuid,
+            'deployment_uuid' => $uuid,
+        ]);
     }
 
     public function goToPage(int $page): void
@@ -225,6 +285,38 @@ class Show extends Component
         $this->goToPage($this->deploymentPage + 1);
     }
 
+    private function queueLifecycle(NodeWorkloadAction $action): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $revision = $this->workload->revisions()->latest('id')->firstOrFail();
+            $failures = [];
+            $queued = 0;
+            foreach ($this->workload->nodes()->orderBy('nodes.id')->get() as $node) {
+                try {
+                    $operation = CreateLifecycleOperation::run($node, $revision, $action, auth()->user());
+                    ManageNodeWorkloadJob::dispatch($operation->id);
+                    $queued++;
+                } catch (\RuntimeException $exception) {
+                    $failures[] = "{$node->name}: {$exception->getMessage()}";
+                }
+            }
+            if ($queued > 0) {
+                match ($action) {
+                    NodeWorkloadAction::STOP => $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.'),
+                    NodeWorkloadAction::REMOVE => $this->dispatch('info', 'Removing the application container.'),
+                    default => $this->dispatch('success', str($action->value)->title().' command queued.'),
+                };
+            }
+            if ($failures !== []) {
+                $this->dispatch('error', 'Failed to '.$action->value.' the application on every server.', implode('<br>', array_map('e', $failures)));
+            }
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
+        $this->loadData();
+    }
+
     public function render(): View
     {
         return view('livewire.project.cluster-application.show', [
@@ -233,6 +325,7 @@ class Show extends Component
                 ? $this->workload->internal_dns_name.'.default.coolify.internal'
                 : null,
             ...($this->section === 'general' ? $this->ingressData() : []),
+            'servers' => $this->workload->nodes->sortBy('name')->values(),
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
             'selectedDeployment' => $this->section === 'deployment' ? $this->selectedDeployment() : null,
             'routeParameters' => [
@@ -451,9 +544,24 @@ class Show extends Component
             'operations' => fn ($query) => $query->latest('id')->limit(20),
         ]);
         $this->node = $this->workload->nodes->firstOrFail();
-        $state = DetermineWorkloadState::run($this->node, $this->workload);
+        // Worst state wins across servers, like the Resources page of a cluster.
+        $states = $this->workload->nodes->map(fn (Node $node): NodeWorkloadState => DetermineWorkloadState::run($node, $this->workload));
+        $state = $states->first(fn (NodeWorkloadState $state): bool => $state !== NodeWorkloadState::RUNNING)
+            ?? $states->first()
+            ?? NodeWorkloadState::UNKNOWN;
         $this->status = str($state->value)->title()->toString();
         $this->statusType = $state->badgeType();
+        $this->containerPresent = NodeContainer::query()
+            ->where('node_workload_id', $this->workload->id)
+            ->whereIn('node_id', $this->workload->nodes->modelKeys())
+            ->where('is_managed', true)
+            ->exists();
+    }
+
+    private function loadDetails(): void
+    {
+        $this->name = $this->workload->name;
+        $this->description = $this->workload->description;
     }
 
     private function loadConfiguration(): void

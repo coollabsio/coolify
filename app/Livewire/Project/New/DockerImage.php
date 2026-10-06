@@ -24,6 +24,8 @@ class DockerImage extends Component
 
     public string $imageSha256 = '';
 
+    public string $name = '';
+
     public string $deploymentTarget = '';
 
     /** @var array<int, array{value: string, label: string, disabled: bool}> */
@@ -162,6 +164,7 @@ class DockerImage extends Component
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),
             'imageSha256' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/i'],
+            'name' => ValidationPatterns::nameRules(required: false),
         ]);
 
         // Validate that either tag or sha256 is provided, but not both
@@ -210,6 +213,7 @@ class DockerImage extends Component
                 $dockerImage,
                 auth()->user(),
                 $targetNode,
+                $this->name,
             );
             DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
 

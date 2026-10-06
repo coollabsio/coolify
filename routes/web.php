@@ -300,6 +300,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/resource-limits', ClusterApplicationShow::class)->name('project.cluster-application.resource-limits');
             Route::get('/deployments', ClusterApplicationShow::class)->name('project.cluster-application.deployments');
             Route::get('/deployments/{deployment_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.deployment.show');
+            Route::get('/logs', ClusterApplicationShow::class)->name('project.cluster-application.logs');
+            Route::get('/danger', ClusterApplicationShow::class)->name('project.cluster-application.danger');
         });
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');

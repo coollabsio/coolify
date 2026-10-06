@@ -42,6 +42,7 @@ class IssueFluxCredential
             'discovery.corrosion.reconcile.v1',
             'ingress.reconcile.v1',
             'logs.read.v1',
+            'container.logs.v1',
             'trust.bundle.update.v1',
         ], $capabilities));
 

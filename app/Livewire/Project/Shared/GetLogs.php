@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Sentinel\FetchContainerLogs;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
+use App\Models\Node;
+use App\Models\NodeWorkload;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -37,13 +40,14 @@ class GetLogs extends Component
     public string $errors = '';
 
     #[Locked]
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|null $resource = null;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|NodeWorkload|null $resource = null;
 
     #[Locked]
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
 
+    /** A cluster application reads its logs from a Node through Sentinel instead of SSH. */
     #[Locked]
-    public Server $server;
+    public Server|Node $server;
 
     #[Locked]
     public ?string $container = null;
@@ -62,8 +66,15 @@ class GetLogs extends Component
 
     public bool $collapsible = true;
 
+    /** Why logs cannot be shown, such as a Sentinel without the container logs capability. */
+    #[Locked]
+    public ?string $logsUnavailableMessage = null;
+
     public function mount()
     {
+        if ($this->resource instanceof NodeWorkload) {
+            return;
+        }
         if (! is_null($this->resource)) {
             if ($this->resource->getMorphClass() === Application::class) {
                 $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
@@ -139,6 +150,11 @@ class GetLogs extends Component
 
     public function getLogs($refresh = false)
     {
+        if ($this->server instanceof Node) {
+            $this->getClusterLogs();
+
+            return;
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             $this->outputs = 'Unauthorized.';
 
@@ -247,6 +263,20 @@ class GetLogs extends Component
 
     public function downloadAllLogs(): string
     {
+        if ($this->server instanceof Node) {
+            if (! $this->canReadClusterLogs()) {
+                return '';
+            }
+            try {
+                $result = FetchContainerLogs::run($this->server, $this->resource, FetchContainerLogs::MAX_LINES);
+            } catch (\RuntimeException $exception) {
+                $this->dispatch('error', $exception->getMessage());
+
+                return '';
+            }
+
+            return sanitizeLogsForExport($this->formatClusterLogs($result['logs'], $result['truncated'], self::MAX_DOWNLOAD_SIZE_BYTES));
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return '';
         }
@@ -322,6 +352,68 @@ class GetLogs extends Component
         }
 
         return sanitizeLogsForExport($allLogs);
+    }
+
+    /**
+     * Cluster application logs come from Sentinel (`container.logs.v1`). Sentinel always sends
+     * timestamps; they are removed here when the timestamp toggle is off.
+     */
+    private function getClusterLogs(): void
+    {
+        if (! $this->canReadClusterLogs()) {
+            $this->outputs = 'Unauthorized.';
+
+            return;
+        }
+        if ($this->numberOfLines === -1 || $this->numberOfLines > FetchContainerLogs::MAX_LINES) {
+            $this->numberOfLines = FetchContainerLogs::MAX_LINES;
+        }
+        if (is_null($this->numberOfLines) || $this->numberOfLines <= 0) {
+            $this->numberOfLines = 1000;
+        }
+
+        try {
+            $result = FetchContainerLogs::run($this->server, $this->resource, $this->numberOfLines);
+        } catch (\RuntimeException $exception) {
+            $this->outputs = '';
+            $this->logsUnavailableMessage = $exception->getMessage();
+
+            return;
+        }
+
+        $this->logsUnavailableMessage = null;
+        $this->outputs = $this->formatClusterLogs($result['logs'], $result['truncated'], self::MAX_DISPLAY_SIZE_BYTES);
+    }
+
+    private function canReadClusterLogs(): bool
+    {
+        $team = currentTeam();
+
+        return $team !== null
+            && $this->server instanceof Node
+            && $this->resource instanceof NodeWorkload
+            && $this->server->team_id === $team->id
+            && $this->resource->team_id === $team->id
+            && auth()->user()?->can('view', $this->resource) === true
+            && $this->resource->nodes()->whereKey($this->server->id)->exists();
+    }
+
+    private function formatClusterLogs(string $logs, bool $truncated, int $maxBytes): string
+    {
+        $outputTruncated = strlen($logs) > $maxBytes;
+        $logs = removeAnsiColors($outputTruncated ? substr($logs, 0, $maxBytes) : $logs);
+        if (! $this->showTimeStamps) {
+            $logs = (string) preg_replace('/^\d{4}-\d{2}-\d{2}T\S+ /m', '', $logs);
+        }
+        $logs = rtrim($logs, "\n");
+        if ($truncated) {
+            $logs .= "\n\n[... Output truncated by Sentinel ...]";
+        }
+        if ($outputTruncated) {
+            $logs .= "\n\n[... Output truncated at ".($maxBytes / 1024 / 1024).'MB limit ...]';
+        }
+
+        return $logs;
     }
 
     private function boundedLogCommand(string $command, int $maxBytes): string

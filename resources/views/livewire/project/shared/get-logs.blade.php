@@ -600,8 +600,13 @@
                                 <x-reicon name="terminal" class="size-4" />
                             </span>
                             <div>
-                                <p>No logs yet</p>
-                                <span>Logs will appear here when the container produces output.</span>
+                                @if ($logsUnavailableMessage)
+                                    <p>Logs unavailable</p>
+                                    <span>{{ $logsUnavailableMessage }}</span>
+                                @else
+                                    <p>No logs yet</p>
+                                    <span>Logs will appear here when the container produces output.</span>
+                                @endif
                             </div>
                         </div>
                     @endif
