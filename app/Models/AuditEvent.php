@@ -269,6 +269,10 @@ class AuditEvent extends Model
             $value = (array) $value;
         }
 
+        if (is_string($value)) {
+            return self::stripUrlCredentials($value);
+        }
+
         if (! is_array($value)) {
             return $value;
         }
@@ -278,6 +282,14 @@ class AuditEvent extends Model
                 $itemKey => self::redact($item, (string) $itemKey),
             ])
             ->all();
+    }
+
+    /**
+     * Removes the user info of URLs (https://user:token@host), so the audit keeps the URL without credentials.
+     */
+    private static function stripUrlCredentials(string $value): string
+    {
+        return preg_replace('#\b([a-z][a-z0-9+.-]*://)[^/?\#\s]+@#i', '$1', $value) ?? $value;
     }
 
     private static function isSensitiveKey(string $key): bool
