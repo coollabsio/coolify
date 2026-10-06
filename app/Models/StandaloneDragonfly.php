@@ -370,13 +370,26 @@ class StandaloneDragonfly extends BaseModel
     }
 
     /**
+     * Uses the loaded runtime_environment_variables relation when present, so lists that eager
+     * load it do not run a query per database.
+     */
+    private function runtimeEnvironmentVariable(string $key): ?EnvironmentVariable
+    {
+        if ($this->relationLoaded('runtime_environment_variables')) {
+            return $this->runtime_environment_variables->firstWhere('key', $key);
+        }
+
+        return $this->runtime_environment_variables()->where('key', $key)->first();
+    }
+
+    /**
      * The REDIS_PASSWORD variable that sets the server password instead of the stored password.
      * Databases created before this release (legacy_password_quoting) keep their v4.3.23 server
      * password, the stored one, unless the variable reads a remote secret.
      */
     public function serverPasswordEnvironmentVariable(): ?EnvironmentVariable
     {
-        $environmentVariable = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+        $environmentVariable = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
 
         if (! $environmentVariable) {
             return null;
