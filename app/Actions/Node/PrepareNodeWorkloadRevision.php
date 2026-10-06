@@ -23,16 +23,14 @@ class PrepareNodeWorkloadRevision
             $current = $workload->revisions()->latest('id')->lockForUpdate()->firstOrFail();
             $environment = $workload->runtimeEnvironment();
 
+            // Podman accepts any name and value; only `=` in a name and null bytes cannot be passed as `--env KEY=VALUE`.
             foreach ($environment as $key => $value) {
-                if (preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/', $key) !== 1) {
-                    throw new RuntimeException("The environment variable {$key} cannot be used in a cluster application. Use only letters, numbers, and underscores in the name.");
+                if ($key === '' || str_contains($key, '=') || str_contains($key, "\0")) {
+                    throw new RuntimeException("The environment variable {$key} cannot be used in a cluster application. The name cannot be empty or contain = or a null byte.");
                 }
-                if (mb_strlen($value) > 4096 || str_contains($value, "\0")) {
-                    throw new RuntimeException("The value of the environment variable {$key} is too long or contains a null byte.");
+                if (str_contains($value, "\0")) {
+                    throw new RuntimeException("The value of the environment variable {$key} contains a null byte.");
                 }
-            }
-            if (count($environment) > 256) {
-                throw new RuntimeException('A cluster application can use at most 256 runtime environment variables.');
             }
 
             if ($environment === ($current->environment ?? [])) {

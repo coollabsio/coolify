@@ -620,13 +620,40 @@ it('records resolved runtime environment variables in a new encrypted revision o
     expect($workload->revisions()->count())->toBe(2);
 });
 
-it('does not deploy environment variable names that Podman cannot use', function () {
+it('deploys any environment variable that Podman accepts', function () {
     Queue::fake();
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
-    $deployment['workload']->environment_variables()->create(['key' => 'app.name', 'value' => 'demo']);
+    $workload = $deployment['workload'];
+    $longValue = str_repeat('x', 10000);
+    $workload->environment_variables()->create(['key' => 'app.name', 'value' => $longValue]);
+    foreach (range(1, 300) as $index) {
+        $workload->environment_variables()->create(['key' => "VAR_{$index}", 'value' => 'value']);
+    }
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $workload->uuid,
+    ])
+        ->call('deploy')
+        ->assertNotDispatched('error');
+
+    $latest = $workload->revisions()->latest('id')->firstOrFail();
+    expect($latest->environment)->toHaveCount(301)
+        ->and($latest->environment['app.name'])->toBe($longValue);
+    Queue::assertPushed(DeployNodeWorkloadJob::class);
+});
+
+it('does not deploy environment variable values that contain a null byte', function () {
+    Queue::fake();
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
+    $deployment['workload']->environment_variables()->create(['key' => 'APP_NAME', 'value' => "demo\0value"]);
 
     Livewire::test(ClusterApplicationShow::class, [
         'project_uuid' => $this->project->uuid,

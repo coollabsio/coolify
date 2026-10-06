@@ -96,8 +96,8 @@ class DispatchWorkloadDeployment
         $validator = Validator::make($configuration, [
             'command' => ['sometimes', 'array', 'max:64'],
             'command.*' => ['string', 'max:4096'],
-            'environment' => ['sometimes', 'array', 'max:256'],
-            'environment.*' => ['string', 'max:4096'],
+            'environment' => ['sometimes', 'array'],
+            'environment.*' => ['string'],
             'restart_policy' => ['sometimes', 'in:no,always,on-failure,unless-stopped'],
             'resources' => ['sometimes', 'array:cpu_limit,cpu_reservation,memory_limit_bytes,memory_reservation_bytes'],
             'resources.cpu_limit' => ['nullable', 'numeric', 'between:0.01,1024'],
