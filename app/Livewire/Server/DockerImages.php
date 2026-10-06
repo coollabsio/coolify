@@ -31,6 +31,7 @@ class DockerImages extends Component
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+            $this->authorize('view', $this->server);
             $this->parameters = get_route_parameters();
         } catch (\Throwable) {
             return redirect()->route('server.index');
@@ -39,6 +40,7 @@ class DockerImages extends Component
 
     public function load(): void
     {
+        $this->authorize('view', $this->server);
         try {
             if (! $this->server->isFunctional()) {
                 return;
