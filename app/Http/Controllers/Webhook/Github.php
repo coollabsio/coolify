@@ -261,6 +261,14 @@ class Github extends Controller
     }
 
     /**
+     * Cuts a webhook string to the varchar(255) column of the runner tables.
+     */
+    private function limitRunnerColumn(mixed $value): ?string
+    {
+        return is_scalar($value) ? mb_substr((string) $value, 0, 255) : null;
+    }
+
+    /**
      * Handles GitHub Actions runner demand. Every lookup is scoped to the App whose signature was verified.
      * GitHub can give a job to any idle runner with matching labels, so progress is matched by runner name.
      */
@@ -278,12 +286,14 @@ class Github extends Controller
             return response('Nothing to do. The job belongs to another installation of the GitHub App.');
         }
 
+        // The columns are varchar(255). A cut URL would be a broken link, so a longer one is not stored.
+        $htmlUrl = data_get($payload, 'workflow_job.html_url');
         $jobDetails = array_filter([
             'workflow_job_id' => $jobId,
-            'workflow_job_html_url' => data_get($payload, 'workflow_job.html_url'),
-            'workflow_name' => data_get($payload, 'workflow_job.workflow_name'),
-            'job_name' => data_get($payload, 'workflow_job.name'),
-            'repository_full_name' => data_get($payload, 'repository.full_name'),
+            'workflow_job_html_url' => is_string($htmlUrl) && mb_strlen($htmlUrl) <= 255 ? $htmlUrl : null,
+            'workflow_name' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.workflow_name')),
+            'job_name' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.name')),
+            'repository_full_name' => $this->limitRunnerColumn(data_get($payload, 'repository.full_name')),
         ], fn ($value) => filled($value));
 
         if ($action === 'queued') {
@@ -329,7 +339,7 @@ class Github extends Controller
 
         if ($action === 'completed') {
             if ($execution) {
-                $execution->update([...$jobDetails, 'conclusion' => data_get($payload, 'workflow_job.conclusion')]);
+                $execution->update([...$jobDetails, 'conclusion' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.conclusion'))]);
                 if ($execution->isActive() || $execution->status === GithubRunnerStatus::Failed) {
                     $execution->finish(GithubRunnerStatus::Completed);
                     CleanupGithubRunnerJob::dispatch($execution->id);
