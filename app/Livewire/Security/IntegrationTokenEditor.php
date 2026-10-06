@@ -131,7 +131,7 @@ class IntegrationTokenEditor extends Component
             $this->loadZones();
 
             auditLog('ui.integration_token.updated', [
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->integrationToken->team_id,
                 'integration_token_uuid' => $this->integrationToken->uuid,
                 'integration_token_name' => $this->integrationToken->name,
                 'provider' => $this->integrationToken->provider,
@@ -141,12 +141,12 @@ class IntegrationTokenEditor extends Component
 
             if (in_array('base_url', $changedConnectionFields, true)) {
                 auditLog('ui.integration_token.base_url_changed', [
-                    'team_id' => currentTeam()->id,
+                    'team_id' => $this->integrationToken->team_id,
                     'integration_token_uuid' => $this->integrationToken->uuid,
                     'integration_token_name' => $this->integrationToken->name,
                     'provider' => $provider,
-                    'previous_base_url' => data_get($storedMetadata, 'base_url'),
-                    'base_url' => data_get($metadata, 'base_url'),
+                    'previous_base_url' => $this->baseUrlForAudit(data_get($storedMetadata, 'base_url')),
+                    'base_url' => $this->baseUrlForAudit(data_get($metadata, 'base_url')),
                 ], 'warning');
             }
 
@@ -190,6 +190,25 @@ class IntegrationTokenEditor extends Component
         ));
     }
 
+    /**
+     * Base URL without user info, query, or fragment, which can carry credentials.
+     */
+    private function baseUrlForAudit(mixed $url): ?string
+    {
+        if (! is_string($url) || $url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return '[invalid-url]';
+        }
+
+        return $parts['scheme'].'://'.$parts['host']
+            .(isset($parts['port']) ? ':'.$parts['port'] : '')
+            .($parts['path'] ?? '');
+    }
+
     private function reenterSecretMessage(string $provider): string
     {
         return match ($provider) {
@@ -221,7 +240,7 @@ class IntegrationTokenEditor extends Component
         $this->integrationToken->delete();
 
         auditLog('ui.integration_token.deleted', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->integrationToken->team_id,
             'integration_token_uuid' => $uuid,
             'integration_token_name' => $name,
             'provider' => $provider,
