@@ -11,11 +11,14 @@ use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\ReconcileGithubRunnersJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
+use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -46,14 +49,26 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
+        $this->scheduleInstance->call(fn () => app(ScheduledJobDeliveryService::class)->deleteOldOccurrences())
+            ->name('cleanup:scheduled-job-occurrences')
+            ->dailyAt('04:00')
+            ->onOneServer();
         $this->scheduleInstance->command('cleanup:stucked-resources')
             ->dailyAt('03:17')
             ->onOneServer()
             ->withoutOverlapping(60)
             ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
+        $this->scheduleInstance->command('cleanup:database-import-uploads')->hourly()->onOneServer();
+        $this->scheduleInstance->command('dns:release-orphaned-records')
+            ->hourly()
+            ->onOneServer()
+            ->withoutOverlapping(60)
+            ->runInBackground();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new RevalidateUnusableS3StoragesJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new ReconcileGithubRunnersJob)->everyMinute()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
@@ -65,7 +80,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
@@ -86,7 +101,7 @@ class Kernel extends ConsoleKernel
             $this->pullImages();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
@@ -104,6 +119,23 @@ class Kernel extends ConsoleKernel
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
+    }
+
+    /**
+     * Run the manager from the scheduler, not from a queue worker. A busy queue could delay it
+     * past the catch-up window, and then due backups and tasks would be skipped.
+     * Each schedule type runs in its own process with its own overlap lock, so the types run in
+     * parallel and a slow type cannot make another type skip a run.
+     */
+    private function scheduleScheduledJobManager(): void
+    {
+        foreach (array_keys(ScheduledJobManager::TYPES) as $type) {
+            $this->scheduleInstance->command("scheduled:dispatch --type={$type}")
+                ->everyMinute()
+                ->onOneServer()
+                ->withoutOverlapping(5)
+                ->runInBackground();
+        }
     }
 
     private function scheduleUpdates(): void

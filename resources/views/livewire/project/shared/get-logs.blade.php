@@ -1,278 +1,19 @@
+@if (! $canReadLogs)
+    <x-callout type="info" title="Hidden (only admins can view)">
+        Container logs can contain secrets.
+    </x-callout>
+@else
 <div @class(['w-full min-w-0', 'runtime-log-shell' => $collapsible])>
-    <div id="screen" x-data="{
-        collapsible: {{ $collapsible ? 'true' : 'false' }},
-        expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
-        logsLoaded: false,
-        fullscreen: false,
-        alwaysScroll: false,
-        followManuallyDisabled: false,
-        rafId: null,
-        scrollTimeout: null,
-        scrollDebounce: null,
-        destroyed: false,
-        colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
-        logFilters: JSON.parse(localStorage.getItem('coolify-log-filters')) || {error: true, warning: true, debug: true, info: true},
-        searchQuery: '',
-        matchCount: 0,
-        containerName: '{{ $container ?? "logs" }}',
-        makeFullscreen() {
-            this.fullscreen = !this.fullscreen;
-            if (this.fullscreen === false) {
-                this.alwaysScroll = false;
-                this.cancelScrollLoop();
-            }
-        },
-        handleKeyDown(event) {
-            if (event.key === 'Escape' && this.fullscreen) {
-                this.makeFullscreen();
-            }
-        },
-        isScrolling: false,
-        lastTouchY: 0,
-        disableFollow() {
-            if (!this.alwaysScroll) return;
-            this.alwaysScroll = false;
-            this.cancelScrollLoop();
-        },
-        cancelScrollLoop() {
-            if (this.rafId) {
-                cancelAnimationFrame(this.rafId);
-                this.rafId = null;
-            }
-            if (this.scrollTimeout) {
-                clearTimeout(this.scrollTimeout);
-                this.scrollTimeout = null;
-            }
-            if (this.scrollDebounce) {
-                clearTimeout(this.scrollDebounce);
-                this.scrollDebounce = null;
-            }
-        },
-        handleWheel(event) {
-            if (this.alwaysScroll && event.deltaY < 0) {
-                this.disableFollow();
-            }
-        },
-        handleTouchStart(event) {
-            this.lastTouchY = event.touches[0].clientY;
-        },
-        handleTouchMove(event) {
-            if (!this.alwaysScroll) return;
-            const currentY = event.touches[0].clientY;
-            if (currentY > this.lastTouchY) {
-                this.disableFollow();
-            }
-            this.lastTouchY = currentY;
-        },
-        handleKeyScroll(event) {
-            if (!this.alwaysScroll) return;
-            const upKeys = ['ArrowUp', 'PageUp', 'Home'];
-            if (upKeys.includes(event.key)) {
-                this.disableFollow();
-            }
-        },
-        scrollToBottom() {
-            if (this.destroyed) return;
-            const logsContainer = this.$root.querySelector('#logsContainer');
-            if (logsContainer) {
-                this.isScrolling = true;
-                logsContainer.scrollTop = logsContainer.scrollHeight;
-                setTimeout(() => { this.isScrolling = false; }, 50);
-            }
-        },
-        scheduleScroll() {
-            if (!this.alwaysScroll || this.destroyed) return;
-            this.rafId = requestAnimationFrame(() => {
-                if (!this.alwaysScroll || this.destroyed) return;
-                this.scrollToBottom();
-                if (this.alwaysScroll && !this.destroyed) {
-                    this.scrollTimeout = setTimeout(() => this.scheduleScroll(), 250);
-                }
-            });
-        },
-        toggleScroll() {
-            this.alwaysScroll = !this.alwaysScroll;
-            if (this.alwaysScroll) {
-                this.followManuallyDisabled = false;
-                this.scheduleScroll();
-            } else {
-                this.followManuallyDisabled = true;
-                this.cancelScrollLoop();
-            }
-        },
-        handleScroll(event) {
-            if (this.isScrolling || this.destroyed) return;
-            clearTimeout(this.scrollDebounce);
-            this.scrollDebounce = setTimeout(() => {
-                if (this.destroyed) return;
-                const el = event.target;
-                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                if (!this.alwaysScroll && !this.followManuallyDisabled && distanceFromBottom <= 10) {
-                    this.alwaysScroll = true;
-                    this.scheduleScroll();
-                }
-            }, 150);
-        },
-        getLogLevel(content) {
-            if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(content)) return 'error';
-            if (/\b(warn|warning|wrn|caution)\b/.test(content)) return 'warning';
-            if (/\b(debug|dbg|trace|verbose)\b/.test(content)) return 'debug';
-            return 'info';
-        },
-        toggleLogFilter(level) {
-            this.logFilters[level] = !this.logFilters[level];
-            localStorage.setItem('coolify-log-filters', JSON.stringify(this.logFilters));
-            this.applySearch();
-        },
-        toggleColorLogs() {
-            this.colorLogs = !this.colorLogs;
-            localStorage.setItem('coolify-color-logs', this.colorLogs);
-            this.applyColorLogs();
-        },
-        applyColorLogs() {
-            const logs = document.getElementById('logs');
-            if (!logs) return;
-            const lines = logs.querySelectorAll('[data-log-line]');
-            lines.forEach(line => {
-                const content = (line.dataset.logContent || '').toLowerCase();
-                const level = this.getLogLevel(content);
-                line.dataset.logLevel = level;
-                line.classList.remove('log-error', 'log-warning', 'log-debug', 'log-info');
-                if (!this.colorLogs) return;
-                line.classList.add('log-' + level);
-            });
-        },
-        hasActiveLogSelection() {
-            const selection = window.getSelection();
-            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-                return false;
-            }
-            const logsContainer = document.getElementById('logs');
-            if (!logsContainer) return false;
-            const range = selection.getRangeAt(0);
-            return logsContainer.contains(range.commonAncestorContainer);
-        },
-        applySearch() {
-            const logs = document.getElementById('logs');
-            if (!logs) return;
-            const lines = logs.querySelectorAll('[data-log-line]');
-            const query = this.searchQuery.trim().toLowerCase();
-            let count = 0;
-
-            lines.forEach(line => {
-                const content = (line.dataset.logContent || '').toLowerCase();
-                const textSpan = line.querySelector('[data-line-text]');
-                const level = line.dataset.logLevel || this.getLogLevel(content);
-                const passesFilter = this.logFilters[level] !== false;
-                const matchesSearch = !query || content.includes(query);
-                const matches = passesFilter && matchesSearch;
-
-                line.classList.toggle('hidden', !matches);
-                if (matches && query) count++;
-
-                // Update highlighting
-                if (textSpan) {
-                    const originalText = textSpan.dataset.lineText || '';
-                    if (!query) {
-                        textSpan.textContent = originalText;
-                    } else if (matches) {
-                        this.highlightText(textSpan, originalText, query);
-                    }
-                }
-            });
-
-            this.matchCount = query ? count : 0;
-        },
-        highlightText(el, text, query) {
-            // Skip if user has selection
-            if (this.hasActiveLogSelection()) return;
-
-            el.textContent = '';
-            const lowerText = text.toLowerCase();
-            let lastIndex = 0;
-            let index = lowerText.indexOf(query, lastIndex);
-
-            while (index !== -1) {
-                if (index > lastIndex) {
-                    el.appendChild(document.createTextNode(text.substring(lastIndex, index)));
-                }
-                const mark = document.createElement('span');
-                mark.className = 'log-highlight';
-                mark.textContent = text.substring(index, index + query.length);
-                el.appendChild(mark);
-                lastIndex = index + query.length;
-                index = lowerText.indexOf(query, lastIndex);
-            }
-
-            if (lastIndex < text.length) {
-                el.appendChild(document.createTextNode(text.substring(lastIndex)));
-            }
-        },
-        downloadLogs() {
-            const logs = document.getElementById('logs');
-            if (!logs) return;
-            const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
-            let content = '';
-            visibleLines.forEach(line => {
-                const text = line.textContent.replace(/\s+/g, ' ').trim();
-                if (text) {
-                    content += text + String.fromCharCode(10);
-                }
-            });
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const timestamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
-            a.download = this.containerName + '-logs-' + timestamp + '.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-        },
-        init() {
-            if (this.expanded) {
-                this.$wire.getLogs(true);
-                this.logsLoaded = true;
-            }
-
-            // Watch search query changes
-            this.$watch('searchQuery', () => {
-                this.applySearch();
-            });
-
-            // Handler for applying colors and search after DOM changes
-            const applyAfterUpdate = () => {
-                this.$nextTick(() => {
-                    this.applyColorLogs();
-                    this.applySearch();
-                    if (this.alwaysScroll) {
-                        this.scrollToBottom();
-                    }
-                });
-            };
-
-            // Apply colors after Livewire updates (existing content)
-            Livewire.hook('morph.updated', ({ el }) => {
-                if (el.id === 'logs') {
-                    applyAfterUpdate();
-                }
-            });
-
-            // Apply colors after Livewire adds new content (initial load)
-            Livewire.hook('morph.added', ({ el }) => {
-                if (el.id === 'logs') {
-                    applyAfterUpdate();
-                }
-            });
-        },
-        destroy() {
-            this.destroyed = true;
-            this.alwaysScroll = false;
-            this.cancelScrollLoop();
-        }
-    }" @keydown.window="handleKeyDown($event)">
+    <div id="screen" x-data="runtimeLogs(@js([
+        'collapsible' => $collapsible,
+        'expanded' => $expandByDefault || ! $collapsible,
+        'containerName' => $container ?? 'logs',
+        'timezone' => getServerTimezone($server),
+    ]))" @keydown.window="handleKeyDown($event)"
+        :data-runtime-logs="fullscreen ? 'fullscreen' : (expanded ? 'expanded' : 'collapsed')">
         @if ($collapsible)
             <div class="runtime-log-trigger"
-                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(true); logsLoaded = true; }">
+                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { refresh(); logsLoaded = true; }">
                 <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
@@ -292,9 +33,6 @@
                 @endif
             </div>
         @endif
-        @if ($streamLogs)
-            <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
-        @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse.duration.200ms' : '' }}
             :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full mx-auto'"
             :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
@@ -303,7 +41,7 @@
                 <div class="runtime-log-toolbar logs-viewer-toolbar">
                     <div class="logs-viewer-toolbar-controls">
                         <div class="logs-viewer-actions">
-                            <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
+                            <button x-on:click="refresh()" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
                                 class="runtime-log-icon-button order-8">
                                 <x-reicon name="refresh" class="size-3.5" />
                             </button>
@@ -482,23 +220,33 @@
                         </div>
                         <div class="logs-viewer-end runtime-logs-viewer-end">
                             <div class="logs-viewer-meta">
-                                <form wire:submit="getLogs(true)" class="logs-viewer-lines">
-                                    <span class="logs-viewer-lines-label">Lines</span>
-                                    <input type="number" wire:model="numberOfLines" placeholder="100" min="-1" max="50000"
+                                <form x-on:submit.prevent="refreshLines()" class="logs-viewer-lines runtime-log-lines-group">
+                                    <span class="logs-viewer-lines-label relative" :aria-busy="loadingLines">
+                                        <span :class="loadingLines ? 'invisible' : ''">Lines</span>
+                                        <x-loading compact x-cloak x-show="loadingLines" aria-label="Loading logs"
+                                            class="absolute inset-0 text-inherit!" />
+                                    </span>
+                                    <input type="number" wire:model="numberOfLines" x-on:input="allLines = Number($event.target.value) === -1" placeholder="100" min="-1" max="50000"
                                         title="Number of lines (max 50,000; use -1 for all)" {{ $streamLogs ? 'readonly' : '' }}
                                         class="input logs-viewer-lines-input" />
-                                    <button type="button" wire:click="showAllLogs" title="Show all logs"
-                                        class="runtime-log-icon-button" {{ $streamLogs ? 'disabled' : '' }}>All</button>
+                                    <button type="button" x-on:click="showAllLogs()" title="Show all logs"
+                                        :class="allLines ? 'runtime-log-lines-all-active' : ''"
+                                        :aria-pressed="allLines" :aria-busy="loadingAll"
+                                        class="runtime-log-lines-all relative" {{ $streamLogs ? 'disabled' : '' }}>
+                                        <span :class="loadingAll ? 'invisible' : ''">All</span>
+                                        <x-loading compact x-cloak x-show="loadingAll" aria-label="Loading all logs"
+                                            class="absolute inset-0 text-inherit!" />
+                                    </button>
                                 </form>
-                                <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
-                                    class="text-xs text-gray-500 whitespace-nowrap dark:text-gray-400"></span>
                             </div>
                             <div class="logs-viewer-search relative">
                                 <x-reicon name="search"
                                     class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-                                <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
-                                    aria-label="Find in logs"
+                                <input type="search" x-ref="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
+                                    aria-label="Find in logs" :aria-keyshortcuts="findShortcutLabel === '⌘F' ? 'Meta+F' : 'Control+F'"
                                     class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint" />
+                                <kbd x-cloak x-show="!searchQuery" x-text="findShortcutLabel" aria-hidden="true"
+                                    class="pointer-events-none absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded border border-neutral-200 px-1 font-sans text-[10px] leading-4 text-neutral-400 dark:border-white/[0.08] dark:text-fg-faint"></kbd>
                                 <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                     class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
                                     aria-label="Clear search">
@@ -508,57 +256,62 @@
                         </div>
                     </div>
                 </div>
-                <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                <div id="logsContainer" x-ref="viewport" @scroll="handleScroll" @wheel="handleWheel"
                     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
-                    class="runtime-log-viewport logs-viewer-viewport flex min-w-0 w-full flex-col overflow-x-hidden overflow-y-auto scrollbar"
+                    class="runtime-log-viewport logs-viewer-viewport relative flex min-w-0 w-full flex-col overflow-x-hidden overflow-y-auto scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[min(40rem,70dvh)] sm:max-h-[40rem]'">
-                    @if ($outputs)
-                        @php
-                            $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
-                            $lineOccurrences = [];
-                        @endphp
-                        <div id="logs" class="font-logs max-w-full cursor-default text-[11px] leading-relaxed sm:text-xs">
-                            <div x-show="searchQuery.trim() && matchCount === 0"
-                                class="py-2 text-gray-500 dark:text-gray-400">
-                                No matches found.
-                            </div>
-                            @foreach ($displayLines as $line)
-                                @php
-                                    $lineFingerprint = md5($line);
-                                    $lineOccurrence = $lineOccurrences[$lineFingerprint] ?? 0;
-                                    $lineOccurrences[$lineFingerprint] = $lineOccurrence + 1;
-
-                                    // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
-                                    $timestamp = '';
-                                    $logContent = $line;
-                                    if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
-                                        $logContent = $matches[3];
-
-                                        // Convert UTC Docker timestamp to server timezone for display
-                                        $carbonTs = \Carbon\Carbon::parse($matches[1], 'UTC');
-                                        $serverTz = getServerTimezone($server);
-                                        try {
-                                            $carbonTs->setTimezone($serverTz);
-                                        } catch (\Exception) {
-                                            // keep UTC
-                                        }
-                                        $timestamp = $carbonTs->format('Y-M-d H:i:s');
-                                    }
-                                @endphp
-                                <div wire:key="log-{{ $lineFingerprint }}-{{ $lineOccurrence }}" data-log-line data-log-content="{{ $line }}" class="log-line logs-viewer-line">
-                                    @if ($timestamp && $showTimeStamps)
-                                        <span class="logs-viewer-timestamp text-gray-500">{{ $timestamp }}</span>
-                                    @endif
-                                    <span data-line-text="{{ $logContent }}" class="logs-viewer-line-text">{{ $logContent }}</span>
-                                </div>
-                            @endforeach
+                    <div class="runtime-log-loading" x-show="loading && lineCount === 0" role="status">
+                        <x-loading compact aria-label="Loading logs" />
+                        <span>Loading logs</span>
+                    </div>
+                    <div class="runtime-log-empty" x-show="!loading && lineCount === 0" role="status">
+                        <span class="runtime-log-empty-icon" aria-hidden="true">
+                            <x-reicon name="terminal" class="size-4" />
+                        </span>
+                        <div>
+                            <p>No logs yet</p>
+                            <span>Logs will appear here when the container produces output.</span>
                         </div>
-                    @else
-                        <pre id="logs"
-                            class="font-logs max-w-full whitespace-pre-wrap break-all text-neutral-400">No logs yet.</pre>
-                    @endif
+                    </div>
+                    {{-- Alpine renders only the visible rows. Livewire must not morph them. --}}
+                    <div id="logs" wire:ignore x-cloak x-show="lineCount > 0"
+                        :class="{ 'runtime-log-without-time': !$wire.showTimeStamps }"
+                        class="font-logs max-w-full cursor-default text-[11px] leading-relaxed sm:text-xs">
+                        <div x-ref="columns" class="runtime-log-columns" aria-hidden="true">
+                            <span x-show="$wire.showTimeStamps">Time</span>
+                            <span>Type</span>
+                            <span>Message</span>
+                        </div>
+                        <div x-ref="list" class="runtime-log-virtual-list" :style="{ height: totalSize + 'px' }">
+                            <template x-for="row in virtualRows" :key="row.key">
+                                <div class="runtime-log-virtual-row" :data-index="row.index"
+                                    :style="{ transform: 'translateY(' + (row.start - scrollMargin) + 'px)' }"
+                                    x-init="$nextTick(() => measureRow($el))">
+                                    <div data-log-line role="button" tabindex="0" :data-log-level="row.line.level"
+                                        :class="colorLogs ? 'log-' + row.line.level : ''"
+                                        :aria-expanded="isLogExpanded(row.line.id)"
+                                        x-on:click="toggleLogDetails(row.line.id, $event)"
+                                        x-on:keydown="toggleLogDetails(row.line.id, $event)"
+                                        class="log-line logs-viewer-line">
+                                        <template x-if="$wire.showTimeStamps && row.line.ts">
+                                            <span class="logs-viewer-timestamp text-gray-500" x-text="formatTimestamp(row.line.ts)"></span>
+                                        </template>
+                                        <span data-line-text class="logs-viewer-line-text"><template x-for="(segment, segmentIndex) in highlight(row.line.text)" :key="segmentIndex"><span :class="segment.match ? 'log-highlight' : ''" x-text="segment.text"></span></template></span>
+                                    </div>
+                                    <template x-if="isLogExpanded(row.line.id)">
+                                        <pre class="runtime-log-detail" aria-label="Full log entry"
+                                            x-text="formatLogDetails(row.line.text)"></pre>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                        <div x-show="appliedQuery && matchCount === 0" class="px-4 py-2 text-gray-500 dark:text-gray-400">
+                            No matches found.
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+@endif

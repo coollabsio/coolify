@@ -30,7 +30,7 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         $settings = instanceSettings();
-        if (! $settings->is_registration_enabled) {
+        if (! $settings->isPasswordRegistrationAllowed()) {
             abort(403);
         }
 
@@ -81,7 +81,7 @@ class CreateNewUser implements CreatesNewUsers
             }
         }
         // Set session variable
-        session(['currentTeam' => $user->currentTeam = $team]);
+        session(['currentTeam' => $team]);
 
         return $user;
     }

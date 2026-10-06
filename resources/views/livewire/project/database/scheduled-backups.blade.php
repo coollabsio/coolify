@@ -100,13 +100,13 @@
                             {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
                         </div>
                         <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                            <a wire:navigate href="{{ $backupExecutionsRoute }}"
+                            <a {{ wireNavigate() }} href="{{ $backupExecutionsRoute }}"
                                 class="font-medium hover:underline hover:text-black dark:hover:text-fg">
                                 {{ $backup->executions_count ?? $backup->executions()->count() }}
                             </a>
                         </div>
                         <div class="flex justify-end">
-                            <a class="button" wire:navigate href="{{ $backupRoute }}">Manage</a>
+                            <a class="button" {{ wireNavigate() }} href="{{ $backupRoute }}">Manage</a>
                         </div>
                     </div>
                 @endforeach

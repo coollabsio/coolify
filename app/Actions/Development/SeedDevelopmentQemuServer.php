@@ -12,7 +12,10 @@ class SeedDevelopmentQemuServer
 {
     use AsAction;
 
-    public function handle(string $profileName, bool $removeOtherServers = true): Server
+    /**
+     * $ip and $port override the profile address, for example for a Lima VM whose SSH port is forwarded to the host.
+     */
+    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false, ?string $ip = null, int $port = 22): Server
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
@@ -34,13 +37,15 @@ class SeedDevelopmentQemuServer
                 ->delete();
         }
 
-        $server = Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server;
-        $server->forceFill(['uuid' => $profile['uuid']]);
+        $server = $asLocalhost
+            ? (Server::withTrashed()->find(0) ?? new Server)
+            : (Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server);
+        $server->forceFill($asLocalhost ? ['id' => 0, 'uuid' => 'localhost'] : ['uuid' => $profile['uuid']]);
         $server->fill([
-            'name' => $profile['name'],
-            'description' => 'Development-only QEMU virtual machine managed by dev:qemu.',
-            'ip' => $profile['ip'],
-            'port' => 22,
+            'name' => $asLocalhost ? 'localhost' : $profile['name'],
+            'description' => 'Development QEMU virtual machine',
+            'ip' => $ip ?? $profile['ip'],
+            'port' => $port,
             'user' => $profile['user'],
             'team_id' => 0,
             'private_key_id' => $privateKey->id,

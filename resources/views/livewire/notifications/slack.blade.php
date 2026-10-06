@@ -11,7 +11,8 @@
                 description="Send team notifications to Slack through an incoming webhook.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$slackEnabled" enabledProperty="slackEnabled"
-                        toggleMethod="instantSaveSlackEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveSlackEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

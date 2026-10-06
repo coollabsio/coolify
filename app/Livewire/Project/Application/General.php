@@ -2,20 +2,26 @@
 
 namespace App\Livewire\Project\Application;
 
-use App\Actions\Application\GenerateConfig;
+use App\Enums\StaticImageTypes;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
+use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
 
 class General extends Component
 {
+    use AuditsApplicationSettings;
     use AuthorizesRequests;
 
     public string $applicationId;
@@ -156,7 +162,7 @@ class General extends Component
             'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
             'startCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildPack' => 'required',
-            'staticImage' => 'required',
+            'staticImage' => ['required', Rule::enum(StaticImageTypes::class)],
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
             'publishDirectory' => ValidationPatterns::directoryPathRules(),
             'portsExposes' => ['nullable', 'string', 'regex:/^(\d+)(,\d+)*$/'],
@@ -295,6 +301,11 @@ class General extends Component
             // Still sync data even on error, so form fields are populated
             $this->syncData();
         }
+        if (isset($this->parsedServices) && ! auth()->user()?->can('update', $this->application)) {
+            $this->parsedServices = collect([
+                'services' => collect(data_get($this->parsedServices, 'services', []))->map(fn () => []),
+            ]);
+        }
         if ($this->application->build_pack === 'dockercompose') {
             // Only update if user has permission
             try {
@@ -332,10 +343,30 @@ class General extends Component
         $this->syncData();
     }
 
+    /**
+     * The Compose field is read-only in the UI, but a Livewire request can still change it. A changed value
+     * must pass the same injection checks as a Compose file from the repository before the model gets it.
+     *
+     * @throws Exception If the changed Compose content is not safe to use (the message is HTML-escaped)
+     */
+    private function validateChangedDockerComposeRaw(): void
+    {
+        if (blank($this->dockerComposeRaw) || $this->dockerComposeRaw === $this->application->docker_compose_raw) {
+            return;
+        }
+
+        try {
+            validateDockerComposeForInjection($this->dockerComposeRaw);
+        } catch (Exception $e) {
+            throw new Exception(e($e->getMessage()), 0, $e);
+        }
+    }
+
     private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
+            $this->validateChangedDockerComposeRaw();
 
             // Application properties
             $this->application->name = $this->name;
@@ -387,7 +418,7 @@ class General extends Component
             $this->application->settings->is_container_label_escape_enabled = $this->isContainerLabelEscapeEnabled;
             $this->application->settings->is_container_label_readonly_enabled = $this->isContainerLabelReadonlyEnabled;
 
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
         } else {
             // From model to properties
             $this->name = $this->application->name;
@@ -412,8 +443,9 @@ class General extends Component
             $this->dockerRegistryImageName = $this->application->docker_registry_image_name;
             $this->dockerRegistryImageTag = $this->application->docker_registry_image_tag;
             $this->dockerComposeLocation = $this->application->docker_compose_location;
-            $this->dockerCompose = $this->application->docker_compose;
-            $this->dockerComposeRaw = $this->application->docker_compose_raw;
+            $canViewCompose = auth()->user()?->can('update', $this->application) ?? false;
+            $this->dockerCompose = $canViewCompose ? $this->application->docker_compose : null;
+            $this->dockerComposeRaw = $canViewCompose ? $this->application->docker_compose_raw : null;
             $this->dockerComposeCustomStartCommand = $this->application->docker_compose_custom_start_command;
             $this->dockerComposeCustomBuildCommand = $this->application->docker_compose_custom_build_command;
             $this->customLabels = $this->application->parseContainerLabels();
@@ -425,7 +457,9 @@ class General extends Component
             $this->customNginxConfiguration = $this->application->custom_nginx_configuration;
             $this->isHttpBasicAuthEnabled = $this->application->is_http_basic_auth_enabled;
             $this->httpBasicAuthUsername = $this->application->http_basic_auth_username;
-            $this->httpBasicAuthPassword = $this->application->http_basic_auth_password;
+            $this->httpBasicAuthPassword = auth()->user()->can('update', $this->application)
+                ? $this->application->http_basic_auth_password
+                : null;
             $this->watchPaths = $this->application->watch_paths;
             $this->redirect = $this->application->redirect;
 
@@ -487,6 +521,9 @@ class General extends Component
             if ($this->isContainerLabelReadonlyEnabled) {
                 $this->resetDefaultLabels(false);
             }
+            if ($oldPortsExposes !== $this->portsExposes) {
+                $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
+            }
             $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -523,7 +560,7 @@ class General extends Component
             $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('storageCountsChanged')->to(Storage::class);
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(All::class);
         } catch (\Throwable $e) {
             // Refresh model to get restored values from Application::loadComposeFile
             $this->application->refresh();
@@ -594,7 +631,7 @@ class General extends Component
         if ($this->buildPack !== 'nixpacks' && $this->buildPack !== 'railpack') {
             $this->isStatic = false;
             $this->application->settings->is_static = false;
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
         } else {
             $this->resetDefaultLabels(false);
         }
@@ -744,6 +781,8 @@ class General extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+            $previousDnsHostnames = $dnsCleanup->hostnamesOf($this->application->fresh() ?? $this->application);
 
             $this->resetErrorBag();
 
@@ -884,7 +923,11 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
+            $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
             $this->syncData();
+            if ($oldPortsExposes !== $this->portsExposes) {
+                $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
+            }
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $this->application->refresh();
@@ -894,19 +937,6 @@ class General extends Component
         } finally {
             $this->dispatch('configurationChanged');
         }
-    }
-
-    public function downloadConfig()
-    {
-        $config = GenerateConfig::run($this->application, true);
-        $fileName = str($this->application->name)->slug()->append('_config.json');
-
-        return response()->streamDownload(function () use ($config) {
-            echo $config;
-        }, $fileName, [
-            'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename='.$fileName,
-        ]);
     }
 
     public function getDetectedPortInfoProperty(): ?array

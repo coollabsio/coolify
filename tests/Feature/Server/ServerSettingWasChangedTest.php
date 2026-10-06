@@ -4,6 +4,7 @@ use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -40,6 +41,9 @@ it('isDirty returns false after saving', function () {
 });
 
 it('can detect sentinel_token changes with wasChanged', function () {
+    // A token change restarts Sentinel through a queued action; keep it off the sync queue.
+    Queue::fake();
+
     // Create user and server
     $user = User::factory()->create();
     $team = $user->teams()->first();

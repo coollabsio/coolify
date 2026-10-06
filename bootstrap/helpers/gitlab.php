@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\GitlabApp;
+use App\Models\PrivateKey;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -32,7 +33,7 @@ function refreshGitlabToken(GitlabApp $source): void
 
         $baseUrl = rtrim($source->html_url, '/');
 
-        $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
+        $response = Http::GitSource($baseUrl)->asForm()->post("{$baseUrl}/oauth/token", [
             'client_id' => $source->client_id,
             'client_secret' => $source->client_secret,
             'refresh_token' => $source->refresh_token,
@@ -81,6 +82,13 @@ function gitlabApi(GitlabApp $source, string $endpoint, string $method = 'get', 
         'data' => collect($response->json()),
         'total' => (int) $response->header('x-total', 0),
     ];
+}
+
+function gitlabAppPrivateKey(GitlabApp $source): ?PrivateKey
+{
+    $privateKey = $source->privateKey;
+
+    return $privateKey?->team_id === $source->team_id ? $privateKey : null;
 }
 
 function generateGitlabCloneToken(GitlabApp $source): string

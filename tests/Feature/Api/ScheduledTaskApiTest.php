@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // ApiAllowed middleware requires InstanceSettings with id=0
-    InstanceSettings::create(['id' => 0, 'is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -367,5 +367,62 @@ describe('Service scheduled tasks API', function () {
 
         $response->assertStatus(200);
         $response->assertJson(['message' => 'Scheduled task deleted.']);
+    });
+});
+
+describe('scheduled task timeout limit', function () {
+    test('accepts a timeout of up to 36000 seconds on create and update', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
+                'name' => 'Long task',
+                'command' => 'echo test',
+                'frequency' => '* * * * *',
+                'timeout' => 36000,
+            ])
+            ->assertStatus(201);
+        $task = ScheduledTask::query()->sole();
+
+        $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/{$task->uuid}", ['timeout' => 36000])
+            ->assertStatus(200);
+
+        expect($task->fresh()->timeout)->toBe(36000);
+    });
+
+    test('rejects a timeout above 36000 seconds on create and update', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $task = ScheduledTask::factory()->create([
+            'application_id' => $application->id,
+            'team_id' => $this->team->id,
+            'timeout' => 300,
+        ]);
+
+        $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
+                'name' => 'Too long task',
+                'command' => 'echo test',
+                'frequency' => '* * * * *',
+                'timeout' => 36001,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('timeout');
+
+        $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/{$task->uuid}", ['timeout' => 36001])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('timeout');
+
+        expect(ScheduledTask::query()->count())->toBe(1)
+            ->and($task->fresh()->timeout)->toBe(300);
     });
 });

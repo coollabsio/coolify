@@ -11,7 +11,7 @@ services:
     environment:
       - SERVICE_URL_VAULTWARDEN
       - DOMAIN=${SERVICE_URL_VAULTWARDEN}
-      - DATABASE_URL=${VAULTWARDEN_DB_URL:-data/db.sqlite3}
+      - DATABASE_URL=${VAULTWARDEN_DB_URL:-sqlite:///data/db.sqlite3}
       - SIGNUPS_ALLOWED=${SIGNUP_ALLOWED:-true}
       - ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMIN}
       - IP_HEADER=X-Forwarded-For

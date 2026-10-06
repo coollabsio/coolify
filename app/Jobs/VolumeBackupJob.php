@@ -8,6 +8,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Rules\SafeWebhookUrl;
+use App\Services\ScheduledJobDeliveryService;
 use App\Support\BackupCompression;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -16,7 +17,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +32,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?ScheduledVolumeBackupExecution $execution = null;
 
-    public function __construct(public ScheduledVolumeBackup $backup)
+    public function __construct(public ScheduledVolumeBackup $backup, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
         $this->timeout = $backup->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT;
@@ -41,7 +41,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping('volume-backup-'.$this->backup->id))
+            ScheduledJobDeliveryService::withoutOverlapping('volume-backup-'.$this->backup->id, $this->occurrenceUuid)
                 ->shared()
                 ->expireAfter($this->timeout + 60)
                 ->dontRelease(),
@@ -55,6 +55,11 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
+        $failed = false;
         $this->backup->loadMissing(['backupable.resource', 'team', 's3']);
         $server = $this->backup->server();
         $target = $this->backup->backupable;
@@ -192,6 +197,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         } catch (Throwable $exception) {
+            $failed = true;
             $recoveryError = $this->recoverIncompleteBackup($this->execution);
             $archiveDeleted = $streamToS3;
 
@@ -225,6 +231,10 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             throw $exception;
         } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+
             $this->execution->update(['finished_at' => now()]);
             BackupCreated::dispatch($team->id);
         }
@@ -232,6 +242,10 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if ($this->occurrenceUuid) {
+            app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
         $execution = $this->execution ?? $this->backup->executions()
             ->where('status', 'running')
             ->latest('id')
@@ -474,6 +488,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->backup->executions()
             ->where('local_storage_deleted', true)
+            ->where('stop_recovery_pending', false)
+            ->where('s3_cleanup_pending', false)
             ->where(function (Builder $query): void {
                 $query->where('s3_storage_deleted', true)->orWhereNull('s3_uploaded');
             })

@@ -168,3 +168,77 @@ test('privateKeyId is locked so submit() cannot persist a client-supplied foreig
     Livewire::test(Source::class, ['application' => $this->applicationA])
         ->set('privateKeyId', $this->victimPrivateKey->id);
 })->throws(CannotUpdateLockedPropertyException::class);
+
+describe('after the user switches the session team', function () {
+    beforeEach(function () {
+        Http::fake([
+            'https://api.github.com/repos/*' => Http::response(['id' => 123]),
+        ]);
+        $this->teamB->members()->attach($this->userA->id, ['role' => 'owner']);
+        $this->applicationA->update(['git_repository' => 'coollabsio/coolify']);
+
+        $this->ownKey = makePrivateKey('own-ssh-key', 'OWN_KEY_MATERIAL', 'own-fingerprint', $this->teamA->id);
+        $this->ownGithubApp = GithubApp::create([
+            'name' => 'own-github-app',
+            'team_id' => $this->teamA->id,
+            'app_id' => 1,
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => false,
+        ]);
+        $this->victimGithubApp->update(['app_id' => 2]);
+        $this->systemWideGithubApp = GithubApp::create([
+            'name' => 'system-wide-github-app',
+            'team_id' => Team::factory()->create()->id,
+            'app_id' => 3,
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => false,
+            'is_system_wide' => true,
+        ]);
+
+        $this->component = Livewire::test(Source::class, ['application' => $this->applicationA->fresh()]);
+        session(['currentTeam' => $this->teamB]);
+    });
+
+    test('lists only keys and sources of the application team and system-wide sources', function () {
+        $component = Livewire::test(Source::class, ['application' => $this->applicationA->fresh()]);
+
+        expect($component->get('privateKeys')->pluck('id')->all())->toBe([$this->ownKey->id])
+            ->and($component->get('sources')->pluck('id')->sort()->values()->all())
+            ->toBe([$this->ownGithubApp->id, $this->systemWideGithubApp->id]);
+    });
+
+    test('setPrivateKey rejects a key of the session team', function () {
+        $this->component->call('setPrivateKey', $this->victimPrivateKey->id);
+
+        expect($this->applicationA->refresh()->private_key_id)->toBeNull();
+    });
+
+    test('setPrivateKey accepts a key of the application team', function () {
+        $this->component->call('setPrivateKey', $this->ownKey->id);
+
+        expect($this->applicationA->refresh()->private_key_id)->toBe($this->ownKey->id);
+    });
+
+    test('changeSource rejects a source of the session team', function () {
+        try {
+            $this->component->call('changeSource', $this->victimGithubApp->id, GithubApp::class);
+        } catch (Throwable $e) {
+        }
+
+        expect($this->applicationA->refresh()->source_id)->toBeNull();
+    });
+
+    test('changeSource accepts a source of the application team', function () {
+        $this->component->call('changeSource', $this->ownGithubApp->id, GithubApp::class);
+
+        expect($this->applicationA->refresh()->source_id)->toBe($this->ownGithubApp->id);
+    });
+
+    test('changeSource accepts a system-wide source', function () {
+        $this->component->call('changeSource', $this->systemWideGithubApp->id, GithubApp::class);
+
+        expect($this->applicationA->refresh()->source_id)->toBe($this->systemWideGithubApp->id);
+    });
+});

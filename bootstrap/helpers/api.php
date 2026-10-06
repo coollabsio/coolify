@@ -4,15 +4,20 @@ use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
+use App\Models\Application;
+use App\Models\ApplicationSetting;
 use App\Models\Environment;
+use App\Models\EnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -39,7 +44,7 @@ function serializeApiResponse($data)
 {
     if ($data instanceof Collection) {
         return $data->map(function ($d) {
-            $d = collect($d)->sortKeys();
+            $d = collect(apiEnvironmentVariableDisplayValue($d))->sortKeys();
             $created_at = data_get($d, 'created_at');
             $updated_at = data_get($d, 'updated_at');
             if ($created_at) {
@@ -64,10 +69,10 @@ function serializeApiResponse($data)
                 $d = $d->prepend($d['id'], 'id');
             }
 
-            return $d;
+            return removeServerProxySecretsFromApiPayload($d);
         });
     } else {
-        $d = collect($data)->sortKeys();
+        $d = collect(apiEnvironmentVariableDisplayValue($data))->sortKeys();
         $created_at = data_get($d, 'created_at');
         $updated_at = data_get($d, 'updated_at');
         if ($created_at) {
@@ -92,8 +97,69 @@ function serializeApiResponse($data)
             $d = $d->prepend($d['id'], 'id');
         }
 
-        return $d;
+        return removeServerProxySecretsFromApiPayload($d);
     }
+}
+
+/**
+ * Serialize an environment variable with its display value, so a reference to a
+ * locked shared variable keeps its reference text instead of the locked value.
+ */
+function apiEnvironmentVariableDisplayValue(mixed $data): mixed
+{
+    if (! $data instanceof EnvironmentVariable || in_array('real_value', $data->getHidden(), true)) {
+        return $data;
+    }
+
+    return [...$data->toArray(), 'real_value' => $data->displayRealValue()];
+}
+
+/**
+ * Remove the saved proxy configuration and validation logs from every
+ * serialized server in an API payload, including nested ones such as
+ * `destination.server`, unless the token can read sensitive data.
+ * The saved proxy configuration often contains DNS provider API tokens.
+ *
+ * @template T
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true) {
+        return $payload;
+    }
+
+    return removeServerProxySecrets($payload);
+}
+
+/**
+ * @template T
+ *
+ * @param  T  $value
+ * @return T
+ */
+function removeServerProxySecrets(mixed $value): mixed
+{
+    if (! is_array($value) && ! $value instanceof SupportCollection) {
+        return $value;
+    }
+
+    $proxy = $value['proxy'] ?? null;
+    if (is_array($proxy)) {
+        unset($proxy['last_saved_proxy_configuration']);
+        $value['proxy'] = $proxy;
+        unset($value['validation_logs']);
+    }
+
+    foreach ($value as $key => $item) {
+        if (is_array($item) || $item instanceof SupportCollection) {
+            $value[$key] = removeServerProxySecrets($item);
+        }
+    }
+
+    return $value;
 }
 
 /**
@@ -110,7 +176,13 @@ function exposeSensitiveFields(Model $model): Model
     return $model;
 }
 
-function sharedDataApplications()
+/**
+ * Shared validation rules for application create and update API endpoints.
+ *
+ * Pass the existing application on update so unchanged manual webhook secrets
+ * are accepted even when they predate the minimum length.
+ */
+function sharedDataApplications(?Application $application = null): array
 {
     return [
         'git_repository' => 'string',
@@ -140,7 +212,8 @@ function sharedDataApplications()
         'gpu_device_ids' => 'string|nullable',
         'gpu_options' => 'string|nullable',
         'is_consistent_container_name_enabled' => 'boolean',
-        'custom_internal_name' => 'string|nullable',
+        'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
+        'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
@@ -190,10 +263,10 @@ function sharedDataApplications()
         'post_deployment_command_container' => ValidationPatterns::containerNameRules(),
         'pre_deployment_command' => 'string|nullable',
         'pre_deployment_command_container' => ValidationPatterns::containerNameRules(),
-        'manual_webhook_secret_github' => 'string|nullable',
-        'manual_webhook_secret_gitlab' => 'string|nullable',
-        'manual_webhook_secret_bitbucket' => 'string|nullable',
-        'manual_webhook_secret_gitea' => 'string|nullable',
+        'manual_webhook_secret_github' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_github)],
+        'manual_webhook_secret_gitlab' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitlab)],
+        'manual_webhook_secret_bitbucket' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_bitbucket)],
+        'manual_webhook_secret_gitea' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitea)],
         'dockerfile_location' => ValidationPatterns::filePathRules(),
         'dockerfile_target_build' => ValidationPatterns::dockerTargetRules(),
         'docker_compose_location' => ValidationPatterns::filePathRules(),
@@ -408,6 +481,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('gpu_options');
     $request->offsetUnset('is_consistent_container_name_enabled');
     $request->offsetUnset('custom_internal_name');
+    $request->offsetUnset('custom_container_name_prefix');
     $request->offsetUnset('docker_compose_raw');
     $request->offsetUnset('tags');
 }

@@ -3,6 +3,8 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\ApplicationSetting;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +14,9 @@ use Livewire\Component;
 class Advanced extends Component
 {
     use AuthorizesRequests;
+
+    /** The format that saveCustomNamePrefix() produces with str()->slug(). */
+    private const CONTAINER_NAME_PREFIX_PATTERN = '/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/';
 
     public Application $application;
 
@@ -66,8 +71,11 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConsistentContainerNameEnabled = false;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['nullable', 'string', 'max:255', 'regex:'.ValidationPatterns::CONTAINER_NAME_PATTERN])]
     public ?string $customInternalName = null;
+
+    #[Validate(['string', 'nullable', 'max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH])]
+    public ?string $customContainerNamePrefix = null;
 
     #[Validate(['boolean'])]
     public bool $isGzipEnabled = true;
@@ -82,7 +90,7 @@ class Advanced extends Component
     public bool $isConnectToDockerNetworkEnabled = false;
 
     #[Validate(['integer', 'min:0'])]
-    public int $maxRestartCount = 10;
+    public int $maxRestartCount = 0;
 
     public function mount()
     {
@@ -97,6 +105,7 @@ class Advanced extends Component
     {
         if ($toModel) {
             $this->validate();
+            $this->validateChangedContainerNamePrefix();
             $this->application->settings->is_force_https_enabled = $this->isForceHttpsEnabled;
             $this->application->settings->is_git_submodules_enabled = $this->isGitSubmodulesEnabled;
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
@@ -111,6 +120,7 @@ class Advanced extends Component
             $this->application->settings->is_build_server_enabled = $this->isBuildServerEnabled;
             $this->application->settings->is_consistent_container_name_enabled = $this->isConsistentContainerNameEnabled;
             $this->application->settings->custom_internal_name = $this->customInternalName;
+            $this->application->settings->custom_container_name_prefix = $this->customContainerNamePrefix;
             $this->application->settings->is_gzip_enabled = $this->isGzipEnabled;
             $this->application->settings->is_stripprefix_enabled = $this->isStripprefixEnabled;
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
@@ -118,7 +128,9 @@ class Advanced extends Component
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
             $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
+            $changedFields = array_keys($this->application->settings->getDirty());
             $this->application->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
             $this->isGzipEnabled = $this->application->isGzipEnabled();
@@ -137,17 +149,41 @@ class Advanced extends Component
             $this->isBuildServerEnabled = $this->application->settings->is_build_server_enabled;
             $this->isConsistentContainerNameEnabled = $this->application->settings->is_consistent_container_name_enabled;
             $this->customInternalName = $this->application->settings->custom_internal_name;
+            $this->customContainerNamePrefix = $this->application->settings->custom_container_name_prefix;
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
-            $this->maxRestartCount = $this->application->max_restart_count ?? 10;
+            $this->maxRestartCount = $this->application->max_restart_count ?? 0;
         }
 
         // Load stop_grace_period separately since it has its own save handler
         // Convert null to empty string to prevent dirty detection issues
         $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
+    }
+
+    /**
+     * An unchanged stored prefix is skipped, so older values do not block other settings.
+     */
+    private function validateChangedContainerNamePrefix(): void
+    {
+        $prefix = $this->customContainerNamePrefix;
+        if (blank($prefix) || $prefix === $this->application->settings->custom_container_name_prefix) {
+            return;
+        }
+
+        if (preg_match(self::CONTAINER_NAME_PREFIX_PATTERN, $prefix) !== 1) {
+            throw ValidationException::withMessages([
+                'customContainerNamePrefix' => 'The container name prefix may only contain lowercase letters, numbers, and single hyphens between them.',
+            ]);
+        }
+
+        if (ApplicationSetting::isContainerNamePrefixInUse($prefix, $this->application->destination->server, $this->application->id)) {
+            throw ValidationException::withMessages([
+                'customContainerNamePrefix' => 'This container name prefix is already in use by another application on this Coolify instance.',
+            ]);
+        }
     }
 
     private function resetDefaultLabels()
@@ -236,7 +272,6 @@ class Advanced extends Component
 
                 return;
             }
-            $customInternalName = $this->customInternalName;
             $server = $this->application->destination->server;
             $allApplications = $server->applications();
 
@@ -244,14 +279,35 @@ class Advanced extends Component
                 return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->customInternalName;
             });
             if ($foundSameInternalName->isNotEmpty()) {
+                $this->customInternalName = $this->application->settings->custom_internal_name;
                 $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
-                $this->customInternalName = $customInternalName;
-                $this->syncData(true);
 
                 return;
             }
             $this->syncData(true);
             $this->dispatch('success', 'Custom name saved.');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveCustomNamePrefix()
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            $this->customContainerNamePrefix = str($this->customContainerNamePrefix)->slug()->value() ?: null;
+
+            if ($this->customContainerNamePrefix && ApplicationSetting::isContainerNamePrefixInUse($this->customContainerNamePrefix, $this->application->destination->server, $this->application->id)) {
+                $this->customContainerNamePrefix = $this->application->settings->custom_container_name_prefix;
+                $this->dispatch('error', 'This container name prefix is already in use by another application on this Coolify instance.');
+
+                return;
+            }
+
+            $this->syncData(true);
+            $this->dispatch('success', 'Container name prefix saved.');
             $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -273,7 +329,9 @@ class Advanced extends Component
             $this->application->settings->stop_grace_period = $validated['stopGracePeriod'] === null
                 ? null
                 : (int) $validated['stopGracePeriod'];
+            $changedFields = array_keys($this->application->settings->getDirty());
             $this->application->settings->save();
+            $this->auditSettingsUpdate($changedFields);
 
             $this->dispatch('success', 'Stop grace period updated.');
             $this->dispatch('configurationChanged');
@@ -302,5 +360,21 @@ class Advanced extends Component
     public function render()
     {
         return view('livewire.project.application.advanced');
+    }
+
+    /** @param array<int, string> $changedFields */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        $changedFields = array_values(array_diff($changedFields, ['updated_at']));
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.application.settings_updated', [
+            'team_id' => $this->application->team()?->id,
+            'application_uuid' => $this->application->uuid,
+            'application_name' => $this->application->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

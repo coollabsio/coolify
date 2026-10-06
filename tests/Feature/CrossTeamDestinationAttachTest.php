@@ -3,6 +3,7 @@
 use App\Actions\Docker\GetContainersStatus;
 use App\Livewire\Project\Shared\Destination;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -10,6 +11,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -123,6 +125,31 @@ describe('Destination::addServer GHSA-j395-3pqh-9r5g', function () {
         expect($additional->first()->id)->toBe($this->destinationA2->id);
         expect($additional->first()->pivot->server_id)->toBe($this->serverA2->id);
     });
+
+    test('attaching the same server twice does not create duplicate destinations', function () {
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('addServer', $this->destinationA2->id, $this->serverA2->id)
+            ->call('addServer', $this->destinationA2->id, $this->serverA2->id);
+
+        expect(DB::table('additional_destinations')
+            ->where('application_id', $this->applicationA->id)
+            ->where('standalone_docker_id', $this->destinationA2->id)
+            ->where('server_id', $this->serverA2->id)
+            ->count())->toBe(1);
+    });
+
+    test('the database rejects duplicate application server destinations', function () {
+        $destination = [
+            'application_id' => $this->applicationA->id,
+            'server_id' => $this->serverA2->id,
+            'standalone_docker_id' => $this->destinationA2->id,
+        ];
+
+        DB::table('additional_destinations')->insert($destination);
+
+        expect(fn () => DB::table('additional_destinations')->insert($destination))
+            ->toThrow(QueryException::class);
+    });
 });
 
 describe('Destination::promote GHSA-j395-3pqh-9r5g', function () {
@@ -228,5 +255,66 @@ describe('Destination::removeServer', function () {
             ->where('standalone_docker_id', $this->destinationA2->id)
             ->where('server_id', $this->serverA2->id)
             ->exists())->toBeFalse();
+    });
+});
+
+describe('Destination after the user switches the session team', function () {
+    beforeEach(function () {
+        Server::flushIdentityMap();
+        $this->userA->teams()->attach($this->teamB, ['role' => 'owner']);
+        foreach ([$this->serverA2, $this->serverB] as $server) {
+            $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+        }
+
+        $this->component = Livewire::test(Destination::class, ['resource' => $this->applicationA]);
+        session(['currentTeam' => $this->teamB]);
+    });
+
+    test('lists only networks of the application team', function () {
+        $networkIds = $this->component->call('loadData')->get('networks')->pluck('id');
+
+        expect($networkIds)->toContain($this->destinationA2->id)
+            ->not->toContain($this->destinationB->id);
+    });
+
+    test('cannot attach a server of the session team to the application', function () {
+        try {
+            $this->component->call('addServer', $this->destinationB->id, $this->serverB->id);
+        } catch (Throwable $e) {
+        }
+
+        expect($this->applicationA->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('can attach a server of the application team', function () {
+        $this->component->call('addServer', $this->destinationA2->id, $this->serverA2->id);
+
+        expect($this->applicationA->fresh()->additional_networks->pluck('id')->all())->toBe([$this->destinationA2->id]);
+    });
+
+    test('cannot promote a network of the session team', function () {
+        try {
+            $this->component->call('promote', $this->destinationB->id, $this->serverB->id);
+        } catch (Throwable $e) {
+        }
+
+        expect($this->applicationA->fresh()->destination_id)->toBe($this->destinationA->id);
+    });
+
+    test('can promote a network of the application team', function () {
+        $this->applicationA->additional_networks()->attach($this->destinationA2->id, ['server_id' => $this->serverA2->id]);
+
+        $this->component->call('promote', $this->destinationA2->id, $this->serverA2->id);
+
+        expect($this->applicationA->fresh()->destination_id)->toBe($this->destinationA2->id);
+    });
+
+    test('cannot redeploy to a server of the session team', function () {
+        try {
+            $this->component->call('redeploy', $this->destinationB->id, $this->serverB->id);
+        } catch (Throwable $e) {
+        }
+
+        expect(ApplicationDeploymentQueue::query()->where('server_id', $this->serverB->id)->exists())->toBeFalse();
     });
 });

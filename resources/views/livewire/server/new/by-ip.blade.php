@@ -83,11 +83,12 @@
                             helper="Non-root SSH users are experimental." />
                         <x-forms.input type="number" id="port" label="Port" required />
                     </div>
-                    <x-forms.listbox id="is_build_server"
-                        helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
-                        label="Use as a dedicated build server" :options="[
-                            ['value' => false, 'label' => 'No'],
-                            ['value' => true, 'label' => 'Yes'],
+                    <x-forms.listbox id="server_role"
+                        helper="Choose whether this server runs deployments, application builds, or both. GitHub Actions runners need the Builds only role."
+                        label="Server role" :options="[
+                            ['value' => 'deployment', 'label' => 'Deployments only', 'description' => 'Runs your resources. Images are built on a build server.'],
+                            ['value' => 'build', 'label' => 'Builds only', 'description' => 'Builds images for other servers. Required for GitHub Actions runners.'],
+                            ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs your resources on this server.'],
                         ]" />
                 </x-forms.collapsible>
             </x-application.settings-section>

@@ -3,12 +3,14 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\StopSentinel;
+use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
 use App\Rules\ValidServerIp;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -43,14 +45,16 @@ class Show extends Component
 
     public bool $isUsable;
 
+    #[Locked]
     public bool $isSwarmManager;
 
+    #[Locked]
     public bool $isSwarmWorker;
 
-    public bool $isBuildServer;
+    public string $serverRole;
 
     #[Locked]
-    public bool $isBuildServerLocked = false;
+    public ?string $pendingServerRole = null;
 
     public bool $isMetricsEnabled;
 
@@ -150,7 +154,7 @@ class Show extends Component
             'isUsable' => 'required',
             'isSwarmManager' => 'required',
             'isSwarmWorker' => 'required',
-            'isBuildServer' => 'required',
+            'serverRole' => ['required', 'in:deployment,build,both'],
             'isMetricsEnabled' => 'required',
             'sentinelToken' => 'required',
             'sentinelUpdatedAt' => 'nullable',
@@ -198,9 +202,6 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
-            if (! $this->server->isBuildServer() && ! $this->server->isEmpty()) {
-                $this->isBuildServerLocked = true;
-            }
             // Load saved Hetzner status and validation state
             $this->hetznerServerStatus = $this->server->hetzner_server_status;
             $this->vultrInstanceStatus = $this->server->vultr_instance_status;
@@ -235,11 +236,7 @@ class Show extends Component
                 ->first();
             if ($foundServer) {
                 $this->ip = $this->server->ip;
-                if ($foundServer->team_id === currentTeam()->id) {
-                    throw new \Exception('A server with this IP/Domain already exists in your team.');
-                }
-
-                throw new \Exception('A server with this IP/Domain is already in use by another team.');
+                throw new \Exception('A server with this IP/Domain already exists.');
             }
 
             $this->server->name = $this->name;
@@ -251,10 +248,9 @@ class Show extends Component
             $this->server->save();
 
             $this->server->settings->connection_timeout = $this->connectionTimeout;
-            $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
-            $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
-            $this->server->settings->is_build_server = $this->isBuildServer;
+            // The role is only changed through requestServerRoleChange()/confirmServerRoleChange().
+            $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
@@ -270,7 +266,9 @@ class Show extends Component
                 $this->server->settings->server_timezone = $this->serverTimezone;
             }
 
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->name = $this->server->name;
             $this->description = $this->server->description;
@@ -284,18 +282,41 @@ class Show extends Component
             $this->isUsable = $this->server->settings->is_usable;
             $this->isSwarmManager = $this->server->settings->is_swarm_manager;
             $this->isSwarmWorker = $this->server->settings->is_swarm_worker;
-            $this->isBuildServer = $this->server->settings->is_build_server;
+            $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
-            $this->sentinelToken = $this->server->settings->sentinel_token;
+            $this->sentinelToken = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->ensureValidSentinelToken()
+                : '';
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
             $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
             $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
-            $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+            $this->sentinelCustomUrl = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->sentinel_custom_url
+                : null;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
             $this->isValidating = $this->server->is_validating ?? false;
         }
+    }
+
+    /**
+     * Server columns are audited by the model. Settings live on ServerSetting, so record their names here.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.settings_updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function refresh()
@@ -352,6 +373,45 @@ class Show extends Component
         }
     }
 
+    public function toggleManagement(ServerTransferClaimer $claimer): void
+    {
+        abort_unless(isDev(), 404);
+        $this->authorize('update', $this->server);
+
+        if ($this->server->isLocalhost()) {
+            $this->dispatch('error', 'The Coolify host cannot be transferred.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway() && $this->server->team->serverOverflow()) {
+            $this->dispatch('error', 'Your team is over its server limit. Upgrade your subscription or remove a server first.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway()) {
+            $claimer->claim($this->server);
+            $event = 'ui.server.management_enabled';
+            $message = 'This Coolify instance now manages the server.';
+        } else {
+            $claimer->markTransferred($this->server, managementDisabled: true);
+            $event = 'ui.server.management_disabled';
+            $message = 'Server automations are disabled on this Coolify instance.';
+        }
+
+        $this->server->refresh();
+        $this->syncData();
+
+        auditLog($event, [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ]);
+
+        $this->dispatch('success', $message);
+    }
+
     public function checkLocalhostConnection()
     {
         try {
@@ -392,8 +452,8 @@ class Show extends Component
     public function updatedIsSentinelDebugEnabled($value)
     {
         try {
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
             $this->submit();
-            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -402,36 +462,81 @@ class Show extends Component
     public function updatedIsMetricsEnabled($value)
     {
         try {
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
             $this->submit();
-            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function updatedIsBuildServer($value)
+    public function requestServerRoleChange(): void
     {
         try {
             $this->authorize('update', $this->server);
-            if ($value === true && ! $this->server->isEmpty()) {
-                $this->isBuildServer = false;
-                $this->dispatch('error', 'A server with existing resources cannot be configured as a build server.');
+            $newRole = ServerRole::from($this->serverRole);
+            $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
+
+            if ($newRole !== ServerRole::BUILD && $this->server->hasEnabledGithubRunners()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Disable the GitHub runners before you change the role of this server.');
 
                 return;
             }
-            if ($value === true && $this->server->isSentinelEnabled()) {
-                $this->isMetricsEnabled = false;
-                $this->isSentinelDebugEnabled = false;
-                $this->server->settings->is_sentinel_enabled = false;
-                StopSentinel::dispatch($this->server);
-                $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
+
+            if ($newRole === ServerRole::BUILD && ! $this->server->isEmpty()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Move or remove the existing resources before you set this server to build only.');
+
+                return;
             }
-            $this->submit();
-            // Dispatch event to refresh the navbar
-            $this->dispatch('refreshServerShow');
+
+            if ($newRole === ServerRole::DEPLOYMENT && ! Server::buildServers($this->server->team_id)->whereKeyNot($this->server->id)->exists()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Add a usable build server before you set this server to deployments only.');
+
+                return;
+            }
+
+            if ($newRole === ServerRole::BOTH && $currentRole !== ServerRole::BOTH) {
+                $this->pendingServerRole = $newRole->value;
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('open-server-role-confirmation');
+
+                return;
+            }
+
+            $this->saveServerRole($newRole);
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
+    }
+
+    public function confirmServerRoleChange(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $role = ServerRole::from($this->pendingServerRole ?? '');
+            $this->pendingServerRole = null;
+            $this->saveServerRole($role);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    private function saveServerRole(ServerRole $role): void
+    {
+        $this->serverRole = $role->value;
+        $this->server->settings->server_role = $role;
+        $this->server->settings->is_build_server = $role === ServerRole::BUILD;
+        if ($role === ServerRole::BUILD && $this->server->isSentinelEnabled()) {
+            $this->isMetricsEnabled = false;
+            $this->isSentinelDebugEnabled = false;
+            $this->server->settings->is_sentinel_enabled = false;
+            StopSentinel::dispatch($this->server);
+            $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
+        }
+        $this->submit();
+        $this->dispatch('refreshServerShow');
     }
 
     public function regenerateSentinelToken()
@@ -439,6 +544,11 @@ class Show extends Component
         try {
             $this->authorize('manageSentinel', $this->server);
             $this->server->settings->generateSentinelToken();
+            auditLog('ui.server.sentinel.token_regenerated', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
             $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -507,6 +617,7 @@ class Show extends Component
     public function checkVultrInstanceStatus(bool $manual = false)
     {
         try {
+            $this->authorize('view', $this->server);
             if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
 
@@ -674,21 +785,21 @@ class Show extends Component
 
     public function loadHetznerTokens(): void
     {
-        $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableHetznerTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'hetzner')
             ->get();
     }
 
     public function loadVultrTokens(): void
     {
-        $this->availableVultrTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableVultrTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'vultr')
             ->get();
     }
 
     public function loadDigitalOceanTokens(): void
     {
-        $this->availableDigitalOceanTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableDigitalOceanTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'digitalocean')
             ->get();
     }

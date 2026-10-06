@@ -3,7 +3,7 @@
 /**
  * Seed a rich transfer-demo inventory on the current Coolify instance.
  * Run: php artisan tinker scripts/seed-transfer-demo.php
- * Or:  ./scripts/dev-instances exec a php artisan tinker --execute "require 'scripts/seed-transfer-demo.php';"
+ * Or:  ./scripts/dev exec php artisan tinker --execute "require 'scripts/seed-transfer-demo.php';"
  */
 
 use App\Models\Application;

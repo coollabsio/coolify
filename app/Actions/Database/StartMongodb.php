@@ -2,15 +2,18 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMongodb;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartMongodb
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneMongodb $database;
 
@@ -20,7 +23,13 @@ class StartMongodb
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneMongodb $database)
+    private string $resolvedMongoUsername;
+
+    private string $resolvedMongoPassword;
+
+    private string $resolvedMongoDatabase;
+
+    public function handle(StandaloneMongodb $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -28,9 +37,6 @@ class StartMongodb
 
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
-        if (isDev()) {
-            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
-        }
 
         $this->commands = [
             "echo 'Starting database.'",
@@ -61,18 +67,8 @@ class StartMongodb
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
             if (! $this->ssl_certificate) {
@@ -109,11 +105,7 @@ class StartMongodb
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD',
-                        'echo',
-                        'ok',
-                    ]),
+                    'healthcheck' => $this->database->healthCheckConfiguration($this->generate_health_check_command()),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -254,8 +246,8 @@ class StartMongodb
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mongodb:mongodb /etc/mongo/certs/server.pem < /dev/null";
@@ -265,7 +257,7 @@ class StartMongodb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -303,8 +295,20 @@ class StartMongodb
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedMongoUsername = (string) $this->database->mongo_initdb_root_username;
+        $this->resolvedMongoPassword = (string) $this->database->mongo_initdb_root_password;
+        $this->resolvedMongoDatabase = (string) $this->database->mongo_initdb_database;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'MONGO_INITDB_ROOT_USERNAME') {
+                $this->resolvedMongoUsername = $rawValue;
+            } elseif ($env->key === 'MONGO_INITDB_ROOT_PASSWORD') {
+                $this->resolvedMongoPassword = $rawValue;
+            } elseif ($env->key === 'MONGO_INITDB_DATABASE') {
+                $this->resolvedMongoDatabase = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
@@ -324,6 +328,39 @@ class StartMongodb
         return $environment_variables->all();
     }
 
+    /**
+     * The shell is chosen when the check runs: images before MongoDB 5 (and some custom images) have only the legacy mongo shell.
+     * The check uses ping, which needs no authentication and passes on members that are not the writable primary (e.g. an uninitiated replica set).
+     */
+    private function generate_health_check_command(): array
+    {
+        $mongosh = $this->health_check_shell_command(legacy: false);
+        $mongo = $this->health_check_shell_command(legacy: true);
+
+        return ['CMD-SHELL', "if command -v mongosh >/dev/null 2>&1; then {$mongosh}; else {$mongo}; fi"];
+    }
+
+    private function health_check_shell_command(bool $legacy): string
+    {
+        $command = [$legacy ? 'mongo' : 'mongosh', '--quiet', '--host', $this->database->uuid];
+
+        if ($this->database->enable_ssl) {
+            $command = [...$command, $legacy ? '--ssl' : '--tls', $legacy ? '--sslCAFile' : '--tlsCAFile', '/etc/mongo/certs/ca.pem'];
+
+            if ($this->database->ssl_mode === 'verify-full') {
+                $command = [...$command, $legacy ? '--sslPEMKeyFile' : '--tlsCertificateKeyFile', '/etc/mongo/certs/server.pem'];
+            }
+        }
+
+        $command = [
+            ...$command,
+            '--eval',
+            'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
+        ];
+
+        return implode(' ', array_map('escapeshellarg', $command));
+    }
+
     private function add_custom_mongo_conf()
     {
         if (is_null($this->database->mongo_conf) || empty($this->database->mongo_conf)) {
@@ -337,9 +374,9 @@ class StartMongodb
 
     private function add_default_database()
     {
-        $dbJson = json_encode($this->database->mongo_initdb_database, JSON_UNESCAPED_SLASHES);
-        $userJson = json_encode($this->database->mongo_initdb_root_username, JSON_UNESCAPED_SLASHES);
-        $pwdJson = json_encode($this->database->mongo_initdb_root_password, JSON_UNESCAPED_SLASHES);
+        $dbJson = json_encode($this->resolvedMongoDatabase, JSON_UNESCAPED_SLASHES);
+        $userJson = json_encode($this->resolvedMongoUsername, JSON_UNESCAPED_SLASHES);
+        $pwdJson = json_encode($this->resolvedMongoPassword, JSON_UNESCAPED_SLASHES);
         $content = "db = db.getSiblingDB({$dbJson});db.createCollection('init_collection');db.createUser({user: {$userJson}, pwd: {$pwdJson}, roles: [{role:\"readWrite\",db:{$dbJson}}]});";
         $content_base64 = base64_encode($content);
         $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";

@@ -1,6 +1,7 @@
 {{-- DNS entries: Domain Connect (Cloud only + key) and/or generic Type/Name/Value records. --}}
 @php
     $domainConnectAvailable = $this->domainConnectAvailable();
+    $dnsAuthResource = property_exists($this, 'application') ? $this->application : $this->service;
 @endphp
 
 <div x-data="{ dnsEntriesOpen: false }" class="relative" @click.outside="dnsEntriesOpen = false">
@@ -8,10 +9,12 @@
         x-bind:aria-expanded="dnsEntriesOpen" title="DNS entries for this server">
         <x-reicon name="globe" class="size-3.5" />
         DNS entries
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
-            stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
-        </svg>
+        <span class="inline-flex transition-transform" :class="dnsEntriesOpen && 'rotate-180'">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
+            </svg>
+        </span>
     </button>
     <div x-show="dnsEntriesOpen" x-cloak role="menu" x-transition.origin.top.right
         class="listbox-panel left-auto! right-0! z-[90]! w-56! min-w-56!">
@@ -23,7 +26,7 @@
             </button>
         @endif
         <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-            @click="dnsEntriesOpen = false; $dispatch('open-dns-records-modal')">
+            wire:click="openManualDnsRecords" @click="dnsEntriesOpen = false">
             <x-reicon name="documentation" class="size-3.5 shrink-0 opacity-70" />
             Manual records
         </button>
@@ -79,7 +82,7 @@
                             </div>
 
                             <x-forms.input label="Server IP (A record target)"
-                                value="{{ $serverIp ?: 'Unavailable' }}" readonly
+                                value="{{ $this->publicServerIpForDomainConnect() ?: 'Unavailable' }}" readonly
                                 helper="This IP is taken from the destination server." />
 
                             <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
@@ -168,6 +171,11 @@
                                 Use Recheck after changing DNS.
                             </x-callout>
                         @else
+                            @if (collect($dnsProviderProposals)->isNotEmpty() && collect($dnsHints)->contains(fn (array $record): bool => ! \App\Support\DnsRecordHints::isPublicAddress($record['value'])))
+                                <x-callout type="warning" title="No public IP">
+                                    {{ \App\Support\DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE }}
+                                </x-callout>
+                            @endif
                             <div class="overflow-x-auto rounded-md border border-neutral-200 dark:border-coolgray-300">
                                 <table class="w-full min-w-[32rem] text-left text-sm">
                                     <thead
@@ -176,6 +184,7 @@
                                             <th class="px-3 py-2 font-medium">Type</th>
                                             <th class="px-3 py-2 font-medium">Name</th>
                                             <th class="px-3 py-2 font-medium">Value</th>
+                                            <th class="px-3 py-2 font-medium"><span class="sr-only">Action</span></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-neutral-200 dark:divide-coolgray-300">
@@ -196,6 +205,17 @@
                                                         'break' => true,
                                                     ])
                                                 </td>
+                                                <td class="px-3 py-2.5 text-right">
+                                                    @php($recordProviders = \App\Support\DnsRecordHints::isPublicAddress($record['value']) ? collect($dnsProviderProposals)->where('hostname', $record['name'])->where('managed', false) : collect())
+                                                    @foreach ($recordProviders as $provider)
+                                                        <x-forms.button type="button"
+                                                            wire:click="createManagedDnsRecord({{ \Illuminate\Support\Js::from($record['name']) }}, {{ $provider['zone_id'] }}, {{ \Illuminate\Support\Js::from($record['value']) }})"
+                                                            wire:target="createManagedDnsRecord"
+                                                            canGate="update" :canResource="$dnsAuthResource">
+                                                            Add with {{ $provider['credential'] }}
+                                                        </x-forms.button>
+                                                    @endforeach
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -203,39 +223,15 @@
                             </div>
 
                             @if (filled($dnsCopyText))
-                                <div class="flex flex-wrap items-center justify-between gap-2"
-                                    x-data="{
-                                        copied: false,
-                                        async copyAll(text) {
-                                            try {
-                                                if (navigator.clipboard?.writeText) {
-                                                    await navigator.clipboard.writeText(text);
-                                                } else {
-                                                    const el = document.createElement('textarea');
-                                                    el.value = text;
-                                                    el.setAttribute('readonly', '');
-                                                    el.style.position = 'fixed';
-                                                    el.style.left = '-9999px';
-                                                    document.body.appendChild(el);
-                                                    el.select();
-                                                    document.execCommand('copy');
-                                                    document.body.removeChild(el);
-                                                }
-                                                this.copied = true;
-                                                setTimeout(() => this.copied = false, 1000);
-                                            } catch (e) {
-                                                console.error('Copy failed', e);
-                                            }
-                                        }
-                                    }">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
                                     <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
                                         {{ count($dnsHints) }}
                                         {{ count($dnsHints) === 1 ? 'entry' : 'entries' }}
                                         · BIND zone format
                                     </p>
                                     <button type="button" class="button shrink-0"
-                                        title="Copy as BIND-compatible zone file"
-                                        @click.prevent="copyAll(@js($dnsCopyText))">
+                                        title="Copy as BIND-compatible zone file" x-data="copyButton"
+                                        @click.prevent="copy(@js($dnsCopyText))">
                                         <span x-text="copied ? 'Copied' : 'Copy all'"></span>
                                     </button>
                                 </div>

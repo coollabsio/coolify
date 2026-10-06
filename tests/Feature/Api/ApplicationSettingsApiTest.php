@@ -347,6 +347,60 @@ test('PATCH /api/v1/applications/{uuid} updates advanced application settings', 
     }
 });
 
+test('PATCH /api/v1/applications/{uuid} accepts Docker-compatible custom internal names', function (string $name) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'custom_internal_name' => $name,
+            'is_consistent_container_name_enabled' => true,
+        ])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->custom_internal_name)->toBe($name);
+})->with([
+    'hyphens' => 'my-app-container',
+    'uppercase, underscores, and dots' => 'My_App.v2',
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects unsafe custom internal names', function (string $name) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'custom_internal_name' => $name,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_internal_name');
+
+    expect($this->application->fresh()->settings->custom_internal_name)->toBeNull();
+})->with([
+    'semicolon' => 'app;id',
+    'command substitution' => 'app$(id)',
+    'backticks' => 'app`id`',
+    'single quote' => "app'id",
+    'double quote' => 'app"id',
+    'space' => 'app name',
+    'newline' => "app\nid",
+    'option-like prefix' => '--help',
+    'pipe' => 'app|id',
+    'ampersand' => 'app&id',
+]);
+
+test('application creation rejects an unsafe custom internal name', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/custom-name-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'custom_internal_name' => 'app$(id)',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_internal_name');
+});
+
 test('PATCH /api/v1/applications/{uuid} updates preview_url_template and max_restart_count', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -467,3 +521,61 @@ test('rejects swarm fields on application update', function (string $field, mixe
     'swarm_placement_constraints' => ['swarm_placement_constraints', 'node.role==worker'],
     'is_swarm_only_worker_nodes' => ['is_swarm_only_worker_nodes', true],
 ]);
+
+test('PATCH /api/v1/applications/{uuid} saves a slugged container name prefix', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'My API'])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBe('my-api');
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/applications/{$this->application->uuid}")
+        ->assertOk()
+        ->assertJsonPath('settings.custom_container_name_prefix', 'my-api');
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a container name prefix that is in use', function () {
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherApplication->settings->update(['custom_container_name_prefix' => 'shared-prefix']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'shared-prefix'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});
+
+test('application creation rejects a non-string container name prefix with 422', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/prefix-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'custom_container_name_prefix' => ['nested' => 'value'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect(Application::query()->where('git_repository', 'like', '%prefix-test%')->exists())->toBeFalse();
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a non-string container name prefix with 422', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => ['a', 'b']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});

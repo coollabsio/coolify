@@ -110,3 +110,160 @@ it('does not start another resolver query after the total dns budget is exhauste
         ->and($result['example']['message'])->toBe('Could not validate DNS for this domain.')
         ->and($queryCount)->toHaveCount(0);
 });
+
+it('falls back to the system resolver when custom dns servers return no answers', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+        ['id' => 0],
+        [
+            'is_dns_validation_enabled' => true,
+            'custom_dns_servers' => '192.0.2.1',
+        ]
+    ));
+
+    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1') extends DNSQuery
+    {
+        public function query(string $question, string $typeName = DNSTypes::NAME_A): false
+        {
+            return false;
+        }
+
+        public function hasError(): bool
+        {
+            return true;
+        }
+    });
+
+    $action = new class extends CheckDomainDns
+    {
+        protected function resolveWithSystemDns(string $host, string $type): array
+        {
+            return ['203.0.113.10'];
+        }
+    };
+
+    $result = $action->handle(
+        ['example' => 'https://example.com'],
+        new Server(['ip' => '203.0.113.10']),
+        '203.0.113.10',
+    );
+
+    expect($result['example']['status'])->toBe('ok');
+});
+
+it('does not use the system resolver after a custom dns server returns an address', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+        ['id' => 0],
+        [
+            'is_dns_validation_enabled' => true,
+            'custom_dns_servers' => '192.0.2.1',
+        ]
+    ));
+
+    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1') extends DNSQuery
+    {
+        public function query(string $question, string $typeName = DNSTypes::NAME_A): array
+        {
+            return [new DNSResult($typeName, 1, 'IN', 60, '198.51.100.20', $question, '', [])];
+        }
+
+        public function hasError(): bool
+        {
+            return false;
+        }
+    });
+
+    $action = new class extends CheckDomainDns
+    {
+        protected function resolveWithSystemDns(string $host, string $type): array
+        {
+            throw new RuntimeException('The system resolver must not be used.');
+        }
+    };
+
+    $result = $action->handle(
+        ['example' => 'https://example.com'],
+        new Server(['ip' => '203.0.113.10']),
+        '203.0.113.10',
+    );
+
+    expect($result['example']['status'])->toBe('failed');
+});
+
+it('treats equivalent IPv6 notations as the same address', function (string $resolvedIp, string $expectedIp) {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+        ['id' => 0],
+        ['is_dns_validation_enabled' => true, 'custom_dns_servers' => '192.0.2.1'],
+    ));
+
+    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1', $resolvedIp) extends DNSQuery
+    {
+        public function __construct(string $server, private readonly string $resolvedIp)
+        {
+            parent::__construct($server);
+        }
+
+        public function query(string $question, string $typeName = DNSTypes::NAME_A)
+        {
+            return [new DNSResult($typeName, 1, 'IN', 60, $this->resolvedIp, $question, '', [])];
+        }
+
+        public function hasError(): bool
+        {
+            return false;
+        }
+    });
+
+    $server = new Server(['ip' => $expectedIp]);
+    $server->id = 1;
+
+    $result = CheckDomainDns::run(['example' => 'https://example.com'], $server, $expectedIp);
+
+    expect($result['example']['status'])->toBe('ok');
+})->with([
+    'compressed record, expanded expectation' => ['2001:db8::1', '2001:0db8:0:0::1'],
+    'expanded record, compressed expectation' => ['2001:0DB8:0000:0000:0000:0000:0000:0001', '2001:db8::1'],
+]);
+
+it('treats equivalent IPv6 notations from the system resolver as the same address', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+        ['id' => 0],
+        ['is_dns_validation_enabled' => true, 'custom_dns_servers' => ''],
+    ));
+
+    $action = new class extends CheckDomainDns
+    {
+        protected function resolveWithSystemDns(string $host, string $type): array
+        {
+            return ['2001:db8::1'];
+        }
+    };
+    $server = new Server(['ip' => '2001:0db8:0:0::1']);
+    $server->id = 1;
+
+    expect($action->handle(['example' => 'https://example.com'], $server, '2001:0db8:0:0::1')['example']['status'])->toBe('ok');
+});
+
+it('validateDNSEntry treats equivalent IPv6 notations as the same address', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+        ['id' => 0],
+        ['is_dns_validation_enabled' => true, 'custom_dns_servers' => '192.0.2.1'],
+    ));
+
+    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1') extends DNSQuery
+    {
+        public function query(string $question, string $typeName = DNSTypes::NAME_A)
+        {
+            return [new DNSResult($typeName, 1, 'IN', 60, '2001:db8::1', $question, '', [])];
+        }
+
+        public function hasError(): bool
+        {
+            return false;
+        }
+    });
+
+    $server = new Server(['ip' => '2001:0db8:0:0::1']);
+    $server->id = 1;
+
+    expect(validateDNSEntry('https://example.com', $server))->toBeTrue();
+});

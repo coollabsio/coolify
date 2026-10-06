@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Traits\StagesCloneArchives;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,9 +18,7 @@ use Illuminate\Support\Str;
  */
 class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    protected string $cloneDir = '/data/coolify/clone';
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, StagesCloneArchives;
 
     public int $timeout = 3600;
 
@@ -64,10 +63,8 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
     {
         $archiveName = 'hostpath-data.tar.gz';
         $token = Str::uuid()->toString();
-        $sourceCloneDir = "{$this->cloneDir}/hostpath-{$token}";
-        $targetCloneDir = "{$this->cloneDir}/hostpath-{$token}";
-        $srcDir = escapeshellarg($sourceCloneDir);
-        $tgtDir = escapeshellarg($targetCloneDir);
+        $sourceCloneDir = null;
+        $targetCloneDir = null;
         $srcPath = escapeshellarg($this->sourcePath);
         $tgtPath = escapeshellarg($this->targetPath);
         $tgtParent = escapeshellarg(dirname($this->targetPath));
@@ -77,17 +74,15 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
         try {
             File::ensureDirectoryExists($localTempDir, 0755);
 
+            $sourceCloneDir = $this->createCloneArchiveDirectory($this->sourceServer, "hostpath-{$token}");
+            $srcDir = escapeshellarg($sourceCloneDir);
             instant_remote_process([
-                "mkdir -p {$srcDir}",
-                "chmod 777 {$srcDir}",
                 "test -e {$srcPath}",
                 "docker run --rm -v {$srcPath}:/source:ro -v {$srcDir}:/clone alpine sh -c 'cd /source && tar czf /clone/{$archiveName} .'",
             ], $this->sourceServer);
 
-            instant_remote_process([
-                "mkdir -p {$tgtDir}",
-                "chmod 777 {$tgtDir}",
-            ], $this->targetServer);
+            $targetCloneDir = $this->createCloneArchiveDirectory($this->targetServer, "hostpath-{$token}");
+            $tgtDir = escapeshellarg($targetCloneDir);
 
             instant_scp_from_server(
                 "{$sourceCloneDir}/{$archiveName}",
@@ -116,17 +111,8 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
                 \Log::warning('Failed to clean up local host-path clone directory: '.$e->getMessage());
             }
 
-            try {
-                instant_remote_process(["rm -rf {$srcDir}"], $this->sourceServer, false);
-            } catch (\Exception $e) {
-                \Log::warning('Failed to clean up source host-path clone directory: '.$e->getMessage());
-            }
-
-            try {
-                instant_remote_process(["rm -rf {$tgtDir}"], $this->targetServer, false);
-            } catch (\Exception $e) {
-                \Log::warning('Failed to clean up target host-path clone directory: '.$e->getMessage());
-            }
+            $this->removeCloneArchiveDirectory($this->sourceServer, $sourceCloneDir);
+            $this->removeCloneArchiveDirectory($this->targetServer, $targetCloneDir);
         }
     }
 }

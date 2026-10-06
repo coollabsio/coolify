@@ -33,7 +33,7 @@
                                             href="{{ route('shared-variables.environment.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}" {{ wireNavigate() }}>
                                             <div class="flex items-start gap-3">
                                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim"><x-reicon name="layers" class="size-4" /></div>
-                                                <div class="min-w-0 flex-1"><h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">{{ $environment->name }}</h3><p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $environment->description ?: 'No description' }}</p></div>
+                                                <div class="min-w-0 flex-1"><h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">{{ $environment->name }}</h3><p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $environment->description }}</p></div>
                                             </div>
                                         </a>
                                     @endforeach
@@ -50,7 +50,7 @@
                                 href="{{ route('shared-variables.environment.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}" {{ wireNavigate() }}
                                 class="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                                 <x-reicon name="layers" class="size-4 shrink-0 text-neutral-500 dark:text-fg-dim" />
-                                <div class="min-w-0 flex-1"><div class="truncate text-[13px] font-medium">{{ $environment->name }}</div><div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $environment->description ?: 'No description' }}</div></div>
+                                <div class="min-w-0 flex-1"><div class="truncate text-[13px] font-medium">{{ $environment->name }}</div><div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $environment->description }}</div></div>
                                 <span class="shrink-0 text-[11px] text-neutral-500 dark:text-fg-dim">{{ $project->name }}</span>
                             </a>
                         @endforeach

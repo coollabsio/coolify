@@ -135,6 +135,32 @@ describe('GET /api/v1/servers sensitive field gating', function () {
         expect($body)->toContain('logdrain_axiom_api_key');
     });
 
+    test('saved proxy configuration in server detail requires read sensitive', function () {
+        $this->server->proxy->set('last_saved_proxy_configuration', "services:\n  traefik:\n    environment:\n      TOKEN: stored-proxy-config-value\n");
+        $this->server->save();
+
+        $readToken = makeApiToken($this->user, $this->team, ['read']);
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$readToken,
+        ])->getJson("/api/v1/servers/{$this->server->uuid}");
+
+        $response->assertStatus(200);
+        expect($response->getContent())->not->toContain('stored-proxy-config-value')
+            ->and($response->json('proxy'))->toBeArray();
+    });
+
+    test('read sensitive token sees saved proxy configuration in server detail', function () {
+        $this->server->proxy->set('last_saved_proxy_configuration', "services:\n  traefik:\n    environment:\n      TOKEN: stored-proxy-config-value\n");
+        $this->server->save();
+
+        $sensitiveToken = makeApiToken($this->user, $this->team, ['read', 'read:sensitive']);
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$sensitiveToken,
+        ])->getJson("/api/v1/servers/{$this->server->uuid}")
+            ->assertStatus(200)
+            ->assertJsonPath('proxy.last_saved_proxy_configuration', "services:\n  traefik:\n    environment:\n      TOKEN: stored-proxy-config-value\n");
+    });
+
     test('server resources response does not leak server secrets', function () {
         $token = makeApiToken($this->user, $this->team, ['read', 'read:sensitive']);
 

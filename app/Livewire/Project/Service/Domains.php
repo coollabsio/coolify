@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Concerns\InteractsWithDnsProviders;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
@@ -12,15 +13,20 @@ use App\Models\ServiceApplication;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Domains extends Component
 {
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
+    use InteractsWithDnsProviders;
+    use ListensToTeamChannel;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -43,6 +49,7 @@ class Domains extends Component
     public ?int $pendingRedirectServiceApplicationId = null;
 
     /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public ?int $newServiceApplicationId = null;
@@ -103,10 +110,13 @@ class Domains extends Component
 
     public bool $isCheckingDns = false;
 
+    #[Locked]
     public bool $dnsValidationEnabled = true;
 
+    #[Locked]
     public ?string $serverIp = null;
 
+    #[Locked]
     public ?string $serverIpConfigured = null;
 
     /** Pending save payload after conflict/port confirmation */
@@ -117,6 +127,11 @@ class Domains extends Component
         'refreshServices' => 'refreshDomains',
         'confirmDomainUsage',
     ];
+
+    public function getListeners(): array
+    {
+        return array_merge($this->listeners, $this->teamChannelListeners(['DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished']));
+    }
 
     protected function rules(): array
     {
@@ -182,7 +197,7 @@ class Domains extends Component
 
         match ($status) {
             'ok' => $this->dispatch('success', "DNS is configured correctly for {$host}."),
-            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record."),
+            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later."),
             default => $this->dispatch('info', "DNS check skipped for {$host}."),
         };
     }
@@ -197,7 +212,9 @@ class Domains extends Component
         $domains = $noindex ? $domains->push($domain) : $domains->reject(fn (string $item) => $item === $domain);
 
         $application->setNoindexDomains($domains);
+        $changedFields = auditChangedFields($application);
         $application->save();
+        $this->auditServiceApplicationUpdate($application, $changedFields);
         $this->service->parse();
         $this->refreshDomains();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
@@ -213,7 +230,9 @@ class Domains extends Component
         $this->validateOnly("forceHttpsRedirects.{$serviceApplicationId}");
 
         $application->is_force_https_enabled = $enabled;
+        $changedFields = auditChangedFields($application);
         $application->save();
+        $this->auditServiceApplicationUpdate($application, $changedFields);
         $this->service->parse();
         $this->refreshDomains();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
@@ -562,7 +581,16 @@ class Domains extends Component
         $this->domainRows[$index]['suggestion_role'] = $meta['role'];
     }
 
-    protected function persistAllDomainDnsStatuses(): void
+    protected function persistDomainDnsStatuses(): void
+    {
+        $this->persistAllDomainDnsStatuses();
+    }
+
+    /**
+     * @param  array<int, string>  $startingCheckKeys  Status keys whose check is being started by this call.
+     *                                                 They are allowed to replace a stored completed result.
+     */
+    protected function persistAllDomainDnsStatuses(array $startingCheckKeys = []): void
     {
         $byApp = [];
 
@@ -602,11 +630,15 @@ class Domains extends Component
                 ->all();
             $statuses = array_intersect_key($statuses, array_flip($currentUrls));
 
-            DB::transaction(function () use ($app, &$statuses): void {
+            DB::transaction(function () use ($app, &$statuses, $startingCheckKeys): void {
                 $application = ServiceApplication::query()->lockForUpdate()->findOrFail($app->id);
                 $storedStatuses = $application->domain_dns_statuses ?? [];
 
                 foreach ($statuses as $key => $status) {
+                    if (in_array($key, $startingCheckKeys, true)) {
+                        continue;
+                    }
+
                     $localCheckId = $status['check_id'] ?? null;
                     $storedCheckId = $storedStatuses[$key]['check_id'] ?? null;
 
@@ -779,7 +811,8 @@ class Domains extends Component
             $this->pendingRedirectServiceApplicationId = $serviceApplicationId;
 
             $addedDomains = [];
-            $saved = DB::transaction(function () use ($app, $redirect, &$addedDomains): bool {
+            $changedFields = [];
+            $saved = DB::transaction(function () use ($app, $redirect, &$addedDomains, &$changedFields): bool {
                 // Promote the optional www/non-www suggestion to a real domain for redirects.
                 if (in_array($redirect, ['www', 'non-www'], true)) {
                     $domainsBeforePairing = collect($this->splitDomains($app->fqdn));
@@ -796,6 +829,7 @@ class Domains extends Component
                 }
 
                 $app->redirect = $redirect;
+                $changedFields = auditChangedFields($app);
                 $app->save();
                 updateCompose($app);
                 $this->service->parse();
@@ -806,6 +840,7 @@ class Domains extends Component
             if (! $saved) {
                 return;
             }
+            $this->auditServiceApplicationUpdate($app, $changedFields);
 
             $this->pendingAction = null;
             $this->pendingRedirectServiceApplicationId = null;
@@ -1065,9 +1100,15 @@ class Domains extends Component
             $this->pendingAction = null;
             $this->dispatch('close-modal');
             $this->refreshDomains();
-            $urlsToCheck = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            $addedUrls = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            if ($this->configureDnsAfterDomainAdd($addedUrls)) {
+                $this->dispatch('success', 'Domain added.');
+
+                return;
+            }
+
             $serviceApplicationId = (int) $app->id;
-            $dnsChecks = collect($urlsToCheck)->map(fn (string $url) => [
+            $dnsChecks = collect($addedUrls)->map(fn (string $url) => [
                 'url' => $url,
                 'check_id' => new_public_id(),
             ]);
@@ -1075,7 +1116,7 @@ class Domains extends Component
             foreach ($dnsChecks as $dnsCheck) {
                 $this->markUrlsAsChecking([$dnsCheck['url']], $serviceApplicationId, $dnsCheck['check_id']);
             }
-            $this->persistAllDomainDnsStatuses();
+            $this->persistAllDomainDnsStatuses($dnsChecks->pluck('url')->all());
 
             $failedDnsChecks = 0;
             foreach ($dnsChecks as $dnsCheck) {
@@ -1293,10 +1334,13 @@ class Domains extends Component
                 }
             }
             $this->pendingAction = 'update';
+            $previousDnsHostnames = $this->managedDnsHostnamesOf($app);
 
             if (! $this->saveDomainListForApp($app, $updated, noindexDomains: $noindexDomains, redirect: $this->editingRedirect)) {
                 return;
             }
+
+            $this->releaseManagedDnsForEditedDomains($app, $previousDnsHostnames);
 
             $this->cancelEdit();
             $this->dispatch('edit-domain-saved');
@@ -1313,7 +1357,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomain(int $index): void
+    public function removeDomain(int $index, string $password = '', array $selectedActions = []): void
     {
         try {
             $this->authorize('update', $this->service);
@@ -1336,6 +1380,8 @@ class Domains extends Component
                 return;
             }
 
+            $this->releaseManagedDnsForUrl($url, $app, in_array('deleteManagedDns', $selectedActions, true));
+
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Domain removed.');
@@ -1346,7 +1392,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomainByKey(string $domainKey): void
+    public function removeDomainByKey(string $domainKey, string $password = '', array $selectedActions = []): void
     {
         $index = collect($this->domainRows)->search(
             fn (array $row): bool => ! ($row['is_suggested'] ?? false)
@@ -1357,7 +1403,7 @@ class Domains extends Component
             return;
         }
 
-        $this->removeDomain((int) $index);
+        $this->removeDomain((int) $index, $password, $selectedActions);
     }
 
     /**
@@ -1366,6 +1412,18 @@ class Domains extends Component
     private function domainRowKey(array $row): string
     {
         return hash('sha256', $row['url'].'|'.$row['service_application_id']);
+    }
+
+    protected function dnsResourceForHostname(string $hostname): ?Model
+    {
+        foreach ($this->domainRows as $row) {
+            $rowHostname = parse_url((string) ($row['url'] ?? ''), PHP_URL_HOST);
+            if (is_string($rowHostname) && strtolower($rowHostname) === strtolower($hostname)) {
+                return $this->findServiceApp((int) $row['service_application_id']);
+            }
+        }
+
+        return null;
     }
 
     public function addSuggestedDomain(int $index): void
@@ -1546,11 +1604,14 @@ class Domains extends Component
             $this->dispatch('warning', __('warning.sslipdomain'));
         }
 
-        DB::transaction(function () use ($app): void {
+        $changedFields = [];
+        DB::transaction(function () use ($app, &$changedFields): void {
+            $changedFields = auditChangedFields($app);
             $app->save();
             updateCompose($app);
             $this->service->parse();
         });
+        $this->auditServiceApplicationUpdate($app, $changedFields);
 
         if (str($app->fqdn)->contains(',')) {
             $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
@@ -1620,7 +1681,7 @@ class Domains extends Component
         foreach (array_unique($urls) as $url) {
             $checkId = new_public_id();
             $this->markUrlsAsChecking([$url], (int) $application->id, $checkId);
-            $this->persistAllDomainDnsStatuses();
+            $this->persistAllDomainDnsStatuses([$url]);
 
             try {
                 CheckDomainDnsJob::dispatch(
@@ -1663,6 +1724,27 @@ class Domains extends Component
         }
 
         return null;
+    }
+
+    /**
+     * Records `ui.service_application.updated`; nothing is recorded when no attribute changed.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditServiceApplicationUpdate(ServiceApplication $application, array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.service_application.updated', [
+            'team_id' => $this->service->team()?->id,
+            'service_uuid' => $this->service->uuid,
+            'service_name' => $this->service->name,
+            'service_application_uuid' => $application->uuid,
+            'service_application_name' => $application->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     protected function findServiceApp(?int $id): ?ServiceApplication

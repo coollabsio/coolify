@@ -12,19 +12,25 @@
             'active' => request()->routeIs('team.member.index'),
             'icon' => 'teams',
         ],
+        auth()->user()->isAdminOfTeam(currentTeam()->id) ? [
+            'label' => 'Audit log',
+            'route' => 'team.audit-log',
+            'active' => request()->routeIs('team.audit-log'),
+            'icon' => 'time-back',
+        ] : null,
         isInstanceAdmin() ? [
             'label' => 'Admin View',
             'route' => 'team.admin-view',
             'active' => request()->routeIs('team.admin-view'),
             'icon' => 'admin',
         ] : null,
-        [
+        auth()->user()->can('delete', currentTeam()) ? [
             'label' => 'Danger Zone',
             'route' => 'team.danger-zone',
             'active' => request()->routeIs('team.danger-zone'),
             'icon' => 'shield-alert',
             'sectionStart' => true,
-        ],
+        ] : null,
     ])->filter();
 @endphp
 

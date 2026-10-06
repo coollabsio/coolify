@@ -8,11 +8,13 @@ ARG CLOUDFLARED_VERSION=2025.7.0
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.2-r1
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.0
 
 # =================================================================
 # Get MinIO client
 # =================================================================
-FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
+FROM ghcr.io/coollabsio/mx:0.1.0 AS minio-client
 
 # =================================================================
 # Final Stage: Production image
@@ -26,6 +28,7 @@ ARG TARGETARCH
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG PHP_UV_VERSION
 
 WORKDIR /var/www/html
 
@@ -56,6 +59,11 @@ RUN apk upgrade --no-cache && \
 # Install system dependencies
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
+    nodejs \
+    npm \
+    make \
+    g++ \
+    python3 \
     openssh-client \
     openssl \
     git \
@@ -65,7 +73,8 @@ RUN apk add --no-cache \
     vim
 
 # Install PHP extensions
-RUN install-php-extensions sockets
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions sockets uv-${PHP_UV_VERSION}
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
@@ -84,6 +93,14 @@ RUN mkdir -p /usr/local/bin && \
 # Configure PHP
 COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=0
+
+# Install terminal WebSocket server dependencies
+COPY docker/coolify-terminal/package*.json /terminal/
+RUN npm ci --prefix /terminal && \
+    npm rebuild node-pty --prefix /terminal --update-binary
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
+RUN chown -R www-data:www-data /terminal
 
 # Configure Nginx and S6 overlay
 COPY docker/development/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
