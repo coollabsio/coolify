@@ -2623,8 +2623,7 @@ function isAnyDeploymentInprogress(bool $showAll = false)
     $deploymentDetails = [];
 
     foreach ($runningJobs as $runningJob) {
-        $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
-        if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
+        if ($runningJob->isHorizonJobActive()) {
             $horizonJobIds[] = $runningJob->horizon_job_id;
 
             if ($showAll) {
