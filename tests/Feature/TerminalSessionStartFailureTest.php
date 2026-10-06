@@ -56,7 +56,7 @@ function fakeTerminalContainer(string $state, bool $hasShell = true, array $runn
 
         if (str_contains($command, 'docker ps -a')) {
             return Process::result(output: collect($runningContainers)
-                ->map(fn (string $name) => json_encode(['Names' => $name, 'State' => 'running', 'Labels' => '']))
+                ->map(fn (string $name) => json_encode(['ID' => md5($name), 'Names' => $name, 'State' => 'running', 'Labels' => '']))
                 ->implode("\n"));
         }
 
