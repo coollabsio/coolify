@@ -1,3 +1,4 @@
+<div>
 @if (! $canReadLogs)
     <x-callout type="info" title="Hidden (only admins can view)">
         Container logs can contain secrets.
@@ -315,3 +316,4 @@
     </div>
 </div>
 @endif
+</div>
