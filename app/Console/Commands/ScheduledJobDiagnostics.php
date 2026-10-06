@@ -211,8 +211,8 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKeys = [
-                "server-patch-check:{$server->id}" => ServerManagerJob::patchCheckCron($server),
-                "sentinel-version-check:{$server->id}" => ServerManagerJob::sentinelVersionCheckCron($server),
+                "server-patch-check-v2:{$server->id}" => ServerManagerJob::patchCheckCron($server),
+                "sentinel-version-check-v2:{$server->id}" => ServerManagerJob::sentinelVersionCheckCron($server),
                 "server-check:{$server->id}" => isCloud() ? '*/5 * * * *' : '* * * * *',
                 "server-storage-check:{$server->id}" => data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *'),
             ];
