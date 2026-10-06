@@ -92,8 +92,8 @@ class DeleteNodeWorkloadJob implements ShouldQueue
 
     private function deleteRecords(NodeWorkload $workload, ?User $requestedBy): void
     {
-        // Clusters whose network intent references the workload: ingress routes and firewall rules.
-        $clusterIds = collect($workload->hasIngressRoutes() ? $workload->clusterIds() : [])
+        // Clusters whose network intent references the workload: ingress routes, internal names, and firewall rules.
+        $clusterIds = collect($workload->hasIngressRoutes() || filled($workload->internal_dns_name) ? $workload->clusterIds() : [])
             ->merge(NodeFirewallRule::query()
                 ->where('source_workload_id', $workload->id)
                 ->orWhere('destination_workload_id', $workload->id)

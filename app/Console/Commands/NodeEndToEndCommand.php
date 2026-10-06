@@ -149,6 +149,7 @@ class NodeEndToEndCommand extends Command
             'workload' => $workload === null ? null : [
                 'uuid' => $workload->uuid,
                 'name' => $workload->name,
+                'dns_name' => $workload->internal_dns_name,
                 'container_name' => 'coolify-'.$workload->uuid.'-main',
                 'desired_state' => $workload->desired_state?->value,
                 'node_uuids' => $workload->nodes()->pluck('nodes.uuid')->all(),

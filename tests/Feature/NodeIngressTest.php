@@ -153,6 +153,7 @@ function fakeIngressFlux(ArrayObject $state): Collection
                 'active' => $data['enabled'],
                 'revision' => $data['revision'],
                 'route_count' => in_array($server, $state['bad_ingress'], true) ? count($data['routes']) + 1 : count($data['routes']),
+                'name_count' => in_array($server, $state['bad_names'], true) ? count($data['names']) + 1 : count($data['names']),
             ],
         }]);
     });
@@ -172,7 +173,7 @@ beforeEach(function () {
     $this->team = $this->user->teams()->firstOrFail();
     $this->team->update(['show_boarding' => false]);
     Cache::flush();
-    $this->flux = new ArrayObject(['alive' => 0, 'bad_ingress' => []]);
+    $this->flux = new ArrayObject(['alive' => 0, 'bad_ingress' => [], 'bad_names' => []]);
     $this->requests = fakeIngressFlux($this->flux);
 });
 
@@ -259,10 +260,39 @@ describe('routes and firewall', function () {
         $otherNode->workloads()->attach($elsewhere, ['container_ip' => '100.64.9.10']);
 
         expect(BuildNodeClusterIngressRoutes::run($cluster))->toBe([
-            ['host' => 'shop.example.com', 'workload_id' => 'shop', 'namespace' => 'default', 'port' => 8080],
-            ['host' => 'www.example.com', 'workload_id' => 'shop', 'namespace' => 'default', 'port' => 8080],
+            ['host' => 'shop.example.com', 'workload_id' => $shop->uuid, 'namespace' => 'default', 'port' => 8080],
+            ['host' => 'www.example.com', 'workload_id' => $shop->uuid, 'namespace' => 'default', 'port' => 8080],
         ])->and(BuildNodeClusterIngressRoutes::run($otherCluster))->toBe([
-            ['host' => 'elsewhere.example.com', 'workload_id' => 'elsewhere', 'namespace' => 'default', 'port' => 80],
+            ['host' => 'elsewhere.example.com', 'workload_id' => $elsewhere->uuid, 'namespace' => 'default', 'port' => 80],
+        ]);
+    });
+
+    it('routes a workload by uuid before it has an internal name', function () {
+        [$cluster, [$node]] = ingressCluster($this->user, 1);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => null, 'domains' => ['shop.example.com'], 'http_port' => 80]);
+        $node->workloads()->attach($shop, ['container_ip' => '100.64.0.10']);
+
+        expect(BuildNodeClusterIngressRoutes::run($cluster))->toBe([
+            ['host' => 'shop.example.com', 'workload_id' => $shop->uuid, 'namespace' => 'default', 'port' => 80],
+        ])->and(BuildNodeClusterIngressRoutes::names($cluster))->toBe([]);
+    });
+
+    it('maps the internal names of the cluster workloads to their uuids once each', function () {
+        [$cluster, [$first, $second]] = ingressCluster($this->user, 2);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', 'domains' => ['shop.example.com'], 'http_port' => 80]);
+        $first->workloads()->attach($shop, ['container_ip' => '100.64.0.10']);
+        $second->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
+        $worker = routedWorkload($this->team, ['internal_dns_name' => 'worker']);
+        $first->workloads()->attach($worker, ['container_ip' => '100.64.0.11']);
+        $unnamed = routedWorkload($this->team, ['internal_dns_name' => null]);
+        $first->workloads()->attach($unnamed, ['container_ip' => '100.64.0.12']);
+        [, [$otherNode]] = ingressCluster($this->user, 1);
+        $elsewhere = routedWorkload($this->team, ['internal_dns_name' => 'elsewhere']);
+        $otherNode->workloads()->attach($elsewhere, ['container_ip' => '100.64.9.10']);
+
+        expect(BuildNodeClusterIngressRoutes::names($cluster))->toBe([
+            ['name' => 'shop', 'workload_id' => $shop->uuid, 'namespace' => 'default'],
+            ['name' => 'worker', 'workload_id' => $worker->uuid, 'namespace' => 'default'],
         ]);
     });
 
@@ -287,30 +317,33 @@ describe('routes and firewall', function () {
 });
 
 describe('network reconciliation', function () {
-    it('sends ingress last with the routes to ingress Nodes and disables it on other capable Nodes', function () {
-        [$cluster, [$ingress, $plain, $older]] = ingressCluster($this->user, 3);
+    it('sends ingress last with the full routes and names to every Node and enables Caddy only on ingress Nodes', function () {
+        [$cluster, [$ingress, $plain]] = ingressCluster($this->user, 2);
         $ingress->update(['is_ingress' => true]);
-        connectIngressNode($older, ingress: false);
         $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', 'domains' => ['shop.example.com'], 'http_port' => 3000]);
         $plain->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $cluster->increment('desired_revision');
-        $this->flux['alive'] = 2;
+        $this->flux['alive'] = 1;
 
         ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
 
+        $routes = [['host' => 'shop.example.com', 'workload_id' => $shop->uuid, 'namespace' => 'default', 'port' => 3000]];
+        $names = [['name' => 'shop', 'workload_id' => $shop->uuid, 'namespace' => 'default']];
         $ingressRequests = $this->requests->where('command', 'ingress.reconcile')->keyBy('server_id');
-        expect($ingressRequests)->toHaveCount(2)
-            ->and($ingressRequests->get($older->uuid))->toBeNull();
+        expect($ingressRequests)->toHaveCount(2);
         expect(collect($ingressRequests->get($ingress->uuid)['data'])->except(['server_id', 'command_id'])->all())->toBe([
             'enabled' => true,
             'caddy_version' => ReconcileNodeClusterNetwork::CADDY_VERSION,
             'revision' => $cluster->refresh()->desired_revision,
-            'routes' => [['host' => 'shop.example.com', 'workload_id' => 'shop', 'namespace' => 'default', 'port' => 3000]],
+            'routes' => $routes,
+            'names' => $names,
         ]);
-        expect($ingressRequests->get($plain->uuid)['data'])->toMatchArray([
+        expect(collect($ingressRequests->get($plain->uuid)['data'])->except(['server_id', 'command_id'])->all())->toBe([
             'enabled' => false,
+            'caddy_version' => ReconcileNodeClusterNetwork::CADDY_VERSION,
             'revision' => $cluster->desired_revision,
-            'routes' => [],
+            'routes' => $routes,
+            'names' => $names,
         ]);
         foreach ([$ingress, $plain] as $node) {
             expect($this->requests->where('server_id', $node->uuid)->last()['command'])->toBe('ingress.reconcile');
@@ -318,9 +351,41 @@ describe('network reconciliation', function () {
         expect($ingress->refresh()->network_status)->toBe('converged')
             ->and($cluster->nodeIngressState($ingress))->toBe('active')
             ->and($ingress->metadata['ingress_route_count'])->toBe(1)
-            ->and($cluster->nodeIngressState($plain->refresh()))->toBe('off')
-            ->and($older->refresh()->network_status)->toBe('converged')
+            ->and($ingress->metadata['ingress_name_count'])->toBe(1)
+            ->and($plain->refresh()->metadata['ingress_name_count'])->toBe(1)
+            ->and($cluster->nodeIngressState($plain))->toBe('off')
+            ->and($plain->network_status)->toBe('converged')
             ->and($cluster->network_status)->toBe('active');
+    });
+
+    it('does not apply the network on a Node whose Sentinel cannot apply routes and names', function () {
+        [$cluster, [$current, $older]] = ingressCluster($this->user, 2);
+        connectIngressNode($older, ingress: false);
+        $cluster->increment('desired_revision');
+
+        ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
+
+        expect($older->refresh()->network_status)->toBe('error')
+            ->and($this->requests->where('server_id', $older->uuid))->toBeEmpty()
+            ->and($this->requests->where('server_id', $current->uuid)->last()['command'])->toBe('ingress.reconcile');
+    });
+
+    it('fails the Node whose Sentinel reports a different internal name count', function () {
+        [$cluster, [$broken, $healthy]] = ingressCluster($this->user, 2);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop']);
+        $healthy->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
+        $cluster->increment('desired_revision');
+        $this->flux['alive'] = 1;
+        $this->flux['bad_names'] = [$broken->uuid];
+
+        ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
+
+        expect($broken->refresh()->network_status)->toBe('error')
+            ->and($broken->network_error)->toContain('unsafe or incomplete')
+            ->and($broken->hasAppliedNetworkRevision($cluster->refresh()->desired_revision))->toBeFalse()
+            ->and($healthy->refresh()->network_status)->toBe('converged')
+            ->and($healthy->hasAppliedNetworkRevision($cluster->desired_revision))->toBeTrue()
+            ->and($broken->operations()->where('command_type', 'ingress.reconcile.v1')->sole()->status)->toBe(NodeOperationStatus::FAILED);
     });
 
     it('marks only the Node with an invalid ingress result as failed', function () {
@@ -400,7 +465,15 @@ describe('triggers', function () {
         Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $this->cluster->id);
     });
 
-    it('does not queue a run when a workload without domains is deleted', function () {
+    it('bumps the revision and queues reachable Nodes when a workload with an internal name is deleted', function () {
+        $this->workload->delete();
+
+        expect($this->cluster->refresh()->desired_revision)->toBe($this->revision + 1);
+        Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $this->cluster->id);
+    });
+
+    it('does not queue a run when a workload without domains or an internal name is deleted', function () {
+        $this->workload->update(['internal_dns_name' => null]);
         $this->workload->delete();
 
         expect($this->cluster->refresh()->desired_revision)->toBe($this->revision);

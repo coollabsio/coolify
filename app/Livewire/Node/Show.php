@@ -10,6 +10,7 @@ use App\Actions\Node\FetchContainers;
 use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\UpgradeSentinel;
 use App\Actions\Node\ValidateNode;
@@ -24,6 +25,7 @@ use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\MoveNodeWorkloadJob;
 use App\Jobs\UpgradeNodeSentinelJob;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
@@ -211,7 +213,7 @@ class Show extends Component
                 $field.'.regex' => 'Use lowercase letters, numbers, and hyphens. Do not start or end with a hyphen.',
             ]);
 
-            DB::transaction(function () use ($field, $workloadUuid): void {
+            $workload = DB::transaction(function () use ($field, $workloadUuid): ?NodeWorkload {
                 $workload = NodeWorkload::query()
                     ->where('uuid', $workloadUuid)
                     ->where('team_id', $this->node->team_id)
@@ -231,12 +233,25 @@ class Show extends Component
                     ]);
                 }
 
+                if ($workload->internal_dns_name === $dnsName) {
+                    return null;
+                }
                 $workload->update(['internal_dns_name' => $dnsName]);
+
+                return $workload;
             });
+
+            // Sentinel reads the name table from the cluster network revision, so no redeploy is needed.
+            if ($workload !== null) {
+                NodeCluster::query()
+                    ->whereKey($workload->clusterIds())
+                    ->get()
+                    ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, auth()->user()));
+            }
 
             $this->loadNodeData();
             $this->dispatch('close-modal');
-            $this->dispatch('success', 'Internal DNS name updated. Redeploy the workload to apply it.');
+            $this->dispatch('success', 'Internal DNS name updated.');
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (\Throwable $e) {

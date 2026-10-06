@@ -381,7 +381,20 @@ describe('danger zone', function () {
         Notification::assertNothingSent();
     });
 
-    it('bumps the cluster network revision only when routes or firewall rules referenced the application', function () {
+    it('bumps the cluster network revision only when routes, an internal name, or firewall rules referenced the application', function () {
+        Queue::fake();
+        ($this->fakeFlux)();
+        $this->firewallRule->delete();
+        $this->workload->update(['internal_dns_name' => null]);
+        $revisionBefore = $this->cluster->refresh()->desired_revision;
+
+        (new DeleteNodeWorkloadJob($this->workload->id, $this->user->id))->handle();
+
+        expect(NodeWorkload::query()->whereKey($this->workload->id)->exists())->toBeFalse()
+            ->and($this->cluster->refresh()->desired_revision)->toBe($revisionBefore);
+    });
+
+    it('bumps the cluster network revision when the deleted application had an internal name', function () {
         Queue::fake();
         ($this->fakeFlux)();
         $this->firewallRule->delete();
@@ -390,7 +403,7 @@ describe('danger zone', function () {
         (new DeleteNodeWorkloadJob($this->workload->id, $this->user->id))->handle();
 
         expect(NodeWorkload::query()->whereKey($this->workload->id)->exists())->toBeFalse()
-            ->and($this->cluster->refresh()->desired_revision)->toBe($revisionBefore);
+            ->and($this->cluster->refresh()->desired_revision)->toBe($revisionBefore + 1);
     });
 
     it('keeps the application and notifies the team when a server cannot remove the container', function () {

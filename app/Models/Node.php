@@ -218,18 +218,18 @@ class Node extends BaseModel
         $this->syncOriginalAttributes($columns);
     }
 
-    /** Whether Sentinel on this Node reported that it can run the ingress proxy. */
     /**
      * Whether a network run applied this revision or a newer one up to its last step: the
-     * firewall, and ingress on Nodes that get the ingress command.
+     * firewall, and the ingress routes and internal names that every Node applies.
      */
     public function hasAppliedNetworkRevision(int $revision): bool
     {
         return (int) $this->network_applied_revision >= $revision
             && (int) data_get($this->metadata, 'firewall_applied_revision') >= $revision
-            && (! ($this->is_ingress || $this->supportsIngress()) || (int) data_get($this->metadata, 'ingress_applied_revision') >= $revision);
+            && (int) data_get($this->metadata, 'ingress_applied_revision') >= $revision;
     }
 
+    /** Whether Sentinel on this Node reported that it can run the ingress proxy. */
     public function supportsIngress(): bool
     {
         return $this->supportsCapability(ReconcileNodeClusterNetwork::INGRESS_CAPABILITY) === true;

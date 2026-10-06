@@ -175,3 +175,4 @@
 
 ## Format only your own files
 - `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.
+- Put only immutable identity (the workload UUID) in container labels. Keep mutable routing data, such as domains and internal names, in Coolify and replicate it to Corrosion with the cluster network revision, so a change needs no redeploy.

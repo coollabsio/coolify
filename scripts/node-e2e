@@ -55,7 +55,8 @@ RESTART_DIR="$ROOT/storage/app/node-e2e"
 KEY="$WORK/ssh-key"
 SSH_OPTS=(-i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes)
 declare -A NODE_IP=() NODE_WG=()
-WORKLOAD_NAME=''
+WORKLOAD_UUID=''
+WORKLOAD_DNS_NAME=''
 CONTAINER_NAME=''
 WORKLOAD_IP=''
 ROTATION_START_VERSION=''
@@ -211,7 +212,7 @@ container_state() { node_ssh a "podman inspect -f '{{.State.Status}}' $CONTAINER
 workload_running() { [[ "$(container_state)" == running ]]; }
 
 dns_answer() {
-  node_ssh "$1" "dig +short +time=2 +tries=1 @${NODE_WG[$1]} $WORKLOAD_NAME.default.coolify.internal" 2>/dev/null
+  node_ssh "$1" "dig +short +time=2 +tries=1 @${NODE_WG[$1]} $WORKLOAD_DNS_NAME.default.coolify.internal" 2>/dev/null
 }
 
 dns_resolves() { [[ "$(dns_answer "$1")" == "$WORKLOAD_IP" ]]; }
@@ -220,7 +221,7 @@ dns_resolves_everywhere() { dns_resolves a && dns_resolves b; }
 
 # Expiry of the workload endpoint row in Corrosion on a Node, as Unix seconds.
 endpoint_expires_at() {
-  node_ssh "$1" "corrosion query --config /etc/corrosion/config.toml \"SELECT expires_at FROM workload_endpoints WHERE workload_id = '$WORKLOAD_NAME' AND container_ip = '$WORKLOAD_IP'\"" 2>/dev/null | tail -1
+  node_ssh "$1" "corrosion query --config /etc/corrosion/config.toml \"SELECT expires_at FROM workload_endpoints WHERE workload_id = '$WORKLOAD_UUID' AND container_ip = '$WORKLOAD_IP'\"" 2>/dev/null | tail -1
 }
 
 cluster_active() { st_is '.cluster.network_status' active; }
@@ -262,7 +263,8 @@ load_environment() {
     NODE_IP[$node]="$(jq -er ".nodes.$node.ip" <<<"$status")"
     NODE_WG[$node]="$(jq -er ".nodes.$node.wireguard_ip" <<<"$status")"
   done
-  WORKLOAD_NAME="$(jq -er '.workload.name' <<<"$status")"
+  WORKLOAD_UUID="$(jq -er '.workload.uuid' <<<"$status")"
+  WORKLOAD_DNS_NAME="$(jq -er '.workload.dns_name' <<<"$status")"
   CONTAINER_NAME="$(jq -er '.workload.container_name' <<<"$status")"
   WORKLOAD_IP="$(jq -er '.workload.container_ips[0]' <<<"$status")"
   [[ "$(jq -er '.workload.node_uuids[0]' <<<"$status")" == development-qemu-node-worker-a ]] ||
@@ -304,7 +306,7 @@ build_and_install() {
   for node in a b; do
     log "installing Sentinel on worker $node"
     scp "${SSH_OPTS[@]}" -q "$WORK/sentinel" "root@${NODE_IP[$node]}:/usr/local/bin/sentinel.new"
-    node_ssh "$node" 'chmod 755 /usr/local/bin/sentinel.new && mv /usr/local/bin/sentinel.new /usr/local/bin/sentinel && systemctl restart sentinel'
+    node_ssh "$node" 'chmod 755 /usr/local/bin/sentinel.new && mv /usr/local/bin/sentinel.new /usr/local/bin/sentinel && systemctl restart sentinel && systemctl try-restart coolify-discovery-dns'
   done
   rm -f "$WORK/sentinel"
   printf 'services:\n  flux:\n    image: flux:%s-dev\n' "$INSTANCE" >"$FLUX_OVERRIDE"

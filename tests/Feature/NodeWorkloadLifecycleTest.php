@@ -270,6 +270,8 @@ it('updates a permanent workload dns name from the Node page', function () {
         'wireguard_ip' => '10.250.0.2',
     ]);
     $this->workload->update(['internal_dns_name' => 'example-app']);
+    $revisionBefore = $cluster->refresh()->desired_revision;
+    Queue::fake();
     Http::fake();
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
@@ -278,10 +280,33 @@ it('updates a permanent workload dns name from the Node page', function () {
         ->set('dnsNames.'.$this->workload->uuid, 'stable-api')
         ->call('saveWorkloadDnsName', $this->workload->uuid)
         ->assertHasNoErrors()
-        ->assertDispatched('success', 'Internal DNS name updated. Redeploy the workload to apply it.');
+        ->assertDispatched('success', 'Internal DNS name updated.');
 
-    expect($this->workload->refresh()->internal_dns_name)->toBe('stable-api');
+    // Sentinel gets the new name with the next cluster network revision; no container changes.
+    expect($this->workload->refresh()->internal_dns_name)->toBe('stable-api')
+        ->and($cluster->refresh()->desired_revision)->toBe($revisionBefore + 1);
     Http::assertNothingSent();
+});
+
+it('does not queue a network revision when the internal DNS name did not change', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $user->teams()->attach($this->team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id, 'network_status' => 'active']);
+    $this->node->update(['node_cluster_id' => $cluster->id, 'wireguard_ip' => '10.250.0.2']);
+    $this->workload->update(['internal_dns_name' => 'example-app']);
+    $revisionBefore = $cluster->refresh()->desired_revision;
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
+        ->set('dnsNames.'.$this->workload->uuid, 'Example-App ')
+        ->call('saveWorkloadDnsName', $this->workload->uuid)
+        ->assertHasNoErrors()
+        ->assertDispatched('success', 'Internal DNS name updated.');
+
+    expect($cluster->refresh()->desired_revision)->toBe($revisionBefore);
 });
 
 it('rejects invalid or colliding workload dns names from the Node page', function () {
@@ -461,3 +486,24 @@ function lifecycleContainer(object $test, string $state): array
         ],
     ];
 }
+
+it('does not ask for a redeploy after an internal DNS name changed', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $user->teams()->attach($this->team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+    $this->workload->update(['internal_dns_name' => 'stable-api']);
+    NodeContainer::factory()->create([
+        'node_id' => $this->node->id,
+        'node_workload_id' => $this->workload->id,
+        'labels' => ['coolify.managed' => 'true'],
+        'management_state' => NodeContainerManagementState::MANAGED,
+        'is_managed' => true,
+    ]);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
+        ->assertSee('stable-api')
+        ->assertDontSee('Redeploy to apply');
+});

@@ -95,15 +95,16 @@ it('reconciles a complete full mesh through durable typed operations', function 
             str_ends_with($request->url(), 'network.firewall.reconcile') => Http::response([...$base, 'changed' => true, 'rollback_cancelled' => true, 'applied_revision' => $data['revision'], 'configuration_hash' => 'firewall-hash', 'drifted' => false, 'table' => 'coolify_cluster', 'ingress_enforced' => true]),
             str_ends_with($request->url(), 'discovery.corrosion.reconcile') => Http::response([...$base, 'changed' => true, 'version' => 'v1.0.0', 'member_state' => 'joining', 'endpoint_count' => 2, 'last_convergence_unix_seconds' => null]),
             str_ends_with($request->url(), 'discovery.corrosion.inspect') => Http::response([...$base, 'version' => 'v1.0.0', 'member_state' => 'converged', 'endpoint_count' => 2, 'last_convergence_unix_seconds' => 1_700_000_000]),
+            str_ends_with($request->url(), 'ingress.reconcile') => Http::response([...$base, 'enabled' => $data['enabled'], 'active' => false, 'revision' => $data['revision'], 'route_count' => count($data['routes']), 'name_count' => count($data['names']), 'caddy_version' => $data['caddy_version']]),
             default => Http::response([], 404),
         };
     });
 
     ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
 
-    expect($requests)->toHaveCount(10)
-        ->and(NodeOperation::query()->count())->toBe(10)
-        ->and(NodeOperation::query()->where('status', NodeOperationStatus::SUCCEEDED)->count())->toBe(10)
+    expect($requests)->toHaveCount(12)
+        ->and(NodeOperation::query()->count())->toBe(12)
+        ->and(NodeOperation::query()->where('status', NodeOperationStatus::SUCCEEDED)->count())->toBe(12)
         ->and($cluster->refresh()->network_status)->toBe('active');
     foreach ([$first->refresh(), $second->refresh()] as $node) {
         expect($node->wireguard_public_key)->toBe('public-'.$node->uuid)
@@ -112,8 +113,15 @@ it('reconciles a complete full mesh through durable typed operations', function 
             ->and(data_get($node->metadata, 'firewall_applied_revision'))->toBe($cluster->desired_revision)
             ->and(data_get($node->metadata, 'firewall_configuration_hash'))->toBe('firewall-hash')
             ->and(data_get($node->metadata, 'corrosion_endpoint_count'))->toBe(2)
-            ->and(data_get($node->metadata, 'corrosion_last_convergence_unix_seconds'))->toBe(1_700_000_000);
+            ->and(data_get($node->metadata, 'corrosion_last_convergence_unix_seconds'))->toBe(1_700_000_000)
+            ->and(data_get($node->metadata, 'ingress_applied_revision'))->toBe($cluster->desired_revision)
+            ->and($node->hasAppliedNetworkRevision($cluster->desired_revision))->toBeTrue();
     }
+    $ingressRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'ingress.reconcile'));
+    expect($ingressRequests)->toHaveCount(2)
+        ->and($ingressRequests->every(fn (array $request): bool => $request['data']['enabled'] === false
+            && $request['data']['routes'] === []
+            && $request['data']['names'] === []))->toBeTrue();
 
     $wireguardRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'network.wireguard.reconcile'));
     expect($wireguardRequests)->toHaveCount(2);

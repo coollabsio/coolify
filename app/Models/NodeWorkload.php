@@ -34,10 +34,10 @@ class NodeWorkload extends BaseModel
     protected static function booted(): void
     {
         static::deleting(function (NodeWorkload $workload): void {
-            $workload->ingressClusterIdsBeforeDelete = $workload->hasIngressRoutes() ? $workload->clusterIds() : [];
+            $workload->ingressClusterIdsBeforeDelete = $workload->hasIngressRoutes() || filled($workload->internal_dns_name) ? $workload->clusterIds() : [];
         });
         static::deleted(function (NodeWorkload $workload): void {
-            // The routes of a deleted workload must disappear from every ingress Node.
+            // The routes and internal name of a deleted workload must disappear from every Node.
             NodeCluster::query()
                 ->whereKey($workload->ingressClusterIdsBeforeDelete)
                 ->get()

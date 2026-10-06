@@ -66,7 +66,7 @@ it('publishes a ready target before it removes and withdraws the source workload
         if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
             $events[] = 'deploy-target';
             expect($request['ports'])->toBe([])
-                ->and($request['labels']['coolify.dns_name'])->toBe('move-app');
+                ->and($request['labels'])->not->toHaveKey('coolify.dns_name');
 
             return Http::response([
                 'command_id' => $request['command_id'],
@@ -114,9 +114,15 @@ it('publishes a ready target before it removes and withdraws the source workload
         return Http::response('unexpected request', 500);
     });
 
+    Queue::fake();
+    $revisionBefore = $cluster->refresh()->desired_revision;
+
     $operation = CreateMoveOperation::run($source, $target, $revision, $user);
     (new MoveNodeWorkloadJob($operation->id))->handle();
 
+    // The new internal name reaches Sentinel with the next network revision, not as a label.
+    expect($workload->refresh()->internal_dns_name)->toBe('move-app')
+        ->and($cluster->refresh()->desired_revision)->toBe($revisionBefore + 1);
     expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
         ->and($source->workloads()->whereKey($workload->id)->exists())->toBeFalse()
         ->and($target->workloads()->whereKey($workload->id)->exists())->toBeTrue()

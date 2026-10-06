@@ -37,6 +37,7 @@ function convergenceCapabilities(): array
         'discovery.corrosion.inspect.v1',
         'discovery.corrosion.reconcile.v1',
         'network.cluster.leave.v1',
+        'ingress.reconcile.v1',
     ];
 }
 
@@ -94,6 +95,14 @@ function fakeConvergenceFlux(ArrayObject $state): Collection
             'discovery.corrosion.inspect' => ['version' => 'v1.0.0', 'member_state' => 'joining', 'endpoint_count' => 0, 'alive_member_count' => $state['alive']],
             'network.wireguard.inspect' => ['drifted' => in_array($server, $state['drifted'], true), 'applied_revision' => $data['expected_revision'], 'listen_port' => 51820],
             'network.firewall.inspect' => ['drifted' => false, 'applied_revision' => $data['expected_revision'], 'table' => 'coolify_cluster', 'ingress_enforced' => true],
+            'ingress.reconcile' => [
+                'enabled' => $data['enabled'],
+                'caddy_version' => $data['caddy_version'],
+                'active' => $data['enabled'],
+                'revision' => $data['revision'],
+                'route_count' => count($data['routes']),
+                'name_count' => count($data['names']),
+            ],
             'network.cluster.leave' => ['wireguard_removed' => true, 'firewall_removed' => true, 'discovery_removed' => true, 'resolver_reverted' => true],
         }]);
     });

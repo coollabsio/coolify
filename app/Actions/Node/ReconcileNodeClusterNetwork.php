@@ -28,7 +28,7 @@ class ReconcileNodeClusterNetwork
     /** The Caddy release that Sentinel runs on ingress Nodes. */
     public const CADDY_VERSION = 'v2.11.7';
 
-    /** Optional: only ingress Nodes need it, and other Nodes keep the old path without it. */
+    /** Applies ingress routes and internal DNS names; every Node writes them to Corrosion. */
     public const INGRESS_CAPABILITY = 'ingress.reconcile.v1';
 
     public const REQUIRED_CAPABILITIES = [
@@ -37,6 +37,7 @@ class ReconcileNodeClusterNetwork
         'network.firewall.reconcile.v1',
         'discovery.corrosion.inspect.v1',
         'discovery.corrosion.reconcile.v1',
+        self::INGRESS_CAPABILITY,
     ];
 
     private const CORROSION_INSPECTIONS = 20;
@@ -194,9 +195,11 @@ class ReconcileNodeClusterNetwork
             $ingressRules = $this->ingressRules($cluster);
             $workloadCidrs = $members->pluck('workload_cidr')->filter()->values()->all();
             $ingressRoutes = [];
+            $workloadNames = [];
             $ingressRoutesError = null;
             try {
                 $ingressRoutes = BuildNodeClusterIngressRoutes::run($cluster);
+                $workloadNames = BuildNodeClusterIngressRoutes::names($cluster);
             } catch (RuntimeException $exception) {
                 $ingressRoutesError = $exception->getMessage();
             }
@@ -285,10 +288,7 @@ class ReconcileNodeClusterNetwork
             // Ingress is the last step: Caddy reads its routes and endpoints from a converged Corrosion.
             foreach ($applied as $nodeId => $node) {
                 try {
-                    $operation = $this->reconcileIngress($cluster, $node->refresh(), $user, $attempt, $ingressRoutes, $ingressRoutesError);
-                    if ($operation !== null) {
-                        $operations[] = $operation;
-                    }
+                    $operations[] = $this->reconcileIngress($cluster, $node->refresh(), $user, $attempt, $ingressRoutes, $workloadNames, $ingressRoutesError);
                 } catch (Throwable $exception) {
                     $failures[$nodeId] = $exception->getMessage();
                     unset($applied[$nodeId]);
@@ -325,34 +325,26 @@ class ReconcileNodeClusterNetwork
     }
 
     /**
-     * Ingress Nodes get the full route list. Other Nodes that support ingress get `enabled: false`,
-     * so a Node that served ingress before removes Caddy. Older Sentinels are left alone.
+     * Every Node gets the full route and internal name lists, because Sentinel writes them to
+     * Corrosion from any Node. `enabled` only controls Caddy: Nodes that are not ingress Nodes
+     * get `enabled: false`, so a Node that served ingress before removes Caddy.
      *
      * @param  list<array{host: string, workload_id: string, namespace: string, port: int}>  $routes
+     * @param  list<array{name: string, workload_id: string, namespace: string}>  $names
      */
-    private function reconcileIngress(NodeCluster $cluster, Node $node, User $user, string $attempt, array $routes, ?string $routesError): ?NodeOperation
+    private function reconcileIngress(NodeCluster $cluster, Node $node, User $user, string $attempt, array $routes, array $names, ?string $routesError): NodeOperation
     {
-        if ($node->is_ingress) {
-            if ($routesError !== null) {
-                throw new RuntimeException($routesError);
-            }
-
-            return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, [
-                'enabled' => true,
-                'caddy_version' => self::CADDY_VERSION,
-                'revision' => $cluster->desired_revision,
-                'routes' => $routes,
-            ]);
-        }
-        if (! $node->supportsIngress()) {
-            return null;
+        // Without the full lists a Node would write an empty route and name table.
+        if ($routesError !== null) {
+            throw new RuntimeException($routesError);
         }
 
         return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, [
-            'enabled' => false,
+            'enabled' => (bool) $node->is_ingress,
             'caddy_version' => self::CADDY_VERSION,
             'revision' => $cluster->desired_revision,
-            'routes' => [],
+            'routes' => $routes,
+            'names' => $names,
         ]);
     }
 
@@ -509,6 +501,7 @@ class ReconcileNodeClusterNetwork
             self::INGRESS_CAPABILITY => data_get($result, 'enabled') === data_get($operation->request, 'enabled')
                 && data_get($result, 'revision') === data_get($operation->request, 'revision')
                 && data_get($result, 'route_count') === count(data_get($operation->request, 'routes', []))
+                && data_get($result, 'name_count') === count(data_get($operation->request, 'names', []))
                 && (data_get($operation->request, 'enabled') !== true || data_get($result, 'active') === true),
             default => false,
         };
@@ -547,6 +540,7 @@ class ReconcileNodeClusterNetwork
                 'ingress_active' => data_get($result, 'active'),
                 'ingress_applied_revision' => data_get($result, 'revision'),
                 'ingress_route_count' => data_get($result, 'route_count'),
+                'ingress_name_count' => data_get($result, 'name_count'),
                 'ingress_caddy_version' => data_get($result, 'caddy_version'),
             ]),
             default => null,

@@ -114,7 +114,6 @@ it('does not publish discovery endpoints after a cluster inventory refresh', fun
                     'coolify.workload' => $workload->uuid,
                     'coolify.revision' => $revision->uuid,
                     'coolify.component' => 'main',
-                    'coolify.dns_name' => 'example-app',
                 ],
             ]],
         ]),
@@ -175,7 +174,6 @@ it('tracks workload ownership across a move without publishing discovery endpoin
                     'coolify.workload' => $workload->uuid,
                     'coolify.revision' => $revision->uuid,
                     'coolify.component' => 'main',
-                    'coolify.dns_name' => 'moving-app',
                 ],
             ]],
         ]);

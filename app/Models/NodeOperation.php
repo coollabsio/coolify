@@ -38,7 +38,7 @@ class NodeOperation extends BaseModel
         'discovery.corrosion.endpoints.reconcile.v1' => 'Configure internal DNS',
         'discovery.corrosion.inspect.v1' => 'Inspect internal DNS',
         'discovery.corrosion.reconcile.v1' => 'Configure internal DNS',
-        'ingress.reconcile.v1' => 'Apply ingress routes',
+        'ingress.reconcile.v1' => 'Apply routes and internal names',
         'network.cluster.leave.v1' => 'Leave cluster',
         'network.firewall.inspect.v1' => 'Inspect firewall',
         'network.firewall.reconcile.v1' => 'Apply firewall rules',

@@ -211,10 +211,11 @@ it('deploys a clustered workload with its stable managed network address', funct
         && $request['dns_server'] === $this->node->fresh()->wireguard_ip);
 });
 
-it('labels a clustered workload with its internal dns name before deploying', function () {
+it('assigns an internal dns name to a clustered workload without baking it into the labels', function () {
     $cluster = CreateNodeCluster::run($this->node->team, User::factory()->create(), 'Mesh');
     AssignNodeToCluster::run($cluster, $this->node);
     expect($this->workload->fresh()->internal_dns_name)->toBeNull();
+    $revisionBefore = $cluster->refresh()->desired_revision;
     Http::fake(['*/v1/commands/workload.deploy' => Http::response([
         'command_id' => $this->operation->uuid,
         'observed_at_unix_ms' => 1_700_000_000_000,
@@ -227,8 +228,9 @@ it('labels a clustered workload with its internal dns name before deploying', fu
 
     expect($this->workload->fresh()->internal_dns_name)->toBe('example-app');
     Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/v1/commands/workload.deploy')
-        && $request['labels']['coolify.dns_name'] === 'example-app'
+        && ! array_key_exists('coolify.dns_name', $request['labels'])
         && $request['labels']['coolify.workload'] === $this->workload->uuid);
+    expect($cluster->refresh()->desired_revision)->toBe($revisionBefore + 1);
 });
 
 it('does not add a dns name label for a workload outside a cluster', function () {
