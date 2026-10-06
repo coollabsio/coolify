@@ -1,8 +1,11 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Request as RequestFacade;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Yaml\Yaml;
 
 it('uses Reverb as the first-party broadcast server', function () {
@@ -119,12 +122,14 @@ it('runs Reverb and terminal websocket services inside the Coolify containers', 
 
 it('removes the dedicated realtime service from bundled compose files', function (string $composeFile, bool $hasRuntimeEnvironment) {
     $composeContents = file_get_contents(base_path($composeFile));
+    $soketi = Yaml::parse($composeContents)['services']['soketi'] ?? null;
 
-    // Production keeps "coolify-realtime" only as a network alias of the coolify container.
+    // Production keeps "coolify-realtime" only as a network alias of the coolify container, and "soketi"
+    // only as an inactive placeholder for old overrides in docker-compose.custom.yml.
+    expect($soketi === null || array_keys($soketi) === ['image', 'profiles'])->toBeTrue();
     expect($composeContents)
         ->not->toContain('container_name: coolify-realtime')
         ->not->toContain('coolify-realtime:')
-        ->not->toContain('soketi:')
         ->not->toContain('SOKETI_DEFAULT_APP_ID')
         ->toContain('6001')
         ->toContain('6002')
@@ -304,3 +309,28 @@ it('uses current Reverb and terminal names in development tooling', function () 
         ->toContain('FORWARD_TERMINAL_PORT')
         ->not->toContain('SOKETI');
 });
+
+it('accepts a soketi override from 4.3.23 in docker-compose.custom.yml without starting soketi', function (string $composeFile, string $override) {
+    if (! (new ExecutableFinder)->find('docker')) {
+        $this->markTestSkipped('Docker is not installed.');
+    }
+    $directory = sys_get_temp_dir().'/coolify-soketi-override-'.Str::random(8);
+    mkdir($directory);
+    copy(base_path('docker-compose.yml'), "{$directory}/docker-compose.yml");
+    copy(base_path($composeFile), "{$directory}/docker-compose.prod.yml");
+    file_put_contents("{$directory}/docker-compose.custom.yml", $override);
+
+    try {
+        $result = Process::path($directory)->run('docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.custom.yml config --services');
+    } finally {
+        File::deleteDirectory($directory);
+    }
+
+    expect($result->successful())->toBeTrue($result->errorOutput())
+        ->and(array_filter(explode("\n", trim($result->output()))))->not->toContain('soketi')
+        ->toContain('coolify');
+})->with([
+    'production compose, partial override' => ['docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n    ports:\n      - '6001:6001'\n"],
+    'production compose, full service' => ['docker-compose.prod.yml', "services:\n  soketi:\n    image: quay.io/soketi/soketi:1.6-16-alpine\n    container_name: coolify-realtime\n    ports:\n      - '6001:6001'\n"],
+    'nightly production compose, partial override' => ['other/nightly/docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n"],
+]);
