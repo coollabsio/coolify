@@ -2,6 +2,8 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Jobs\DatabaseBackupJob;
+use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -14,6 +16,10 @@ use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -35,6 +41,7 @@ use App\Models\User;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Process\Pool;
@@ -2614,11 +2621,6 @@ function isAnyDeploymentInprogress(bool $showAll = false)
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
 
-    if ($runningJobs->isEmpty()) {
-        echo "No deployments in progress.\n";
-        exit(0);
-    }
-
     $horizonJobIds = [];
     $deploymentDetails = [];
 
@@ -2654,20 +2656,43 @@ function isAnyDeploymentInprogress(bool $showAll = false)
         }
     }
 
-    if (count($horizonJobIds) === 0) {
-        echo "No active deployments in progress (all jobs completed or failed).\n";
+    $scheduledJobCount = runningScheduledJobCount();
+
+    if (count($horizonJobIds) === 0 && $scheduledJobCount === 0) {
+        echo "No active deployments or scheduled jobs in progress.\n";
         exit(0);
     }
 
-    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll);
+    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll, $scheduledJobCount);
 
     exit(1);
 }
 
-function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false): string
+/**
+ * Counts scheduled task, database backup, and volume backup runs that are still running.
+ * A run that started longer ago than its job timeout is stale: the worker has stopped it.
+ */
+function runningScheduledJobCount(): int
+{
+    $startedWithin = fn (Model $execution, int $timeoutSeconds): bool => $execution->created_at?->gt(now()->subSeconds($timeoutSeconds)) ?? false;
+
+    $tasks = ScheduledTaskExecution::with('scheduledTask')->where('status', 'running')->get()
+        ->filter(fn (ScheduledTaskExecution $execution) => $startedWithin($execution, ($execution->scheduledTask?->timeout ?? 300) + ScheduledTaskJob::WORKER_TIMEOUT_MARGIN_SECONDS));
+
+    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->where('status', 'running')->get()
+        ->filter(fn (ScheduledDatabaseBackupExecution $execution) => $startedWithin($execution, ($execution->scheduledDatabaseBackup?->timeout ?? 3600) + DatabaseBackupJob::WORKER_TIMEOUT_MARGIN_SECONDS));
+
+    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->where('status', 'running')->get()
+        ->filter(fn (ScheduledVolumeBackupExecution $execution) => $startedWithin($execution, $execution->scheduledVolumeBackup?->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT));
+
+    return $tasks->count() + $databaseBackups->count() + $volumeBackups->count();
+}
+
+function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false, int $scheduledJobCount = 0): string
 {
     $output = "\n=== Running Deployments ===\n";
     $output .= 'Total active deployments: '.$activeDeploymentCount."\n";
+    $output .= 'Total running scheduled jobs: '.$scheduledJobCount."\n";
 
     if (! $showAll) {
         return $output;
