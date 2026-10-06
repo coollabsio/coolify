@@ -27,7 +27,7 @@ function shouldChangeOwnership(string $path): bool
  */
 function ownershipCommand(string $path, Server $server): string
 {
-    return "find $path -user root -exec chown $server->user:$server->user {} + && chmod o-rwx $path";
+    return "find $path -user root -exec chown -h $server->user:$server->user {} + && chmod o-rwx $path";
 }
 
 /**

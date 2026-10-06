@@ -276,7 +276,7 @@ test('adds ownership changes for Coolify data paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo find /data/coolify/logs -user root -exec chown ubuntu:ubuntu {} + && sudo chmod o-rwx /data/coolify/logs');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo find /data/coolify/logs -user root -exec chown -h ubuntu:ubuntu {} + && sudo chmod o-rwx /data/coolify/logs');
 });
 
 test('adds ownership changes for Coolify tmp paths', function () {
@@ -286,7 +286,7 @@ test('adds ownership changes for Coolify tmp paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo find /tmp/coolify/cache -user root -exec chown ubuntu:ubuntu {} + && sudo chmod o-rwx /tmp/coolify/cache');
+    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo find /tmp/coolify/cache -user root -exec chown -h ubuntu:ubuntu {} + && sudo chmod o-rwx /tmp/coolify/cache');
 });
 
 test('ownership changes work where root may not use sudo', function (string $parser) {
@@ -372,7 +372,7 @@ test('ownership changes apply only to the mkdir path when more commands follow',
     $process = new Process(['bash', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH'), 'LOG' => "{$directory}/log"]);
     $process->run();
 
-    expect($command)->toContain("find {$path}/dynamic -user root -exec chown ubuntu:ubuntu {} + && ")
+    expect($command)->toContain("find {$path}/dynamic -user root -exec chown -h ubuntu:ubuntu {} + && ")
         ->and($command)->toContain("chmod o-rwx {$path}/dynamic{$separator} ")
         ->and($command)->toEndWith('head -n 1000'.($parser === 'command list' ? "'" : ''))
         ->and($process->getErrorOutput())->toBe('')

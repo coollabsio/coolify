@@ -598,10 +598,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
             $escapedUrl = escapeshellarg($url);
             $escapedContainerName = escapeshellarg($this->container_name);
-            $escapedBackupDir = escapeshellarg($this->backup_dir);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($databaseWithCollections === 'all') {
-                $commands[] = 'mkdir -p '.$escapedBackupDir;
+                $commands = $this->backupDirectoryCommands();
                 if (str($this->database->image)->startsWith('mongo:4')) {
                     $commands[] = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --archive > {$escapedBackupLocation}";
                 } else {
@@ -615,7 +614,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databaseName = $databaseWithCollections;
                     $collectionsToExclude = collect();
                 }
-                $commands[] = 'mkdir -p '.$escapedBackupDir;
+                $commands = $this->backupDirectoryCommands();
 
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($databaseName, 'database name');
@@ -681,7 +680,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_postgresql(string $database): void
     {
         try {
-            $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
+            $commands = $this->backupDirectoryCommands();
             $backupCommand = 'docker exec';
             if ($this->postgres_password) {
                 $backupCommand .= ' -e PGPASSWORD='.escapeshellarg($this->postgres_password);
@@ -714,7 +713,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_mysql(string $database): void
     {
         try {
-            $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
+            $commands = $this->backupDirectoryCommands();
             $escapedPassword = escapeshellarg($this->database->mysql_root_password);
             $escapedContainerName = escapeshellarg($this->container_name);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
@@ -741,7 +740,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_mariadb(string $database): void
     {
         try {
-            $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
+            $commands = $this->backupDirectoryCommands();
             $escapedPassword = escapeshellarg($this->database->mariadb_root_password);
             $escapedContainerName = escapeshellarg($this->container_name);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
@@ -770,12 +769,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $archiveName = ltrim($this->backup_file, '/');
 
         try {
-            $commands = ClickhouseBackupCommand::make(
+            $commands = [...$this->backupDirectoryCommands(), ...ClickhouseBackupCommand::make(
                 containerName: $this->container_name,
                 database: $database,
                 archiveName: $archiveName,
                 backupDirectory: $this->backup_dir,
-            );
+            )];
 
             $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
@@ -797,7 +796,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if (! preg_match(StandaloneSqlite::DATABASES_PATTERN, $database)) {
                 throw new \Exception("Invalid database file name: {$database}");
             }
-            $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
+            $commands = $this->backupDirectoryCommands();
             $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' \'.timeout 10000\' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
             $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
             $commands[] = $this->buildCompressedDumpCommand($dumpCommand, escapeshellarg($this->backup_location));
@@ -910,6 +909,24 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
+    }
+
+    /**
+     * Creates the backup directory. On a server with a non-root SSH user, the directory gets the ownership step
+     * that the sudo parser adds only to unquoted paths: the SSH user owns it (backup downloads read it over SFTP
+     * as that user) and other users cannot read the dumps in it.
+     *
+     * @return array<int, string>
+     */
+    private function backupDirectoryCommands(): array
+    {
+        $backupDirectory = escapeshellarg($this->backup_dir);
+        $commands = ['mkdir -p '.$backupDirectory];
+        if ($this->server->isNonRoot()) {
+            $commands[] = ownershipCommand($backupDirectory, $this->server);
+        }
+
+        return $commands;
     }
 
     /**

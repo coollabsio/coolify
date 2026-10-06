@@ -304,7 +304,12 @@ class User extends Authenticatable implements SendsEmail
     public function sendVerificationEmail()
     {
         $mail = new MailMessage;
-        $url = URL::temporarySignedRoute(
+        // Sign the link for the configured instance URL instead of the request Host header.
+        $urlGenerator = clone URL::getFacadeRoot();
+        $instanceUrl = rtrim(base_url(), '/');
+        $urlGenerator->forceRootUrl($instanceUrl);
+        $urlGenerator->forceScheme(parse_url($instanceUrl, PHP_URL_SCHEME) ?: 'http');
+        $url = $urlGenerator->temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [

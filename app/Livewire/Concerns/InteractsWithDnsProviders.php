@@ -56,7 +56,7 @@ trait InteractsWithDnsProviders
         }
         $zone = $this->findTeamZone($zoneId, $hostname);
         $content = $this->dnsRecordContent($content);
-        if ($zone === null || $content === null) {
+        if ($zone === null || $content === null || ! $this->isDnsHostnameOfResource($hostname)) {
             $this->dispatch('error', 'No connected DNS provider or public server IP is available for this domain.');
 
             return;
@@ -174,7 +174,7 @@ trait InteractsWithDnsProviders
         }
         $zone = $this->findTeamZone($zoneId, $hostname);
         $content = $this->dnsRecordContent($conflict['proposed'] ?? null);
-        if ($conflict === null || $zone === null || $content === null) {
+        if ($conflict === null || $zone === null || $content === null || ! $this->isDnsHostnameOfResource($hostname)) {
             $this->dispatch('error', 'The DNS conflict is no longer available. Check the record again.');
 
             return;
@@ -369,6 +369,19 @@ trait InteractsWithDnsProviders
     protected function dnsTeamId(): int
     {
         return $this->dnsResource()->team()?->id ?? throw new RuntimeException('The resource has no team.');
+    }
+
+    /**
+     * Whether the hostname belongs to a domain row of this resource. The rows are locked and built on the server;
+     * form inputs such as the new or edited domain are not trusted.
+     */
+    protected function isDnsHostnameOfResource(string $hostname): bool
+    {
+        return collect($this->domainRows)->contains(function (array $row) use ($hostname): bool {
+            $rowHostname = parse_url((string) ($row['url'] ?? ''), PHP_URL_HOST);
+
+            return is_string($rowHostname) && strtolower($rowHostname) === strtolower($hostname);
+        });
     }
 
     /**

@@ -249,9 +249,8 @@ class Show extends Component
 
             $this->server->settings->connection_timeout = $this->connectionTimeout;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
-            $role = ServerRole::from($this->serverRole);
-            $this->server->settings->server_role = $role;
-            $this->server->settings->is_build_server = $role === ServerRole::BUILD;
+            // The role is only changed through requestServerRoleChange()/confirmServerRoleChange().
+            $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
@@ -527,6 +526,8 @@ class Show extends Component
     private function saveServerRole(ServerRole $role): void
     {
         $this->serverRole = $role->value;
+        $this->server->settings->server_role = $role;
+        $this->server->settings->is_build_server = $role === ServerRole::BUILD;
         if ($role === ServerRole::BUILD && $this->server->isSentinelEnabled()) {
             $this->isMetricsEnabled = false;
             $this->isSentinelDebugEnabled = false;
