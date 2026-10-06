@@ -4,6 +4,7 @@ import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { initializeFirewallCanvas } from './firewall-canvas.js';
+import { initializeClusterMap } from './cluster-map.js';
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
@@ -23,6 +24,7 @@ document.addEventListener('livewire:navigated', () => {
 document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
 document.addEventListener('alpine:init', initializeFirewallCanvas);
+document.addEventListener('alpine:init', initializeClusterMap);
 document.addEventListener('alpine:init', initializeSettingsSidebarAccordionComponent);
 
 /**

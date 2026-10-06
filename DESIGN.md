@@ -239,6 +239,24 @@ resource type. Place active deployments above the resource grids as a compact,
 live-updating table rather than a metric card. Communicate server health with
 the shared status badge.
 
+When the cluster stack is enabled and the team has a cluster, the Servers
+section heading carries a List / Map `view-toggle` (remembered in
+`coolify-dashboard-servers-view`, Map by default). The read-only map
+(`livewire:dashboard.cluster-map`, `resources/js/cluster-map.js`) shows one
+frame per cluster with its server cards and application rows (status dot plus
+name), and a dashed Docker servers frame. The optional Traffic layer (off by
+default, `coolify-dashboard-map-traffic`) draws firewall rules as dashed accent
+lines and public domains as neutral lines from an Internet marker. With the
+layer on, each cluster becomes a layered drawing: Internet node, one
+equal-width domain label per public application, then the server cards stacked
+in one column (a second column only above four servers). Labels sit level with
+their application rows, so public lines are straight where possible and gentle
+horizontal-tangent curves otherwise; firewall rules run as rounded arcs in
+lanes right of the column, nested rules on inner lanes. Lines never cross a
+card they do not connect and open a details popover with an Edit rules link. Below `sm` the map becomes a
+stacked list without pan, zoom, or traffic lines. Never show IP addresses on
+the map.
+
 ### Top-level dashboard destinations
 
 Every page opened directly from the main sidebar uses the same compact content

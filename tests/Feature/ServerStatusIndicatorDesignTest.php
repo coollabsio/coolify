@@ -27,11 +27,13 @@ test('server cards use warning icons instead of colored icon borders', function 
 
 test('dashboard server cards warn when proxy or sentinel needs attention', function () {
     $dashboard = file_get_contents(resource_path('views/livewire/dashboard.blade.php'));
+    $serverModel = file_get_contents(app_path('Models/Server.php'));
 
-    expect($dashboard)
-        ->toContain("\$proxyNeedsAttention = \$server->proxySet() && (\$server->proxy->status !== 'running' || \$server->hasCurrentTraefikOutdatedInfo())")
-        ->toContain("\$sentinelNeedsAttention = \$server->isSentinelEnabled() && \$server->sentinelStatus() === 'out_of_sync'")
-        ->toContain("\$proxyNeedsAttention || \$sentinelNeedsAttention => ['Attention required', 'warning']");
+    expect($dashboard)->toContain("['status' => \$serverStatus, 'type' => \$serverStatusType] = \$server->dashboardStatus();");
+    expect($serverModel)
+        ->toContain("\$proxyNeedsAttention = \$this->proxySet() && (\$this->proxy->status !== 'running' || \$this->hasCurrentTraefikOutdatedInfo())")
+        ->toContain("\$sentinelNeedsAttention = \$this->isSentinelEnabled() && \$this->sentinelStatus() === 'out_of_sync'")
+        ->toContain("\$proxyNeedsAttention || \$sentinelNeedsAttention => ['status' => 'Attention required', 'type' => 'warning']");
 });
 
 test('server status summary uses warning indicators for proxy updates and sentinel outages', function () {

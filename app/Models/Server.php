@@ -1042,6 +1042,26 @@ $siteAddress {
         return $this->isSentinelLive() ? 'in_sync' : 'out_of_sync';
     }
 
+    /**
+     * The compact server status shown on the dashboard.
+     *
+     * @return array{status: string, type: 'success'|'warning'|'error'}
+     */
+    public function dashboardStatus(): array
+    {
+        $proxyNeedsAttention = $this->proxySet() && ($this->proxy->status !== 'running' || $this->hasCurrentTraefikOutdatedInfo());
+        $sentinelNeedsAttention = $this->isSentinelEnabled() && $this->sentinelStatus() === 'out_of_sync';
+
+        return match (true) {
+            $this->settings->force_disabled => ['status' => 'Disabled', 'type' => 'error'],
+            ! $this->settings->is_reachable && ! $this->settings->is_usable => ['status' => 'Unavailable', 'type' => 'error'],
+            ! $this->settings->is_reachable => ['status' => 'Unreachable', 'type' => 'error'],
+            ! $this->settings->is_usable => ['status' => 'Not ready', 'type' => 'warning'],
+            $proxyNeedsAttention || $sentinelNeedsAttention => ['status' => 'Attention required', 'type' => 'warning'],
+            default => ['status' => 'Ready', 'type' => 'success'],
+        };
+    }
+
     public function isSentinelEnabled(): bool
     {
         return ! $this->isBuildServer()

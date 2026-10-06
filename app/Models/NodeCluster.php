@@ -121,6 +121,21 @@ class NodeCluster extends BaseModel
                 : 'pending';
     }
 
+    /**
+     * The badge for an ingress state from nodeIngressState(), or `on`/`off` for a Node without a cluster.
+     *
+     * @return array{status: string, type: 'success'|'warning'|'neutral'}
+     */
+    public static function ingressBadge(string $state): array
+    {
+        return match ($state) {
+            'active' => ['status' => 'Active', 'type' => 'success'],
+            'pending' => ['status' => 'Pending', 'type' => 'warning'],
+            'on' => ['status' => 'On', 'type' => 'success'],
+            default => ['status' => 'Off', 'type' => 'neutral'],
+        };
+    }
+
     public function isNodeNetworkInSync(Node $node): bool
     {
         return $this->nodeNetworkState($node) === 'converged';

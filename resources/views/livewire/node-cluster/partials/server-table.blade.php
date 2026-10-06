@@ -12,14 +12,8 @@
     </div>
     @foreach ($nodes as $node)
         @php
-            $sentinelConnected = data_get(\Illuminate\Support\Facades\Cache::get($node->cacheKey()), 'status') === 'connected';
-            [$serverStatus, $serverStatusType] = match (true) {
-                ! $node->is_reachable => ['Unreachable', 'error'],
-                ! $node->is_usable => ['Not ready', 'warning'],
-                ! $sentinelConnected => ['Sentinel disconnected', 'warning'],
-                default => ['Ready', 'success'],
-            };
-            $ingressState = $cluster ? $cluster->nodeIngressState($node) : ($node->is_ingress ? 'on' : 'off');
+            $serverStatus = $node->statusBadge();
+            $ingressBadge = \App\Models\NodeCluster::ingressBadge($cluster ? $cluster->nodeIngressState($node) : ($node->is_ingress ? 'on' : 'off'));
             $sentinelVersion = $node->runningSentinelVersion();
         @endphp
         <a wire:key="cluster-server-{{ $node->uuid }}" href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}"
@@ -36,16 +30,7 @@
                 </div>
             </div>
             <div class="hidden md:block">
-                <x-status-badge :status="match ($ingressState) {
-                    'active' => 'Active',
-                    'pending' => 'Pending',
-                    'on' => 'On',
-                    default => 'Off',
-                }" :type="match ($ingressState) {
-                    'active', 'on' => 'success',
-                    'pending' => 'warning',
-                    default => 'neutral',
-                }" />
+                <x-status-badge :status="$ingressBadge['status']" :type="$ingressBadge['type']" />
             </div>
             <div class="hidden min-w-0 flex-col items-start gap-1 md:flex">
                 <span class="truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim">{{ $sentinelVersion ?? '-' }}</span>
@@ -54,7 +39,7 @@
                 @endif
             </div>
             <div>
-                <x-status-badge :status="$serverStatus" :type="$serverStatusType" />
+                <x-status-badge :status="$serverStatus['status']" :type="$serverStatus['type']" />
             </div>
         </a>
     @endforeach

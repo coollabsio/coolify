@@ -122,95 +122,135 @@
             @endif
         </section>
 
-        <section class="mb-0! min-w-0">
-            <x-section-heading title="Servers" subtitle="Infrastructure available for deployments"
-                :href="route('server.index')" />
-
-            @if ($dashboardServers->isEmpty())
-                @if ($privateKeys->isEmpty())
-                    <x-empty title="A private key is required"
-                        description="Add an SSH private key before connecting your first server."
-                        icon-name="keys" size="sm">
-                        @can('create', App\Models\PrivateKey::class)
-                            <x-slot:contents>
-                                <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}
-                                    class="button button-highlighted">
-                                    <x-reicon name="plus" class="size-3.5" />
-                                    Add private key
-                                </a>
-                            </x-slot:contents>
-                        @endcan
-                    </x-empty>
-                @else
-                    <x-empty title="No servers yet"
-                        description="Connect infrastructure for your deployments."
-                        icon-name="servers" size="sm">
-                        @can('createAnyResource')
-                            <x-slot:contents>
-                                <a href="{{ route('server.create') }}" {{ wireNavigate() }}
-                                    class="button button-highlighted">
-                                    <x-reicon name="plus" class="size-3.5" />
-                                    New server
-                                </a>
-                            </x-slot:contents>
-                        @endcan
-                    </x-empty>
-                @endif
-            @else
-                <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    @foreach ($dashboardServers as $server)
-                        @php
-                            $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-                            $sentinelNeedsAttention = $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
-
-                            [$serverStatus, $serverStatusType] = match (true) {
-                                $server->settings->force_disabled => ['Disabled', 'error'],
-                                ! $server->settings->is_reachable && ! $server->settings->is_usable => ['Unavailable', 'error'],
-                                ! $server->settings->is_reachable => ['Unreachable', 'error'],
-                                ! $server->settings->is_usable => ['Not ready', 'warning'],
-                                $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-                                default => ['Ready', 'success'],
-                            };
-                        @endphp
-
-                        <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
-                            {{ wireNavigate() }} aria-label="Open {{ $server->name }}"
-                            class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                            @if ($server->isMetricsEnabled())
-                                <livewire:dashboard.server-metrics-chart :server="$server"
-                                    :key="'dashboard-server-metrics-'.$server->uuid" />
-                            @endif
-
-                            <div class="relative z-10 flex min-w-0 items-start gap-3">
-                                <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="servers" class="size-4" />
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h3
-                                        class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
-                                        {{ $server->name }}
-                                    </h3>
-                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $server->description }}
-                                    </p>
-                                </div>
-                                @if ($serverStatusType !== 'success')
-                                    <span data-tooltip="{{ $serverStatus }}"
-                                        aria-label="Server status: {{ $serverStatus }}"
-                                        @class([
-                                            'flex size-6 shrink-0 items-center justify-center rounded-md',
-                                            'text-orange-500 dark:text-warning' => $serverStatusType === 'warning',
-                                            'text-red-500 dark:text-red-400' => $serverStatusType === 'error',
-                                        ])>
-                                        <x-reicon name="alert-triangle" class="size-4" />
-                                    </span>
-                                @endif
+        <section class="mb-0! min-w-0"
+            @if ($clusterMapAvailable) data-testid="dashboard-servers-view-switcher"
+                x-data="{
+                    serversView: ['list', 'map'].includes(localStorage.getItem('coolify-dashboard-servers-view'))
+                        ? localStorage.getItem('coolify-dashboard-servers-view')
+                        : 'map',
+                    setServersView(view) {
+                        this.serversView = view;
+                        localStorage.setItem('coolify-dashboard-servers-view', view);
+                    },
+                }" @endif>
+            @if ($clusterMapAvailable)
+                <x-section-heading title="Servers" subtitle="Infrastructure available for deployments">
+                    <x-slot:actions>
+                        <div class="flex items-center gap-2">
+                            <div class="view-toggle" role="group" aria-label="Servers view">
+                                <button type="button" x-on:click="setServersView('list')"
+                                    class="flex size-7.5 items-center justify-center rounded-md transition-colors"
+                                    x-bind:class="serversView === 'list'
+                                        ? 'control-selected'
+                                        : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                                    x-bind:aria-pressed="serversView === 'list' ? 'true' : 'false'"
+                                    aria-label="List view" title="List">
+                                    <x-reicon name="unordered-list" class="size-3.5" />
+                                </button>
+                                <button type="button" x-on:click="setServersView('map')"
+                                    class="flex size-7.5 items-center justify-center rounded-md transition-colors"
+                                    x-bind:class="serversView === 'map'
+                                        ? 'control-selected'
+                                        : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                                    x-bind:aria-pressed="serversView === 'map' ? 'true' : 'false'"
+                                    aria-label="Map view" title="Map">
+                                    <x-reicon name="layers" class="size-3.5" />
+                                </button>
                             </div>
-                        </a>
-                    @endforeach
+                            <a href="{{ route('server.index') }}" {{ wireNavigate() }} class="button group">
+                                View all
+                                <x-reicon name="arrow-right"
+                                    class="size-3 opacity-70 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
+                            </a>
+                        </div>
+                    </x-slot:actions>
+                </x-section-heading>
+
+                <div x-cloak x-show="serversView === 'map'">
+                    <livewire:dashboard.cluster-map key="dashboard-cluster-map" />
                 </div>
+            @else
+                <x-section-heading title="Servers" subtitle="Infrastructure available for deployments"
+                    :href="route('server.index')" />
             @endif
+
+            <div @if ($clusterMapAvailable) x-cloak x-show="serversView === 'list'" @endif>
+                @if ($dashboardServers->isEmpty())
+                    @if ($privateKeys->isEmpty())
+                        <x-empty title="A private key is required"
+                            description="Add an SSH private key before connecting your first server."
+                            icon-name="keys" size="sm">
+                            @can('create', App\Models\PrivateKey::class)
+                                <x-slot:contents>
+                                    <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}
+                                        class="button button-highlighted">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        Add private key
+                                    </a>
+                                </x-slot:contents>
+                            @endcan
+                        </x-empty>
+                    @else
+                        <x-empty title="No servers yet"
+                            description="Connect infrastructure for your deployments."
+                            icon-name="servers" size="sm">
+                            @can('createAnyResource')
+                                <x-slot:contents>
+                                    <a href="{{ route('server.create') }}" {{ wireNavigate() }}
+                                        class="button button-highlighted">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        New server
+                                    </a>
+                                </x-slot:contents>
+                            @endcan
+                        </x-empty>
+                    @endif
+                @else
+                    <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach ($dashboardServers as $server)
+                            @php
+                                ['status' => $serverStatus, 'type' => $serverStatusType] = $server->dashboardStatus();
+                            @endphp
+
+                            <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
+                                {{ wireNavigate() }} aria-label="Open {{ $server->name }}"
+                                class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                                @if ($server->isMetricsEnabled())
+                                    <livewire:dashboard.server-metrics-chart :server="$server"
+                                        :key="'dashboard-server-metrics-'.$server->uuid" />
+                                @endif
+
+                                <div class="relative z-10 flex min-w-0 items-start gap-3">
+                                    <div
+                                        class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
+                                        <x-reicon name="servers" class="size-4" />
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <h3
+                                            class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                            {{ $server->name }}
+                                        </h3>
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $server->description }}
+                                        </p>
+                                    </div>
+                                    @if ($serverStatusType !== 'success')
+                                        <span data-tooltip="{{ $serverStatus }}"
+                                            aria-label="Server status: {{ $serverStatus }}"
+                                            @class([
+                                                'flex size-6 shrink-0 items-center justify-center rounded-md',
+                                                'text-orange-500 dark:text-warning' => $serverStatusType === 'warning',
+                                                'text-red-500 dark:text-red-400' => $serverStatusType === 'error',
+                                            ])>
+                                            <x-reicon name="alert-triangle" class="size-4" />
+                                        </span>
+                                    @endif
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
         </section>
     </div>
 </div>

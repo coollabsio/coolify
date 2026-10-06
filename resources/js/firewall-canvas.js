@@ -1,3 +1,7 @@
+import { anchoredPopoverPosition, closestRectConnectionPoints, fitZoomToViewport } from './canvas-geometry.js';
+
+export { anchoredPopoverPosition };
+
 const CARD_WIDTH = 224;
 const CARD_HEIGHT = 104;
 const CANVAS_WIDTH = 2400;
@@ -189,69 +193,18 @@ export function firewallCanvasSize(positions) {
  * Returns the zoom level that shows every card inside the viewport.
  */
 export function fitFirewallZoom(positions, viewport) {
-    if (!Object.keys(positions).length || !viewport.width || !viewport.height) {
+    if (!Object.keys(positions).length) {
         return 1;
     }
 
-    const { width, height } = firewallCanvasSize(positions);
-    const zoom = Math.min(1, viewport.width / width, viewport.height / height);
-
-    return Math.max(0.5, Math.floor(zoom * 100) / 100);
+    return fitZoomToViewport(firewallCanvasSize(positions), viewport);
 }
 
 export function closestCardConnectionPoints(source, destination) {
-    const sourceCenter = {
-        x: source.x + CARD_WIDTH / 2,
-        y: source.y + CARD_HEIGHT / 2,
-    };
-    const destinationCenter = {
-        x: destination.x + CARD_WIDTH / 2,
-        y: destination.y + CARD_HEIGHT / 2,
-    };
-    const delta = {
-        x: destinationCenter.x - sourceCenter.x,
-        y: destinationCenter.y - sourceCenter.y,
-    };
-
-    if (delta.x === 0 && delta.y === 0) {
-        return {
-            x1: source.x + CARD_WIDTH,
-            y1: sourceCenter.y,
-            x2: destination.x,
-            y2: destinationCenter.y,
-        };
-    }
-
-    const scale = 1 / Math.max(
-        Math.abs(delta.x) / (CARD_WIDTH / 2),
-        Math.abs(delta.y) / (CARD_HEIGHT / 2),
+    return closestRectConnectionPoints(
+        { ...source, width: CARD_WIDTH, height: CARD_HEIGHT },
+        { ...destination, width: CARD_WIDTH, height: CARD_HEIGHT },
     );
-
-    return {
-        x1: sourceCenter.x + delta.x * scale,
-        y1: sourceCenter.y + delta.y * scale,
-        x2: destinationCenter.x - delta.x * scale,
-        y2: destinationCenter.y - delta.y * scale,
-    };
-}
-
-export function anchoredPopoverPosition(anchor, viewport, size) {
-    const gap = 12;
-    const minimumLeft = viewport.scrollLeft + gap;
-    const maximumLeft = viewport.scrollLeft + viewport.width - size.width - gap;
-    const minimumTop = viewport.scrollTop + gap;
-    const maximumTop = viewport.scrollTop + viewport.height - size.height - gap;
-    const preferredLeft = anchor.x + gap + size.width <= viewport.scrollLeft + viewport.width
-        ? anchor.x + gap
-        : anchor.x - size.width - gap;
-    const preferredTop = anchor.y + gap + size.height <= viewport.scrollTop + viewport.height
-        ? anchor.y + gap
-        : anchor.y - size.height - gap;
-
-    return {
-        left: Math.max(minimumLeft, Math.min(preferredLeft, Math.max(minimumLeft, maximumLeft))),
-        top: Math.max(minimumTop, Math.min(preferredTop, Math.max(minimumTop, maximumTop))),
-    };
 }
 
 export function firewallNodeIdFromConnector(connector) {

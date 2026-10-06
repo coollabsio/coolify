@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Dashboard\ClusterMap;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -39,6 +40,8 @@ class Dashboard extends Component
 
     public function render()
     {
-        return view('livewire.dashboard');
+        return view('livewire.dashboard', [
+            'clusterMapAvailable' => ClusterMap::isAvailableForCurrentTeam(),
+        ]);
     }
 }
