@@ -139,6 +139,19 @@ class DatabasesController extends Controller
         return $storage;
     }
 
+    /**
+     * Store numeric resource limits (e.g. 0 or 1.5) as the strings the string limit columns expect.
+     */
+    private function normalizeNumericLimits(Request $request): void
+    {
+        foreach (['limits_memory', 'limits_memory_swap', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset'] as $field) {
+            $value = $request->input($field);
+            if (is_int($value) || is_float($value)) {
+                $request->offsetSet($field, (string) $value);
+            }
+        }
+    }
+
     private function removeSensitiveData($database, bool $loadNestedServerSecrets = false)
     {
         $database->makeHidden([
@@ -2023,6 +2036,7 @@ class DatabasesController extends Controller
                 return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
+        $this->normalizeNumericLimits($request);
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
