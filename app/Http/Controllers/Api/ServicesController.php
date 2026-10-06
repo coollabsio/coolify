@@ -1282,7 +1282,7 @@ class ServicesController extends Controller
 
             // Validate for command injection BEFORE saving to database
             try {
-                validateDockerComposeForInjection($dockerComposeRaw, composeResourceDirectory($service));
+                validateDockerComposeForInjection($dockerComposeRaw);
             } catch (\Exception $e) {
                 return response()->json([
                     'message' => 'Validation failed.',

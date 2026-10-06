@@ -2352,7 +2352,7 @@ class Application extends BaseModel
         }
         if ($composeFileContent) {
             try {
-                validateDockerComposeForInjection($composeFileContent, composeResourceDirectory($this));
+                validateDockerComposeForInjection($composeFileContent);
             } catch (\Exception $e) {
                 $this->docker_compose_location = $initialDockerComposeLocation;
                 $this->base_directory = $initialBaseDirectory;
