@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -112,4 +113,14 @@ it('dispatches the patch check once per week at the server slot on Sunday', func
 
     runStaggerTestManagerAt($slot->copy()->addWeek());
     Queue::assertPushed(ServerPatchCheckJob::class, 2);
+});
+
+it('does not run every patch check at once after an upgrade from the old weekly schedule', function () {
+    $server = createStaggerTestServer($this->team);
+    // v4.3.23 ran the patch check for all servers on Sunday at 00:00 under this key.
+    Cache::put("server-patch-check:{$server->id}", Carbon::parse('2025-01-12 00:00:00', 'UTC')->toIso8601String(), 2592000);
+
+    runStaggerTestManagerAt(Carbon::parse('2025-01-15 12:00:00', 'UTC'));
+
+    Queue::assertNotPushed(ServerPatchCheckJob::class);
 });

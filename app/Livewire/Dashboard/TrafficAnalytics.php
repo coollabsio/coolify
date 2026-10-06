@@ -74,16 +74,12 @@ class TrafficAnalytics extends Component
             try {
                 $client = $this->trafficClient($server);
 
-                $aggregator->addOverview($client->overview(null, $from, $to));
-
+                $overview = $client->overview(null, $from, $to);
                 // Per-bucket status series, summed across servers, for the sparklines.
-                // Isolated so a series hiccup (older Sentinel) never drops a server's overview.
-                try {
-                    $aggregator->addSeries($client->series(null, $this->range));
-                } catch (\Throwable $e) {
-                    // Leave this server out of the sparkline series.
-                    \Log::debug('Traffic series fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);
-                }
+                $series = $client->series(null, $this->range);
+
+                $aggregator->addOverview($overview);
+                $aggregator->addSeries($series);
             } catch (\Throwable $e) {
                 // Skip unreachable/failed servers so one bad server doesn't break the whole summary.
                 \Log::debug('Traffic overview fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);

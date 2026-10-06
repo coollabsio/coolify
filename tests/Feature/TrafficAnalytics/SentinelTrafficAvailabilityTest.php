@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Analytics;
 use App\Livewire\Dashboard\TrafficAnalytics;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -43,7 +44,7 @@ it('does not run a remote command for a server that is not reachable', function 
     [$from, $to] = SentinelTrafficClient::rangeWindow('24h');
 
     expect(fn () => $client->overview(null, $from, $to))->toThrow(RuntimeException::class);
-    $client->prefetchAppOverviews(['app'], $from, $to);
+    expect($client->prefetchServerWide(null, $from, $to, [], '24h'))->toBe([]);
 
     Process::assertNothingRan();
 });
@@ -91,4 +92,29 @@ it('fetches a healthy server with a bounded ssh and curl timeout', function () {
     expect($overview->requests)->toBe(7);
     Process::assertRan(fn (PendingProcess $process) => $process->timeout <= 30
         && str_contains($process->command, '--max-time'));
+});
+
+it('shows no data without an error when Sentinel has no traffic routes (0.0.x answers 404)', function () {
+    markTrafficServerReachable($this->server);
+    // Gin's 404 body for every unknown route, including /api/traffic/dashboard.
+    Process::fake(fn () => Process::result(output: '404 page not found'));
+    $user = User::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSet('overview', null)
+        ->assertSet('topApps', [])
+        ->assertSet('series', [])
+        ->assertNotDispatched('error');
+
+    loadLazy(Livewire::test(TrafficAnalytics::class))
+        ->assertOk()
+        ->assertSet('overview', null)
+        ->assertSet('series', [])
+        ->assertNotDispatched('error');
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, '/api/traffic/dashboard'));
 });

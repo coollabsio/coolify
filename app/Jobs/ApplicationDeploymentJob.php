@@ -2807,7 +2807,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * @return int The number of deployments that Coolify queued on additional servers
+     * @return int The number of deployments that Coolify created on additional servers, including ones that failed to dispatch
      */
     private function deploy_to_additional_destinations(): int
     {
@@ -2839,18 +2839,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             $deployment_uuid = new_public_id();
-            // Deploy the exact commit and image tag of the main server, also for a rollback.
-            $result = queue_application_deployment(
-                deployment_uuid: $deployment_uuid,
-                application: $this->application,
-                commit: $this->commit,
-                no_questions_asked: true,
-                server: $server,
-                destination: $destination,
-                rollback: $this->rollback,
-                docker_registry_image_tag: $this->application_deployment_queue->docker_registry_image_tag,
-                parent_deployment_uuid: $this->deployment_uuid,
-            );
+            try {
+                // Deploy the exact commit and image tag of the main server, also for a rollback.
+                $result = queue_application_deployment(
+                    deployment_uuid: $deployment_uuid,
+                    application: $this->application,
+                    commit: $this->commit,
+                    no_questions_asked: true,
+                    server: $server,
+                    destination: $destination,
+                    rollback: $this->rollback,
+                    docker_registry_image_tag: $this->application_deployment_queue->docker_registry_image_tag,
+                    parent_deployment_uuid: $this->deployment_uuid,
+                );
+            } catch (Throwable $e) {
+                \Log::warning("Deployment {$this->deployment_uuid} could not queue the deployment to {$server->name}: {$e->getMessage()}");
+                $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} could not be started: {$e->getMessage()}", 'stderr');
+                // A deployment that failed to dispatch is already failed; it counts for the combined notification.
+                if (ApplicationDeploymentQueue::query()->where('deployment_uuid', $deployment_uuid)->exists()) {
+                    $queued++;
+                }
+
+                continue;
+            }
             if ($result['status'] !== 'queued') {
                 $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} was not queued: {$result['message']}", 'stderr');
 
