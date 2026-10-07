@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Enums\TrafficIpMode;
 use App\Events\SentinelRestarted;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -58,6 +59,7 @@ class StartSentinel
             'TRAFFIC_RETENTION_1D_DAYS' => (string) ($settings->traffic_retention_1d_days ?: 395),
             'GEOIP_ENABLED' => $settings->is_geoip_enabled ? 'true' : 'false',
             'GEOIP_REFRESH_DAYS' => (string) ($settings->geoip_refresh_days ?: 30),
+            'TRAFFIC_IP_MODE' => TrafficIpMode::forServer($server)->value,
         ];
         $license = data_get($settings, 'geoip_maxmind_license_key');
         if ($settings->is_geoip_enabled && filled($license)) {

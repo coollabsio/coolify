@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ServerRole;
+use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -36,6 +37,7 @@ use OpenApi\Attributes as OA;
         'traffic_retention_1d_days' => ['type' => 'integer'],
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
+        'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -131,6 +133,7 @@ class ServerSetting extends Model
         'is_geoip_enabled',
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
+        'traffic_ip_mode',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
@@ -167,6 +170,7 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
+        'traffic_ip_mode' => TrafficIpMode::class,
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
@@ -218,7 +222,8 @@ class ServerSetting extends Model
                 $settings->wasChanged('traffic_retention_1d_days') ||
                 $settings->wasChanged('is_geoip_enabled') ||
                 $settings->wasChanged('geoip_refresh_days') ||
-                $settings->wasChanged('geoip_maxmind_license_key')
+                $settings->wasChanged('geoip_maxmind_license_key') ||
+                $settings->wasChanged('traffic_ip_mode')
             ) {
                 // Only recreate Sentinel when it is already enabled. Otherwise a change to a
                 // traffic/geoip tuning knob would turn Sentinel on as a side effect, because

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Enums\TrafficIpMode;
 use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Models\Service;
@@ -51,6 +52,10 @@ abstract class ResourceTrafficAnalytics extends Component
     public array $breakdowns = [];
 
     public ?string $attribution = null;
+
+    /** TrafficIpMode of the resource's server; decides how the IP breakdown renders. */
+    #[Locked]
+    public string $ipMode = 'full';
 
     /**
      * Per-bucket status-class time series for the stacked area chart.
@@ -131,11 +136,14 @@ abstract class ResourceTrafficAnalytics extends Component
 
             $resource = $this->trafficResource();
             [$from, $to] = SentinelTrafficClient::rangeWindow($this->range);
-            $client = app(SentinelTrafficClient::class, ['server' => $resource->server()]);
+            $server = $resource->server();
+            $client = app(SentinelTrafficClient::class, ['server' => $server]);
+            $ipMode = $server ? TrafficIpMode::forServer($server) : TrafficIpMode::Full;
+            $this->ipMode = $ipMode->value;
 
             // Sentinel's resource scope merges every key exactly in one docker exec. A Sentinel
             // before 1.0.2 falls back to all keys of the resource, merged here (approximate).
-            $aggregator = new TrafficAnalyticsAggregator($this->breakdownDimensions);
+            $aggregator = new TrafficAnalyticsAggregator($ipMode->breakdownDimensions($this->breakdownDimensions));
             $aggregator->collectResource($client, $resource->uuid(), $from, $to, $this->range, fn (string $appKey) => $resource->domainForKey($appKey));
 
             $result = $aggregator->overview();
