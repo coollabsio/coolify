@@ -307,6 +307,43 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Build the --add-host flags for the containers on the destination network.
+     *
+     * Build helper containers are named after their deployment uuid and only live for the
+     * duration of that deployment. BuildKit keys every RUN layer on the --add-host set,
+     * so letting one in gives the next build a different set and forces a full rebuild.
+     */
+    private function addHostFlags(Collection $containers): string
+    {
+        $containers = $containers->sort()->values();
+        $buildHelperNames = ApplicationDeploymentQueue::query()
+            ->whereIn('deployment_uuid', $containers->pluck('Name')->filter())
+            ->pluck('deployment_uuid');
+
+        $ips = collect([]);
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Name');
+            if ($containerName === 'coolify-proxy') {
+                continue;
+            }
+            if (isGeneratedContainerName($containerName)) {
+                continue;
+            }
+            if ($buildHelperNames->contains($containerName)) {
+                continue;
+            }
+            $containerIp = data_get($container, 'IPv4Address');
+            if ($containerName && $containerIp) {
+                $ips->put($containerName, str($containerIp)->before('/')->value());
+            }
+        }
+
+        return $ips->map(function ($ip, $name) {
+            return "--add-host $name:$ip";
+        })->implode(' ');
+    }
+
     public function handle(): void
     {
         // Check if deployment was cancelled before we even started
@@ -347,36 +384,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             if (! is_null($allContainers)) {
                 $allContainers = format_docker_command_output_to_json($allContainers);
-                $ips = collect([]);
-                if (count($allContainers) > 0) {
-                    $allContainers = $allContainers[0];
-                    $allContainers = collect($allContainers)->sort()->values();
-                    // Build helper containers are named after their deployment uuid and only live for
-                    // the duration of that deployment. BuildKit keys every RUN layer on the --add-host
-                    // set, so letting one in gives the next build a different set and forces a full rebuild.
-                    $buildHelperNames = ApplicationDeploymentQueue::whereIn('deployment_uuid', $allContainers->pluck('Name')->filter())
-                        ->pluck('deployment_uuid');
-                    foreach ($allContainers as $container) {
-                        $containerName = data_get($container, 'Name');
-                        if ($containerName === 'coolify-proxy') {
-                            continue;
-                        }
-                        if (isGeneratedContainerName($containerName)) {
-                            continue;
-                        }
-                        if ($buildHelperNames->contains($containerName)) {
-                            continue;
-                        }
-                        $containerIp = data_get($container, 'IPv4Address');
-                        if ($containerName && $containerIp) {
-                            $containerIp = str($containerIp)->before('/');
-                            $ips->put($containerName, $containerIp->value());
-                        }
-                    }
-                }
-                $this->addHosts = $ips->map(function ($ip, $name) {
-                    return "--add-host $name:$ip";
-                })->implode(' ');
+                $this->addHosts = count($allContainers) > 0 ? $this->addHostFlags(collect($allContainers[0])) : '';
             }
 
             if ($this->application->dockerfile_target_build) {
