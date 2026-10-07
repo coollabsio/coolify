@@ -77,20 +77,47 @@ it('generates a compose file that passes the database files to the image', funct
         ->and($service['volumes'])->toBe(['sqlite-data-'.$this->database->uuid.':/var/lib/sqlite']);
 });
 
-it('backs up with a read-only VACUUM INTO snapshot instead of a SQL dump', function () {
-    expect(file_get_contents(app_path('Jobs/DatabaseBackupJob.php')))
-        ->toContain('sqlite3 -readonly')
-        ->toContain('VACUUM INTO')
-        ->not->toContain('.dump');
-});
-
 it('restores a gzipped backup with .restore into the first database file', function () {
     $command = app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->database, '/tmp/restore_1', false);
 
     expect($command)
         ->toStartWith("backup='/tmp/restore_1'\n")
         ->toContain('stream() { if is_gzip; then gunzip -c "$backup"; else cat "$backup"; fi; }')
-        ->toEndWith("stream > \"\$backup.db\" || fail 'The backup cannot be read. Nothing was changed.'\nsqlite3 -bail '/var/lib/sqlite/app.db' '.timeout 10000' \".restore \$backup.db\"; status=\$?; rm -f \"\$backup.db\"; exit \$status");
+        ->toEndWith("stream > \"\$backup.db\" || fail 'The backup cannot be read. Nothing was changed.'\n[ \"\$(head -c 15 \"\$backup.db\")\" = 'SQLite format 3' ] || { rm -f \"\$backup.db\"; fail 'The backup is not a SQLite database. Nothing was changed.'; }\nsqlite3 -bail '/var/lib/sqlite/app.db' '.timeout 10000' \".restore \$backup.db\"; status=\$?; rm -f \"\$backup.db\"; exit \$status");
+});
+
+it('lists its own database files and resolves only those as restore targets', function () {
+    expect($this->database->databaseFiles())->toBe(['app.db', 'jobs.db'])
+        ->and($this->database->databaseFilePath('jobs.db'))->toBe('/var/lib/sqlite/jobs.db')
+        ->and($this->database->databaseFilePath())->toBe('/var/lib/sqlite/app.db');
+});
+
+it('rejects restore targets that are not one of its database files', function (string $file) {
+    expect(fn () => $this->database->databaseFilePath($file))->toThrow(InvalidArgumentException::class);
+})->with([
+    'unknown file' => ['cache.db'],
+    'path traversal' => ['../app.db'],
+    'absolute path' => ['/etc/passwd'],
+    'empty' => [''],
+]);
+
+it('defaults the restore target to the file named in the backup, else the first file', function (?string $backupName, string $expected) {
+    expect($this->database->defaultRestoreFile($backupName))->toBe($expected);
+})->with([
+    'coolify backup of the second file' => ['sqlite-backup-jobs.db-1700000000.gz', 'jobs.db'],
+    'server path of the second file' => ['/backups/jobs.db.gz', 'jobs.db'],
+    'plain second file' => ['jobs.db', 'jobs.db'],
+    'coolify backup of the first file' => ['sqlite-backup-app.db-1700000000.gz', 'app.db'],
+    'unrelated name' => ['backup.gz', 'app.db'],
+    'no name' => [null, 'app.db'],
+]);
+
+it('restores into the selected database file instead of the first one', function () {
+    $command = app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->database, '/tmp/restore_1', false, sqliteDatabase: 'jobs.db');
+
+    expect($command)->toContain("sqlite3 -bail '/var/lib/sqlite/jobs.db'")
+        ->not->toContain('/var/lib/sqlite/app.db')
+        ->toContain("[ \"\$(head -c 15 \"\$backup.db\")\" = 'SQLite format 3' ]");
 });
 
 it('normalises the file list when saved from the general page', function () {

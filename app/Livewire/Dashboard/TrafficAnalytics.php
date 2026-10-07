@@ -9,6 +9,7 @@ use App\Services\TrafficAnalyticsAggregator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 #[Lazy]
@@ -16,6 +17,7 @@ class TrafficAnalytics extends Component
 {
     use BuildsTrafficChartPayload;
 
+    #[Locked]
     public string $chartId = 'dashboard-traffic';
 
     public Collection $servers;
@@ -54,6 +56,12 @@ class TrafficAnalytics extends Component
 
     public function loadData(): void
     {
+        $this->reset('overview', 'latencyApproximate', 'uniquesApproximate', 'series');
+
+        foreach ($this->servers as $server) {
+            $this->authorize('view', $server);
+        }
+
         if ($this->servers->isEmpty()) {
             return;
         }
@@ -66,16 +74,12 @@ class TrafficAnalytics extends Component
             try {
                 $client = $this->trafficClient($server);
 
-                $aggregator->addOverview($client->overview(null, $from, $to));
-
+                $overview = $client->overview(null, $from, $to);
                 // Per-bucket status series, summed across servers, for the sparklines.
-                // Isolated so a series hiccup (older Sentinel) never drops a server's overview.
-                try {
-                    $aggregator->addSeries($client->series(null, $this->range));
-                } catch (\Throwable $e) {
-                    // Leave this server out of the sparkline series.
-                    \Log::debug('Traffic series fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);
-                }
+                $series = $client->series(null, $this->range);
+
+                $aggregator->addOverview($overview);
+                $aggregator->addSeries($series);
             } catch (\Throwable $e) {
                 // Skip unreachable/failed servers so one bad server doesn't break the whole summary.
                 \Log::debug('Traffic overview fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);
@@ -141,14 +145,7 @@ class TrafficAnalytics extends Component
      */
     private function window(): array
     {
-        $to = now();
-        $from = match ($this->range) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
-        };
-
-        return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+        return SentinelTrafficClient::rangeWindow($this->range);
     }
 
     public function placeholder(): View

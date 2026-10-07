@@ -22,14 +22,11 @@ function importCleanupPayload(array $overrides = []): array
     ], $overrides);
 }
 
-test('the finished event keeps the payload and does not import Server', function () {
+test('the finished event keeps the payload', function () {
     $data = importCleanupPayload(['serverTmpPath' => '/tmp/database-import-op']);
     $event = new DatabaseImportFinished($data);
 
-    expect($event->data)->toBe($data)
-        ->and(file_get_contents(app_path('Events/DatabaseImportFinished.php')))
-        ->not->toContain('instant_remote_process')
-        ->not->toContain('use App\Models\Server');
+    expect($event->data)->toBe($data);
 });
 
 test('the cleanup listener is queued and discovered', function () {

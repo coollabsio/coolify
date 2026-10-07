@@ -14,7 +14,7 @@ class StopApplicationPreview
     {
         $application = $preview->application;
         $server = $application->destination->server;
-        $containers = getCurrentApplicationContainerStatus($server, $application->id, $preview->pull_request_id);
+        $containers = getCurrentApplicationContainerStatus($server, $application, $preview->pull_request_id);
 
         foreach ($containers->pluck('Names') as $containerName) {
             $escapedContainerName = escapeshellarg($containerName);

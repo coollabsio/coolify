@@ -37,7 +37,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
 describe('Application Source with localhost key (id=0)', function () {
     test('renders deploy key section when private_key_id is 0', function () {
-        $privateKey = PrivateKey::create([
+        $privateKey = PrivateKey::forceCreate([
             'id' => 0,
             'name' => 'localhost',
             'private_key' => applicationSourceValidPrivateKey(),
@@ -52,7 +52,8 @@ describe('Application Source with localhost key (id=0)', function () {
         Livewire::test(Source::class, ['application' => $application])
             ->assertSuccessful()
             ->assertSet('privateKeyId', 0)
-            ->assertSee('Deploy Key');
+            ->assertSee('localhost')
+            ->assertSee('Deploy key');
     });
 
     test('shows no source connected section when private_key_id is null', function () {
@@ -64,7 +65,7 @@ describe('Application Source with localhost key (id=0)', function () {
         Livewire::test(Source::class, ['application' => $application])
             ->assertSuccessful()
             ->assertSet('privateKeyId', null)
-            ->assertDontSee('Deploy Key')
+            ->assertDontSee('Deploy key')
             ->assertSee('No source connected');
     });
 

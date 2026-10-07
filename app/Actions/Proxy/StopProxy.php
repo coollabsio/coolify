@@ -26,6 +26,8 @@ class StopProxy
             instant_remote_process(command: [
                 dockerStopCommand($timeout, $containerName, $server).' 2>/dev/null || true',
                 "docker rm -f $containerName 2>/dev/null || true",
+                // The Traefik traffic analytics log rotation sidecar must not outlive the proxy.
+                'docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true',
                 '# Wait for container to be fully removed',
                 'for i in {1..10}; do',
                 "    if ! docker ps -a --format \"{{.Names}}\" | grep -q \"^$containerName$\"; then",

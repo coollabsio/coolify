@@ -1,6 +1,5 @@
 <?php
 
-use App\Jobs\ServerStorageSaveJob;
 use App\Livewire\Project\Application\General;
 use App\Livewire\Project\Service\StackForm;
 use App\Models\Application;
@@ -19,36 +18,55 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 
+/**
+ * Only administrators can edit a Compose file, and they can mount any host path. Coolify writes the
+ * `content:` of a Compose bind volume to the source path, like Coolify v4.3.23 did, also outside
+ * the resource directory. Every path in a remote command is shell-escaped, and the source must not
+ * contain shell metacharacters.
+ */
 uses(RefreshDatabase::class);
 
-const CONTENT_CONFINEMENT_SAFE_COMPOSE = "services:\n  app:\n    image: nginx:alpine\n";
+const CONTENT_HOST_PATH_SAFE_COMPOSE = "services:\n  app:\n    image: nginx:alpine\n";
 
-const CONTENT_CONFINEMENT_OUTSIDE_COMPOSE = <<<'YAML'
+const CONTENT_HOST_PATH_COMPOSE = <<<'YAML'
 services:
   app:
     image: nginx:alpine
     volumes:
       - type: bind
-        source: /root/.ssh/authorized_keys
-        target: /keys
-        content: ssh-ed25519 AAAA attacker
+        source: /etc/myapp/app.conf
+        target: /etc/a.conf
+        content: a
+      - type: bind
+        source: ~/x/app.conf
+        target: /etc/b.conf
+        content: b
+      - type: bind
+        source: app.conf
+        target: /etc/c.conf
+        content: c
+      - type: bind
+        source: ./../shared/app.conf
+        target: /etc/d.conf
+        content: d
 YAML;
 
-const CONTENT_CONFINEMENT_RELATIVE_COMPOSE = <<<'YAML'
+const CONTENT_HOST_PATH_INJECTION_COMPOSE = <<<'YAML'
 services:
   app:
     image: nginx:alpine
     volumes:
       - type: bind
-        source: ./config/app.conf
+        source: /etc/$(id)/app.conf
         target: /etc/app.conf
-        content: |
-          listen 8080;
+        content: x
 YAML;
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Bus::fake();
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
     config([
@@ -70,18 +88,24 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $project->id]);
 });
 
-function contentConfinementService(string $compose): Service
+afterEach(function () {
+    Server::flushIdentityMap();
+});
+
+function contentHostPathService(string $compose): Service
 {
     return Service::factory()->create([
+        'name' => 'content-host-path',
         'environment_id' => test()->environment->id,
         'server_id' => test()->server->id,
         'destination_id' => test()->destination->id,
         'destination_type' => test()->destination->getMorphClass(),
         'docker_compose_raw' => $compose,
+        'connect_to_docker_network' => false,
     ]);
 }
 
-function contentConfinementApplication(string $compose): Application
+function contentHostPathApplication(string $compose): Application
 {
     return Application::factory()->create([
         'environment_id' => test()->environment->id,
@@ -96,266 +120,293 @@ function contentConfinementApplication(string $compose): Application
     ]);
 }
 
-/**
- * A file volume row that skipped the Compose validation, for example because it was stored before
- * the validation existed or because the content came from the UI.
- */
-function contentConfinementFileVolume(Service $service, string $fsPath, ?string $content, bool $isDirectory = false): LocalFileVolume
+function contentHostPathUseServerUser(string $user): void
 {
-    $serviceApplication = ServiceApplication::create(['name' => 'app', 'service_id' => $service->id]);
-
-    // Bus::fake() keeps the ServerStorageSaveJob of the `created` hook from running.
-    return LocalFileVolume::create([
-        'fs_path' => $fsPath,
-        'mount_path' => '/keys',
-        'content' => $content,
-        'is_directory' => $isDirectory,
-        'resource_id' => $serviceApplication->id,
-        'resource_type' => $serviceApplication->getMorphClass(),
-    ])->fresh();
+    test()->server->update(['user' => $user]);
+    Server::flushIdentityMap();
 }
 
 /**
- * Fakes the server. The symlink check prints $confinement, `test -f`/`test -d` print NOK.
+ * Fakes the server: `test -f`/`test -d` print NOK (the file is missing), the symlink check prints OK.
  */
-function contentConfinementFakeServer(string $confinement = 'OK'): void
+function contentHostPathFakeServer(): void
 {
     Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'readlink -f') => $confinement,
+        str_contains($process->command, 'readlink -f') => 'OK',
         str_contains($process->command, 'test -') => 'NOK',
         default => '',
     }));
 }
 
-function contentConfinementAssertNoContentWrite(): void
+/**
+ * The stored fs_path and the host path that Coolify writes, for a source in CONTENT_HOST_PATH_COMPOSE.
+ * `~` and `./` are relative to the resource directory, as in v4.3.23. A bare relative path is
+ * stored as written and written inside the resource directory (never relative to the SSH user's
+ * working directory).
+ *
+ * @return array{0: string, 1: string}
+ */
+function contentHostPathExpected(string $target, string $workdir): array
 {
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'base64 -d'));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'touch '));
+    $parent = dirname($workdir);
+
+    return match ($target) {
+        '/etc/a.conf' => ['/etc/myapp/app.conf', '/etc/myapp/app.conf'],
+        '/etc/b.conf' => [$workdir.'/x/app.conf', $workdir.'/x/app.conf'],
+        '/etc/c.conf' => ['app.conf', $workdir.'/app.conf'],
+        '/etc/d.conf' => [$parent.'/shared/app.conf', $parent.'/shared/app.conf'],
+    };
 }
 
-test('the service parser rejects a content volume outside the service directory', function () {
-    $service = contentConfinementService(CONTENT_CONFINEMENT_OUTSIDE_COMPOSE);
+function contentHostPathAssertWritten(string $path, string $content, string $user): void
+{
+    $sudo = $user === 'root' ? '' : 'sudo ';
+    $escapedPath = escapeshellarg($path);
+    $escapedParent = escapeshellarg(dirname($path));
+    $base64 = base64_encode($content);
 
-    expect(fn () => serviceParser($service))
-        ->toThrow(Exception::class, 'Volume source /root/.ssh/authorized_keys with content must be inside the resource directory.');
+    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p {$escapedParent}"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee {$escapedPath} > /dev/null"));
+}
 
-    expect(LocalFileVolume::query()->count())->toBe(0);
-    Bus::assertNotDispatched(ServerStorageSaveJob::class);
-});
+/**
+ * @return array<string, array{string, string}>
+ */
+function contentHostPathTargets(): array
+{
+    return [
+        'absolute host file' => ['/etc/a.conf', 'a'],
+        'home directory' => ['/etc/b.conf', 'b'],
+        'bare relative path' => ['/etc/c.conf', 'c'],
+        'parent directory' => ['/etc/d.conf', 'd'],
+    ];
+}
 
-test('the application parser rejects a content volume outside the application directory', function () {
-    $application = contentConfinementApplication(CONTENT_CONFINEMENT_OUTSIDE_COMPOSE);
-
-    expect(fn () => applicationParser($application))
-        ->toThrow(Exception::class, 'Volume source /root/.ssh/authorized_keys with content must be inside the resource directory.');
-
-    expect(LocalFileVolume::query()->count())->toBe(0);
-    Bus::assertNotDispatched(ServerStorageSaveJob::class);
-});
-
-test('the parsers reject traversal, home and variable sources with content', function (string $source) {
-    $compose = str_replace('/root/.ssh/authorized_keys', $source, CONTENT_CONFINEMENT_OUTSIDE_COMPOSE);
-
-    expect(fn () => serviceParser(contentConfinementService($compose)))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.')
-        ->and(fn () => applicationParser(contentConfinementApplication($compose)))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.');
-
-    expect(LocalFileVolume::query()->count())->toBe(0);
-})->with([
-    './../../../root/.ssh/authorized_keys',
-    '../authorized_keys',
-    '~/.ssh/authorized_keys',
-    '${HOME}/.ssh/authorized_keys',
-]);
-
-test('a relative content volume is stored and written inside the service directory', function () {
-    $service = contentConfinementService(CONTENT_CONFINEMENT_RELATIVE_COMPOSE);
+test('the service parser stores a content volume at its host path and Coolify writes it there', function (string $target, string $content, string $user) {
+    contentHostPathUseServerUser($user);
+    $service = contentHostPathService(CONTENT_HOST_PATH_COMPOSE);
     serviceParser($service);
 
-    $fileVolume = LocalFileVolume::query()->sole();
-    $expectedPath = $service->workdir().'/config/app.conf';
-    expect($fileVolume->fs_path)->toBe($expectedPath)
-        ->and($fileVolume->content)->toBe('listen 8080;')
-        ->and($fileVolume->is_directory)->toBeFalse();
+    [$fsPath, $writePath] = contentHostPathExpected($target, $service->workdir());
+    $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    expect($fileVolume->fs_path)->toBe($fsPath)
+        ->and($fileVolume->content)->toBe($content)
+        ->and($fileVolume->is_directory)->toBeFalse()
+        ->and($fileVolume->contentPathOnServer())->toBe($writePath);
 
-    contentConfinementFakeServer();
+    contentHostPathFakeServer();
     $fileVolume->saveStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'readlink -f')
-        && str_contains($process->command, "'{$service->workdir()}' '{$expectedPath}'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$service->workdir()}/config'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "| base64 -d | tee '{$expectedPath}' > /dev/null"));
-});
+    contentHostPathAssertWritten($writePath, $content, $user);
+})->with(contentHostPathTargets())->with(['root', 'coolify']);
 
-test('a relative content volume is stored inside the application directory', function () {
-    $application = contentConfinementApplication(CONTENT_CONFINEMENT_RELATIVE_COMPOSE);
+test('the application parser stores a content volume at its host path and Coolify writes it there', function (string $target, string $content, string $user) {
+    contentHostPathUseServerUser($user);
+    $application = contentHostPathApplication(CONTENT_HOST_PATH_COMPOSE);
     applicationParser($application);
 
-    expect(LocalFileVolume::query()->sole()->fs_path)->toBe($application->workdir().'/config/app.conf');
-});
+    [$fsPath, $writePath] = contentHostPathExpected($target, $application->workdir());
+    $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    expect($fileVolume->fs_path)->toBe($fsPath)
+        ->and($fileVolume->content)->toBe($content)
+        ->and($fileVolume->contentPathOnServer())->toBe($writePath);
 
-test('the write path refuses content outside the resource directory for a Compose bind mount', function () {
-    // The Compose file no longer has `content:` (the parser removes it), so the mount is administrator-controlled.
-    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - type: bind\n        source: /root/.ssh/authorized_keys\n        target: /keys\n";
-    $service = contentConfinementService($compose);
-    $fileVolume = contentConfinementFileVolume($service, '/root/.ssh/authorized_keys', 'ssh-ed25519 AAAA attacker');
+    contentHostPathFakeServer();
+    $fileVolume->saveStorageOnServer();
 
-    contentConfinementFakeServer();
+    contentHostPathAssertWritten($writePath, $content, $user);
+})->with(contentHostPathTargets())->with(['root', 'coolify']);
 
-    expect(fn () => $fileVolume->saveStorageOnServer())
-        ->toThrow(RuntimeException::class, 'Coolify writes file content only inside the resource directory.');
-    contentConfinementAssertNoContentWrite();
-});
+test('loading files for a service writes content at its host path', function (string $target, string $content, string $user) {
+    contentHostPathUseServerUser($user);
+    $service = contentHostPathService(CONTENT_HOST_PATH_COMPOSE);
+    serviceParser($service);
+    $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    [, $writePath] = contentHostPathExpected($target, $service->workdir());
 
-test('the write path refuses ../ traversal out of the resource directory', function () {
-    $source = './../../../root/.ssh/authorized_keys';
-    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - type: bind\n        source: {$source}\n        target: /keys\n";
-    $service = contentConfinementService($compose);
-    $fileVolume = contentConfinementFileVolume($service, $service->workdir().'/../../../root/.ssh/authorized_keys', 'attacker');
+    contentHostPathFakeServer();
+    getFilesystemVolumesFromServer($fileVolume->resource, true);
 
-    contentConfinementFakeServer();
+    $sudo = $user === 'root' ? '' : 'sudo ';
+    $escapedPath = escapeshellarg($writePath);
+    $base64 = base64_encode($content);
+    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p -- \"$({$sudo}dirname -- {$escapedPath})\""));
+    Process::assertRan(fn ($process) => str_contains($process->command, "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
+})->with(contentHostPathTargets())->with(['root', 'coolify']);
 
-    expect(fn () => $fileVolume->saveStorageOnServer())
-        ->toThrow(RuntimeException::class, 'Coolify writes file content only inside the resource directory.');
-    contentConfinementAssertNoContentWrite();
-});
+test('a quote in a content path is shell-escaped in every write command', function (string $user) {
+    contentHostPathUseServerUser($user);
+    $path = "/etc/my'app/app.conf";
+    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - type: bind\n        source: \"{$path}\"\n        target: /etc/app.conf\n        content: x\n";
+    $service = contentHostPathService($compose);
+    serviceParser($service);
+    $fileVolume = LocalFileVolume::query()->sole();
+    expect($fileVolume->fs_path)->toBe($path);
 
-test('the write path refuses a symlink that leaves the resource directory', function () {
-    $service = contentConfinementService(CONTENT_CONFINEMENT_RELATIVE_COMPOSE);
-    $fileVolume = contentConfinementFileVolume($service, $service->workdir().'/config/app.conf', 'listen 8080;');
+    contentHostPathFakeServer();
+    $fileVolume->saveStorageOnServer();
+    getFilesystemVolumesFromServer($fileVolume->resource, true);
 
-    // The server resolves the symlinked config directory to a path outside the resource directory.
-    contentConfinementFakeServer('NOK');
+    $sudo = $user === 'root' ? '' : 'sudo ';
+    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}tee '/etc/my'\\''app/app.conf' > /dev/null"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}tee -- '/etc/my'\\''app/app.conf'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p '/etc/my'\\''app'"));
+})->with(['root', 'coolify']);
 
-    expect(fn () => $fileVolume->saveStorageOnServer())
-        ->toThrow(RuntimeException::class, 'Coolify writes file content only inside the resource directory.');
-    contentConfinementAssertNoContentWrite();
-});
+test('the parsers reject shell injection in a content volume source', function () {
+    expect(fn () => serviceParser(contentHostPathService(CONTENT_HOST_PATH_INJECTION_COMPOSE)))
+        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)')
+        ->and(fn () => applicationParser(contentHostPathApplication(CONTENT_HOST_PATH_INJECTION_COMPOSE)))
+        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)');
 
-test('the write path refuses to write content to the resource directory itself', function () {
-    $service = contentConfinementService(CONTENT_CONFINEMENT_SAFE_COMPOSE);
-    $fileVolume = contentConfinementFileVolume($service, $service->workdir(), 'content');
-
-    contentConfinementFakeServer();
-
-    expect(fn () => $fileVolume->saveStorageOnServer())
-        ->toThrow(RuntimeException::class, 'Coolify writes file content only inside the resource directory.');
-    contentConfinementAssertNoContentWrite();
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -fr'));
+    expect(LocalFileVolume::query()->count())->toBe(0);
 });
 
 test('a bind mount without content keeps its administrator-selected host path', function () {
     $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - /srv/shared:/keys\n";
-    $service = contentConfinementService($compose);
-    $fileVolume = contentConfinementFileVolume($service, '/srv/shared', null, isDirectory: true);
+    $service = contentHostPathService($compose);
+    $serviceApplication = ServiceApplication::create(['name' => 'app', 'service_id' => $service->id]);
+    $fileVolume = LocalFileVolume::create([
+        'fs_path' => '/srv/shared',
+        'mount_path' => '/keys',
+        'is_directory' => true,
+        'resource_id' => $serviceApplication->id,
+        'resource_type' => $serviceApplication->getMorphClass(),
+    ])->fresh();
 
-    contentConfinementFakeServer();
+    contentHostPathFakeServer();
     $fileVolume->saveStorageOnServer();
 
     Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '/srv/shared'"));
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'readlink -f'));
 });
 
-test('a host file bind mount without content is still touched in place', function () {
-    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - /etc/localtime:/keys:ro\n";
-    $service = contentConfinementService($compose);
-    $fileVolume = contentConfinementFileVolume($service, '/etc/localtime', null);
-
-    contentConfinementFakeServer();
-    $fileVolume->saveStorageOnServer();
-
-    Process::assertRan(fn ($process) => str_contains($process->command, "touch '/etc/localtime'"));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'readlink -f'));
-});
-
-test('loading files for a service does not write content outside the resource directory', function () {
-    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - type: bind\n        source: /etc/cron.d/coolify\n        target: /keys\n";
-    $service = contentConfinementService($compose);
-    $fileVolume = contentConfinementFileVolume($service, '/etc/cron.d/coolify', '* * * * * root id');
-
-    contentConfinementFakeServer();
-
-    expect(fn () => getFilesystemVolumesFromServer($fileVolume->resource, true))
-        ->toThrow(Exception::class, 'Coolify writes file content only inside the resource directory.');
-    contentConfinementAssertNoContentWrite();
-});
-
-test('loading files for a service writes relative content inside the resource directory', function () {
-    $service = contentConfinementService(CONTENT_CONFINEMENT_RELATIVE_COMPOSE);
-    $expectedPath = $service->workdir().'/config/app.conf';
-    $fileVolume = contentConfinementFileVolume($service, $expectedPath, 'listen 8080;');
-
-    contentConfinementFakeServer();
-    getFilesystemVolumesFromServer($fileVolume->resource, true);
-
-    Process::assertRan(fn ($process) => str_contains($process->command, "base64 -d | tee -- '{$expectedPath}'"));
-});
-
-test('the service stack form rejects a content volume outside the service directory', function () {
+test('the service stack form saves content volumes with host paths', function () {
     $this->actingAs($this->user);
-    $service = contentConfinementService(CONTENT_CONFINEMENT_SAFE_COMPOSE);
+    $service = contentHostPathService(CONTENT_HOST_PATH_SAFE_COMPOSE);
+    contentHostPathFakeServer();
 
     Livewire::test(StackForm::class, ['service' => $service])
-        ->set('dockerComposeRaw', CONTENT_CONFINEMENT_OUTSIDE_COMPOSE)
+        ->set('dockerComposeRaw', CONTENT_HOST_PATH_COMPOSE)
         ->call('submit')
-        ->assertDispatched('error', fn (string $event, array $params): bool => str_contains($params[0], 'with content must be inside the resource directory'));
+        ->assertNotDispatched('error');
 
-    expect($service->fresh()->docker_compose_raw)->toBe(CONTENT_CONFINEMENT_SAFE_COMPOSE)
+    expect($service->fresh()->docker_compose_raw)->toContain('source: /etc/myapp/app.conf')
+        ->and(LocalFileVolume::query()->where('fs_path', '/etc/myapp/app.conf')->value('content'))->toBe('a');
+});
+
+test('the service stack form rejects shell injection in a content volume source', function () {
+    $this->actingAs($this->user);
+    $service = contentHostPathService(CONTENT_HOST_PATH_SAFE_COMPOSE);
+
+    Livewire::test(StackForm::class, ['service' => $service])
+        ->set('dockerComposeRaw', CONTENT_HOST_PATH_INJECTION_COMPOSE)
+        ->call('submit')
+        ->assertDispatched('error', fn (string $event, array $params): bool => str_contains($params[0], 'Invalid Docker volume definition'));
+
+    expect($service->fresh()->docker_compose_raw)->toBe(CONTENT_HOST_PATH_SAFE_COMPOSE)
         ->and(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('the application General form rejects a content volume outside the application directory', function () {
+test('the application General form saves content volumes with host paths', function () {
     $this->actingAs($this->user);
-    $application = contentConfinementApplication(CONTENT_CONFINEMENT_SAFE_COMPOSE);
+    $application = contentHostPathApplication(CONTENT_HOST_PATH_SAFE_COMPOSE);
+    contentHostPathFakeGitCompose(CONTENT_HOST_PATH_COMPOSE);
+
+    Livewire::test(General::class, ['application' => $application->fresh()])
+        ->set('dockerComposeRaw', CONTENT_HOST_PATH_COMPOSE)
+        ->call('submit')
+        ->assertNotDispatched('error');
+
+    expect($application->fresh()->docker_compose_raw)->toContain('source: /etc/myapp/app.conf')
+        ->and(LocalFileVolume::query()->where('fs_path', '/etc/myapp/app.conf')->value('content'))->toBe('a');
+});
+
+test('the application General form rejects shell injection in a content volume source', function () {
+    $this->actingAs($this->user);
+    $application = contentHostPathApplication(CONTENT_HOST_PATH_SAFE_COMPOSE);
     Process::fake();
 
     Livewire::test(General::class, ['application' => $application->fresh()])
-        ->set('dockerComposeRaw', CONTENT_CONFINEMENT_OUTSIDE_COMPOSE)
+        ->set('dockerComposeRaw', CONTENT_HOST_PATH_INJECTION_COMPOSE)
         ->call('submit')
-        ->assertDispatched('error', fn (string $event, array $params): bool => str_contains($params[0], 'with content must be inside the resource directory'))
+        ->assertDispatched('error', fn (string $event, array $params): bool => str_contains($params[0], 'Invalid Docker volume definition'))
         ->assertNotDispatched('success');
 
-    expect($application->fresh()->docker_compose_raw)->toBe(CONTENT_CONFINEMENT_SAFE_COMPOSE)
+    expect($application->fresh()->docker_compose_raw)->toBe(CONTENT_HOST_PATH_SAFE_COMPOSE)
         ->and(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('loading a Git Compose file rejects a content volume outside the application directory', function () {
-    $application = contentConfinementApplication(CONTENT_CONFINEMENT_SAFE_COMPOSE);
-    Process::fake(function ($process) {
+function contentHostPathFakeGitCompose(string $compose): void
+{
+    Process::fake(function ($process) use ($compose) {
         $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
 
         return Process::result(output: match (true) {
             str_contains($command, 'git --version') => 'git version 2.43.0',
-            str_contains($command, 'head -c') => CONTENT_CONFINEMENT_OUTSIDE_COMPOSE,
+            str_contains($command, 'head -c') => $compose,
             default => '',
         });
     });
+}
+
+test('loading a Git Compose file accepts content volumes with host paths', function () {
+    $application = contentHostPathApplication(CONTENT_HOST_PATH_SAFE_COMPOSE);
+    contentHostPathFakeGitCompose(CONTENT_HOST_PATH_COMPOSE);
+
+    $application->loadComposeFile();
+
+    expect($application->fresh()->docker_compose_raw)->toContain('source: /etc/myapp/app.conf')
+        ->and(LocalFileVolume::query()->orderBy('mount_path')->pluck('fs_path')->all())->toBe([
+            '/etc/myapp/app.conf',
+            $application->workdir().'/x/app.conf',
+            'app.conf',
+            dirname($application->workdir()).'/shared/app.conf',
+        ]);
+});
+
+test('loading a Git Compose file rejects shell injection in a content volume source', function () {
+    $application = contentHostPathApplication(CONTENT_HOST_PATH_SAFE_COMPOSE);
+    contentHostPathFakeGitCompose(CONTENT_HOST_PATH_INJECTION_COMPOSE);
 
     expect(fn () => $application->loadComposeFile())
-        ->toThrow(Exception::class, 'with content must be inside the resource directory');
+        ->toThrow(Exception::class, 'Invalid Docker volume definition');
 
-    expect($application->fresh()->docker_compose_raw)->toBe(CONTENT_CONFINEMENT_SAFE_COMPOSE)
+    expect($application->fresh()->docker_compose_raw)->toBe(CONTENT_HOST_PATH_SAFE_COMPOSE)
         ->and(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('the service API rejects a content volume outside the service directory', function () {
-    $service = contentConfinementService(CONTENT_CONFINEMENT_SAFE_COMPOSE);
+function contentHostPathPatchService(Service $service, string $compose): TestResponse
+{
     $plainTextToken = Str::random(40);
-    $token = $this->user->tokens()->create([
-        'name' => 'content-confinement',
+    $token = test()->user->tokens()->create([
+        'name' => 'content-host-path',
         'token' => hash('sha256', $plainTextToken),
         'abilities' => ['*'],
-        'team_id' => $this->team->id,
+        'team_id' => test()->team->id,
     ]);
 
-    $this->withHeaders(['Authorization' => 'Bearer '.$token->getKey().'|'.$plainTextToken])
-        ->patchJson("/api/v1/services/{$service->uuid}", [
-            'docker_compose_raw' => base64_encode(CONTENT_CONFINEMENT_OUTSIDE_COMPOSE),
-        ])
-        ->assertStatus(422)
-        ->assertJsonPath('errors.docker_compose_raw', 'Volume source /root/.ssh/authorized_keys with content must be inside the resource directory. Use a relative path such as ./config/app.conf.');
+    return test()->withHeaders(['Authorization' => 'Bearer '.$token->getKey().'|'.$plainTextToken])
+        ->patchJson("/api/v1/services/{$service->uuid}", ['docker_compose_raw' => base64_encode($compose)]);
+}
 
-    expect($service->fresh()->docker_compose_raw)->toBe(CONTENT_CONFINEMENT_SAFE_COMPOSE)
+test('the service API saves content volumes with host paths', function () {
+    $service = contentHostPathService(CONTENT_HOST_PATH_SAFE_COMPOSE);
+    contentHostPathFakeServer();
+
+    contentHostPathPatchService($service, CONTENT_HOST_PATH_COMPOSE)->assertSuccessful();
+
+    expect($service->fresh()->docker_compose_raw)->toContain('source: /etc/myapp/app.conf')
+        ->and(LocalFileVolume::query()->where('fs_path', '/etc/myapp/app.conf')->value('content'))->toBe('a');
+});
+
+test('the service API rejects shell injection in a content volume source', function () {
+    $service = contentHostPathService(CONTENT_HOST_PATH_SAFE_COMPOSE);
+
+    contentHostPathPatchService($service, CONTENT_HOST_PATH_INJECTION_COMPOSE)
+        ->assertStatus(422)
+        ->assertJsonPath('errors.docker_compose_raw', fn (string $error): bool => str_contains($error, 'Invalid Docker volume definition'));
+
+    expect($service->fresh()->docker_compose_raw)->toBe(CONTENT_HOST_PATH_SAFE_COMPOSE)
         ->and(LocalFileVolume::query()->count())->toBe(0);
 });

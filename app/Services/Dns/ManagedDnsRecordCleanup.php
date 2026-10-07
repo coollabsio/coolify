@@ -23,6 +23,11 @@ use Throwable;
  */
 class ManagedDnsRecordCleanup
 {
+    /**
+     * A record without references is released only after this time, so a record that was just created is never touched.
+     */
+    public const ORPHAN_GRACE_MINUTES = 60;
+
     public function __construct(
         private CloudflareDnsProvider $provider,
         private ManagedDnsHostnameLock $hostnameLock,
@@ -145,6 +150,57 @@ class ManagedDnsRecordCleanup
     }
 
     /**
+     * Releases orphaned records: records whose references all point to deleted (or soft-deleted) resources, and
+     * records without references that are older than the grace period. Records with a live reference are not touched.
+     * Each orphan goes through release(), so a hostname that a live resource uses again keeps its record, and
+     * Busy or Failed records stay for the next run. Never throws.
+     *
+     * @return array<string, int> Number of records per outcome (a ManagedDnsDeletionResult value, "kept" or "forgotten").
+     */
+    public function releaseOrphanedRecords(): array
+    {
+        $counts = [];
+        $cutoff = now()->subMinutes(self::ORPHAN_GRACE_MINUTES);
+
+        ManagedDnsRecord::query()
+            ->where(fn (Builder $query) => $query->has('references')->orWhere('created_at', '<=', $cutoff))
+            ->with('references.resource')
+            ->chunkById(100, function (Collection $records) use (&$counts): void {
+                foreach ($records as $record) {
+                    if ($record->references->contains(fn (ManagedDnsRecordReference $reference): bool => $reference->resource !== null)) {
+                        continue;
+                    }
+
+                    $outcome = $this->releaseOrphanedRecord($record);
+                    $counts[$outcome] = ($counts[$outcome] ?? 0) + 1;
+                }
+            });
+
+        return $counts;
+    }
+
+    private function releaseOrphanedRecord(ManagedDnsRecord $record): string
+    {
+        try {
+            $result = $this->release($record, [], true);
+        } catch (Throwable $e) {
+            Log::warning('Managed DNS orphaned record cleanup failed.', [
+                'managed_dns_record_id' => $record->id,
+                'hostname' => $record->name,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ManagedDnsDeletionResult::Failed->value;
+        }
+
+        if ($result !== null) {
+            return $result->value;
+        }
+
+        return ManagedDnsRecord::query()->whereKey($record->getKey())->exists() ? 'kept' : 'forgotten';
+    }
+
+    /**
      * Runs under the hostname lock, so a concurrent create or reference for the same hostname either finishes before
      * the usage re-check or starts after the record is gone. When the lock is not free in time, nothing changes and
      * Busy is returned so the caller can retry.
@@ -213,7 +269,7 @@ class ManagedDnsRecordCleanup
         }
 
         if (! $record->owned || ! $deleteRecord) {
-            $record->delete();
+            $this->forget($record, $record->owned ? 'kept_by_user' : 'not_owned', 'info');
 
             return $record->owned ? null : ManagedDnsDeletionResult::NotOwned;
         }
@@ -333,19 +389,24 @@ class ManagedDnsRecordCleanup
      */
     private function deleteReferences(ManagedDnsRecord $record, array $keys): void
     {
+        // An empty nested where adds no constraint and would delete every reference of the record.
+        if ($keys === []) {
+            return;
+        }
+
         $this->whereResourceKeys($record->references()->getQuery(), $keys)->delete();
     }
 
     /**
      * Stops tracking the record without touching the provider.
      */
-    private function forget(ManagedDnsRecord $record, string $reason): void
+    private function forget(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
         $record->delete();
-        $this->auditSkipped($record, $reason);
+        $this->auditSkipped($record, $reason, $level);
     }
 
-    private function auditSkipped(ManagedDnsRecord $record, string $reason): void
+    private function auditSkipped(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
         $source = auth()->check() ? 'ui' : 'system';
         auditLog("{$source}.dns_record.delete_skipped", [
@@ -353,7 +414,7 @@ class ManagedDnsRecordCleanup
             'hostname' => $record->name,
             'provider' => 'cloudflare',
             'reason' => $reason,
-        ], 'warning');
+        ], $level);
     }
 
     /**

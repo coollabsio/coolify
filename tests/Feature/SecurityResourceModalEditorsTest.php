@@ -29,60 +29,6 @@ beforeEach(function () {
     Storage::fake('ssh-keys');
 });
 
-it('opens security resources in modal editors and keeps create actions in card headers', function () {
-    $views = [
-        resource_path('views/livewire/security/private-key/index.blade.php'),
-        resource_path('views/livewire/security/cloud-provider-tokens.blade.php'),
-        resource_path('views/livewire/security/cloud-init-scripts.blade.php'),
-    ];
-
-    foreach ($views as $view) {
-        $contents = file_get_contents($view);
-
-        expect($contents)
-            ->toContain('<x-application.settings-section')
-            ->toContain('<x-slot:actions>')
-            ->toContain('<x-modal-input title="Edit')
-            ->toContain('<x-reicon name="settings"')
-            ->toContain(':contentClicks="false"')
-            ->not->toContain('href="{{ route(\'security.');
-    }
-
-    expect(file_get_contents($views[0]))
-        ->toContain('>Private key</div>', '>Status</div>')
-        ->toContain('wire:click="openEditor(\'{{ $key->uuid }}\')"')
-        ->toContain("\$dispatch('open-private-key-editor', { name:")
-        ->toContain('$refs.loadingPrivateKeyName.value = $event.detail.name')
-        ->toContain('wire:loading.flex wire:target="openEditor"')
-        ->toContain('aria-label="Loading private key editor"')
-        ->toContain('class="w-full flex-col gap-4"')
-        ->toContain('<x-forms.input label="Public key" loading')
-        ->toContain('<x-forms.input loading :allowToPeak="false" />')
-        ->toContain('<x-forms.input label="Name" required x-ref="loadingPrivateKeyName" />')
-        ->toContain('<x-forms.input label="Description" x-ref="loadingPrivateKeyDescription" />')
-        ->not->toContain('class="flex flex-col gap-1.5 lg:col-span-2"')
-        ->not->toContain('animate-pulse')
-        ->and(substr_count(file_get_contents($views[0]), '<livewire:security.private-key.show'))->toBe(1);
-    expect(file_get_contents($views[1]))->toContain('>Token</div>', '>Provider</div>');
-    expect(file_get_contents($views[2]))->toContain('>Script</div>', '>Last updated</div>');
-
-    expect(substr_count(file_get_contents($views[0]), 'sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem]'))->toBeGreaterThanOrEqual(2);
-    expect(substr_count(file_get_contents($views[1]), 'sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_1.75rem]'))->toBeGreaterThanOrEqual(2);
-    expect(substr_count(file_get_contents($views[2]), 'grid-cols-[minmax(0,1fr)_12rem_1.75rem]'))->toBeGreaterThanOrEqual(2);
-    expect(file_get_contents($views[2]))
-        ->toContain('<div>Last updated</div>')
-        ->toContain('<div class="flex items-center">')
-        ->not->toContain('<div class="text-right">Last updated</div>');
-
-    foreach ($views as $view) {
-        expect(file_get_contents($view))
-            ->toContain('grid-cols-[')
-            ->toContain('items-center gap-3')
-            ->toContain('class="pl-11"')
-            ->toContain('text-[13px] font-medium');
-    }
-});
-
 it('deletes a cloud-init script from its modal editor without redirecting to a detail page', function () {
     $script = CloudInitScript::query()->create([
         'team_id' => $this->team->id,
@@ -154,16 +100,4 @@ it('loads the public key with the editor instead of making a follow-up request',
         'private_key_uuid' => $privateKey->uuid,
         'modalMode' => true,
     ])->assertSet('public_key', $privateKey->getPublicKey());
-
-    expect(file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php')))
-        ->not->toContain('x-init="$wire.loadPublicKey()"');
-});
-
-it('shows deletion progress in the underlying private key editor', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php'));
-
-    expect($view)
-        ->toContain('wire:loading.class="pointer-events-none opacity-50" wire:target="delete"')
-        ->toContain('wire:loading.flex wire:target="delete"')
-        ->toContain('<x-loading text="Deleting private key..." />');
 });

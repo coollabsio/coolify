@@ -201,18 +201,14 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $escapedWorkdir = escapeshellarg($workdir);
         $commands = collect([
             "mkdir -p -- {$escapedWorkdir} > /dev/null 2>&1 || true",
-            "cd {$escapedWorkdir}",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
-            $path = str(data_get($fileVolume, 'fs_path'));
             $content = data_get($fileVolume, 'content');
-            if ($path->startsWith('.')) {
-                $path = $path->after('.');
-                $fileLocation = $workdir.$path;
-            } else {
-                $fileLocation = $path;
-            }
+            // A relative path is inside the resource directory, never in the SSH user's working
+            // directory. A persisted Compose expression (`${VAR:-/path}`) stays as it is.
+            $fsPath = trim((string) $fileVolume->fs_path);
+            $fileLocation = str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
             $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
             // Exists and is a file
             $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
@@ -238,16 +234,14 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
-                // Does not exists (no dir or file), not flagged as directory, is init, has content.
-                // Content is written only inside the resource directory, as a literal path.
-                $escapedContentLocation = escapeshellarg($fileVolume->confinedContentPath((string) $fileLocation, $server));
+                // Does not exists (no dir or file), not flagged as directory, is init, has content
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedContentLocation.')"',
-                    "echo '$content' | base64 -d | tee -- {$escapedContentLocation}",
+                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
+                    "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
@@ -275,7 +269,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         if (! $dockerComposeRaw) {
             throw new Exception('No compose file found or not a valid YAML file.');
         }
-        $dockerCompose = Yaml::parse($dockerComposeRaw);
+        $dockerCompose = parseDockerComposeYaml($dockerComposeRaw);
 
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');

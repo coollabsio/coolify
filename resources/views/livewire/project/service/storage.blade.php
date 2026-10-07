@@ -112,6 +112,11 @@
                                                     })
                                                 }
                                             })">
+                                            @if ($this->volumeUnavailableReason)
+                                                <x-callout type="warning" title="Volume mounts are unavailable" class="w-full">
+                                                    {{ $this->volumeUnavailableReason }}
+                                                </x-callout>
+                                            @else
                                             <form class="flex w-full flex-col gap-4"
                                                 wire:submit='submitPersistentVolume'>
                                                 <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
@@ -130,6 +135,7 @@
                                                     </div>
                                                 </div>
                                             </form>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -176,7 +182,12 @@
                                                 x-data="{
                                                     hostPath: @js($this->fileStorageHostPath()),
                                                     filePath: @entangle('file_storage_path'),
+                                                    sourcePath: @entangle('file_storage_source'),
                                                     previewPath() {
+                                                        const source = (this.sourcePath || '').trim();
+                                                        if (source !== '') {
+                                                            return source.startsWith('/') ? source : `${this.hostPath}/${source.replace(/^\.\//, '')}`;
+                                                        }
                                                         const path = (this.filePath || '').trim();
 
                                                         return this.hostPath + (path === '' ? '/' : (path.startsWith('/') ? path : `/${path}`));
@@ -196,6 +207,11 @@
                                                         label="Destination Path" required
                                                         x-on:input="filePath = $event.target.value"
                                                         helper="File location inside the container" />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/srv/config/app.conf" id="file_storage_source"
+                                                        label="Source Path"
+                                                        x-on:input="sourcePath = $event.target.value"
+                                                        helper="Optional. File location on the host: an absolute path anywhere on the host, or a path relative to the resource directory. Empty: Coolify keeps the file in the resource directory. Coolify never deletes a file outside the resource directory." />
                                                     <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
                                                         id="file_storage_content"></x-forms.textarea>
                                                     <div class="flex justify-end pt-2">
@@ -320,7 +336,7 @@
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="{{ application_configuration_dir() }}/{{ $resource->uuid }}/etc/nginx"
                                                         id="file_storage_directory_source" label="Source Directory"
-                                                        required helper="Directory on the host system." />
+                                                        required helper="Directory on the host: an absolute path anywhere on the host, or a path relative to the resource directory. Coolify creates it when it is missing, and never deletes a directory outside the resource directory." />
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx" id="file_storage_directory_destination"
                                                         label="Destination Directory" required
@@ -465,6 +481,59 @@
                     @endif
                 </div>
             @endif
+        </x-application.settings-section>
+    @endif
+
+    @if (count($externalVolumes) > 0)
+        {{-- External Compose volumes: read-only, no storage entry, never removed by Coolify --}}
+        <x-application.settings-section :id="'external-volumes-'.$resource->uuid" title="External volumes"
+            :flush="true"
+            helper="Docker volumes that the Docker Compose file declares with external: true. Coolify mounts them as written.">
+            <div class="flex w-full flex-col">
+                <div
+                    class="border-b border-neutral-200 px-4 py-3 text-[13px] leading-5 text-neutral-500 dark:border-white/[0.08] dark:text-fg-dim">
+                    Managed outside Coolify. Coolify never removes these volumes.
+                </div>
+                <div class="data-table w-full">
+                    <div class="data-table-header external-volumes-table-grid">
+                        <span>Volume</span>
+                        <span>Docker volume</span>
+                        <span>Mount path</span>
+                        <span>Service</span>
+                    </div>
+                    @foreach ($externalVolumes as $externalVolume)
+                        <div class="env-table-item"
+                            wire:key="external-volume-{{ $externalVolume['service'] }}-{{ $externalVolume['key'] }}">
+                            <div
+                                class="data-table-row external-volumes-table-grid text-[13px] text-neutral-700 dark:text-fg-dim">
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Volume</span>
+                                    <span class="block min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
+                                        title="{{ $externalVolume['key'] }}">{{ $externalVolume['key'] }}</span>
+                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">External volume</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Docker volume</span>
+                                    <span class="block min-w-0 truncate text-neutral-950 dark:text-fg"
+                                        title="{{ $externalVolume['dockerName'] }}">{{ $externalVolume['dockerName'] }}</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Mount path</span>
+                                    @foreach ($externalVolume['mountPaths'] as $mountPath)
+                                        <span class="block min-w-0 truncate text-neutral-950 dark:text-fg"
+                                            title="{{ $mountPath }}">{{ $mountPath }}</span>
+                                    @endforeach
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Service</span>
+                                    <span class="block min-w-0 truncate"
+                                        title="{{ $externalVolume['service'] }}">{{ $externalVolume['service'] }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
         </x-application.settings-section>
     @endif
 </div>

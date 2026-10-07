@@ -2,13 +2,27 @@
 
 namespace App\Actions\Server;
 
+use App\Enums\TrafficIpMode;
 use App\Events\SentinelRestarted;
 use App\Models\Server;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartSentinel
 {
     use AsAction;
+
+    /** Longer than one start, including the image pull. */
+    public const LOCK_SECONDS = 300;
+
+    /** Shorter than the 120 second timeout of CheckAndStartSentinelJob. */
+    public const LOCK_WAIT_SECONDS = 90;
+
+    public static function lockKey(Server $server): string
+    {
+        return 'sentinel-start:'.$server->uuid;
+    }
 
     /**
      * Sentinel and the proxy both mount this host path, and Sentinel reads the access log at the same path.
@@ -45,6 +59,7 @@ class StartSentinel
             'TRAFFIC_RETENTION_1D_DAYS' => (string) ($settings->traffic_retention_1d_days ?: 395),
             'GEOIP_ENABLED' => $settings->is_geoip_enabled ? 'true' : 'false',
             'GEOIP_REFRESH_DAYS' => (string) ($settings->geoip_refresh_days ?: 30),
+            'TRAFFIC_IP_MODE' => TrafficIpMode::forServer($server)->value,
         ];
         $license = data_get($settings, 'geoip_maxmind_license_key');
         if ($settings->is_geoip_enabled && filled($license)) {
@@ -74,11 +89,27 @@ class StartSentinel
         ];
     }
 
-    public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null)
+    /**
+     * @throws LockTimeoutException when another start for the server does not finish in time
+     */
+    public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null): void
     {
         if ($server->isSwarm() || $server->isBuildServer()) {
             return;
         }
+
+        // Two starts at the same time both remove the container, and then the second `docker run`
+        // fails because the first one already uses the coolify-sentinel name.
+        Cache::lock(self::lockKey($server), self::LOCK_SECONDS)->block(
+            self::LOCK_WAIT_SECONDS,
+            fn () => $this->start($server, $restart, $latestVersion, $customImage),
+        );
+    }
+
+    private function start(Server $server, bool $restart, ?string $latestVersion, ?string $customImage): void
+    {
+        // A start that waited for the lock must use the settings saved in the meantime.
+        $server->refresh();
         if ($restart) {
             StopSentinel::run($server);
         }
@@ -117,7 +148,7 @@ class StartSentinel
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $network = $server->isLocalhost() ? ' --network coolify' : '';
-        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
         $server->sentinelHeartbeat(isReset: true);
         $server->forceFill(['sentinel_waiting_since' => now()])->save();

@@ -61,9 +61,4 @@ class ConfigurationRepository
             Mail::purge();
         }
     }
-
-    public function disableSshMux(): void
-    {
-        $this->config->set('constants.ssh.mux_enabled', false);
-    }
 }

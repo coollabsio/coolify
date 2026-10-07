@@ -112,9 +112,11 @@ class InstanceSettings extends Model
             // Clear once() cache so subsequent calls get fresh data
             Once::flush();
 
-            // Clear trusted hosts cache when FQDN changes
-            if ($settings->wasChanged('fqdn')) {
-                \Cache::forget('instance_settings_fqdn_host');
+            if ($settings->wasChanged(['fqdn', 'public_ipv4', 'public_ipv6'])) {
+                ServerSetting::followInstanceUrlChange(
+                    ServerSetting::instanceSentinelUrl($settings->getOriginal('fqdn'), $settings->getOriginal('public_ipv4'), $settings->getOriginal('public_ipv6')),
+                    ServerSetting::instanceSentinelUrl($settings->fqdn, $settings->public_ipv4, $settings->public_ipv6),
+                );
             }
         });
     }

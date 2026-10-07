@@ -50,4 +50,13 @@ class SslCertificate extends Model
     {
         return $this->belongsTo(Server::class);
     }
+
+    /**
+     * Whether the database reads its certificate and key from one combined server.pem file
+     * instead of separate server.crt and server.key files.
+     */
+    public function requiresPemKeyFile(): bool
+    {
+        return $this->resource_type === StandaloneMongodb::class;
+    }
 }

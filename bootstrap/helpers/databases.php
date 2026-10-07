@@ -199,6 +199,16 @@ function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker 
     return $database;
 }
 
+/**
+ * Shell line that pipes $source into $sink and writes the output to $escapedFile. It fails when
+ * either command fails: a plain pipe only reports the exit status of $sink, so a failed dump
+ * would still leave a small, valid archive. POSIX sh (dash, BusyBox ash); no pipefail needed.
+ */
+function pipeToFileKeepingExitStatus(string $source, string $sink, string $escapedFile): string
+{
+    return 'status=$( { { '.$source.'; echo $? >&3; } | '.$sink.' > '.$escapedFile.'; } 3>&1 ) && [ "$status" -eq 0 ]';
+}
+
 function deleteBackupsLocally(string|array|null $filenames, Server $server, bool $throwError = false): void
 {
     if (empty($filenames)) {
@@ -216,12 +226,17 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server, bool
 
 function streamBackupFromServer(Server $server, string $filename, string $contentType): StreamedResponse
 {
+    $privateKey = $server->privateKey;
+    if (! $privateKey || $privateKey->team_id !== $server->team_id) {
+        throw new RuntimeException('Private key not found for this server.');
+    }
+
     $disk = Storage::build([
         'driver' => 'sftp',
         'host' => $server->ip,
         'port' => (int) $server->port,
         'username' => $server->user,
-        'privateKey' => $server->privateKey->getKeyLocation(),
+        'privateKey' => $privateKey->getKeyLocation(),
         'root' => '/',
     ]);
 
@@ -267,9 +282,16 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'endpoint' => $s3->endpoint,
         'use_path_style_endpoint' => true,
         'aws_url' => $s3->awsUrl(),
+        'throw' => true,
     ]);
 
-    if (! $disk->delete($filenames)) {
+    try {
+        $deleted = $disk->delete($filenames);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('One or more S3 backup files could not be deleted.', previous: $exception);
+    }
+
+    if (! $deleted) {
         throw new RuntimeException('One or more S3 backup files could not be deleted.');
     }
 }

@@ -1,20 +1,28 @@
 <?php
 
+use App\Auth\GitlabProvider;
 use App\Auth\Oidc\OidcConfig;
 use App\Models\OauthSetting;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\BitbucketProvider;
 use Laravel\Socialite\Two\GithubProvider;
-use Laravel\Socialite\Two\GitlabProvider;
 use SocialiteProviders\Discord\Provider;
 use SocialiteProviders\Manager\Config;
+
+/**
+ * Callback URL built from the instance URL, never from the request Host header.
+ */
+function oauth_default_redirect_uri(string $provider): string
+{
+    return rtrim(base_url(), '/').route('auth.callback', $provider, false);
+}
 
 function get_socialite_provider(string $provider)
 {
     $oauth_setting = OauthSetting::firstWhere('provider', $provider);
 
     if (! filled($oauth_setting->redirect_uri)) {
-        $oauth_setting->update(['redirect_uri' => route('auth.callback', $provider)]);
+        $oauth_setting->redirect_uri = oauth_default_redirect_uri($provider);
     }
 
     if ($provider === 'azure') {

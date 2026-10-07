@@ -10,7 +10,6 @@ use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
@@ -367,7 +366,7 @@ class ServiceApplication extends BaseModel
                 return $this->service->getRequiredPort();
             }
 
-            $dockerCompose = Yaml::parse($dockerComposeRaw);
+            $dockerCompose = parseDockerComposeYaml($dockerComposeRaw);
             $serviceConfig = $dockerCompose['services'][$this->name] ?? null;
             if (! $serviceConfig) {
                 return $this->service->getRequiredPort();
@@ -448,7 +447,7 @@ class ServiceApplication extends BaseModel
      */
     private function getSavedLegacyRoutingPort(array $serviceConfig): ?int
     {
-        $savedCompose = Yaml::parse($this->service->docker_compose ?? '');
+        $savedCompose = parseDockerComposeYaml($this->service->docker_compose ?? '');
         $savedService = $savedCompose['services'][$this->name] ?? null;
         $image = $serviceConfig['image'] ?? null;
         if (! is_string($image) || $image === '' || ($savedService['image'] ?? null) !== $image) {

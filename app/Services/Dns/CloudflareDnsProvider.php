@@ -7,6 +7,7 @@ use App\Exceptions\DnsRecordConflictException;
 use App\Models\DnsProviderZone;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
+use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\PendingRequest;
@@ -132,7 +133,7 @@ class CloudflareDnsProvider
     {
         $type = $this->recordType($content);
         $remoteRecords = $this->findRecords($zone, $hostname, $type);
-        $matching = collect($remoteRecords)->first(fn (array $remote): bool => $remote['content'] === $content);
+        $matching = collect($remoteRecords)->first(fn (array $remote): bool => DnsRecordHints::sameAddress($remote['content'], $content));
         if ($matching !== null) {
             if ($matching['id'] === '') {
                 throw new RuntimeException('Cloudflare DNS records could not be checked.');
@@ -222,7 +223,7 @@ class CloudflareDnsProvider
         if ($remote === null
             || $remote['id'] === ''
             || $remote['id'] !== $recordId
-            || ($expectedCurrent !== null && $remote['content'] !== $expectedCurrent)
+            || ($expectedCurrent !== null && ! DnsRecordHints::sameAddress($remote['content'], $expectedCurrent))
             || $remote['name'] !== $hostname) {
             throw new RuntimeException('The DNS conflict is no longer available. Check the record again.');
         }
@@ -265,7 +266,7 @@ class CloudflareDnsProvider
             }
             if (($remote['type'] ?? null) !== $record->type
                 || strtolower((string) ($remote['name'] ?? '')) !== $record->name
-                || ($remote['content'] ?? null) !== $record->content
+                || ! DnsRecordHints::sameAddress(is_string($remote['content'] ?? null) ? $remote['content'] : null, $record->content)
                 || ($remote['comment'] ?? null) !== $record->ownershipComment()) {
                 return ManagedDnsDeletionResult::ChangedExternally;
             }
@@ -287,9 +288,7 @@ class CloudflareDnsProvider
     private function forgetDeletedRecord(ManagedDnsRecord $record, ManagedDnsDeletionResult $result, ?Model $resource): ManagedDnsDeletionResult
     {
         $record->delete();
-        if ($result === ManagedDnsDeletionResult::Deleted) {
-            $this->auditDnsRecord('deleted', $record->zone, $record->name, $resource);
-        }
+        $this->auditDnsRecord($result === ManagedDnsDeletionResult::Deleted ? 'deleted' : 'already_deleted', $record->zone, $record->name, $resource);
 
         return $result;
     }

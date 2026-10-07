@@ -192,3 +192,14 @@ it('does not detect changes when sentinel field is set to same value', function 
 
     expect($changeDetected)->toBeFalse();
 });
+
+it('restarts sentinel when a setting in its environment changes while sentinel is enabled', function (string $field) {
+    $settings = $this->server->settings;
+    $settings->is_sentinel_enabled = true;
+    $settings->save();
+
+    $settings->{$field} = ! $settings->{$field};
+    $settings->save();
+
+    Queue::assertPushed(JobDecorator::class, fn ($job) => isStartSentinelJob($job));
+})->with(['is_metrics_enabled', 'is_sentinel_debug_enabled']);

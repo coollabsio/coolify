@@ -67,7 +67,7 @@ class Show extends Component
         ]);
 
         auditLog('ui.cloud_token.updated', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudProviderToken->team_id,
             'cloud_token_uuid' => $this->cloudProviderToken->uuid,
             'cloud_token_name' => $this->cloudProviderToken->name,
             'provider' => $this->cloudProviderToken->provider,
@@ -98,7 +98,7 @@ class Show extends Component
         );
 
         auditLog('ui.cloud_token.validated', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudProviderToken->team_id,
             'cloud_token_uuid' => $this->cloudProviderToken->uuid,
             'cloud_token_name' => $this->cloudProviderToken->name,
             'provider' => $this->cloudProviderToken->provider,
@@ -118,7 +118,7 @@ class Show extends Component
         }
 
         auditLog('ui.cloud_token.deleted', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudProviderToken->team_id,
             'cloud_token_uuid' => $this->cloudProviderToken->uuid,
             'cloud_token_name' => $this->cloudProviderToken->name,
             'provider' => $this->cloudProviderToken->provider,

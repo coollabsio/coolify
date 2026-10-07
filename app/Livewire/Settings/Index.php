@@ -104,9 +104,29 @@ class Index extends Component
         $this->settings->instance_timezone = $this->instance_timezone;
         $this->settings->dev_helper_version = $this->dev_helper_version;
         if ($isSave) {
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
         }
+    }
+
+    /**
+     * Save the instance settings and record the changed field names.
+     */
+    private function saveAndAudit(): void
+    {
+        $changedFields = auditChangedFields($this->settings);
+        $this->settings->save();
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.instance.settings.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'section' => 'general',
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function confirmDomainUsage()
@@ -169,7 +189,7 @@ class Index extends Component
 
             $this->instantSave(isSave: false);
 
-            $this->settings->save();
+            $this->saveAndAudit();
             if ($this->server) {
                 $this->server->setupDynamicProxyConfiguration();
             }

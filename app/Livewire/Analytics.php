@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Enums\TrafficIpMode;
 use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Models\Server;
@@ -13,6 +14,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -22,8 +24,10 @@ class Analytics extends Component
 {
     use BuildsTrafficChartPayload;
 
+    #[Locked]
     public string $chartId = 'global-analytics';
 
+    #[Locked]
     public ?string $scopedServerUuid = null;
 
     /** Traffic-enabled servers owned by the current team. */
@@ -76,16 +80,17 @@ class Analytics extends Component
 
     public ?string $attribution = null;
 
+    /** Effective TrafficIpMode of the queried servers; decides how the IP breakdown renders. */
+    #[Locked]
+    public string $ipMode = 'full';
+
     /**
      * Per-bucket status-class time series for the stacked area chart, summed across
-     * target servers and sorted by bucket. Empty when no target Sentinel exposes the
-     * series endpoint (older builds), which flips the chart back to the status donut.
+     * target servers and sorted by bucket.
      *
      * @var array<int, array{bucket: int, s2xx: int, s3xx: int, s4xx: int, s5xx: int}>
      */
     public array $series = [];
-
-    public bool $hasSeries = false;
 
     /**
      * Servers that could run traffic analytics but have it off — drives the nudge banner.
@@ -326,18 +331,27 @@ class Analytics extends Component
 
     public function loadData(): void
     {
+        $this->resetData();
+
+        foreach ($this->servers as $server) {
+            $this->authorize('view', $server);
+        }
+
         if ($this->servers->isEmpty()) {
             return;
         }
 
         [$from, $to] = $this->window();
         // A selected application or service is queried in Sentinel's resource scope, or under
-        // all of its keys on an older Sentinel.
+        // all of its keys on a Sentinel without resource routes (before 1.0.2).
         $resource = $this->selectedResource();
         $servers = $this->targetServers();
         $domainForKey = fn (string $key): ?string => $this->appMeta($key)['domain'];
+        $ipMode = TrafficIpMode::forServers($servers);
+        $this->ipMode = $ipMode->value;
+        $dimensions = $ipMode->breakdownDimensions($this->breakdownDimensions);
 
-        $aggregator = new TrafficAnalyticsAggregator($this->breakdownDimensions);
+        $aggregator = new TrafficAnalyticsAggregator($dimensions);
         $appRows = [];
         $hostTotals = [];
 
@@ -347,27 +361,24 @@ class Analytics extends Component
 
                 if ($resource !== null) {
                     // One server in Sentinel's resource scope is exact; a merge across servers
-                    // or the per-key fallback of an older Sentinel stays approximate.
+                    // or the per-key fallback (Sentinel before 1.0.2) stays approximate.
                     $aggregator->collectResource($client, $resource->uuid(), $from, $to, $this->range, $domainForKey);
 
                     continue;
                 }
 
-                // Warm every server-wide endpoint in one docker exec instead of ~15 serial
-                // SSH round-trips; the per-call methods below then read from cache.
-                $leaderboardKeys = $client->prefetchServerWide(null, $from, $to, $this->breakdownDimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
+                // Warm every server-wide endpoint, including the leaderboard's per-key
+                // overviews, in one dashboard fetch; the per-call methods below then read
+                // from cache.
+                $leaderboardKeys = $client->prefetchServerWide(null, $from, $to, $dimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
 
-                if ($leaderboardKeys !== []) {
-                    if (count($leaderboardKeys) > self::MAX_LEADERBOARD_APPS) {
-                        Log::warning('Traffic analytics leaderboard truncated', [
-                            'server' => $server->uuid,
-                            'total' => count($leaderboardKeys),
-                            'shown' => self::MAX_LEADERBOARD_APPS,
-                        ]);
-                        $leaderboardKeys = array_slice($leaderboardKeys, 0, self::MAX_LEADERBOARD_APPS);
-                    }
-                    // Warm the leaderboard's per-key overviews in a second batched exec.
-                    $client->prefetchAppOverviews($leaderboardKeys, $from, $to);
+                if (count($leaderboardKeys) > self::MAX_LEADERBOARD_APPS) {
+                    Log::warning('Traffic analytics leaderboard truncated', [
+                        'server' => $server->uuid,
+                        'total' => count($leaderboardKeys),
+                        'shown' => self::MAX_LEADERBOARD_APPS,
+                    ]);
+                    $leaderboardKeys = array_slice($leaderboardKeys, 0, self::MAX_LEADERBOARD_APPS);
                 }
 
                 $aggregator->collect($client, null, $from, $to, $this->range, $domainForKey);
@@ -426,31 +437,21 @@ class Analytics extends Component
         $this->breakdowns = $aggregator->breakdowns();
         $this->attribution = $aggregator->attribution();
         $this->series = $aggregator->series();
-        $this->hasSeries = $this->series !== [];
 
         $this->dispatch("refreshChartData-{$this->chartId}-status", $this->chartPayload());
     }
 
     /**
-     * Payload for the status chart: the stacked-area time series when available,
-     * plus the donut totals as a fallback for older Sentinel builds.
+     * Payload for the status chart: the stacked-area time series and the KPI sparklines.
      *
      * @return array<string, mixed>
      */
     protected function chartPayload(): array
     {
         $device = $this->deviceChartData();
-        $overview = $this->overview ?? [];
 
         return [
-            'hasSeries' => $this->hasSeries,
             'range' => $this->range,
-            'seriesData' => [
-                $overview['s2xx'] ?? 0,
-                $overview['s3xx'] ?? 0,
-                $overview['s4xx'] ?? 0,
-                $overview['s5xx'] ?? 0,
-            ],
             'timeSeries' => [
                 'categories' => array_column($this->series, 'bucket'),
                 'requests' => $this->requestsSpark(),
@@ -482,7 +483,6 @@ class Analytics extends Component
         $this->breakdowns = [];
         $this->attribution = null;
         $this->series = [];
-        $this->hasSeries = false;
     }
 
     public function errorRate(): float
@@ -560,14 +560,7 @@ class Analytics extends Component
      */
     private function window(): array
     {
-        $to = now();
-        $from = match ($this->range) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
-        };
-
-        return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+        return SentinelTrafficClient::rangeWindow($this->range);
     }
 
     public function placeholder(array $params = []): View

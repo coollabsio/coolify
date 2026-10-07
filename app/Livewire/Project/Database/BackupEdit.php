@@ -6,6 +6,8 @@ use App\Jobs\DatabaseBackupJob;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Models\StandalonePostgresql;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -17,6 +19,7 @@ use Livewire\Component;
 class BackupEdit extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ScheduledDatabaseBackup $backup;
 
@@ -100,12 +103,10 @@ class BackupEdit extends Component
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refreshStatus';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refreshStatus';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners(['ServiceChecked' => 'refreshStatus']),
+        ];
     }
 
     public function mount()
@@ -131,7 +132,10 @@ class BackupEdit extends Component
         $this->status = $database->status;
     }
 
-    private function syncData(bool $toModel = false): void
+    /**
+     * @return array<int, string> Names of the backup fields the save changed.
+     */
+    private function syncData(bool $toModel = false): array
     {
         if ($toModel) {
             $this->backup->enabled = $this->backupEnabled;
@@ -157,7 +161,10 @@ class BackupEdit extends Component
             $this->backup->timeout = $this->timeout;
             $this->backup->missing_backup_notification_days = $this->missingBackupNotificationDays;
             $this->customValidate();
+            $changedFields = auditChangedFields($this->backup);
             $this->backup->save();
+
+            return $changedFields;
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
@@ -176,6 +183,8 @@ class BackupEdit extends Component
             $this->timeout = $this->backup->timeout;
             $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
         }
+
+        return [];
     }
 
     public function delete($password, $selectedActions = [])
@@ -301,7 +310,7 @@ class BackupEdit extends Component
         try {
             $this->authorize('manageBackups', $this->backup->database);
 
-            $this->syncData(true);
+            $this->auditBackupScheduleUpdated($this->syncData(true));
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
@@ -314,7 +323,10 @@ class BackupEdit extends Component
             $this->authorize('manageBackups', $this->backup->database);
 
             $this->backupEnabled = ! $this->backupEnabled;
-            $this->backup->update(['enabled' => $this->backupEnabled]);
+            $this->backup->enabled = $this->backupEnabled;
+            $changedFields = auditChangedFields($this->backup);
+            $this->backup->save();
+            $this->auditBackupScheduleUpdated($changedFields);
             $this->dispatch('success', $this->backupEnabled ? 'Backup enabled.' : 'Backup disabled.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
@@ -368,24 +380,37 @@ class BackupEdit extends Component
         $this->validate();
     }
 
-    private function availableS3StorageIds(): Collection
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditBackupScheduleUpdated(array $changedFields): void
     {
-        $storages = collect($this->availableS3Storages);
-        $storageIds = $storages->pluck('id')->filter()->all();
-
-        if (empty($storageIds)) {
-            return collect();
+        if ($changedFields === []) {
+            return;
         }
 
-        $teamIds = $storages->pluck('team_id')->reject(fn ($teamId) => $teamId === null)->unique()->values()->all();
+        $database = $this->backup->database;
+        auditLog('ui.database.backup_schedule_updated', [
+            'team_id' => $database?->team()?->id,
+            'database_uuid' => $database?->uuid,
+            'database_name' => $database?->name,
+            'backup_uuid' => $this->backup->uuid,
+            'changed_fields' => $changedFields,
+        ]);
+    }
 
-        if (empty($teamIds)) {
+    private function availableS3StorageIds(): Collection
+    {
+        $database = $this->backup->database;
+        // The instance database (id 0) has no project and belongs to the root team.
+        $teamId = $database instanceof StandalonePostgresql && $database->id === 0 ? 0 : $database?->team()?->id;
+
+        if ($teamId === null) {
             return collect();
         }
 
         return S3Storage::query()
-            ->whereKey($storageIds)
-            ->whereIn('team_id', $teamIds)
+            ->where('team_id', $teamId)
             ->where('is_usable', true)
             ->pluck('id');
     }
@@ -395,7 +420,7 @@ class BackupEdit extends Component
         try {
             $this->authorize('manageBackups', $this->backup->database);
 
-            $this->syncData(true);
+            $this->auditBackupScheduleUpdated($this->syncData(true));
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());

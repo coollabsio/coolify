@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
+use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
@@ -19,6 +20,7 @@ use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -38,7 +40,29 @@ class ServersController extends Controller
             ]);
         }
 
-        return serializeApiResponse($settings);
+        return serializeApiResponse($settings)
+            ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD);
+    }
+
+    /**
+     * Rejects requests where the deprecated is_build_server flag disagrees with server_role.
+     */
+    private function legacyBuildServerRoleConflict(Request $request): ?JsonResponse
+    {
+        if (! $request->filled('is_build_server') || ! $request->filled('server_role')) {
+            return null;
+        }
+
+        $wantsBuildOnly = $request->boolean('is_build_server');
+        $roleIsBuildOnly = $request->string('server_role')->toString() === ServerRole::BUILD->value;
+        if ($wantsBuildOnly === $roleIsBuildOnly) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['is_build_server' => ['is_build_server is deprecated and conflicts with server_role. Send only server_role.']],
+        ], 422);
     }
 
     private function removeSensitiveData($server)
@@ -46,14 +70,20 @@ class ServersController extends Controller
         $server->makeHidden([
             'id',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        $canReadSensitive = request()->attributes->get('can_read_sensitive', false) === true;
+        if ($canReadSensitive) {
             $server->makeVisible([
                 'logdrain_axiom_api_key',
                 'logdrain_newrelic_license_key',
             ]);
         }
 
-        return serializeApiResponse($server);
+        $serialized = serializeApiResponse($server);
+        if (! $canReadSensitive && is_array($serialized->get('proxy'))) {
+            $serialized->put('proxy', Arr::except($serialized->get('proxy'), ['last_saved_proxy_configuration']));
+        }
+
+        return $serialized;
     }
 
     #[OA\Get(
@@ -179,6 +209,7 @@ class ServersController extends Controller
             $server->load(['settings']);
         }
 
+        $server->append('unreachable_notification_sent');
         $settings = $this->removeSensitiveDataFromSettings($server->settings);
         $server = $this->removeSensitiveData($server);
         data_set($server, 'settings', $settings);
@@ -305,7 +336,7 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
         if (is_null($server)) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
@@ -443,6 +474,7 @@ class ServersController extends Controller
                         'user' => ['type' => 'string', 'example' => 'root', 'description' => 'The user of the server.'],
                         'private_key_uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the private key.'],
                         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both'], 'example' => 'both', 'description' => 'Server role.'],
+                        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false sets it to both. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'example' => 'traefik', 'description' => 'The proxy type.'],
                     ],
@@ -484,7 +516,7 @@ class ServersController extends Controller
     )]
     public function create_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'instant_validate', 'proxy_type'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -504,6 +536,7 @@ class ServersController extends Controller
             'private_key_uuid' => 'string|required',
             'user' => ValidationPatterns::serverUsernameRules(required: false),
             'server_role' => 'string|nullable|in:deployment,build,both',
+            'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
         ], [
@@ -533,9 +566,15 @@ class ServersController extends Controller
         if (is_null($request->port)) {
             $request->offsetSet('port', 22);
         }
-        $serverRole = $request->filled('server_role')
-            ? ServerRole::from($request->string('server_role')->toString())
-            : ServerRole::BOTH;
+        $legacyRoleConflict = $this->legacyBuildServerRoleConflict($request);
+        if ($legacyRoleConflict) {
+            return $legacyRoleConflict;
+        }
+        $serverRole = match (true) {
+            $request->filled('server_role') => ServerRole::from($request->string('server_role')->toString()),
+            $request->filled('is_build_server') && $request->boolean('is_build_server') => ServerRole::BUILD,
+            default => ServerRole::BOTH,
+        };
 
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->exists()) {
             return response()->json([
@@ -630,6 +669,7 @@ class ServersController extends Controller
                         'user' => ['type' => 'string', 'description' => 'The user of the server.'],
                         'private_key_uuid' => ['type' => 'string', 'description' => 'The UUID of the private key.'],
                         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both'], 'description' => 'Server role.'],
+                        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false changes a build server to both and leaves other roles unchanged. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'description' => 'Instant validate.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
                         'concurrent_builds' => ['type' => 'integer', 'description' => 'Number of concurrent builds.'],
@@ -637,6 +677,7 @@ class ServersController extends Controller
                         'deployment_queue_limit' => ['type' => 'integer', 'description' => 'Maximum number of queued deployments.'],
                         'server_disk_usage_notification_threshold' => ['type' => 'integer', 'description' => 'Server disk usage notification threshold (%).'],
                         'server_disk_usage_check_frequency' => ['type' => 'string', 'description' => 'Cron expression for disk usage check frequency.'],
+                        'server_disk_usage_notification_interval_hours' => ['type' => 'integer', 'description' => 'Minimum hours between high disk usage notifications (1-720). Default: 24.'],
                         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds (1-300). Default: 10.'],
                     ],
                 ),
@@ -674,7 +715,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout', 'is_terminal_enabled'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -693,6 +734,7 @@ class ServersController extends Controller
             'private_key_uuid' => 'string|nullable',
             'user' => ValidationPatterns::serverUsernameRules(required: false),
             'server_role' => 'string|nullable|in:deployment,build,both',
+            'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
             'concurrent_builds' => 'integer|min:1',
@@ -700,6 +742,7 @@ class ServersController extends Controller
             'deployment_queue_limit' => 'integer|min:1',
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
+            'server_disk_usage_notification_interval_hours' => 'integer|min:1|max:720',
             'connection_timeout' => 'integer|min:1|max:300',
             'is_terminal_enabled' => 'boolean|nullable',
         ], [
@@ -749,15 +792,34 @@ class ServersController extends Controller
             ], 422);
         }
 
+        $legacyRoleConflict = $this->legacyBuildServerRoleConflict($request);
+        if ($legacyRoleConflict) {
+            return $legacyRoleConflict;
+        }
+
         $serverRole = null;
         if ($request->filled('server_role')) {
             $serverRole = ServerRole::from($request->string('server_role')->toString());
+        } elseif ($request->filled('is_build_server')) {
+            // Legacy flag: true makes the server build only, false turns a build only server back into a regular one.
+            if ($request->boolean('is_build_server')) {
+                $serverRole = ServerRole::BUILD;
+            } elseif ($server->isBuildServer()) {
+                $serverRole = ServerRole::BOTH;
+            }
         }
 
         if ($serverRole === ServerRole::BUILD && ! $server->isBuildServer() && ! $server->isEmpty()) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => ['server_role' => ['A server with existing resources cannot be configured as build only.']],
+            ], 422);
+        }
+
+        if ($serverRole === ServerRole::DEPLOYMENT && $server->hasEnabledGithubRunners()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_role' => ['Disable the GitHub runners before you set this server to deployments only.']],
             ], 422);
         }
 
@@ -782,7 +844,7 @@ class ServersController extends Controller
             ]);
         }
 
-        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout']);
+        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
         }
@@ -825,6 +887,20 @@ class ServersController extends Controller
                 schema: new OA\Schema(
                     type: 'string',
                 )
+            ),
+            new OA\Parameter(
+                name: 'force',
+                in: 'query',
+                description: 'Also delete all resources on the server.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
+            new OA\Parameter(
+                name: 'delete_from_provider',
+                in: 'query',
+                description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
             ),
         ],
         responses: [
@@ -886,6 +962,26 @@ class ServersController extends Controller
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 
+        $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($deleteFromProvider)) {
+            return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
+        }
+        if ($deleteFromProvider) {
+            $linkedProviders = array_keys(array_filter([
+                'hetzner' => $server->hetzner_server_id,
+                'vultr' => $server->vultr_instance_id,
+                'digitalocean' => $server->digitalocean_droplet_id,
+            ]));
+            if (empty($linkedProviders)) {
+                return response()->json(['message' => 'Server is not linked to a cloud provider.'], 422);
+            }
+            foreach ($linkedProviders as $provider) {
+                if (! CloudProviderToken::whereTeamId($server->team_id)->whereProvider($provider)->exists()) {
+                    return response()->json(['message' => "No {$provider} token found for this team. Add one before deleting the server from the cloud provider."], 422);
+                }
+            }
+        }
+
         if ($force) {
             foreach ($server->definedResources() as $resource) {
                 DeleteResourceJob::dispatch($resource);
@@ -898,13 +994,13 @@ class ServersController extends Controller
         $server->delete();
         DeleteServer::dispatch(
             $server->id,
-            false, // Don't delete from Hetzner via API
+            $deleteFromProvider,
             $server->hetzner_server_id,
             $server->cloud_provider_token_id,
             $server->team_id,
-            false, // Don't delete from Vultr via API
+            $deleteFromProvider,
             $server->vultr_instance_id,
-            false, // Don't delete from DigitalOcean via API
+            $deleteFromProvider,
             $server->digitalocean_droplet_id
         );
 
@@ -914,6 +1010,7 @@ class ServersController extends Controller
             'server_name' => $deletedName,
             'ip' => $deletedIp,
             'force' => $force,
+            'delete_from_provider' => $deleteFromProvider,
         ]);
 
         return response()->json(['message' => 'Server deleted.']);

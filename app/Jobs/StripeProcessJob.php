@@ -23,7 +23,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public $event)
     {
-        $this->onQueue('high');
+        $this->onQueue(webhooks_queue());
     }
 
     public function handle(): void

@@ -70,6 +70,7 @@
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
                 ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => $activeSubMenu === 'dynamic-confs', 'icon' => 'sliders', 'visible' => $server->proxySet()],
+                ['label' => 'TLS Certificates', 'route' => 'server.proxy.certificates', 'active' => $activeSubMenu === 'certificates', 'icon' => 'shield-star', 'visible' => $server->proxyType() === \App\Enums\ProxyTypes::TRAEFIK->value],
                 ['label' => 'Logs', 'route' => 'server.proxy.logs', 'active' => $activeSubMenu === 'logs', 'icon' => 'file-content', 'visible' => $server->proxySet(), 'navigate' => false],
             ],
         ],
@@ -120,12 +121,37 @@
             'visible' => $server->team->usesSwarm() && ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
         ],
         [
+            'label' => 'Images',
+            'route' => 'server.docker-images',
+            'active' => $activeMenu === 'docker-images',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => $server->isFunctional(),
+        ],
+        [
             'label' => 'Docker Cleanup',
             'route' => 'server.docker-cleanup',
             'active' => $activeMenu === 'docker-cleanup',
             'icon' => 'broom',
             'group' => 'Operations',
             'visible' => $server->isFunctional(),
+        ],
+        [
+            'label' => 'GitHub Runners',
+            'route' => 'server.github-runners',
+            'active' => $activeMenu === 'github-runners',
+            'icon' => 'play-circle',
+            'group' => 'Operations',
+            'visible' => ! $server->isLocalhost(),
+            'beta' => true,
+        ],
+        [
+            'label' => 'Registries',
+            'route' => 'server.registries',
+            'active' => $activeMenu === 'registries',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => auth()->user()?->can('update', $server),
         ],
         [
             'label' => 'Log Drains',
@@ -197,6 +223,7 @@
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start"
+    data-settings-search-items="{{ json_encode(settingsSearchItems($groupedServerMenuItems, $serverRouteParameters)) }}"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
         traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),
@@ -258,6 +285,8 @@
                     @elseif ($menuItem['warning'] ?? false)
                         <x-reicon name="alert-triangle"
                             class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @elseif ($menuItem['beta'] ?? false)
+                        <x-beta-badge class="ml-auto shrink-0" />
                     @endif
                 </a>
                 @if ($menuItem['active'] && isset($menuItem['children']))

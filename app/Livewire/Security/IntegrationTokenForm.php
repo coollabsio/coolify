@@ -87,6 +87,8 @@ class IntegrationTokenForm extends Component
 
     public function addToken(IntegrationTokenValidator $validator, CloudflareDnsProvider $cloudflare): void
     {
+        $this->authorize('create', IntegrationToken::class);
+
         $validated = $this->validate();
         $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
         if ($validated['provider'] === 'cloudflare' && ! $validated['automaticDns']) {

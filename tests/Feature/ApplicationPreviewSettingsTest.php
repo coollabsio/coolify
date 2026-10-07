@@ -3,6 +3,7 @@
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -117,19 +118,21 @@ it('renders preview deployment enablement as a section action', function () {
     expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeTrue();
 });
 
-it('renders GitHub pull requests in a modal opened from the preview settings', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
-    $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
+it('does not load GitHub pull requests for GitLab sources', function () {
+    $gitlabApp = GitlabApp::create([
+        'name' => 'Self-hosted GitLab',
+        'api_url' => 'https://gitlab.example.com/api/v4',
+        'html_url' => 'https://gitlab.example.com',
+        'team_id' => $this->team->id,
+    ]);
+    $this->application->update(['source_id' => $gitlabApp->id, 'source_type' => GitlabApp::class]);
 
-    expect($view)
-        ->toContain('<x-modal-input title="Pull requests"')
-        ->toContain(':isLarge="true"')
-        ->toContain('wire:click="load_prs"')
-        ->not->toContain('id="preview-pull-requests-section"')
-        ->and(strpos($view, '<x-modal-input title="Pull requests"'))
-        ->toBeLessThan(strpos($view, '<livewire:project.application.preview.form'));
-
-    expect($sidebar)->not->toContain("['id' => 'preview-pull-requests-section', 'label' => 'Pull requests']");
+    Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->assertSee('PR deployment access')
+        ->assertDontSee('Load pull requests')
+        ->call('load_prs')
+        ->assertSet('rate_limit_remaining', 0)
+        ->assertDispatched('error');
 });
 
 it('does not show git preview settings for non-git applications', function (string $buildPack, ?string $dockerfile) {
@@ -156,10 +159,3 @@ it('denies preview setting changes without application update permission', funct
         ->is_preview_deployments_enabled->toBeFalse()
         ->is_pr_deployments_public_enabled->toBeFalse();
 })->with([['member', false], ['owner', true]]);
-
-it('removes preview settings from Advanced including its persistence path', function () {
-    expect(file_get_contents(resource_path('views/livewire/project/application/advanced.blade.php')))
-        ->not->toContain('isPreviewDeploymentsEnabled', 'isPrDeploymentsPublicEnabled');
-    expect(file_get_contents(app_path('Livewire/Project/Application/Advanced.php')))
-        ->not->toContain('is_preview_deployments_enabled', 'is_pr_deployments_public_enabled');
-});

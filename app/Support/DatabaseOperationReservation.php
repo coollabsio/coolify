@@ -20,6 +20,8 @@ class DatabaseOperationReservation
 {
     public const TTL_SECONDS = ResourceStartActivity::QUEUED_STALE_AFTER_SECONDS;
 
+    public const EXPIRED_MESSAGE = 'The queued start or restart waited too long in the queue and was not run. Start the database again.';
+
     public static function key(string $databaseUuid): string
     {
         return "database-operation-pending:{$databaseUuid}";
@@ -53,6 +55,30 @@ class DatabaseOperationReservation
         $holder = Cache::get(self::key($databaseUuid));
 
         return $holder !== null && $holder !== $token;
+    }
+
+    /**
+     * Confirm that the token still holds the reservation and extend it, so it does not expire
+     * while the operation runs. False when the reservation expired (the queued action waited
+     * longer than the TTL) or a newer request took it over: the operation must not run then.
+     */
+    public static function renew(?string $databaseUuid, ?string $token): bool
+    {
+        if ($token === null) {
+            return false;
+        }
+
+        if (blank($databaseUuid)) {
+            return true;
+        }
+
+        if (Cache::get(self::key($databaseUuid)) !== $token) {
+            return false;
+        }
+
+        Cache::put(self::key($databaseUuid), $token, self::TTL_SECONDS);
+
+        return true;
     }
 
     /**

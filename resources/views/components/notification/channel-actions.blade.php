@@ -24,6 +24,7 @@
             enabled = next;
             $wire.$set(enabledProperty, next)
                 .then(() => $wire.$call(toggleMethod))
+                .then(() => { enabled = Boolean($wire.$get(enabledProperty)); })
                 .catch(() => { enabled = !next; });
         ">
         <span x-text="enabled ? 'Disable' : 'Enable'">{{ $enabled ? 'Disable' : 'Enable' }}</span>

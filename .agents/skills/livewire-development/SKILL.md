@@ -78,13 +78,16 @@ You can listen for `livewire:init` to hook into Livewire initialization:
 ```js
 document.addEventListener('livewire:init', function () {
     Livewire.hook('request', ({ fail }) => {
-        if (fail && fail.status === 419) {
-            alert('Your session expired');
-        }
+        fail(({ status, preventDefault }) => {
+            if (status === 419) {
+                preventDefault();
+                alert('Your session expired');
+            }
+        });
     });
 
-    Livewire.hook('message.failed', (message, component) => {
-        console.error(message);
+    Livewire.hook('commit', ({ fail }) => {
+        fail(() => console.error('Livewire commit failed'));
     });
 });
 ```

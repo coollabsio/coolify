@@ -104,7 +104,7 @@
                                 </p>
                             </div>
                             <x-reicon name="check"
-                                class="size-4 shrink-0 text-coollabs dark:text-warning" />
+                                class="size-4 shrink-0 text-black dark:text-fg" />
                         </div>
                     @endif
 

@@ -23,6 +23,12 @@ class DatabaseBackupFileValidator
         'bz2',
         'xz',
         'dmp',
+        'db',
+        'db.gz',
+        'sqlite',
+        'sqlite.gz',
+        'sqlite3',
+        'sqlite3.gz',
     ];
 
     private const DANGEROUS_EXTENSIONS = [
@@ -136,7 +142,7 @@ class DatabaseBackupFileValidator
 
         return match ($extension) {
             'sql' => self::looksLikeText($sample) && ! self::containsPostgresqlProgramExecution($sample),
-            'sql.gz', 'gz', 'tar.gz', 'tgz', 'bson.gz', 'archive.gz' => str_starts_with($sample, "\x1f\x8b"),
+            'sql.gz', 'gz', 'tar.gz', 'tgz', 'bson.gz', 'archive.gz', 'db.gz', 'sqlite.gz', 'sqlite3.gz' => str_starts_with($sample, "\x1f\x8b"),
             'zip' => str_starts_with($sample, "PK\x03\x04") || str_starts_with($sample, "PK\x05\x06") || str_starts_with($sample, "PK\x07\x08"),
             'tar' => substr($sample, 257, 5) === 'ustar',
             'bz2' => str_starts_with($sample, 'BZh'),
@@ -144,6 +150,7 @@ class DatabaseBackupFileValidator
             'dump', 'bak', 'archive', 'dmp' => str_starts_with($sample, 'PGDMP')
                 || (self::looksLikeText($sample) && ! self::containsPostgresqlProgramExecution($sample)),
             'bson' => self::looksLikeBson($path, $sample),
+            'db', 'sqlite', 'sqlite3' => str_starts_with($sample, "SQLite format 3\0"),
             default => false,
         };
     }

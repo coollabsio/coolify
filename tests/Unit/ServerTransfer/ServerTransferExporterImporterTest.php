@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
@@ -21,6 +22,7 @@ use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneSqlite;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferBundle;
@@ -352,7 +354,6 @@ test('import rolls back all created rows when a later resource fails', function 
         dryRun: false,
         preserveUuids: true,
         adoptMode: true,
-        claim: false,
     ))->toThrow(RuntimeException::class, 'Unsupported database type');
 
     expect(Server::where('uuid', $originalServerUuid)->exists())->toBeFalse()
@@ -377,6 +378,26 @@ test('import reuses existing private key fingerprint on same team', function () 
 
     $server = Server::where('uuid', $result['server_uuid'])->first();
     expect($server->private_key_id)->toBe($originalKeyId);
+});
+
+test('import into another team creates its own key when the same key exists in a different team', function () {
+    $bundle = $this->exporter->export($this->server);
+    $sourceKeyId = $this->privateKey->id;
+    $targetTeam = Team::factory()->create();
+
+    // Free the IP without deleting the source team's key.
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->team_id)->toBe($targetTeam->id)
+        ->and($server->private_key_id)->not->toBe($sourceKeyId)
+        ->and($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
+        ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
 });
 
 test('encrypted export decrypts for import', function () {
@@ -891,3 +912,104 @@ test('import rejects shell-like file ownership and mode metadata', function (str
     'mode command' => ['chmod', '600; id'],
     'option mode' => ['chmod', '--reference=/etc/passwd'],
 ]);
+
+test('transfer keeps whether a volume ignores the Compose driver options', function (?bool $exported, bool $expected) {
+    LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => (bool) $exported]);
+    $bundle = $this->exporter->export($this->server);
+    $storage = &$bundle['projects'][0]['environments'][0]['applications'][0]['persistent_storages'][0];
+    expect($storage['ignores_compose_driver_options'])->toBe((bool) $exported);
+    if ($exported === null) {
+        // A bundle from a Coolify version without the flag: its volumes were created without driver options.
+        unset($storage['ignores_compose_driver_options']);
+    }
+    unset($storage);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->persistentStorages()->sole()->ignores_compose_driver_options)->toBe($expected);
+})->with([
+    'existing volume' => [true, true],
+    'new volume' => [false, false],
+    'bundle without the flag' => [null, true],
+]);
+
+test('transfer keeps the link between an application volume and its sqlite database', function () {
+    $sqlite = StandaloneSqlite::create([
+        'name' => 'app-sqlite',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    LocalPersistentVolume::create([
+        'name' => 'sqlite-data-'.$sqlite->uuid,
+        'mount_path' => StandaloneSqlite::DATA_DIRECTORY,
+        'standalone_sqlite_id' => $sqlite->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->id,
+    ]);
+    $bundle = $this->exporter->export($this->server);
+    $originalAppName = $this->application->name;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $sqlite->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: false, adoptMode: true);
+
+    $importedSqlite = StandaloneSqlite::where('name', 'app-sqlite')->sole();
+    $connectedVolume = Application::where('name', $originalAppName)->sole()
+        ->persistentStorages()->where('mount_path', StandaloneSqlite::DATA_DIRECTORY)->sole();
+
+    expect($connectedVolume->standalone_sqlite_id)->toBe($importedSqlite->id)
+        ->and($connectedVolume->isSharedWithAnotherResource())->toBeTrue()
+        ->and($importedSqlite->hasConnectedApplications())->toBeTrue()
+        ->and($importedSqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeTrue();
+});
+
+test('export warns about secret manager links without exporting the integration token', function () {
+    $token = IntegrationToken::factory()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'vault',
+        'token' => 'vault-root-token',
+        'capabilities' => ['secrets'],
+    ]);
+    $this->application->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    $this->database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+
+    $bundle = $this->exporter->export($this->server);
+    $warning = collect($bundle['warnings'])->first(fn (string $warning) => str_contains($warning, 'secret manager'));
+
+    expect($warning)->not->toBeNull()
+        ->and($warning)->toContain('my-app')
+        ->and($warning)->toContain('app-db')
+        ->and(json_encode($bundle))->not->toContain('vault-root-token');
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect($result['warnings'])->toContain($warning);
+});

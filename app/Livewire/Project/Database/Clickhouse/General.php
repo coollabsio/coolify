@@ -7,14 +7,16 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class General extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?Server $server = null;
 
@@ -44,20 +46,15 @@ class General extends Component
 
     public bool $isPasswordHiddenForMember = false;
 
+    /** Unnamed Docker volume that holds the current data; shown as a warning. */
+    #[Locked]
+    public ?string $anonymousDataVolume = null;
+
     public function getListeners(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return [];
-        }
-        $team = $user->currentTeam();
-        if (! $team) {
-            return [];
-        }
-
-        return [
-            "echo-private:team.{$team->id},DatabaseProxyStopped" => 'databaseProxyStopped',
-        ];
+        return $this->teamChannelListeners([
+            'DatabaseProxyStopped' => 'databaseProxyStopped',
+        ]);
     }
 
     public function mount()
@@ -71,14 +68,12 @@ class General extends Component
 
                 return;
             }
+            $this->anonymousDataVolume = $this->database->anonymousDataVolume();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->clickhouseAdminPassword = '';
-        }
     }
 
     protected function rules(): array
@@ -141,7 +136,8 @@ class General extends Component
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->clickhouseAdminUser = $this->database->clickhouse_admin_user;
-            $this->clickhouseAdminPassword = $this->database->clickhouse_admin_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->clickhouseAdminPassword = $canSeeCredentials ? $this->database->clickhouse_admin_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
@@ -204,6 +200,27 @@ class General extends Component
             $this->syncData(true);
 
             return handleError($e, $this);
+        }
+    }
+
+    public function keepCurrentDataVolume(): void
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            $volumeName = $this->database->anonymousDataVolume();
+            if ($volumeName === null) {
+                $this->anonymousDataVolume = null;
+                $this->dispatch('info', 'This database already uses its data volume.');
+
+                return;
+            }
+
+            $this->database->keepAnonymousDataVolume($volumeName);
+            $this->anonymousDataVolume = null;
+            $this->dispatch('success', 'The current data volume is now the data volume of this database. You can restart it safely.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

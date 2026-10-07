@@ -70,6 +70,14 @@ class Index extends Component
             abort(404);
         }
         $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
+        auditLog('ui.user.impersonated', [
+            'team_id' => currentTeam()?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+            'target_user_id' => $user->id,
+            'target_user_email' => $user->email,
+            'target_team_id' => $team_to_switch_to?->id,
+        ]);
         Auth::login($user);
         refreshSession($team_to_switch_to);
 

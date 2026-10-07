@@ -151,6 +151,15 @@ test('loading a safe Compose file from Git saves it', function () {
     expect($this->application->refresh()->docker_compose_raw)->toBe(trim($compose));
 });
 
+test('loading a Compose file with a variable external volume name saves it', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external: true\n    name: \${SHARED_VOLUME}\n";
+    fakeRepositoryCompose($compose);
+
+    $this->application->loadComposeFile();
+
+    expect($this->application->fresh()->docker_compose_raw)->toBe(trim($compose));
+});
+
 test('the queued LoadComposeFile action rejects injection', function () {
     fakeRepositoryCompose(composeInjectionPayloads()['service name command substitution'][0]);
 
@@ -257,6 +266,26 @@ test('API create accepts a safe docker_compose_raw', function () {
         ->assertCreated();
 });
 
+test('API create does not generate a domain for a docker compose application', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(['Authorization' => 'Bearer '.$this->token])
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/compose-app',
+            'git_branch' => 'main',
+            'build_pack' => 'dockercompose',
+            'ports_exposes' => '80',
+            'autogenerate_domain' => true,
+            'docker_compose_raw' => SAFE_APPLICATION_COMPOSE,
+        ])
+        ->assertCreated();
+
+    expect(Application::query()->where('uuid', $response->json('uuid'))->value('fqdn'))->toBeNull();
+});
+
 test('API update does not accept docker_compose_raw', function () {
     $this->withHeaders(['Authorization' => 'Bearer '.$this->token])
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -344,6 +373,27 @@ test('the Compose deployment validates the repository file before any command us
         ->and($body)->not->toContain('$this->application->loadComposeFile(')
         ->and($loadPosition)->toBeLessThan(strpos($body, '$this->application->oldRawParser()'))
         ->and($loadPosition)->toBeLessThan(strpos($body, '$this->parseComposeFileForDeployment()'))
-        ->and($loadPosition)->toBeLessThan(strpos($body, 'base64 -d'))
+        ->and($loadPosition)->toBeLessThan(strpos($body, "'input' =>"))
         ->and($body)->toContain('"stat -c \'%F\' ".escapeshellarg($realPathInGit)');
+});
+
+test('loading a Compose file with a variable service network saves it', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - \${NET:-proxy}\nnetworks:\n  proxy:\n    external: true\n";
+    fakeRepositoryCompose($compose);
+
+    $this->application->loadComposeFile();
+
+    expect($this->application->fresh()->docker_compose_raw)->toBe(trim($compose));
+});
+
+test('the deployment log names the service and network that failed validation', function () {
+    fakeRepositoryCompose("services:\n  web:\n    image: nginx\n    networks:\n      - '\$(id)'\n");
+    $logEntries = [];
+    $job = composeDeploymentJob($this->application, 0, $logEntries);
+
+    expect(fn () => (new ReflectionMethod(ApplicationDeploymentJob::class, 'loadComposeFileForDeployment'))->invoke($job))
+        ->toThrow(DeploymentException::class);
+
+    expect(collect($logEntries)->pluck(0)->implode("\n"))
+        ->toContain('Invalid Docker Compose service network "$(id)" in service web.');
 });

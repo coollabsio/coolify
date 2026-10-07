@@ -5,11 +5,10 @@ use App\Models\Service;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Coolify writes the `content:` of a Compose bind volume to the host. The validator makes sure
- * that the file is inside the resource directory, for Services and Git-based Compose applications.
+ * Coolify writes the `content:` of a Compose bind volume to the host. Only administrators can edit
+ * a Compose file, and they can mount any host path, so the source can be any host path. It must
+ * still be safe to use in a shell command.
  */
-const CONTENT_VOLUME_RESOURCE_DIRECTORY = '/data/coolify/services/content-test-uuid';
-
 function contentVolumeCompose(string $source, array $extra = ['content' => "key=value\n"]): string
 {
     return Yaml::dump([
@@ -24,90 +23,45 @@ function contentVolumeCompose(string $source, array $extra = ['content' => "key=
     ], 10, 2);
 }
 
-/**
- * @return array<string, array{string}>
- */
-function contentVolumeSourcesOutsideTheResourceDirectory(): array
-{
-    return [
-        'absolute host file' => ['/root/.ssh/authorized_keys'],
-        'absolute cron file' => ['/etc/cron.d/coolify'],
-        'absolute path in another resource directory' => ['/data/coolify/services/other-uuid/app.conf'],
-        'home directory' => ['~/app.conf'],
-        'home directory of another user' => ['~root/.ssh/authorized_keys'],
-        'parent directory' => ['../app.conf'],
-        'traversal after ./' => ['./../../../root/.ssh/authorized_keys'],
-        'traversal inside the path' => ['./config/../../outside.conf'],
-        'dot segment in the path' => ['./config/../app.conf'],
-        'braced variable' => ['${HOME}/.ssh/authorized_keys'],
-        'variable with default' => ['${DATA:-/etc/cron.d/coolify}'],
-        'plain variable' => ['$HOME/.ssh/authorized_keys'],
-        'variable after ./' => ['./$HOME/app.conf'],
-        'resource directory itself' => ['./'],
-        'current directory' => ['.'],
-        'hidden sibling' => ['.ssh/authorized_keys'],
-        'bare relative path' => ['config/app.conf'],
-        'backslash' => ['./config\\app.conf'],
-    ];
-}
+it('accepts content volumes with any host path, like Coolify v4.3.23', function (string $source) {
+    validateDockerComposeForInjection(contentVolumeCompose($source));
 
-it('rejects content volumes outside the resource directory', function (string $source) {
+    expect(true)->toBeTrue();
+})->with([
+    'absolute host file' => ['/etc/myapp/app.conf'],
+    'home directory' => ['~/x/app.conf'],
+    'bare relative path' => ['app.conf'],
+    'parent directory after ./' => ['./../shared/app.conf'],
+    'parent directory' => ['../shared/app.conf'],
+    'relative path' => ['./config/app.conf'],
+    'braced variable with a path' => ['${DATA_DIR}/app.conf'],
+    'single quote' => ["/etc/my'app/app.conf"],
+]);
+
+it('rejects shell injection in a content volume source', function (string $source) {
     expect(fn () => validateDockerComposeForInjection(contentVolumeCompose($source)))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory. Use a relative path such as ./config/app.conf.');
-})->with(contentVolumeSourcesOutsideTheResourceDirectory());
-
-it('rejects content volumes outside the resource directory of an existing resource', function (string $source) {
-    expect(fn () => validateDockerComposeForInjection(contentVolumeCompose($source), CONTENT_VOLUME_RESOURCE_DIRECTORY))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.');
-})->with(contentVolumeSourcesOutsideTheResourceDirectory());
-
-it('shows the source in the error message', function () {
-    expect(fn () => validateDockerComposeForInjection(contentVolumeCompose('/root/.ssh/authorized_keys')))
-        ->toThrow(Exception::class, 'Volume source /root/.ssh/authorized_keys with content must be inside the resource directory. Use a relative path such as ./config/app.conf.');
-});
-
-it('rejects an outside content volume that is also marked as a directory', function (string $flag) {
-    $compose = contentVolumeCompose('/etc/cron.d', ['content' => '', $flag => true]);
-
-    expect(fn () => validateDockerComposeForInjection($compose))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.');
-})->with(['is_directory', 'isDirectory']);
-
-it('rejects an empty or missing content value on an outside source', function (mixed $content) {
-    expect(fn () => validateDockerComposeForInjection(contentVolumeCompose('/etc/nginx', ['content' => $content])))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.');
-})->with(['empty string' => '', 'null' => null]);
+        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)');
+})->with([
+    'command substitution' => ['/etc/$(id)/app.conf'],
+    'backtick' => ['/etc/`id`/app.conf'],
+    'command separator' => ['/etc/app.conf;id'],
+    'pipe' => ['/etc/app.conf|id'],
+    'background operator' => ['/etc/app.conf&id'],
+    'redirect' => ['/etc/app.conf>/root/x'],
+    'newline' => ["/etc/app.conf\nid"],
+    'control character' => ["/etc/app\x01.conf"],
+    'command substitution in a variable default' => ['${DATA:-/etc/$(id)}'],
+]);
 
 it('rejects a content volume without a source', function () {
     $compose = "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        target: /etc/app.conf\n        content: x\n";
 
     expect(fn () => validateDockerComposeForInjection($compose))
-        ->toThrow(Exception::class, 'Volume source (empty) with content must be inside the resource directory.');
-});
-
-it('accepts relative content volumes inside the resource directory', function (string $source) {
-    validateDockerComposeForInjection(contentVolumeCompose($source));
-    validateDockerComposeForInjection(contentVolumeCompose($source), CONTENT_VOLUME_RESOURCE_DIRECTORY);
-
-    expect(true)->toBeTrue();
-})->with(['./app.conf', './config/app.conf', './config/nested/app.conf', './config/', './.env.local']);
-
-it('accepts an absolute content source only inside the directory of an existing resource', function () {
-    $inside = CONTENT_VOLUME_RESOURCE_DIRECTORY.'/config/app.conf';
-
-    validateDockerComposeForInjection(contentVolumeCompose($inside), CONTENT_VOLUME_RESOURCE_DIRECTORY);
-
-    expect(fn () => validateDockerComposeForInjection(contentVolumeCompose($inside)))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.')
-        ->and(fn () => validateDockerComposeForInjection(contentVolumeCompose(CONTENT_VOLUME_RESOURCE_DIRECTORY), CONTENT_VOLUME_RESOURCE_DIRECTORY))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.')
-        ->and(fn () => validateDockerComposeForInjection(contentVolumeCompose(CONTENT_VOLUME_RESOURCE_DIRECTORY.'-sibling/app.conf'), CONTENT_VOLUME_RESOURCE_DIRECTORY))
-        ->toThrow(Exception::class, 'with content must be inside the resource directory.');
+        ->toThrow(Exception::class, 'A bind volume with content needs a source path.');
 });
 
 it('does not change bind volumes without content', function (string $compose) {
     validateDockerComposeForInjection($compose);
-    validateDockerComposeForInjection($compose, CONTENT_VOLUME_RESOURCE_DIRECTORY);
 
     expect(true)->toBeTrue();
 })->with([
@@ -155,38 +109,8 @@ function composeTemplatesWithContentVolumes(): array
     return $templates;
 }
 
-it('still accepts every service template with content volumes', function (string $file) {
-    $compose = file_get_contents($file);
-    validateDockerComposeForInjection($compose);
-    validateDockerComposeForInjection($compose, CONTENT_VOLUME_RESOURCE_DIRECTORY);
+it('accepts every service template with content volumes', function (string $file) {
+    validateDockerComposeForInjection(file_get_contents($file));
 
-    $contentVolumes = 0;
-    foreach (Yaml::parse($compose)['services'] as $service) {
-        foreach ($service['volumes'] ?? [] as $volume) {
-            if (! is_array($volume) || ! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
-                continue;
-            }
-            $contentVolumes++;
-            $resolved = replaceLocalSource(str($volume['source']), str(CONTENT_VOLUME_RESOURCE_DIRECTORY))->value();
-
-            expect(confinePathToBase(CONTENT_VOLUME_RESOURCE_DIRECTORY, $resolved))->toStartWith(CONTENT_VOLUME_RESOURCE_DIRECTORY.'/');
-        }
-    }
-
-    expect($contentVolumes)->toBeGreaterThan(0);
+    expect(true)->toBeTrue();
 })->with(composeTemplatesWithContentVolumes());
-
-it('checks the complete content volume template corpus', function () {
-    $contentVolumes = 0;
-    foreach (composeTemplatesWithContentVolumes() as [$file]) {
-        foreach (Yaml::parse(file_get_contents($file))['services'] as $service) {
-            foreach ($service['volumes'] ?? [] as $volume) {
-                if (is_array($volume) && array_key_exists('content', $volume)) {
-                    $contentVolumes++;
-                }
-            }
-        }
-    }
-
-    expect($contentVolumes)->toBeGreaterThanOrEqual(94);
-});

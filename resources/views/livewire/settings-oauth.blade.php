@@ -58,10 +58,10 @@
                         @if ($provider === 'oidc')
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.redirect_uri"
-                                placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
+                                placeholder="{{ oauth_default_redirect_uri($provider) }}" label="Redirect URI" />
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.base_url" label="Issuer URL" required
-                                helper="OpenID Provider issuer URL, for example https://example.okta.com. Coolify uses it to discover the authorization, token, userinfo, and JWKS endpoints." />
+                                helper="OpenID Provider issuer URL, for example https://example.okta.com. Coolify uses it to discover the authorization, token, userinfo, and JWKS endpoints. For Microsoft Entra ID, use https://login.microsoftonline.com/&lt;tenant ID&gt;/v2.0 and add the optional ID token claims email and xms_edov to the app registration." />
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.client_id" label="Client ID" required />
                             <x-forms.input canGate="update" :canResource="$settings"
@@ -81,7 +81,7 @@
                         @else
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.redirect_uri"
-                                placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
+                                placeholder="{{ oauth_default_redirect_uri($provider) }}" label="Redirect URI" />
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.client_id" label="Client ID" required />
                             <x-forms.input canGate="update" :canResource="$settings"
@@ -97,7 +97,7 @@
                         @if ($provider === 'google')
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.tenant"
-                                helper="Optional hosted domain supplied to Google as a login hint."
+                                helper="Optional Google Workspace domain, for example example.com. Only accounts from this domain can sign in. Use * to allow any Workspace account but no personal Google accounts."
                                 label="Hosted domain" />
                         @endif
 

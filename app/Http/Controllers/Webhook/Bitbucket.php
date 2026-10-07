@@ -82,9 +82,6 @@ class Bitbucket extends Controller
                 ]);
             }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_name, $branch);
-            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
-                return $this->tooManyManualWebhookFailuresResponse($failure_key);
-            }
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_bitbucket_token);
             $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
@@ -120,7 +117,7 @@ class Bitbucket extends Controller
                 }
                 $hash = $parts[1];
                 $payloadHash = hash_hmac('sha256', $rawPayload, $webhook_secret);
-                if (! hash_equals($hash, $payloadHash) && ! isDev()) {
+                if (! hash_equals($hash, $payloadHash)) {
                     auditLogWebhookFailure('bitbucket', 'invalid_signature', [
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,

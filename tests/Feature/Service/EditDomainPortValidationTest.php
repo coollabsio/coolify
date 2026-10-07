@@ -1,7 +1,6 @@
 <?php
 
 use App\Livewire\Project\Service\Domains;
-use App\Livewire\Project\Service\EditDomain;
 use App\Livewire\Project\Service\Index;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -121,17 +120,6 @@ it('preserves a legacy embedded port when only the description changes', functio
         ->domain_port_overrides->toBe(['http://example.com' => 8080]);
 });
 
-it('loads a legacy embedded port in the domain editor', function () {
-    ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
-        'fqdn' => 'http://example.com:8080',
-        'domain_port_overrides' => null,
-    ]);
-
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->assertSet('fqdn', 'http://example.com:8080')
-        ->assertOk();
-});
-
 it('prefers a persisted override over a legacy embedded port', function () {
     ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
         'fqdn' => 'http://example.com:8080',
@@ -139,26 +127,6 @@ it('prefers a persisted override over a legacy embedded port', function () {
     ]);
 
     expect($this->serviceApplication->fresh()->url)->toBe('http://example.com:3000');
-});
-
-it('allows explicit removal of a legacy embedded port', function () {
-    ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
-        'fqdn' => 'http://example.com:8080',
-        'domain_port_overrides' => null,
-    ]);
-
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com')
-        ->call('submit')
-        ->assertSet('showPortWarningModal', true)
-        ->call('confirmRemovePort')
-        ->assertHasNoErrors()
-        ->assertSet('showPortWarningModal', false);
-
-    expect($this->serviceApplication->fresh())
-        ->fqdn->toBe('http://example.com')
-        ->url->toBe('http://example.com')
-        ->domain_port_overrides->toBeNull();
 });
 
 it('initializes route state when mounting a service application directly', function () {
@@ -175,35 +143,6 @@ it('initializes route state when mounting a service application directly', funct
         ->assertOk();
 });
 
-it('loads the EditDomain component with required port', function () {
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->assertSet('requiredPort', 8000)
-        ->assertSet('fqdn', 'http://example.com:8000')
-        ->assertOk();
-});
-
-it('loads a persisted port override and moves it when the hostname changes', function () {
-    $this->serviceApplication->update([
-        'fqdn' => 'https://old.example.com',
-        'domain_port_overrides' => [
-            'https://old.example.com' => 8080,
-        ],
-    ]);
-
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->assertSet('fqdn', 'https://old.example.com:8080')
-        ->set('fqdn', 'https://new.example.com:8080')
-        ->call('submit')
-        ->assertSet('showPortWarningModal', false)
-        ->assertSet('fqdn', 'https://new.example.com:8080');
-
-    expect($this->serviceApplication->fresh())
-        ->fqdn->toBe('https://new.example.com')
-        ->domain_port_overrides->toBe([
-            'https://new.example.com' => 8080,
-        ]);
-});
-
 it('marks noindex changes as pending configuration', function () {
     $this->service->isConfigurationChanged(save: true);
 
@@ -212,88 +151,4 @@ it('marks noindex changes as pending configuration', function () {
         ->assertDispatched('configurationChanged');
 
     expect($this->service->refresh()->isConfigurationChanged())->toBeTrue();
-});
-
-it('shows warning modal when trying to remove required port', function () {
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com') // Remove port
-        ->call('submit')
-        ->assertSet('showPortWarningModal', true)
-        ->assertSet('requiredPort', 8000);
-});
-
-it('allows port removal when user confirms', function () {
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com') // Remove port
-        ->call('submit')
-        ->assertSet('showPortWarningModal', true)
-        ->call('confirmRemovePort')
-        ->assertSet('showPortWarningModal', false);
-
-    // Verify the FQDN was updated in database
-    $this->serviceApplication->refresh();
-    expect($this->serviceApplication->fqdn)->toBe('http://example.com');
-});
-
-it('cancels port removal when user cancels', function () {
-    $originalFqdn = $this->serviceApplication->url;
-
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com') // Remove port
-        ->call('submit')
-        ->assertSet('showPortWarningModal', true)
-        ->call('cancelRemovePort')
-        ->assertSet('showPortWarningModal', false)
-        ->assertSet('fqdn', $originalFqdn); // Should revert to original
-});
-
-it('allows saving when port is changed to different port', function () {
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com:3000') // Change to different port
-        ->call('submit')
-        ->assertSet('showPortWarningModal', false); // Should not show warning
-
-    // Verify the FQDN was updated
-    $this->serviceApplication->refresh();
-    expect($this->serviceApplication->fqdn)->toBe('http://example.com')
-        ->and($this->serviceApplication->domain_port_overrides)->toBe([
-            'http://example.com' => 3000,
-        ]);
-});
-
-it('allows saving when all domains have ports (multiple domains)', function () {
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com:8000,https://app.example.com:8080')
-        ->call('submit')
-        ->assertSet('showPortWarningModal', false); // Should not show warning
-});
-
-it('shows warning when at least one domain is missing port (multiple domains)', function () {
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('fqdn', 'http://example.com:8000,https://app.example.com') // Second domain missing port
-        ->call('submit')
-        ->assertSet('showPortWarningModal', true);
-});
-
-it('does not show warning for services without required port', function () {
-    // Create a service without required port (e.g., cloudflared)
-    $serviceWithoutPort = Service::factory()->create([
-        'name' => 'cloudflared-test456',
-        'server_id' => $this->server->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'environment_id' => $this->environment->id,
-    ]);
-
-    $appWithoutPort = ServiceApplication::create([
-        'service_id' => $serviceWithoutPort->id,
-        'name' => 'web',
-        'image' => 'nginx:alpine',
-        'fqdn' => 'http://example.com',
-    ]);
-
-    Livewire::test(EditDomain::class, ['applicationId' => $appWithoutPort->id])
-        ->set('fqdn', 'http://example.com') // No port
-        ->call('submit')
-        ->assertSet('showPortWarningModal', false); // Should not show warning
 });

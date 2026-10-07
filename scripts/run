@@ -27,8 +27,8 @@ function test {
     docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan test --testsuite=Feature -p
 }
 
-function sync:bunny {
-    php artisan sync:bunny --env=secrets
+function sync:cdn {
+    php artisan sync:cdn --env=secrets
 }
 
 function db:reset {

@@ -21,6 +21,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Process;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
 class GetLogs extends Component
@@ -33,7 +34,8 @@ class GetLogs extends Component
 
     public const MAX_DOWNLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
-    public string $outputs = '';
+    /** Docker log timestamp accepted by `--since`, for example 2026-09-28T10:15:30.123456789Z. */
+    private const DOCKER_TIMESTAMP_PATTERN = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/';
 
     public string $errors = '';
 
@@ -118,7 +120,6 @@ class GetLogs extends Component
 
         try {
             $this->instantSave();
-            $this->getLogs(true);
         } catch (\Throwable $e) {
             // Revert the flag to its previous value on failure
             $this->showTimeStamps = $previousValue;
@@ -132,122 +133,53 @@ class GetLogs extends Component
         $this->streamLogs = ! $this->streamLogs;
     }
 
-    public function showAllLogs(): void
+    public function showAllLogs(): string
     {
         $this->numberOfLines = -1;
-        $this->getLogs(true);
+
+        return $this->getLogs();
     }
 
-    public function getLogs($refresh = false)
+    /**
+     * Return timestamped log output for the browser-side log viewer.
+     *
+     * The output is returned instead of stored in a public property, so it is
+     * not included in the component snapshot on every request. When `$since`
+     * holds a Docker timestamp, only lines from that moment onward are returned.
+     */
+    #[Renderless]
+    public function getLogs(?string $since = null): string
     {
+        if (! $this->canReadLogs()) {
+            return 'Unauthorized.';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
-            $this->outputs = 'Unauthorized.';
-
-            return;
+            return 'Unauthorized.';
         }
         if (! $this->server->isFunctional()) {
-            return;
+            return '';
         }
         if ($this->container && ! ValidationPatterns::isValidContainerName($this->container)) {
-            $this->outputs = 'Invalid container name.';
-
-            return;
+            return 'Invalid container name.';
         }
-        if (! $refresh && ! $this->expandByDefault && ($this->resource?->getMorphClass() === Service::class || str($this->container)->contains('-pr-'))) {
-            return;
+        if (! $this->container) {
+            return '';
         }
-        $logTail = $this->numberOfLines === -1 ? 'all' : $this->numberOfLines;
-        if ($logTail !== 'all' && ($logTail <= 0 || is_null($logTail))) {
-            $this->numberOfLines = 1000;
-            $logTail = $this->numberOfLines;
+
+        if (is_string($since) && preg_match(self::DOCKER_TIMESTAMP_PATTERN, $since)) {
+            $options = "--since {$since} -t";
+        } else {
+            $options = "-n {$this->resolveLogTail()} -t";
         }
-        if ($logTail !== 'all' && $logTail > self::MAX_LOG_LINES) {
-            $this->numberOfLines = self::MAX_LOG_LINES;
-            $logTail = $this->numberOfLines;
-        }
-        if ($this->container) {
-            if ($this->showTimeStamps) {
-                if ($this->server->isSwarm()) {
-                    $command = "docker service logs -n {$logTail} -t {$this->container}";
-                    if ($this->server->isNonRoot()) {
-                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
-                        $command = $command[0];
-                    }
-                } else {
-                    $command = "docker logs -n {$logTail} -t {$this->container}";
-                    if ($this->server->isNonRoot()) {
-                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
-                        $command = $command[0];
-                    }
-                }
-            } else {
-                if ($this->server->isSwarm()) {
-                    $command = "docker service logs -n {$logTail} {$this->container}";
-                    if ($this->server->isNonRoot()) {
-                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
-                        $command = $command[0];
-                    }
-                } else {
-                    $command = "docker logs -n {$logTail} {$this->container}";
-                    if ($this->server->isNonRoot()) {
-                        $command = parseCommandsByLineForSudo(collect($command), $this->server);
-                        $command = $command[0];
-                    }
-                }
-            }
-            $command = $this->boundedLogCommand($command, self::MAX_DISPLAY_SIZE_BYTES);
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
 
-            // Collect new logs into temporary variable first to prevent flickering
-            // (avoids clearing output before new data is ready)
-            // Use array accumulation + implode for O(n) instead of O(n²) string concatenation
-            $logChunks = [];
-            $accumulatedBytes = 0;
-            $truncated = false;
-            Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
-                if ($truncated) {
-                    return;
-                }
-
-                $remainingBytes = self::MAX_DISPLAY_SIZE_BYTES - $accumulatedBytes;
-                $outputBytes = strlen($output);
-                if ($outputBytes > $remainingBytes) {
-                    $logChunks[] = removeAnsiColors(substr($output, 0, max(0, $remainingBytes)));
-                    $truncated = true;
-
-                    return;
-                }
-
-                $logChunks[] = removeAnsiColors($output);
-                $accumulatedBytes += $outputBytes;
-            });
-            $newOutputs = implode('', $logChunks);
-
-            if ($this->showTimeStamps) {
-                $newOutputs = str($newOutputs)->split('/\n/')->sort(function ($a, $b) {
-                    $a = explode(' ', $a);
-                    $b = explode(' ', $b);
-
-                    return $a[0] <=> $b[0];
-                })->join("\n");
-            }
-
-            if ($truncated) {
-                $newOutputs .= "\n\n[... Output truncated at 5MB limit ...]";
-            }
-
-            // Only update outputs after new data is ready (atomic update prevents flicker)
-            $this->outputs = $newOutputs;
-        }
+        return $this->runLogCommand($this->logCommand($options), self::MAX_DISPLAY_SIZE_BYTES, '5MB');
     }
 
     public function copyLogs(): string
     {
-        return sanitizeLogsForExport($this->outputs);
-    }
-
-    public function downloadAllLogs(): string
-    {
+        if (! $this->canReadLogs()) {
+            return '';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return '';
         }
@@ -258,71 +190,81 @@ class GetLogs extends Component
             return '';
         }
 
-        if ($this->showTimeStamps) {
-            if ($this->server->isSwarm()) {
-                $command = "docker service logs -t {$this->container}";
-            } else {
-                $command = "docker logs -t {$this->container}";
-            }
-        } else {
-            if ($this->server->isSwarm()) {
-                $command = "docker service logs {$this->container}";
-            } else {
-                $command = "docker logs {$this->container}";
-            }
+        $options = "-n {$this->resolveLogTail()}".($this->showTimeStamps ? ' -t' : '');
+
+        return sanitizeLogsForExport($this->runLogCommand($this->logCommand($options), self::MAX_DISPLAY_SIZE_BYTES, '5MB', $this->showTimeStamps));
+    }
+
+    public function downloadAllLogs(): string
+    {
+        if (! $this->canReadLogs()) {
+            return '';
         }
+        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
+            return '';
+        }
+        if (! $this->server->isFunctional() || ! $this->container) {
+            return '';
+        }
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
+            return '';
+        }
+
+        $command = $this->logCommand($this->showTimeStamps ? '-t' : '');
+
+        return sanitizeLogsForExport($this->runLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES, '50MB', $this->showTimeStamps));
+    }
+
+    private function resolveLogTail(): int|string
+    {
+        if ($this->numberOfLines === -1) {
+            return 'all';
+        }
+        if (is_null($this->numberOfLines) || $this->numberOfLines <= 0) {
+            $this->numberOfLines = 1000;
+        }
+        if ($this->numberOfLines > self::MAX_LOG_LINES) {
+            $this->numberOfLines = self::MAX_LOG_LINES;
+        }
+
+        return $this->numberOfLines;
+    }
+
+    private function logCommand(string $options): string
+    {
+        $options = trim($options);
+        $options = $options === '' ? '' : "{$options} ";
+        $command = $this->server->isSwarm()
+            ? "docker service logs {$options}{$this->container}"
+            : "docker logs {$options}{$this->container}";
 
         if ($this->server->isNonRoot()) {
-            $command = parseCommandsByLineForSudo(collect($command), $this->server);
-            $command = $command[0];
+            $command = parseCommandsByLineForSudo(collect($command), $this->server)[0];
         }
 
-        $command = $this->boundedLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES);
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
+        return $command;
+    }
 
-        // Use array accumulation + implode for O(n) instead of O(n²) string concatenation
-        // Enforce 50MB size limit to prevent memory exhaustion from large logs
-        $logChunks = [];
-        $accumulatedBytes = 0;
-        $truncated = false;
+    private function runLogCommand(string $command, int $maxBytes, string $limitLabel, bool $timestamped = true): string
+    {
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $this->boundedLogCommand($command, $maxBytes));
 
-        Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
-            if ($truncated) {
-                return;
-            }
-
-            $outputBytes = strlen($output);
-
-            if ($accumulatedBytes + $outputBytes > self::MAX_DOWNLOAD_SIZE_BYTES) {
-                $remaining = self::MAX_DOWNLOAD_SIZE_BYTES - $accumulatedBytes;
-                if ($remaining > 0) {
-                    $logChunks[] = removeAnsiColors(substr($output, 0, $remaining));
-                }
-                $truncated = true;
-
-                return;
-            }
-
-            $logChunks[] = removeAnsiColors($output);
-            $accumulatedBytes += $outputBytes;
-        });
-
-        $allLogs = implode('', $logChunks);
-
-        if ($truncated) {
-            $allLogs .= "\n\n[... Output truncated at 50MB limit ...]";
-        }
-
-        if ($this->showTimeStamps) {
-            $allLogs = str($allLogs)->split('/\n/')->sort(function ($a, $b) {
-                $a = explode(' ', $a);
-                $b = explode(' ', $b);
-
-                return $a[0] <=> $b[0];
+        // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
+        $output = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand)->output();
+        $truncated = strlen($output) > $maxBytes;
+        $logs = rtrim(removeAnsiColors($truncated ? substr($output, 0, $maxBytes) : $output), "\n");
+        if ($timestamped) {
+            // Docker writes stdout and stderr separately, so sort timestamped lines back into order.
+            $logs = str($logs)->split('/\n/')->sort(function ($a, $b) {
+                return explode(' ', $a)[0] <=> explode(' ', $b)[0];
             })->join("\n");
         }
 
-        return sanitizeLogsForExport($allLogs);
+        if ($truncated) {
+            $logs .= "\n\n[... Output truncated at {$limitLabel} limit ...]";
+        }
+
+        return $logs;
     }
 
     private function boundedLogCommand(string $command, int $maxBytes): string
@@ -330,8 +272,19 @@ class GetLogs extends Component
         return "({$command}) 2>&1 | head -c ".($maxBytes + 1);
     }
 
+    /**
+     * Container output can contain secrets, so only users who can edit the resource (or the server,
+     * for server-level containers) may read it.
+     */
+    private function canReadLogs(): bool
+    {
+        return auth()->user()?->can('update', $this->resource ?? $this->server) ?? false;
+    }
+
     public function render()
     {
-        return view('livewire.project.shared.get-logs');
+        return view('livewire.project.shared.get-logs', [
+            'canReadLogs' => $this->canReadLogs(),
+        ]);
     }
 }
