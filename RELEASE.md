@@ -17,7 +17,7 @@ Release workflows never edit or commit versions. Stable versions come from `conf
 
 - Fixes, security updates, and small improvements target `main`.
 - New features and larger changes target the current `release/v4.x` branch.
-- Merge `main` into `release/v4.x` regularly so every production fix is included in the next release.
+- **Sync main to release branches** merges `main` into every `release/v*` branch every 10 minutes, so every production fix is included in the next release. If a merge conflicts, it opens a `chore: merge main into release/vX.Y` pull request to resolve.
 - Do not merge `release/v4.x` into `main` until an RC is approved for a stable release.
 
 ## Feature and RC flow
