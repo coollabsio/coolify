@@ -9,6 +9,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -117,6 +118,23 @@ class RestartLimitReached extends CustomEmailNotification
         $message = "{$this->resource_name} has been stopped after {$this->restart_count} restarts (limit: {$this->max_restart_count}).";
 
         return new PushoverMessage(
+            title: 'Restart limit reached',
+            level: 'error',
+            message: $message,
+            buttons: [
+                [
+                    'text' => 'Open Resource in Coolify',
+                    'url' => $this->resource_url,
+                ],
+            ],
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        $message = "{$this->resource_name} has been stopped after {$this->restart_count} restarts (limit: {$this->max_restart_count}).";
+
+        return new GotifyMessage(
             title: 'Restart limit reached',
             level: 'error',
             message: $message,
