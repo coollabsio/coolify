@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureCloudflared;
+use App\Actions\Server\UpdateCloudflared;
 use App\Models\Server;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -98,6 +99,19 @@ class CloudflareTunnel extends Component
             auditLog('ui.server.cloudflare_tunnel.configuration_started', $this->auditContext([
                 'ssh_domain' => (string) $this->ssh_domain,
             ]));
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function updateCloudflareTunnel()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $activity = UpdateCloudflared::run($this->server);
+            auditLog('ui.server.cloudflare_tunnel.update_started', $this->auditContext());
+            $this->dispatch('cloudflare-tunnel-update-started');
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);

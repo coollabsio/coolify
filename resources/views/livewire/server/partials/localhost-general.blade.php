@@ -92,13 +92,13 @@
                                 id="connectionTimeout" label="Connection timeout"
                                 helper="Seconds to wait before an SSH connection fails." min="1" max="300"
                                 required :disabled="$isValidating" />
-                            <x-forms.searchable-listbox id="serverTimezone" label="Server timezone"
+                            <x-forms.listbox searchable id="serverTimezone" label="Server timezone"
                                 helper="Used for backup schedules, cron jobs, and displayed timestamps."
-                                searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                                searchPlaceholder="Search timezones" searchEmptyText="No matching timezone"
                                 :options="collect($this->timezones)->map(fn ($timezone) => [
                                     'value' => $timezone,
                                     'label' => $timezone,
-                                ])->all()" :disabled="$isValidating || !auth()->user()->can('update', $server)" />
+                                ])->all()" :disabled="$isValidating" canGate="update" :canResource="$server" />
                             <x-forms.input canGate="update" :canResource="$server"
                                 placeholder="https://example.com" id="wildcardDomain" label="Wildcard domain"
                                 helper="New resources can receive generated subdomains from this domain."
