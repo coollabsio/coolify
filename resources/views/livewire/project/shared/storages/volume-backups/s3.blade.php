@@ -29,12 +29,12 @@
                 @endif
             </x-slot:actions>
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox canGate="update" :canResource="$resource" id="s3StorageId" label="S3 storage" :required="$saveToS3"
-                    :disabled="! auth()->user()?->can('update', $resource)"
-                    :options="$availableS3Storages->map(fn ($s3Storage) => [
-                        'value' => $s3Storage->id,
-                        'label' => $s3Storage->name,
-                    ])->values()->all()" />
+                <x-forms.listbox canGate="update" :canResource="$resource" id="s3StorageIds" label="S3 storages" multiple live portal
+                    helper="Each backup is uploaded to every selected storage." placeholder="Select S3 storages"
+                    :options="$availableS3Storages->map(fn ($storage) => [
+                        'value' => $storage->id,
+                        'label' => $storage->name.($storage->is_usable ? '' : ' (unavailable)'),
+                    ])->all()" />
                 <x-forms.listbox canGate="update" :canResource="$resource" id="disableLocalBackup" label="Local copy"
                     :disabled="! $saveToS3 || ! auth()->user()?->can('update', $resource)" :options="[
                         ['value' => false, 'label' => 'Keep local backup'],

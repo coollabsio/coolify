@@ -55,6 +55,10 @@
                                     'failed' => ['Failed', 'error'],
                                     default => [str($executionStatus)->headline(), 'neutral'],
                                 };
+                                $s3Replicas = $execution->s3Replicas;
+                                $hasLiveS3Copies = $s3Replicas->isNotEmpty()
+                                    ? $s3Replicas->contains(fn ($replica) => $replica->s3_uploaded === true && ! $replica->s3_storage_deleted)
+                                    : data_get($execution, 's3_uploaded') === true && ! data_get($execution, 's3_storage_deleted', false);
                                 $executionCheckboxes = [];
                                 $deleteActions = [];
 
@@ -62,11 +66,10 @@
                                     $deleteActions[] = 'This backup will be permanently deleted from local storage.';
                                 }
 
-                                if (data_get($execution, 's3_uploaded') === true
-                                    && ! data_get($execution, 's3_storage_deleted', false)) {
+                                if ($hasLiveS3Copies) {
                                     $executionCheckboxes[] = [
                                         'id' => 'delete_backup_s3',
-                                        'label' => 'Delete the selected backup permanently from S3 Storage',
+                                        'label' => 'Delete the selected backup permanently from every S3 storage',
                                     ];
                                 }
 
@@ -79,10 +82,7 @@
                                 <div class="data-table-row backup-executions-table-grid min-h-14 border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.06]">
                                     <div class="flex items-center gap-2">
                                         <x-status-badge :status="$executionStatusLabel"
-                                            :type="$executionStatusType" />
-                                        @if ($executionStatus === 'running')
-                                            <x-loading />
-                                        @endif
+                                            :type="$executionStatusType" :pulse="$executionStatus === 'running'" />
                                     </div>
                                     <div class="truncate text-[12px] font-medium text-black dark:text-fg">
                                         {{ data_get($execution, 'database_name', 'N/A') }}
@@ -112,7 +112,22 @@
                                         <x-status-badge label="Local"
                                             :status="data_get($execution, 'local_storage_deleted', false) ? 'Deleted' : 'Available'"
                                             :type="data_get($execution, 'local_storage_deleted', false) ? 'neutral' : 'success'" />
-                                        @if (data_get($execution, 's3_uploaded') !== null)
+                                        @foreach ($s3Replicas as $replica)
+                                            <x-status-badge wire:key="database-backup-replica-{{ $replica->id }}"
+                                                :label="$replica->s3?->name ?? 'Removed S3 storage'"
+                                                :status="$replica->s3_storage_deleted
+                                                    ? 'Deleted'
+                                                    : match ($replica->s3_uploaded) {
+                                                        true => 'Available',
+                                                        false => 'Failed',
+                                                        default => $executionStatus === 'running' ? 'Pending' : 'Not uploaded',
+                                                    }"
+                                                :type="$replica->s3_storage_deleted || $replica->s3_uploaded === null
+                                                    ? 'neutral'
+                                                    : ($replica->s3_uploaded ? 'success' : 'error')"
+                                                :title="$replica->message" />
+                                        @endforeach
+                                        @if ($s3Replicas->isEmpty() && data_get($execution, 's3_uploaded') !== null)
                                             <x-status-badge label="S3"
                                                 :status="data_get($execution, 's3_storage_deleted', false)
                                                     ? 'Deleted'

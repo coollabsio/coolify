@@ -1237,13 +1237,10 @@ class ServerTransferImporter
                 $uuid = new_public_id();
             }
 
-            $s3Id = null;
-            $s3Uuid = data_get($backup, 's3_storage_uuid');
-            if ($s3Uuid && isset($this->s3StorageMap[$s3Uuid])) {
-                $s3Id = $this->s3StorageMap[$s3Uuid]->id;
-            }
+            $s3Ids = $this->importedBackupS3StorageIds($backup);
+            $s3Id = $s3Ids[0] ?? null;
 
-            ScheduledDatabaseBackup::create([
+            $importedBackup = ScheduledDatabaseBackup::create([
                 'uuid' => $uuid,
                 'team_id' => $teamId,
                 'description' => data_get($backup, 'description'),
@@ -1264,7 +1261,24 @@ class ServerTransferImporter
                 'database_type' => $database->getMorphClass(),
                 'database_id' => $database->id,
             ]);
+            $importedBackup->syncS3Storages($s3Ids);
         }
+    }
+
+    /**
+     * Maps the exported S3 destinations of a backup to imported storages, primary first. Older bundles only have
+     * `s3_storage_uuid`.
+     *
+     * @param  array<string, mixed>  $backup
+     * @return list<int>
+     */
+    private function importedBackupS3StorageIds(array $backup): array
+    {
+        $uuids = collect(data_get($backup, 's3_storage_uuids', []))
+            ->prepend(data_get($backup, 's3_storage_uuid'))
+            ->filter(fn ($uuid): bool => is_string($uuid) && isset($this->s3StorageMap[$uuid]));
+
+        return $uuids->map(fn (string $uuid): int => $this->s3StorageMap[$uuid]->id)->unique()->values()->all();
     }
 
     /**
@@ -1612,13 +1626,10 @@ class ServerTransferImporter
                 $uuid = new_public_id();
             }
 
-            $s3Id = null;
-            $s3Uuid = data_get($backupPayload, 's3_storage_uuid');
-            if ($s3Uuid && isset($this->s3StorageMap[$s3Uuid])) {
-                $s3Id = $this->s3StorageMap[$s3Uuid]->id;
-            }
+            $s3Ids = $this->importedBackupS3StorageIds($backupPayload);
+            $s3Id = $s3Ids[0] ?? null;
 
-            ScheduledVolumeBackup::create([
+            $importedBackup = ScheduledVolumeBackup::create([
                 'uuid' => $uuid,
                 'backupable_type' => $volume->getMorphClass(),
                 'backupable_id' => $volume->id,
@@ -1637,6 +1648,7 @@ class ServerTransferImporter
                 'retention_max_storage_s3' => data_get($backupPayload, 'retention_max_storage_s3'),
                 'timeout' => data_get($backupPayload, 'timeout'),
             ]);
+            $importedBackup->syncS3Storages($s3Ids);
             $count++;
         }
 

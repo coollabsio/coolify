@@ -14,6 +14,7 @@ use App\Models\Service;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\MessageBag;
 use OpenApi\Attributes as OA;
 use RuntimeException;
@@ -27,7 +28,8 @@ use RuntimeException;
         new OA\Property(property: 'save_s3', type: 'boolean', default: false),
         new OA\Property(property: 'disable_local_backup', type: 'boolean', default: false),
         new OA\Property(property: 'stop_during_backup', type: 'boolean', default: false),
-        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true),
+        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true, description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.'),
+        new OA\Property(property: 's3_storage_uuids', type: 'array', items: new OA\Items(type: 'string'), description: 'UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.'),
         new OA\Property(property: 'retention_amount_locally', type: 'integer', default: 7, minimum: 0, maximum: 10000),
         new OA\Property(property: 'retention_days_locally', type: 'integer', default: 0, maximum: 2147483647, minimum: 0),
         new OA\Property(property: 'retention_max_storage_locally', type: 'number', format: 'float', default: 0, maximum: 9999999999, minimum: 0),
@@ -53,7 +55,8 @@ use RuntimeException;
         new OA\Property(property: 'save_s3', type: 'boolean'),
         new OA\Property(property: 'disable_local_backup', type: 'boolean'),
         new OA\Property(property: 'stop_during_backup', type: 'boolean'),
-        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true),
+        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true, description: 'Primary S3 destination.'),
+        new OA\Property(property: 's3_storage_uuids', type: 'array', items: new OA\Items(type: 'string'), description: 'Every S3 destination, primary first.'),
         new OA\Property(property: 'retention_amount_locally', type: 'integer'),
         new OA\Property(property: 'retention_days_locally', type: 'integer'),
         new OA\Property(property: 'retention_max_storage_locally', type: 'number', format: 'float'),
@@ -165,7 +168,7 @@ class VolumeBackupsController extends Controller
             return response()->json(['message' => 'Storage not found.'], 404);
         }
 
-        ['errors' => $errors, 's3Storage' => $s3Storage, 'saveToS3' => $saveToS3] = $this->validateUpsertRequest($request, $storage, $teamId);
+        ['errors' => $errors, 's3Storages' => $s3Storages, 'saveToS3' => $saveToS3] = $this->validateUpsertRequest($request, $storage, $teamId);
 
         if ($errors->isNotEmpty()) {
             return response()->json([
@@ -174,11 +177,11 @@ class VolumeBackupsController extends Controller
             ], 422);
         }
 
-        return $this->persistSchedule($request, $storage, $teamId, $s3Storage, $saveToS3, $resourceType, $resource);
+        return $this->persistSchedule($request, $storage, $teamId, $s3Storages, $saveToS3, $resourceType, $resource);
     }
 
     /**
-     * @return array{errors: MessageBag, s3Storage: S3Storage|null, saveToS3: bool}
+     * @return array{errors: MessageBag, s3Storages: Collection<int, S3Storage>, saveToS3: bool}
      */
     private function validateUpsertRequest(
         Request $request,
@@ -192,6 +195,8 @@ class VolumeBackupsController extends Controller
             'disable_local_backup' => 'boolean',
             'stop_during_backup' => 'boolean',
             's3_storage_uuid' => 'nullable|string',
+            's3_storage_uuids' => 'array',
+            's3_storage_uuids.*' => 'string|distinct',
             'retention_amount_locally' => 'integer|min:0|max:10000',
             'retention_days_locally' => 'integer|min:0|max:2147483647',
             'retention_max_storage_locally' => 'numeric|min:0|max:9999999999',
@@ -209,6 +214,7 @@ class VolumeBackupsController extends Controller
             'disable_local_backup',
             'stop_during_backup',
             's3_storage_uuid',
+            's3_storage_uuids',
             'retention_amount_locally',
             'retention_days_locally',
             'retention_max_storage_locally',
@@ -232,16 +238,24 @@ class VolumeBackupsController extends Controller
             $errors->add('disable_local_backup', 'Local backups can only be disabled when S3 backups are enabled.');
         }
 
-        $s3Storage = null;
-        if ($saveToS3) {
-            $s3Storage = S3Storage::query()
+        $s3Storages = collect();
+        if ($saveToS3 && ! $errors->hasAny(['s3_storage_uuid', 's3_storage_uuids', 's3_storage_uuids.*'])) {
+            $hasList = $request->has('s3_storage_uuids');
+            $uuids = collect($hasList ? $request->input('s3_storage_uuids') : [$request->input('s3_storage_uuid')])->filter()->unique()->values();
+            $primaryUuid = $request->input('s3_storage_uuid') ?? $uuids->first();
+
+            $s3Storages = S3Storage::query()
                 ->where('team_id', $teamId)
                 ->where('is_usable', true)
-                ->where('uuid', $request->input('s3_storage_uuid'))
-                ->first();
+                ->whereIn('uuid', $uuids->all())
+                ->get()
+                ->sortBy(fn (S3Storage $s3Storage): int => $s3Storage->uuid === $primaryUuid ? 0 : 1)
+                ->values();
 
-            if (! $s3Storage) {
-                $errors->add('s3_storage_uuid', 'Select a usable S3 storage owned by your team.');
+            if ($hasList && filled($primaryUuid) && ! $uuids->contains($primaryUuid)) {
+                $errors->add('s3_storage_uuid', 'The s3_storage_uuid must be one of the s3_storage_uuids.');
+            } elseif ($uuids->isEmpty() || $s3Storages->count() !== $uuids->count()) {
+                $errors->add($hasList ? 's3_storage_uuids' : 's3_storage_uuid', 'Select a usable S3 storage owned by your team.');
             }
         }
 
@@ -251,7 +265,7 @@ class VolumeBackupsController extends Controller
 
         return [
             'errors' => $errors,
-            's3Storage' => $s3Storage,
+            's3Storages' => $s3Storages,
             'saveToS3' => $saveToS3,
         ];
     }
@@ -260,7 +274,7 @@ class VolumeBackupsController extends Controller
         Request $request,
         LocalPersistentVolume|LocalFileVolume $storage,
         int|string $teamId,
-        ?S3Storage $s3Storage,
+        Collection $s3Storages,
         bool $saveToS3,
         string $resourceType,
         Model $resource,
@@ -272,7 +286,7 @@ class VolumeBackupsController extends Controller
             'save_s3' => $saveToS3,
             'disable_local_backup' => $saveToS3 && $request->boolean('disable_local_backup'),
             'stop_during_backup' => $request->boolean('stop_during_backup'),
-            's3_storage_id' => $s3Storage?->id,
+            's3_storage_id' => $s3Storages->first()?->id,
             'retention_amount_locally' => $request->integer('retention_amount_locally', 7),
             'retention_days_locally' => $request->integer('retention_days_locally'),
             'retention_max_storage_locally' => $request->float('retention_max_storage_locally'),
@@ -288,6 +302,7 @@ class VolumeBackupsController extends Controller
         }
 
         $backup = $storage->scheduledBackups()->updateOrCreate([], $attributes);
+        $backup->syncS3Storages($s3Storages->pluck('id')->all());
         $created = $backup->wasRecentlyCreated;
 
         auditLog('api.volume_backup.schedule_set', [
@@ -298,7 +313,7 @@ class VolumeBackupsController extends Controller
             'backup_uuid' => $backup->uuid,
         ]);
 
-        return response()->json($this->responseData($backup, $storage, $s3Storage, $created), $created ? 201 : 200);
+        return response()->json($this->responseData($backup, $storage, $s3Storages, $created), $created ? 201 : 200);
     }
 
     #[OA\Delete(
@@ -431,7 +446,7 @@ class VolumeBackupsController extends Controller
     private function responseData(
         ScheduledVolumeBackup $backup,
         LocalPersistentVolume|LocalFileVolume $storage,
-        ?S3Storage $s3Storage,
+        Collection $s3Storages,
         bool $created,
     ): array {
         return [
@@ -444,7 +459,8 @@ class VolumeBackupsController extends Controller
             'save_s3' => $backup->save_s3,
             'disable_local_backup' => $backup->disable_local_backup,
             'stop_during_backup' => $backup->stop_during_backup,
-            's3_storage_uuid' => $s3Storage?->uuid,
+            's3_storage_uuid' => $s3Storages->first()?->uuid,
+            's3_storage_uuids' => $s3Storages->pluck('uuid')->all(),
             'retention_amount_locally' => $backup->retention_amount_locally,
             'retention_days_locally' => $backup->retention_days_locally,
             'retention_max_storage_locally' => $backup->retention_max_storage_locally,

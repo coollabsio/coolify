@@ -4,6 +4,7 @@ namespace App\Actions\Shared;
 
 use App\Jobs\VolumeBackupJob;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -52,23 +53,10 @@ class DeleteScheduledVolumeBackup
             }
 
             if ($deleteS3Archives) {
-                $s3Executions = $backup->executions()
-                    ->with('s3')
-                    ->where('s3_uploaded', true)
-                    ->where('s3_storage_deleted', false)
-                    ->get();
-
-                foreach ($s3Executions->groupBy('s3_storage_id') as $executions) {
-                    $s3 = $executions->first()->s3;
-                    if (! $s3) {
-                        throw new \RuntimeException('The S3 storage used by an existing backup is unavailable.');
-                    }
-
-                    $filenames = $executions->pluck('filename')->filter()->all();
-                    if ($filenames !== []) {
-                        deleteBackupsS3($filenames, $s3);
-                    }
-                }
+                $backup->executions()
+                    ->whereHas('s3Replicas', fn ($query) => $query->where('s3_uploaded', true)->where('s3_storage_deleted', false))
+                    ->get()
+                    ->each(fn (ScheduledVolumeBackupExecution $execution) => $execution->deleteS3Copies());
             }
 
             $backup->delete();

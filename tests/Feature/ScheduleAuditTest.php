@@ -300,12 +300,12 @@ test('disabling or moving S3 storage for backups records audit events', function
     $volumeEvent = scheduleAuditEvent('ui.volume_backup.schedule_set');
 
     expect($databaseEvent->resource_uuid)->toBe($database->uuid)
-        ->and($databaseEvent->metadata['changed_fields'])->toEqualCanonicalizing(['save_s3', 's3_storage_id'])
+        ->and($databaseEvent->metadata['changed_fields'])->toEqualCanonicalizing(['save_s3', 's3_storage_id', 's3_storages'])
         ->and($volumeEvent->metadata['resource_type'])->toBe('application')
         ->and($volumeEvent->metadata['resource_uuid'])->toBe($this->application->uuid)
         ->and($volumeEvent->metadata['storage_uuid'])->toBe($volume->uuid)
         ->and($volumeEvent->metadata['backup_uuid'])->toBe($volumeBackup->uuid)
-        ->and($volumeEvent->metadata['changed_fields'])->toBe(['s3_storage_id']);
+        ->and($volumeEvent->metadata['changed_fields'])->toEqualCanonicalizing(['s3_storage_id', 's3_storages']);
 });
 
 test('configuring the instance database backup records an audit event', function () {

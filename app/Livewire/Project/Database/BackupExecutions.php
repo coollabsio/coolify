@@ -109,12 +109,8 @@ class BackupExecutions extends Component
                 deleteBackupsLocally($execution->filename, $server, throwError: true);
             }
 
-            if ($deleteFromS3 && $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
-                if (! $execution->scheduledDatabaseBackup->s3) {
-                    throw new \RuntimeException('The S3 storage is unavailable.');
-                }
-
-                deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+            if ($deleteFromS3) {
+                $execution->deleteS3Copies();
             }
 
             $execution->delete();

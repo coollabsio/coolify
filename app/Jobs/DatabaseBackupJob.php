@@ -83,8 +83,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $mongo_root_password = null;
 
-    public ?S3Storage $s3 = null;
-
     public $timeout = 3600 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?string $backup_log_uuid = null;
@@ -129,11 +127,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
                 $this->server = $this->database->service->server;
-                $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
                 $this->server = $this->database->destination->server;
-                $this->s3 = $this->backup->s3;
             }
             if (is_null($this->server)) {
                 throw new \Exception('Server not found?!');
@@ -329,6 +325,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_location = null;
                 $this->backup_output = null;
                 $this->error_output = null;
+                $this->s3_uploaded = false;
 
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
@@ -484,10 +481,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $localStorageDeleted = false;
                 if ($this->backup->save_s3 && $localBackupSucceeded) {
                     try {
-                        $this->upload_to_s3();
+                        $s3UploadError = $this->uploadToS3Destinations();
 
-                        // If local backup is disabled, delete the local file immediately after S3 upload
-                        if ($this->backup->disable_local_backup) {
+                        // If local backup is disabled, delete the local file only when every destination has a copy
+                        if ($s3UploadError === null && $this->backup->disable_local_backup) {
                             deleteBackupsLocally($this->backup_location, $this->server);
                             $localStorageDeleted = true;
                         }
@@ -843,9 +840,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         return devHostDockerPath($this->server, $this->backup_location);
     }
 
-    private function upload_to_s3(): void
+    /**
+     * Uploads the backup file to every selected S3 destination and records one replica per destination.
+     *
+     * @return string|null The failed destinations and their errors, or null when every upload succeeded.
+     */
+    private function uploadToS3Destinations(): ?string
     {
-        if (is_null($this->s3)) {
+        $storages = $this->backup->selectedS3Storages();
+        if ($storages->isEmpty()) {
             $previousS3StorageId = $this->backup->s3_storage_id;
 
             $this->backup->update([
@@ -856,13 +859,38 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             throw new \Exception('S3 storage configuration is missing or has been deleted (S3 storage ID: '.($previousS3StorageId ?? 'null').'). S3 backup has been disabled for this schedule.');
         }
 
+        $failures = [];
+        foreach ($storages as $storage) {
+            try {
+                $this->upload_to_s3($storage);
+                $this->backup_log->s3Replicas()->create([
+                    's3_storage_id' => $storage->id,
+                    's3_uploaded' => true,
+                ]);
+            } catch (Throwable $e) {
+                $this->backup_log->s3Replicas()->create([
+                    's3_storage_id' => $storage->id,
+                    's3_uploaded' => false,
+                    'message' => $e->getMessage(),
+                ]);
+                $failures[] = "{$storage->name}: {$e->getMessage()}";
+            }
+        }
+
+        $this->backup_log->refreshS3Summary();
+        $this->s3_uploaded = $failures === [];
+
+        return $failures === [] ? null : implode("\n", $failures);
+    }
+
+    protected function upload_to_s3(S3Storage $s3): void
+    {
         try {
-            $key = $this->s3->key;
-            $secret = $this->s3->secret;
-            // $region = $this->s3->region;
-            $bucket = $this->s3->bucket;
-            $endpoint = $this->s3->endpoint;
-            $this->s3->testConnection(shouldSave: true);
+            $key = $s3->key;
+            $secret = $s3->secret;
+            $bucket = $s3->bucket;
+            $endpoint = $s3->endpoint;
+            $s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $network = $this->database->service->destination->network;
             } else {
@@ -883,7 +911,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedSecret = escapeshellarg($secret);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
-            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $this->s3->trustedInternalHosts()))
+            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $s3->trustedInternalHosts()))
                 ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
                 ->implode(' ');
             $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
@@ -892,9 +920,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
 
-            $this->s3_uploaded = true;
         } catch (Throwable $e) {
-            $this->s3_uploaded = false;
             $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {

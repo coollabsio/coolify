@@ -25,11 +25,12 @@
                 @endif
             </x-slot:actions>
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="s3StorageId" label="S3 storage" portal :required="$saveS3"
-                    :options="$availableS3Storages->map(fn ($s3) => [
-                        'value' => $s3->id,
-                        'label' => $s3->name,
-                    ])->values()->all()" />
+                <x-forms.listbox id="s3StorageIds" label="S3 storages" multiple live portal
+                    helper="Each backup is uploaded to every selected storage." placeholder="Select S3 storages"
+                    :options="$availableS3Storages->map(fn ($storage) => [
+                        'value' => $storage->id,
+                        'label' => $storage->name.($storage->is_usable ? '' : ' (unavailable)'),
+                    ])->all()" />
                 <x-forms.listbox id="disableLocalBackup" label="Local copy" portal :disabled="! $saveS3"
                     :options="[
                         ['value' => false, 'label' => 'Keep local backup'],

@@ -118,7 +118,7 @@ class Index extends Component
         );
 
         $databaseBackups = ScheduledDatabaseBackup::query()
-            ->with(['database', 'latest_log', 's3'])
+            ->with(['database', 'latest_log', 's3', 's3Storages'])
             ->withCount('executions')
             ->where('database_type', (new ServiceDatabase)->getMorphClass())
             ->whereHasMorph('database', [ServiceDatabase::class], fn ($query) => $query->where('service_id', $this->service->id))
@@ -126,7 +126,7 @@ class Index extends Component
             ->get();
 
         $backups = ScheduledVolumeBackup::query()
-            ->with(['backupable.resource', 'latestExecution', 's3'])
+            ->with(['backupable.resource', 'latestExecution', 's3', 's3Storages'])
             ->withCount('executions')
             ->forService($this->service)
             ->latest()

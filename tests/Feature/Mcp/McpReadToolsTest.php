@@ -10,6 +10,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTask;
@@ -215,6 +216,36 @@ test('database backup tools scope schedules by database type and id', function (
     ]);
     $response->assertOk();
     expect($response->json('result.isError'))->toBeTrue();
+});
+
+test('list_database_backups returns every S3 destination primary first', function () {
+    $postgres = StandalonePostgresql::create([
+        'name' => 'multi-s3-db',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    [$first, $second] = collect(['first', 'second'])->map(fn (string $name) => S3Storage::create([
+        'name' => $name, 'region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret',
+        'bucket' => $name, 'endpoint' => 'https://s3.example.com', 'team_id' => $this->team->id,
+    ]))->all();
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->team->id,
+        'frequency' => '0 0 * * *',
+        'save_s3' => true,
+        's3_storage_id' => $second->id,
+        'database_id' => $postgres->id,
+        'database_type' => $postgres->getMorphClass(),
+    ]);
+    $backup->syncS3Storages([$first->id, $second->id]);
+
+    $response = mcpReadCall('list_database_backups', ['uuid' => $postgres->uuid]);
+    $response->assertOk();
+
+    $listed = mcpReadJson($response)['data']['backups'][0];
+    expect($listed['s3_storage_uuid'])->toBe($second->uuid)
+        ->and($listed['s3_storage_uuids'])->toBe([$second->uuid, $first->uuid]);
 });
 
 test('list_backup_executions omits messages without sensitive read and redacts when included', function () {
