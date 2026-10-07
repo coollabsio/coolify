@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Symfony\Component\Yaml\Yaml;
@@ -67,6 +68,14 @@ class StartService
             }
         }
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
+        if ($service->is_maintenance_enabled) {
+            // Domains can change with the compose file, so the maintenance routes follow them.
+            try {
+                $service->syncMaintenancePage();
+            } catch (\Throwable $e) {
+                Log::warning('Maintenance page update failed while starting service.', ['service_uuid' => $service->uuid, 'error' => $e->getMessage()]);
+            }
+        }
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
     }
