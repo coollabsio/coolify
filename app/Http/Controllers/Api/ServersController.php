@@ -816,10 +816,10 @@ class ServersController extends Controller
             ], 422);
         }
 
-        if ($serverRole !== null && $serverRole !== ServerRole::BUILD && $server->hasEnabledGithubRunners()) {
+        if ($serverRole === ServerRole::DEPLOYMENT && $server->hasEnabledGithubRunners()) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['server_role' => ['Disable the GitHub runners before you change the role of this server.']],
+                'errors' => ['server_role' => ['Disable the GitHub runners before you set this server to deployments only.']],
             ], 422);
         }
 
