@@ -32,7 +32,7 @@ echo "👉 init-setup: composer install..."
 composer install --no-interaction
 
 echo "👉 init-setup: migrate..."
-php artisan migrate --step --force
+php artisan start:migration --step
 
 echo "👉 init-setup: artisan dev --init..."
 php artisan dev --init
