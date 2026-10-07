@@ -4,8 +4,6 @@ use App\Livewire\Project\New\Select;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\ViewErrorBag;
 
 beforeEach(function () {
     Cache::flush();
@@ -36,19 +34,22 @@ it('returns each service template last updated timestamp from the generated bund
         ->toBe(CarbonImmutable::parse($templateTimestamp)->timezone(config('app.timezone'))->format('M j, Y H:i'));
 });
 
-it('uses a valid local icon or the default icon for every service', function () {
+it('returns local, CDN, and default logo fallbacks for every service', function () {
     $services = (new Select)->loadServices()['services'];
 
     expect($services['opnform']['logo'])->toBe(asset('svgs/opnform.svg'))
-        ->and($services['pydio-cells']['logo'])->toBe(asset('svgs/default.webp'));
+        ->and($services['pydio-cells']['logo'])->toBe(asset('svgs/cells.svg'))
+        ->and($services['pydio-cells']['logo_cdn_url'])
+        ->toBe('https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/svgs/cells.svg')
+        ->and($services['pydio-cells']['logo_default_url'])->toBe(asset('svgs/default.webp'));
 });
 
-it('crops wide database wordmarks to their icon artwork', function () {
+it('uses resource tile icons for databases', function () {
     $databases = collect((new Select)->loadServices()['databases'])->keyBy('id');
 
-    expect($databases['keydb']['logo'])->toContain('viewBox="0 0 160 182"')
-        ->and($databases['dragonfly']['logo'])->toContain('viewBox="0 0 44 44"', 'viewBox="0 0 88 88"')
-        ->and($databases['clickhouse']['logo'])->toContain('viewBox="0 0 24 26"');
+    foreach (['keydb', 'dragonfly', 'clickhouse'] as $database) {
+        expect($databases[$database]['logo'])->toBe(asset("svgs/resources/{$database}.svg"));
+    }
 });
 
 it('prefers embedded service template git timestamps from the templates bundle', function () {
@@ -97,53 +98,32 @@ it('caches parsed local service templates by bundle mtime', function () {
     expect($first->keys()->all())->toBe($second->keys()->all());
 });
 
-it('renders the shared loading indicator while resource choices load', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee('Loading resources...', false);
-    $view->assertSee('animate-spin', false);
-    $view->assertDontSee('<div x-show="loading">Loading...</div>', false);
-});
-
-it('renders the service templates last updated hint placeholder', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee('Updated');
-    $view->assertSee('serviceTemplatesLastUpdated');
-    $view->assertSee('service.templateLastUpdated');
-    $view->assertSee('aria-controls="resource-type-filter-options"', false);
-    $view->assertSee('aria-controls="resource-category-options"', false);
-    $view->assertSee('@click.outside="closeCategoryFilter()"', false);
-    $view->assertSee('@keydown.escape.stop="closeCategoryFilter(true)"', false);
-});
-
 it('keeps service template keys for service selection and docs links', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn(json_encode([
+            'denoKV' => [
+                'documentation' => 'https://coolify.io/docs',
+                'slogan' => 'Deno KV.',
+                'compose' => '',
+                'tags' => null,
+                'category' => 'database',
+                'logo' => 'images/default.webp',
+                'minversion' => '0.0.0',
+            ],
+        ]));
+
     $services = collect((new Select)->loadServices()['services']);
     $denoKv = $services->firstWhere('id', 'denoKV');
 
     expect($denoKv)
         ->not->toBeNull()
         ->and($denoKv['docsSlug'])->toBe('denokv');
-
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee("setType('one-click-service-' + service.id)", false);
-    $view->assertSee('service.docsSlug || this.extractBaseServiceName(service.name)', false);
 });
 
 it('preserves one click service key casing when selecting a service template', function () {

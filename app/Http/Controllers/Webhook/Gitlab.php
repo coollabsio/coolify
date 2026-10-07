@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -14,13 +17,13 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
-use Visus\Cuid2\Cuid2;
 
 class Gitlab extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ReadsWebhookPushPayload;
+    use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
     {
@@ -48,7 +51,7 @@ class Gitlab extends Controller
 
             $baseUrl = rtrim($gitlabApp->html_url, '/');
 
-            $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
+            $response = Http::GitSource($baseUrl)->asForm()->post("{$baseUrl}/oauth/token", [
                 'client_id' => $gitlabApp->client_id,
                 'client_secret' => $gitlabApp->client_secret,
                 'code' => $code,
@@ -82,11 +85,10 @@ class Gitlab extends Controller
             $return_payloads = collect([]);
             $payload = $request->collect();
             $x_gitlab_token = $request->header('X-Gitlab-Token');
-            $object_kind = data_get($payload, 'object_kind');
-            $project_id = data_get($payload, 'project.id');
+            $object_kind = $this->webhookString(data_get($payload, 'object_kind'));
 
             $allowed_events = ['push', 'merge_request'];
-            if (! in_array($object_kind, $allowed_events)) {
+            if (! in_array($object_kind, $allowed_events, true)) {
                 return response([
                     'status' => 'failed',
                     'message' => 'Event not allowed. Only push and merge_request events are allowed.',
@@ -116,28 +118,30 @@ class Gitlab extends Controller
                 ], 401);
             }
 
+            $project_id = $this->webhookPayloadDatabaseId($payload, 'project.id', required: true);
             $applications = Application::where('source_id', $gitlab_app->id)
                 ->where('source_type', GitlabApp::class)
                 ->where('repository_project_id', $project_id);
 
             if ($object_kind === 'push') {
-                $branch = data_get($payload, 'ref');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 if (! $branch) {
                     return response([
                         'status' => 'failed',
                         'message' => 'No branch found in the request.',
                     ]);
                 }
+                if ($this->isWebhookBranchDeletionPush($payload)) {
+                    return response([
+                        'status' => 'skipped',
+                        'message' => 'Nothing to do. Branch deleted.',
+                    ]);
+                }
+                $commit = $this->webhookCommitSha($payload, 'after');
 
                 $applications = $applications->where('git_branch', $branch)->get();
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
 
                 foreach ($applications as $application) {
                     if (! $application->destination->server->isFunctional()) {
@@ -160,8 +164,7 @@ class Gitlab extends Controller
                         continue;
                     }
 
-                    $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                    if (! $is_watch_path_triggered && ! blank($application->watch_paths)) {
+                    if (! $this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                         $return_payloads->push([
                             'application' => $application->name,
                             'status' => 'failed',
@@ -181,11 +184,11 @@ class Gitlab extends Controller
                         continue;
                     }
 
-                    $deployment_uuid = new Cuid2;
+                    $deployment_uuid = new_public_id();
                     $result = queue_application_deployment(
                         application: $application,
                         deployment_uuid: $deployment_uuid,
-                        commit: data_get($payload, 'after', 'HEAD'),
+                        commit: $commit ?? 'HEAD',
                         force_rebuild: false,
                         is_webhook: true,
                     );
@@ -199,8 +202,8 @@ class Gitlab extends Controller
                         'mode' => 'app',
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
-                        'deployment_uuid' => $deployment_uuid->toString(),
-                        'commit' => data_get($payload, 'after'),
+                        'deployment_uuid' => $deployment_uuid,
+                        'commit' => $commit,
                     ]);
 
                     $return_payloads->push([
@@ -212,14 +215,21 @@ class Gitlab extends Controller
             }
 
             if ($object_kind === 'merge_request') {
-                $action = data_get($payload, 'object_attributes.action');
-                $branch = data_get($payload, 'object_attributes.source_branch');
-                $base_branch = data_get($payload, 'object_attributes.target_branch');
-                $pull_request_id = data_get($payload, 'object_attributes.iid');
-                $pull_request_html_url = data_get($payload, 'object_attributes.url');
-                $pull_request_title = data_get($payload, 'object_attributes.title');
-                $latest_commit_message = data_get($payload, 'object_attributes.last_commit.message');
-                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title, $latest_commit_message]);
+                $branch = $this->webhookString(data_get($payload, 'object_attributes.source_branch'));
+                $base_branch = $this->webhookString(data_get($payload, 'object_attributes.target_branch'));
+                if (! $branch || ! $base_branch) {
+                    return response([
+                        'status' => 'failed',
+                        'message' => 'No branch found in the request.',
+                    ]);
+                }
+                [
+                    'action' => $action,
+                    'pull_request_id' => $pull_request_id,
+                    'pull_request_html_url' => $pull_request_html_url,
+                    'commit' => $commit,
+                    'skip_deploy' => $skip_deploy_pr,
+                ] = $this->readMergeRequestPayload($payload);
 
                 $applications = $applications->where('git_branch', $base_branch)->get();
 
@@ -234,7 +244,7 @@ class Gitlab extends Controller
                         continue;
                     }
 
-                    if (in_array($action, ['open', 'opened', 'synchronize', 'reopened', 'reopen', 'update'])) {
+                    if (in_array($action, ['open', 'opened', 'synchronize', 'reopened', 'reopen', 'update'], true)) {
                         if (! $application->isPRDeployable()) {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -242,6 +252,15 @@ class Gitlab extends Controller
                                 'message' => 'Preview deployments disabled',
                             ]);
 
+                            continue;
+                        }
+
+                        if (! $this->isPreviewDeploymentRepositoryTrusted(
+                            data_get($payload, 'object_attributes.source_project_id'),
+                            data_get($payload, 'object_attributes.target_project_id'),
+                            data_get($payload, 'project.id'),
+                            $application->settings->is_pr_deployments_public_enabled,
+                        )) {
                             continue;
                         }
 
@@ -255,7 +274,7 @@ class Gitlab extends Controller
                             continue;
                         }
 
-                        $deployment_uuid = new Cuid2;
+                        $deployment_uuid = new_public_id();
                         $found = ApplicationPreview::where('application_id', $application->id)
                             ->where('pull_request_id', $pull_request_id)
                             ->first();
@@ -266,7 +285,7 @@ class Gitlab extends Controller
                                     'git_type' => 'gitlab',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
+                                    'pull_request_html_url' => $pull_request_html_url ?? '',
                                     'docker_compose_domains' => $application->docker_compose_domains,
                                 ]);
                                 $pr_app->generate_preview_fqdn_compose();
@@ -275,7 +294,7 @@ class Gitlab extends Controller
                                     'git_type' => 'gitlab',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
+                                    'pull_request_html_url' => $pull_request_html_url ?? '',
                                 ]);
                                 $pr_app->generate_preview_fqdn();
                             }
@@ -285,7 +304,7 @@ class Gitlab extends Controller
                             application: $application,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
-                            commit: data_get($payload, 'object_attributes.last_commit.id', 'HEAD'),
+                            commit: $commit ?? 'HEAD',
                             force_rebuild: false,
                             is_webhook: true,
                             git_type: 'gitlab',
@@ -300,7 +319,7 @@ class Gitlab extends Controller
                             'status' => $result['status'] ?? 'success',
                             'message' => $result['message'] ?? 'Preview Deployment queued',
                         ]);
-                    } elseif (in_array($action, ['closed', 'close', 'merge'])) {
+                    } elseif (in_array($action, ['closed', 'close', 'merge'], true)) {
                         $found = ApplicationPreview::where('application_id', $application->id)
                             ->where('pull_request_id', $pull_request_id)
                             ->first();
@@ -318,6 +337,11 @@ class Gitlab extends Controller
             }
 
             return response($return_payloads);
+        } catch (InvalidWebhookPayloadException $e) {
+            return response([
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+            ]);
         } catch (Exception $e) {
             return handleError($e);
         }
@@ -330,9 +354,9 @@ class Gitlab extends Controller
             $payload = $request->collect();
             $headers = $request->headers->all();
             $x_gitlab_token = data_get($headers, 'x-gitlab-token.0');
-            $x_gitlab_event = data_get($payload, 'object_kind');
+            $x_gitlab_event = $this->webhookString(data_get($payload, 'object_kind'));
             $allowed_events = ['push', 'merge_request'];
-            if (! in_array($x_gitlab_event, $allowed_events)) {
+            if (! in_array($x_gitlab_event, $allowed_events, true)) {
                 $return_payloads->push([
                     'status' => 'failed',
                     'message' => 'Event not allowed. Only push and merge_request events are allowed.',
@@ -341,24 +365,19 @@ class Gitlab extends Controller
                 return response($return_payloads);
             }
 
+            // A delivery without a token does not try a secret, so it is not
+            // counted as a failed attempt.
             if (empty($x_gitlab_token)) {
                 auditLogWebhookFailure('gitlab', 'webhook_token_missing', [
                     'event' => $x_gitlab_event,
                 ]);
-                $return_payloads->push([
-                    'status' => 'failed',
-                    'message' => 'Invalid signature.',
-                ]);
 
-                return response($return_payloads);
+                return response([$this->unauthenticatedManualWebhookFailurePayload()]);
             }
 
             if ($x_gitlab_event === 'push') {
-                $branch = data_get($payload, 'ref');
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 $full_name = data_get($payload, 'project.path_with_namespace');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
                 if (! $branch) {
                     $return_payloads->push([
                         'status' => 'failed',
@@ -367,23 +386,24 @@ class Gitlab extends Controller
 
                     return response($return_payloads);
                 }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                // A deleted branch has no commit to deploy. No secret is checked here.
+                if ($this->isWebhookBranchDeletionPush($payload)) {
+                    $return_payloads->push([
+                        'status' => 'skipped',
+                        'message' => 'Nothing to do. Branch deleted.',
+                    ]);
+
+                    return response($return_payloads);
+                }
+                $commit = $this->webhookCommitSha($payload, 'after');
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_gitlab_event === 'merge_request') {
-                $action = data_get($payload, 'object_attributes.action');
-                $branch = data_get($payload, 'object_attributes.source_branch');
-                $base_branch = data_get($payload, 'object_attributes.target_branch');
+                $branch = $this->webhookString(data_get($payload, 'object_attributes.source_branch'));
+                $base_branch = $this->webhookString(data_get($payload, 'object_attributes.target_branch'));
                 $full_name = data_get($payload, 'project.path_with_namespace');
-                $pull_request_id = data_get($payload, 'object_attributes.iid');
-                $pull_request_html_url = data_get($payload, 'object_attributes.url');
-                $pull_request_title = data_get($payload, 'object_attributes.title');
-                $latest_commit_message = data_get($payload, 'object_attributes.last_commit.message');
-                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title, $latest_commit_message]);
-                if (! $branch) {
+                if (! $branch || ! $base_branch) {
                     $return_payloads->push([
                         'status' => 'failed',
                         'message' => 'Nothing to do. No branch found in the request.',
@@ -391,6 +411,13 @@ class Gitlab extends Controller
 
                     return response($return_payloads);
                 }
+                [
+                    'action' => $action,
+                    'pull_request_id' => $pull_request_id,
+                    'pull_request_html_url' => $pull_request_html_url,
+                    'commit' => $commit,
+                    'skip_deploy' => $skip_deploy_pr,
+                ] = $this->readMergeRequestPayload($payload);
             }
             $full_name = $this->manualWebhookRepositoryFullName($full_name);
             if ($full_name === null) {
@@ -401,27 +428,21 @@ class Gitlab extends Controller
 
                 return response($return_payloads);
             }
+            $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
+            // GitLab sends a static token. A repeated wrong token is one guess.
+            $failure_attempt = $this->manualWebhookTokenAttempt($x_gitlab_token);
             $applications = Application::query();
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                    ]);
-
-                    return response($return_payloads);
+                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with branch '$base_branch'.",
-                    ]);
-
-                    return response($return_payloads);
+                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
             }
             foreach ($applications as $application) {
@@ -460,8 +481,7 @@ class Gitlab extends Controller
                 }
                 if ($x_gitlab_event === 'push') {
                     if ($application->isDeployable()) {
-                        $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                        if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                        if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                             if ($skip_deploy_commits ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -477,7 +497,7 @@ class Gitlab extends Controller
                             $result = queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
-                                commit: data_get($payload, 'after', 'HEAD'),
+                                commit: $commit ?? 'HEAD',
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
@@ -497,7 +517,7 @@ class Gitlab extends Controller
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
                                     'deployment_uuid' => $deployment_uuid,
-                                    'commit' => data_get($payload, 'after'),
+                                    'commit' => $commit,
                                     'repository' => $full_name ?? null,
                                 ]);
                                 $return_payloads->push([
@@ -532,6 +552,15 @@ class Gitlab extends Controller
                 if ($x_gitlab_event === 'merge_request') {
                     if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
                         if ($application->isPRDeployable()) {
+                            if (! $this->isPreviewDeploymentRepositoryTrusted(
+                                data_get($payload, 'object_attributes.source_project_id'),
+                                data_get($payload, 'object_attributes.target_project_id'),
+                                data_get($payload, 'project.id'),
+                                $application->settings->is_pr_deployments_public_enabled,
+                            )) {
+                                continue;
+                            }
+
                             if ($skip_deploy_pr ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -549,7 +578,7 @@ class Gitlab extends Controller
                                         'git_type' => 'gitlab',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'pull_request_html_url' => $pull_request_html_url ?? '',
                                         'docker_compose_domains' => $application->docker_compose_domains,
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
@@ -558,7 +587,7 @@ class Gitlab extends Controller
                                         'git_type' => 'gitlab',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'pull_request_html_url' => $pull_request_html_url ?? '',
                                     ]);
                                     $pr_app->generate_preview_fqdn();
                                 }
@@ -567,7 +596,7 @@ class Gitlab extends Controller
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
-                                commit: data_get($payload, 'object_attributes.last_commit.id', 'HEAD'),
+                                commit: $commit ?? 'HEAD',
                                 force_rebuild: false,
                                 is_webhook: true,
                                 git_type: 'gitlab'
@@ -621,9 +650,34 @@ class Gitlab extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
+        } catch (InvalidWebhookPayloadException $e) {
+            return response([[
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+            ]]);
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Read and validate the merge_request payload fields that the handlers use.
+     *
+     * @return array{action: ?string, pull_request_id: int, pull_request_html_url: ?string, commit: ?string, skip_deploy: bool}
+     *
+     * @throws InvalidWebhookPayloadException When a field has a wrong type or format.
+     */
+    private function readMergeRequestPayload(mixed $payload): array
+    {
+        $title = $this->webhookPayloadString($payload, 'object_attributes.title');
+
+        return [
+            'action' => $this->webhookPayloadString($payload, 'object_attributes.action'),
+            'pull_request_id' => $this->webhookPullRequestId($payload, 'object_attributes.iid'),
+            'pull_request_html_url' => $this->webhookPayloadUrl($payload, 'object_attributes.url'),
+            'commit' => $this->webhookCommitSha($payload, 'object_attributes.last_commit.id'),
+            'skip_deploy' => self::shouldSkipDeployAny([$title, data_get($payload, 'object_attributes.last_commit.message')]),
+        ];
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Jobs\ConnectProxyToNetworksJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -28,42 +27,37 @@ class Destinations extends Component
         }
     }
 
-    private function createNetworkAndAttachToProxy()
-    {
-        ConnectProxyToNetworksJob::dispatchSync($this->server);
-    }
-
     public function add($name)
     {
+        $this->authorize('update', $this->server);
         if ($this->server->isSwarm()) {
-            $this->authorize('create', SwarmDocker::class);
             $found = $this->server->swarmDockers()->where('network', $name)->first();
             if ($found) {
                 $this->dispatch('error', 'Network already added to this server.');
 
                 return;
             } else {
-                SwarmDocker::create([
+                $destination = SwarmDocker::create([
                     'name' => $this->server->name.'-'.$name,
                     'network' => $name,
                     'server_id' => $this->server->id,
                 ]);
+                $this->auditDestinationCreated($destination, 'swarm');
             }
         } else {
-            $this->authorize('create', StandaloneDocker::class);
             $found = $this->server->standaloneDockers()->where('network', $name)->first();
             if ($found) {
                 $this->dispatch('error', 'Network already added to this server.');
 
                 return;
             } else {
-                StandaloneDocker::create([
+                $destination = StandaloneDocker::create([
                     'name' => $this->server->name.'-'.$name,
                     'network' => $name,
                     'server_id' => $this->server->id,
                 ]);
+                $this->auditDestinationCreated($destination, 'standalone');
             }
-            $this->createNetworkAndAttachToProxy();
         }
     }
 
@@ -91,6 +85,17 @@ class Destinations extends Component
             return;
         }
         $this->dispatch('success', 'Scan done.');
+    }
+
+    private function auditDestinationCreated(StandaloneDocker|SwarmDocker $destination, string $type): void
+    {
+        auditLog('ui.destination.created', [
+            'team_id' => $this->server->team_id,
+            'destination_uuid' => $destination->uuid,
+            'destination_name' => $destination->name,
+            'destination_type' => $type,
+            'server_uuid' => $this->server->uuid,
+        ]);
     }
 
     public function render()

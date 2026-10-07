@@ -94,6 +94,7 @@ class CloudProviderTokenForm extends Component
 
     public function addToken()
     {
+        $this->authorize('create', CloudProviderToken::class);
         $this->validate();
 
         try {

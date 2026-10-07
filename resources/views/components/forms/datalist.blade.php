@@ -132,7 +132,7 @@
 
             {{-- Dropdown Options --}}
             <div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
-                class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
+                class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-dropdown max-h-60 overflow-auto scrollbar">
 
                 <template x-if="filteredOptions.length === 0">
                     <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
@@ -277,7 +277,7 @@
 
                 {{-- Dropdown Options --}}
                 <div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
-                    class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
+                    class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-dropdown max-h-60 overflow-auto scrollbar">
 
                     <template x-if="filteredOptions.length === 0">
                         <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">

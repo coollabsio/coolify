@@ -6,11 +6,23 @@
 
 @php
     $serverReady = $server->isFunctional();
-    $proxyUpdateAvailable = $server->proxySet()
-        && ($server->hasCurrentTraefikOutdatedInfo() || $server->hasPendingProxyConfiguration());
+    $proxyConfigurationPending = $server->proxySet() && $server->hasPendingProxyConfiguration();
+    $traefikUpdateAvailable = $server->proxySet() && $server->hasCurrentTraefikOutdatedInfo();
+    $proxyUpdateAvailable = $proxyConfigurationPending || $traefikUpdateAvailable;
     $proxyNeedsAttention = $server->proxySet()
         && (! in_array($proxyStatus, ['running'], true) || $proxyUpdateAvailable);
-    $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
+    $proxyStatusLabel = match (true) {
+        $proxyConfigurationPending => 'Restart required',
+        $traefikUpdateAvailable => 'Update available',
+        default => str($proxyStatus ?: 'unknown')->headline(),
+    };
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelNeedsAttention = $showSentinelStatus && $sentinelStatus === 'out_of_sync';
+    $sentinelStatusLabel = match ($sentinelStatus) {
+        'waiting' => 'Waiting for first report',
+        'in_sync' => 'In sync',
+        default => 'Out of sync',
+    };
 
     [$summaryLabel, $summaryType] = match (true) {
         ! $serverReady => ['Unavailable', 'error'],
@@ -66,7 +78,7 @@
                     'bg-error' => $proxyNeedsAttention && ! $proxyUpdateAvailable && ! in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
                 ])></span>
                 <span class="flex-1">Proxy</span>
-                <span>{{ str($proxyStatus ?: 'unknown')->headline() }}</span>
+                <span>{{ $proxyStatusLabel }}</span>
             </a>
         @endif
         @if ($showSentinelStatus)
@@ -74,11 +86,12 @@
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
-                    'bg-success' => ! $sentinelNeedsAttention,
-                    'bg-warning' => $sentinelNeedsAttention,
+                    'bg-success' => $sentinelStatus === 'in_sync',
+                    'bg-neutral-400 dark:bg-fg-faint' => $sentinelStatus === 'waiting',
+                    'bg-warning' => $sentinelStatus === 'out_of_sync',
                 ])></span>
                 <span class="flex-1">Sentinel</span>
-                <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
+                <span>{{ $sentinelStatusLabel }}</span>
             </a>
         @endif
     </div>

@@ -6,14 +6,20 @@ use App\Actions\Stripe\CancelSubscriptionAtPeriodEnd;
 use App\Actions\Stripe\RefundSubscription;
 use App\Actions\Stripe\ResumeSubscription;
 use App\Actions\Stripe\UpdateSubscriptionQuantity;
+use App\Actions\User\DeleteUserAccount;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Stripe\StripeClient;
 
 class Actions extends Component
 {
+    #[Locked]
+    public ?int $teamId = null;
+
     public $server_limits = 0;
 
     public int $quantity = UpdateSubscriptionQuantity::MIN_SERVER_LIMIT;
@@ -34,21 +40,31 @@ class Actions extends Component
 
     public bool $refundLatestPayment = false;
 
+    public bool $deleteAccount = false;
+
+    public bool $canDeleteAccount = false;
+
     public string $billingInterval = 'monthly';
 
     public ?string $nextBillingDate = null;
 
     public function mount(): void
     {
+        $team = currentTeam();
+        abort_unless($team && auth()->user()->isAdminOfTeam($team->id), 403);
+        $this->teamId = $team->id;
+
         $this->server_limits = Team::serverLimit();
         $this->quantity = (int) $this->server_limits;
-        $this->billingInterval = currentTeam()->subscription?->billingInterval() ?? 'monthly';
+        $this->billingInterval = $team->subscription?->billingInterval() ?? 'monthly';
+        $this->canDeleteAccount = app(DeleteUserAccount::class)->blockers(Auth::user(), removeTeamResources: true) === [];
     }
 
     public function loadPricePreview(int $quantity): void
     {
+        $team = $this->authorizedTeam();
         $this->quantity = $quantity;
-        $result = (new UpdateSubscriptionQuantity)->fetchPricePreview(currentTeam(), $quantity);
+        $result = (new UpdateSubscriptionQuantity)->fetchPricePreview($team, $quantity);
         $this->pricePreview = $result['success'] ? $result['preview'] : null;
     }
 
@@ -57,6 +73,8 @@ class Actions extends Component
     // non-destructive, reversible billing adjustment (prorated by Stripe).
     public function updateQuantity(string $password = ''): bool
     {
+        $team = $this->authorizedTeam();
+
         if ($this->quantity < UpdateSubscriptionQuantity::MIN_SERVER_LIMIT) {
             $this->dispatch('error', 'Minimum server limit is '.UpdateSubscriptionQuantity::MIN_SERVER_LIMIT.'.');
             $this->quantity = UpdateSubscriptionQuantity::MIN_SERVER_LIMIT;
@@ -68,9 +86,14 @@ class Actions extends Component
             return true;
         }
 
-        $result = (new UpdateSubscriptionQuantity)->execute(currentTeam(), $this->quantity);
+        $previousServerLimit = (int) $this->server_limits;
+        $result = (new UpdateSubscriptionQuantity)->execute($team, $this->quantity);
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('quantity_updated', [
+                'from_server_limit' => $previousServerLimit,
+                'to_server_limit' => $this->quantity,
+            ]);
             $this->server_limits = $this->quantity;
             $this->pricePreview = null;
             $this->dispatch('success', 'Server limit updated to '.$this->quantity.'.');
@@ -86,25 +109,29 @@ class Actions extends Component
 
     public function loadRefundEligibility(): void
     {
+        $this->authorizedTeam();
         $this->checkRefundEligibility();
         $this->refundCheckLoading = false;
     }
 
     public function stripeCustomerPortal(): void
     {
-        $session = getStripeCustomerPortalSession(currentTeam());
+        $session = getStripeCustomerPortalSession($this->authorizedTeam());
         redirect($session->url);
     }
 
     public function refundSubscription(string $password): bool|string
     {
+        $team = $this->authorizedTeam();
+
         if (! shouldSkipPasswordConfirmation() && ! Hash::check($password, auth()->user()->password)) {
             return 'Invalid password.';
         }
 
-        $result = app(RefundSubscription::class)->execute(currentTeam());
+        $result = app(RefundSubscription::class)->execute($team);
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('refunded');
             $this->dispatch('success', 'Subscription refunded successfully.');
             $this->redirect(route('subscription.index'), navigate: true);
 
@@ -118,74 +145,46 @@ class Actions extends Component
 
     public function cancelImmediately(string $password, array $selectedActions = []): bool|string
     {
+        $team = $this->authorizedTeam();
+
         if (! shouldSkipPasswordConfirmation() && ! Hash::check($password, auth()->user()->password)) {
             return 'Invalid password.';
         }
 
-        if (in_array('refundLatestPayment', $selectedActions, true)) {
-            // Eligibility is re-validated server-side inside RefundSubscription::execute()
-            $result = app(RefundSubscription::class)->execute(currentTeam());
+        $deleteAccount = in_array('deleteAccount', $selectedActions, true);
+        if ($deleteAccount && ($blockers = app(DeleteUserAccount::class)->blockers(Auth::user(), removeTeamResources: true))) {
+            return implode(' ', $blockers);
+        }
 
-            if ($result['success']) {
-                $this->dispatch('success', 'Subscription refunded and cancelled successfully.');
-                $this->redirect(route('subscription.index'), navigate: true);
-
-                return true;
-            }
-
-            $this->dispatch('error', 'Something went wrong with the refund. Please <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
+        $refund = in_array('refundLatestPayment', $selectedActions, true);
+        if (! $this->cancelSubscriptionNow($team, $refund)) {
+            $this->dispatch('error', 'Something went wrong with the '.($refund ? 'refund' : 'cancellation').'. Please <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
 
             return true;
         }
 
-        $team = currentTeam();
-        $subscription = $team->subscription;
-
-        if (! $subscription?->stripe_subscription_id) {
-            $this->dispatch('error', 'Something went wrong with the cancellation. Please <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
-
-            return true;
+        if ($deleteAccount) {
+            return $this->deleteAccountAfterCancellation();
         }
 
-        try {
-            $stripe = app(StripeClient::class);
-            $stripe->subscriptions->cancel($subscription->stripe_subscription_id);
+        $this->dispatch('success', $refund ? 'Subscription refunded and cancelled successfully.' : 'Subscription cancelled successfully.');
+        $this->redirect(route('subscription.index'), navigate: true);
 
-            $subscription->update([
-                'stripe_cancel_at_period_end' => false,
-                'stripe_invoice_paid' => false,
-                'stripe_trial_already_ended' => false,
-                'stripe_past_due' => false,
-                'stripe_feedback' => 'Cancelled immediately by user',
-                'stripe_comment' => 'Subscription cancelled immediately by user at '.now()->toDateTimeString(),
-            ]);
-
-            $team->subscriptionEnded();
-
-            \Log::info("Subscription {$subscription->stripe_subscription_id} cancelled immediately for team {$team->name}");
-
-            $this->dispatch('success', 'Subscription cancelled successfully.');
-            $this->redirect(route('subscription.index'), navigate: true);
-
-            return true;
-        } catch (\Exception $e) {
-            \Log::error("Immediate cancellation error for team {$team->id}: ".$e->getMessage());
-
-            $this->dispatch('error', 'Something went wrong with the cancellation. Please <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
-
-            return true;
-        }
+        return true;
     }
 
     public function cancelAtPeriodEnd(string $password): bool|string
     {
+        $team = $this->authorizedTeam();
+
         if (! shouldSkipPasswordConfirmation() && ! Hash::check($password, auth()->user()->password)) {
             return 'Invalid password.';
         }
 
-        $result = (new CancelSubscriptionAtPeriodEnd)->execute(currentTeam());
+        $result = (new CancelSubscriptionAtPeriodEnd)->execute($team);
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('cancellation_scheduled', ['cancel_at_period_end' => true]);
             $this->dispatch('success', 'Subscription will be cancelled at the end of the billing period.');
 
             return true;
@@ -198,9 +197,11 @@ class Actions extends Component
 
     public function resumeSubscription(): bool
     {
-        $result = (new ResumeSubscription)->execute(currentTeam());
+        $team = $this->authorizedTeam();
+        $result = (new ResumeSubscription)->execute($team);
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('resumed');
             $this->dispatch('success', 'Subscription resumed successfully.');
 
             return true;
@@ -211,15 +212,125 @@ class Actions extends Component
         return true;
     }
 
+    private function cancelSubscriptionNow(Team $team, bool $refund): bool
+    {
+        if ($refund) {
+            // Eligibility is re-validated server-side inside RefundSubscription::execute()
+            $result = app(RefundSubscription::class)->execute($team);
+
+            if ($result['success']) {
+                $this->auditSubscriptionChange('refunded');
+            }
+
+            return $result['success'];
+        }
+
+        $subscription = $team->subscription;
+
+        if (! $subscription?->stripe_subscription_id) {
+            return false;
+        }
+
+        // subscriptionEnded() clears the ID on this model, so keep it for the log.
+        $subscriptionId = $subscription->stripe_subscription_id;
+
+        try {
+            $stripe = app(StripeClient::class);
+            $stripe->subscriptions->cancel($subscriptionId);
+
+            $subscription->update([
+                'stripe_cancel_at_period_end' => false,
+                'stripe_invoice_paid' => false,
+                'stripe_trial_already_ended' => false,
+                'stripe_past_due' => false,
+                'stripe_feedback' => 'Cancelled immediately by user',
+                'stripe_comment' => 'Subscription cancelled immediately by user at '.now()->toDateTimeString(),
+            ]);
+
+            $team->subscriptionEnded();
+
+            $this->auditSubscriptionChange('cancelled', ['cancel_at_period_end' => false]);
+
+            \Log::info("Subscription {$subscriptionId} cancelled immediately for team {$team->name}");
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error("Immediate cancellation error for team {$team->id}: ".$e->getMessage());
+
+            return false;
+        }
+    }
+
+    private function deleteAccountAfterCancellation(): bool
+    {
+        try {
+            app(DeleteUserAccount::class)->handle(Auth::user(), removeTeamResources: true);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->dispatch('error', 'Your subscription was cancelled, but your account could not be deleted. Delete it from your profile page or <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
+            $this->redirect(route('subscription.index'), navigate: true);
+
+            return true;
+        }
+
+        auditLog('ui.user.account_deleted', ['resource' => 'user']);
+
+        Auth::guard('web')->logout();
+        session()->invalidate();
+        session()->regenerateToken();
+
+        $this->redirect(route('login'));
+
+        return true;
+    }
+
+    /**
+     * Resolve the team locked at mount, rejecting the request when the session
+     * switched to another team or the user is no longer an admin of that team.
+     */
+    private function authorizedTeam(): Team
+    {
+        $team = currentTeam();
+
+        abort_unless(
+            $this->teamId !== null
+                && $team?->id === $this->teamId
+                && auth()->user()->isAdminOfTeam($this->teamId),
+            403
+        );
+
+        return $team;
+    }
+
+    /**
+     * Record a user-triggered subscription change for the current team.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function auditSubscriptionChange(string $action, array $context = []): void
+    {
+        $team = $this->authorizedTeam();
+
+        auditLog("ui.subscription.{$action}", [
+            'team_id' => $team?->id,
+            'resource' => 'subscription',
+            'subscription_id' => $team?->subscription?->id,
+            'team_name' => $team?->name,
+            ...$context,
+        ]);
+    }
+
     private function checkRefundEligibility(): void
     {
-        if (! isCloud() || ! currentTeam()->subscription?->stripe_subscription_id) {
+        $team = $this->authorizedTeam();
+
+        if (! isCloud() || ! $team->subscription?->stripe_subscription_id) {
             return;
         }
 
         try {
-            $this->refundAlreadyUsed = currentTeam()->subscription?->stripe_refunded_at !== null;
-            $result = (new RefundSubscription)->checkEligibility(currentTeam());
+            $this->refundAlreadyUsed = $team->subscription?->stripe_refunded_at !== null;
+            $result = (new RefundSubscription)->checkEligibility($team);
             $this->isRefundEligible = $result['eligible'];
             $this->refundDaysRemaining = $result['days_remaining'];
 

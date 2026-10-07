@@ -50,6 +50,7 @@ class Show extends Component
                             'mongodbs',
                             'mysqls',
                             'mariadbs',
+                            'sqlites',
                         ])
                         ->orderBy('created_at'),
                 ])
@@ -62,7 +63,7 @@ class Show extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Environment::class);
+            $this->authorize('update', $this->project);
             $this->validate();
             $environment = Environment::create([
                 'name' => $this->name,
@@ -105,6 +106,7 @@ class Show extends Component
                     $environment->mongodbs_count,
                     $environment->mysqls_count,
                     $environment->mariadbs_count,
+                    $environment->sqlites_count,
                 ])->sum();
 
                 return [

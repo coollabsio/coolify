@@ -6,7 +6,7 @@
         <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-show" />
         <section class="application-settings-workspace mt-4 flex min-h-0 w-full max-w-none flex-1 lg:mt-0">
             <div class="grid min-h-0 min-w-0 flex-1 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                <x-application.configuration-sidebar :application="$application" :flush="true"
+                <x-application.configuration-sidebar :application="$application"
                     current-route="project.application.deployment.show" />
                 <div class="flex min-h-0 min-w-0 flex-col gap-4 xl:h-full xl:pt-px">
                     <livewire:project.application.deployment.index :embedded="true"
@@ -367,7 +367,7 @@
                                         x-transition:leave="transition ease-in duration-75"
                                         x-transition:leave-start="transform opacity-100 scale-100"
                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-neutral-200 bg-white p-1 shadow-modal focus:outline-none dark:border-white/[0.1] dark:bg-[#181818]">
+                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-neutral-200 bg-white p-1 shadow-dropdown focus:outline-none dark:border-white/[0.1] dark:bg-[#181818]">
                                         <div>
                                             <button x-on:click="downloadLogs(); downloadMenuOpen = false"
                                                 class="listbox-option text-neutral-700! hover:bg-neutral-100! dark:text-neutral-200! dark:hover:bg-white/[0.07]!">

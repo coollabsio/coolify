@@ -15,6 +15,9 @@ class ProjectIconController extends Controller
 
         abort_if($contents === null, 404);
 
-        return response($contents)->header('Content-Type', 'image/jpeg');
+        return response($contents, 200, [
+            'Content-Type' => 'image/jpeg',
+            'Cache-Control' => 'private, max-age=31536000, immutable',
+        ]);
     }
 }

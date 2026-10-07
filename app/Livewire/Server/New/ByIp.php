@@ -3,12 +3,14 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Enums\ServerRole;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -40,7 +42,7 @@ class ByIp extends Component
 
     public int $port = 22;
 
-    public bool $is_build_server = false;
+    public string $server_role = ServerRole::BOTH->value;
 
     public function mount()
     {
@@ -51,7 +53,7 @@ class ByIp extends Component
     protected function rules(): array
     {
         return [
-            'private_key_id' => 'nullable|integer',
+            'private_key_id' => ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', currentTeam()->id)],
             'new_private_key_name' => 'nullable|string',
             'new_private_key_description' => 'nullable|string',
             'new_private_key_value' => 'nullable|string',
@@ -60,7 +62,7 @@ class ByIp extends Component
             'ip' => ['required', 'string', new ValidServerIp],
             'user' => ValidationPatterns::serverUsernameRules(),
             'port' => 'required|integer|between:1,65535',
-            'is_build_server' => 'required|boolean',
+            'server_role' => ['required', 'in:deployment,build,both'],
         ];
     }
 
@@ -69,6 +71,7 @@ class ByIp extends Component
         return array_merge(ValidationPatterns::combinedMessages(), [
             'private_key_id.integer' => 'The Private Key field must be an integer.',
             'private_key_id.nullable' => 'The Private Key field is optional.',
+            'private_key_id.exists' => 'The selected Private Key is invalid.',
             'new_private_key_name.string' => 'The Private Key Name must be a string.',
             'new_private_key_description.string' => 'The Private Key Description must be a string.',
             'new_private_key_value.string' => 'The Private Key Value must be a string.',
@@ -80,8 +83,8 @@ class ByIp extends Component
             'port.required' => 'The Port field is required.',
             'port.integer' => 'The Port field must be an integer.',
             'port.between' => 'The Port field must be between 1 and 65535.',
-            'is_build_server.required' => 'The Build Server field is required.',
-            'is_build_server.boolean' => 'The Build Server field must be true or false.',
+            'server_role.required' => 'The Server Role field is required.',
+            'server_role.in' => 'The selected Server Role is invalid.',
         ]);
     }
 
@@ -142,11 +145,7 @@ class ByIp extends Component
             $this->authorize('create', Server::class);
             $foundServer = Server::whereIp($this->ip)->first();
             if ($foundServer) {
-                if ($foundServer->team_id === currentTeam()->id) {
-                    return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
-                }
-
-                return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
+                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
             }
 
             if (is_null($this->private_key_id)) {
@@ -164,14 +163,15 @@ class ByIp extends Component
                 'team_id' => currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
             ];
-            if ($this->is_build_server) {
+            if ($this->server_role === ServerRole::BUILD->value) {
                 data_forget($payload, 'proxy');
             }
-            $server = Server::create($payload);
+            $server = Team::createServerWithinLimit(currentTeam()->id, $payload);
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
-            $server->settings->is_build_server = $this->is_build_server;
+            $server->settings->server_role = ServerRole::from($this->server_role);
+            $server->settings->is_build_server = $this->server_role === ServerRole::BUILD->value;
             $server->settings->save();
 
             return redirectRoute($this, 'server.show', [$server->uuid]);

@@ -3,6 +3,7 @@
 # category: productivity
 # tags: lowcode, nocode, no, low, platform
 # logo: svgs/appsmith.svg
+# port: 80
 
 services:
   appsmith:

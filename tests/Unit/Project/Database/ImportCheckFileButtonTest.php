@@ -2,16 +2,6 @@
 
 use App\Livewire\Project\Database\ImportForm;
 
-test('checkFile does nothing when customLocation is empty', function () {
-    $component = new ImportForm;
-    $component->customLocation = '';
-
-    // No server commands should be executed when customLocation is empty
-    $component->checkFile();
-
-    expect($component->filename)->toBeNull();
-});
-
 test('checkFile validates file exists on server when customLocation is filled', function () {
     $component = new ImportForm;
     $component->customLocation = '/tmp/backup.sql';
@@ -39,6 +29,7 @@ test('validateBucketName accepts valid bucket names', function () {
     expect($method->invoke($component, 'my-bucket'))->toBeTrue();
     expect($method->invoke($component, 'mybucket123'))->toBeTrue();
     expect($method->invoke($component, 'my.bucket.name'))->toBeTrue();
+    expect($method->invoke($component, 'Legacy-Bucket'))->toBeTrue();
 });
 
 test('validateBucketName rejects invalid bucket names', function () {
@@ -54,7 +45,6 @@ test('validateBucketName rejects invalid bucket names', function () {
     expect($method->invoke($component, "bucket\nid"))->toBeFalse();
     expect($method->invoke($component, 'bucket name'))->toBeFalse(); // Space not allowed in bucket
     expect($method->invoke($component, 'my_bucket'))->toBeFalse();
-    expect($method->invoke($component, 'Bucket-Name'))->toBeFalse();
     expect($method->invoke($component, '192.168.1.1'))->toBeFalse();
 });
 

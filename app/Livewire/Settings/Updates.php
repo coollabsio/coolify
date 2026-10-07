@@ -64,7 +64,16 @@ class Updates extends Component
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
             $this->settings->docker_registry_url = $validated['docker_registry_url'];
             $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
+            $changedFields = auditChangedFields($this->settings);
             $this->settings->save();
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'updates',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
             $this->dispatch('success', 'Settings updated!');
         } catch (ValidationException $e) {
             throw $e;
@@ -80,9 +89,7 @@ class Updates extends Component
         }
 
         try {
-            instant_remote_process([
-                $this->registryEnvSyncCommand($registryUrl),
-            ], $this->server);
+            instant_remote_process($this->registryEnvSyncCommand($registryUrl), $this->server);
         } catch (\Exception $e) {
             Log::warning('Failed to sync REGISTRY_URL to .env', [
                 'error' => $e->getMessage(),
@@ -92,13 +99,25 @@ class Updates extends Component
         }
     }
 
-    private function registryEnvSyncCommand(string $registryUrl): string
+    /**
+     * One command per line: the non-root sudo parser adds sudo to line starts, not to `then`/`else` branches,
+     * and a `>>` redirect would be opened by the SSH user.
+     *
+     * @return list<string>
+     */
+    private function registryEnvSyncCommand(string $registryUrl): array
     {
         $envFile = '/data/coolify/source/.env';
         $sedExpression = escapeshellarg("s|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|");
         $registryLine = escapeshellarg("REGISTRY_URL={$registryUrl}");
 
-        return "if grep -q '^REGISTRY_URL=' {$envFile}; then sed -i {$sedExpression} {$envFile}; else printf '%s\\n' {$registryLine} >> {$envFile}; fi";
+        return [
+            "if grep -q '^REGISTRY_URL=' {$envFile}; then",
+            "    sed -i {$sedExpression} {$envFile}",
+            'else',
+            "    printf '%s\\n' {$registryLine} | tee -a {$envFile} > /dev/null",
+            'fi',
+        ];
     }
 
     public function submit()

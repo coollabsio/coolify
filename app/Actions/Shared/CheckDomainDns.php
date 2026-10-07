@@ -3,6 +3,7 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
 use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
@@ -66,6 +67,7 @@ class CheckDomainDns
         }
 
         $type = dnsRecordTypeForIp($expectedIp) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
+        $receivedAddressRecord = false;
 
         foreach ($dnsServers as $dnsServer) {
             $remainingNanoseconds = $deadline - hrtime(true);
@@ -90,7 +92,8 @@ class CheckDomainDns
                         continue;
                     }
 
-                    if (isCloudflareIp($record->getData()) || ($expectedIp && $record->getData() === $expectedIp)) {
+                    $receivedAddressRecord = true;
+                    if (isCloudflareIp($record->getData()) || ($expectedIp && DnsRecordHints::sameAddress($record->getData(), $expectedIp))) {
                         return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
                     }
                 }
@@ -99,7 +102,40 @@ class CheckDomainDns
             }
         }
 
+        if (! $receivedAddressRecord && hrtime(true) < $deadline) {
+            foreach ($this->resolveWithSystemDns($host, $type) as $resolvedIp) {
+                if (isCloudflareIp($resolvedIp) || ($expectedIp && DnsRecordHints::sameAddress($resolvedIp, $expectedIp))) {
+                    return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
+                }
+            }
+        }
+
         return $this->result('failed', dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveWithSystemDns(string $host, string $type): array
+    {
+        $recordType = $type === DNSTypes::NAME_AAAA ? DNS_AAAA : DNS_A;
+        $addressKey = $type === DNSTypes::NAME_AAAA ? 'ipv6' : 'ip';
+
+        try {
+            $records = @dns_get_record($host, $recordType);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        if (! is_array($records)) {
+            return [];
+        }
+
+        return collect($records)
+            ->pluck($addressKey)
+            ->filter(fn ($address) => is_string($address) && filter_var($address, FILTER_VALIDATE_IP) !== false)
+            ->values()
+            ->all();
     }
 
     private function successMessage(Server $server, ?string $expectedIp): string

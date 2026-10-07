@@ -7,12 +7,15 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
+use App\Support\ResourceStartActivity;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $database;
 
@@ -20,21 +23,31 @@ class Heading extends Component
 
     public $docker_cleanup = true;
 
+    public $isDeploymentProgress = false;
+
+    public $runningActivityId = null;
+
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'activityFinished',
             'refresh' => '$refresh',
             'compose_loaded' => '$refresh',
             'update_links' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => 'activityFinished',
+            ]),
         ];
     }
 
     public function activityFinished()
     {
+        if (auth()->user()->cannot('update', $this->database)) {
+            $this->dispatch('refresh');
+
+            return;
+        }
+
         try {
             // Only set started_at if database is actually running
             if ($this->database->isRunning()) {
@@ -55,10 +68,52 @@ class Heading extends Component
 
     public function checkStatus()
     {
+        $this->checkDeployments();
+
         if ($this->database->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->database->destination->server);
         } else {
             $this->dispatch('error', 'Server is not functional.');
+        }
+    }
+
+    public function checkDeployments()
+    {
+        try {
+            $activity = ResourceStartActivity::latestRunning($this->database->uuid);
+            $this->isDeploymentProgress = $activity !== null;
+            $this->runningActivityId = $activity?->id;
+        } catch (\Throwable) {
+            $this->isDeploymentProgress = false;
+            $this->runningActivityId = null;
+        }
+
+        return $this->isDeploymentProgress;
+    }
+
+    /**
+     * Re-attach the live log dialog to a start/restart that is already running,
+     * so the log reappears after the dialog was closed.
+     */
+    public function reopenDeployment()
+    {
+        $this->authorize('view', $this->database);
+
+        $this->checkDeployments();
+
+        if ($this->isDeploymentProgress && $this->runningActivityId) {
+            $this->dispatch('activityMonitor', $this->runningActivityId, ServiceStatusChanged::class);
+            $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
+        } else {
+            $this->dispatch('info', 'No operation is currently running.');
+        }
+    }
+
+    private function markDeploymentRunning($activity): void
+    {
+        if (is_object($activity)) {
+            $this->isDeploymentProgress = true;
+            $this->runningActivityId = $activity->id;
         }
     }
 
@@ -74,6 +129,8 @@ class Heading extends Component
             'environment_uuid' => $this->database->environment->uuid,
             'database_uuid' => $this->database->uuid,
         ];
+
+        $this->checkDeployments();
     }
 
     public function stop()
@@ -83,6 +140,7 @@ class Heading extends Component
 
             $this->dispatch('info', 'Gracefully stopping database.');
             StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
+            $this->auditDatabaseAction('ui.database.stopped');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
@@ -94,6 +152,14 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = RestartDatabase::run($this->database);
+            if (is_string($activity)) {
+                $this->dispatch('error', $activity);
+
+                return;
+            }
+            $this->auditDatabaseAction('ui.database.restarted');
+            $this->dispatch('info', 'Restarting database.');
+            $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Throwable $e) {
@@ -107,6 +173,13 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = StartDatabase::run($this->database);
+            if (is_string($activity)) {
+                $this->dispatch('error', $activity);
+
+                return;
+            }
+            $this->auditDatabaseAction('ui.database.started');
+            $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Throwable $e) {
@@ -120,6 +193,15 @@ class Heading extends Component
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
             ],
+        ]);
+    }
+
+    private function auditDatabaseAction(string $event): void
+    {
+        auditLog($event, [
+            'team_id' => $this->database->team()?->id,
+            'database_uuid' => $this->database->uuid,
+            'database_name' => $this->database->name,
         ]);
     }
 }

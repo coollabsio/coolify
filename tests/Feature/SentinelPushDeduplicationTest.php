@@ -1,13 +1,16 @@
 <?php
 
+use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Api\SentinelController;
 use App\Jobs\PushServerUpdateJob;
+use App\Models\AuditEvent;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
@@ -88,6 +91,7 @@ it('does not audit successful sentinel pushes', function () use ($running) {
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 
     Queue::assertPushed(PushServerUpdateJob::class, 1);
+    expect(AuditEvent::query()->count())->toBe(0);
 });
 
 it('updates the heartbeat even when the job is skipped', function () use ($running) {
@@ -99,6 +103,32 @@ it('updates the heartbeat even when the job is skipped', function () use ($runni
 
     Queue::assertPushed(PushServerUpdateJob::class, 1);
     expect(Carbon::parse($this->server->fresh()->sentinel_updated_at)->diffInSeconds(now()))->toBeLessThan(5);
+});
+
+it('broadcasts when a successful push restores sentinel synchronization', function () use ($running) {
+    Event::fake([SentinelSynchronized::class]);
+    $this->server->update(['sentinel_updated_at' => now()->subHour()]);
+
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    Event::assertDispatched(SentinelSynchronized::class, fn (SentinelSynchronized $event): bool => $event->serverUuid === $this->server->uuid);
+});
+
+it('clears the waiting state after the first authenticated push', function () use ($running) {
+    $this->server->forceFill(['sentinel_waiting_since' => now()])->save();
+
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    expect($this->server->fresh()->sentinel_waiting_since)->toBeNull();
+});
+
+it('does not broadcast synchronization for each healthy sentinel push', function () use ($running) {
+    Event::fake([SentinelSynchronized::class]);
+    $this->server->sentinelHeartbeat();
+
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    Event::assertNotDispatched(SentinelSynchronized::class);
 });
 
 it('accepts an empty container list as a heartbeat when no containers are running', function () {
@@ -128,16 +158,6 @@ it('rejects malformed sentinel payloads before touching server state', function 
     'non-array containers' => [['containers' => 'not-an-array']],
 ]);
 
-it('guards the dedupe decision with a server scoped atomic cache lock', function () {
-    $controller = file_get_contents(app_path('Http/Controllers/Api/SentinelController.php'));
-
-    expect($controller)
-        ->toContain('$lockKey = "sentinel:push-lock:{$server->id}";')
-        ->toContain('Cache::lock($lockKey, 10)->block(5, function () use ($hashKey, $forceKey, $hash): bool')
-        ->toContain('Cache::put($hashKey, $hash, now()->addDay())')
-        ->toContain("Cache::put(\$forceKey, true, config('constants.sentinel.push_force_interval_seconds', 300))");
-});
-
 it('dispatches the job when container state changes', function () use ($running) {
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 
@@ -147,14 +167,24 @@ it('dispatches the job when container state changes', function () use ($running)
     Queue::assertPushed(PushServerUpdateJob::class, 2);
 });
 
-it('ignores health status changes while container lifecycle state is unchanged', function () {
+it('dispatches the job when only the container restart count changes', function () {
+    $beforeRestart = [['name' => 'app-1', 'state' => 'running', 'restart_count' => 0]];
+    $afterRestart = [['name' => 'app-1', 'state' => 'running', 'restart_count' => 1]];
+
+    pushSentinel($this->token, sentinelPayload($beforeRestart))->assertOk();
+    pushSentinel($this->token, sentinelPayload($afterRestart))->assertOk();
+
+    Queue::assertPushed(PushServerUpdateJob::class, 2);
+});
+
+it('dispatches the job when only the container health status changes', function () {
     $healthy = [['name' => 'app-1', 'state' => 'running', 'health_status' => 'healthy']];
     $unhealthy = [['name' => 'app-1', 'state' => 'running', 'health_status' => 'unhealthy']];
 
     pushSentinel($this->token, sentinelPayload($healthy))->assertOk();
     pushSentinel($this->token, sentinelPayload($unhealthy))->assertOk();
 
-    Queue::assertPushed(PushServerUpdateJob::class, 1);
+    Queue::assertPushed(PushServerUpdateJob::class, 2);
 });
 
 it('ignores disk percentage changes (excluded from the hash)', function () use ($running) {

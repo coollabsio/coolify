@@ -4,6 +4,7 @@ use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -463,7 +464,7 @@ describe('POST /api/v1/s3-storages/{uuid}/validate', function () {
     test('validates a working s3 storage connection', function () {
         $storage = createS3StorageForTeam($this->team);
 
-        $disk = Mockery::mock();
+        $disk = Mockery::mock(FilesystemAdapter::class);
         $disk->expects('files')->once()->andReturn([]);
         Storage::expects('build')->once()->andReturn($disk);
 
@@ -484,7 +485,7 @@ describe('POST /api/v1/s3-storages/{uuid}/validate', function () {
     test('detects an invalid s3 storage connection', function () {
         $storage = createS3StorageForTeam($this->team, ['is_usable' => true]);
 
-        $disk = Mockery::mock();
+        $disk = Mockery::mock(FilesystemAdapter::class);
         $disk->expects('files')
             ->once()
             ->andThrow(new RuntimeException('Access Denied'));
@@ -519,7 +520,7 @@ describe('POST /api/v1/s3-storages/{uuid}/validate', function () {
     test('writes an audit log entry when validating storage', function () {
         $storage = createS3StorageForTeam($this->team, ['name' => 'Audit Storage']);
 
-        $disk = Mockery::mock();
+        $disk = Mockery::mock(FilesystemAdapter::class);
         $disk->expects('files')->once()->andReturn([]);
         Storage::expects('build')->once()->andReturn($disk);
 

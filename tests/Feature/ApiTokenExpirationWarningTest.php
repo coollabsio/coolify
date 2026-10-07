@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ApiTokenExpirationWarningJob;
+use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Notification;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -136,5 +138,16 @@ describe('ApiTokenExpirationWarningJob', function () {
 
         Notification::assertNothingSent();
         expect($token->fresh()->api_token_expiration_warning_sent_at)->toBeNull();
+    });
+
+    test('manage url uses the instance fqdn when configured', function () {
+        InstanceSettings::query()->update(['fqdn' => 'https://coolify.example.com']);
+        $token = createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12));
+
+        $notification = new ApiTokenExpiringNotification($token);
+
+        expect($notification->toSlack()->description)
+            ->toContain('https://coolify.example.com/security/api-tokens')
+            ->not->toContain('localhost');
     });
 });

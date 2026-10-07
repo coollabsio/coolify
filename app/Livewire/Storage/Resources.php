@@ -2,9 +2,13 @@
 
 namespace App\Livewire\Storage;
 
+use App\Models\Application;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -46,11 +50,14 @@ class Resources extends Component
             ->where('s3_storage_id', $this->storage->id)
             ->firstOrFail();
 
-        $backup->update([
+        $backup->fill([
             'save_s3' => false,
             's3_storage_id' => null,
         ]);
+        $changedFields = auditChangedFields($backup);
+        $backup->save();
 
+        $this->auditDatabaseBackupUpdated($backup, $changedFields);
         unset($this->selectedStorages[$backupId]);
 
         $this->dispatch('success', 'S3 disabled.', 'S3 backup has been disabled for this schedule.');
@@ -83,8 +90,11 @@ class Resources extends Component
 
         $this->authorize('update', $newStorage);
 
-        $backup->update(['s3_storage_id' => $newStorage->id]);
+        $backup->s3_storage_id = $newStorage->id;
+        $changedFields = auditChangedFields($backup);
+        $backup->save();
 
+        $this->auditDatabaseBackupUpdated($backup, $changedFields);
         unset($this->selectedStorages[$backupId]);
 
         $this->dispatch('success', 'Backup moved.', "Moved to {$newStorage->name}.");
@@ -99,11 +109,14 @@ class Resources extends Component
             ->where('s3_storage_id', $this->storage->id)
             ->firstOrFail();
 
-        $backup->update([
+        $backup->fill([
             'save_s3' => false,
             's3_storage_id' => null,
         ]);
+        $changedFields = auditChangedFields($backup);
+        $backup->save();
 
+        $this->auditVolumeBackupUpdated($backup, $changedFields);
         unset($this->selectedVolumeStorages[$backupId]);
 
         $this->dispatch('success', 'S3 disabled.', 'S3 backup has been disabled for this schedule.');
@@ -138,11 +151,62 @@ class Resources extends Component
 
         $this->authorize('update', $newStorage);
 
-        $backup->update(['s3_storage_id' => $newStorage->id]);
+        $backup->s3_storage_id = $newStorage->id;
+        $changedFields = auditChangedFields($backup);
+        $backup->save();
 
+        $this->auditVolumeBackupUpdated($backup, $changedFields);
         unset($this->selectedVolumeStorages[$backupId]);
 
         $this->dispatch('success', 'Backup moved.', "Moved to {$newStorage->name}.");
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditDatabaseBackupUpdated(ScheduledDatabaseBackup $backup, array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        $database = $backup->database;
+        auditLog('ui.database.backup_schedule_updated', [
+            'team_id' => $this->storage->team_id,
+            'database_uuid' => $database?->uuid,
+            'database_name' => $database?->name,
+            'backup_uuid' => $backup->uuid,
+            'changed_fields' => $changedFields,
+        ]);
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditVolumeBackupUpdated(ScheduledVolumeBackup $backup, array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        $resource = $backup->targetResource();
+        if ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
+            $resource = $resource->service;
+        }
+
+        auditLog('ui.volume_backup.schedule_set', [
+            'team_id' => $this->storage->team_id,
+            'resource_type' => match (true) {
+                $resource instanceof Application => 'application',
+                $resource instanceof Service => 'service',
+                default => 'database',
+            },
+            'resource_uuid' => $resource?->uuid,
+            'resource_name' => $resource?->name,
+            'storage_uuid' => $backup->backupable?->uuid,
+            'backup_uuid' => $backup->uuid,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function render()

@@ -1,8 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
-# https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.7.3
 # https://www.postgresql.org/support/versioning/
@@ -10,6 +8,8 @@ ARG CLOUDFLARED_VERSION=2026.7.3
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.2-r1
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.0
 
 # Add user/group
 ARG USER_ID=9999
@@ -63,7 +63,25 @@ RUN npm run build
 # =================================================================
 # Stage 3: Get MinIO client
 # =================================================================
-FROM minio/mc:${MINIO_VERSION} AS minio-client
+FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
+
+# =================================================================
+# Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
+# =================================================================
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+
+USER root
+
+RUN apk upgrade && \
+    apk add --no-cache nodejs npm make g++ python3
+COPY docker/coolify-terminal/package*.json /terminal/
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefix /terminal && \
+    npm rebuild node-pty --prefix /terminal --update-binary && \
+    rm -rf /terminal/node_modules/node-pty/prebuilds/darwin-* \
+        /terminal/node_modules/node-pty/prebuilds/win32-*
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 
 # =================================================================
 # Final Stage: Production image
@@ -76,6 +94,7 @@ ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG PHP_UV_VERSION
 ARG COOLIFY_VERSION
 ARG CI=true
 
@@ -110,12 +129,17 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
+    nodejs \
     openssh-client \
     git \
     git-lfs \
     jq \
     lsof \
     vim
+
+# Install PHP extensions
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions uv-${PHP_UV_VERSION}
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
@@ -159,6 +183,9 @@ COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
 
 RUN composer dump-autoload
+
+# Install terminal WebSocket server dependencies
+COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf

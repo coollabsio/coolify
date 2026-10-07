@@ -11,10 +11,11 @@
                 @can('update', $service)
                     <x-modal-input buttonTitle="Edit Compose file" title="Docker Compose" :closeOutside="false"
                         :isLarge="true">
-                        <x-slot:headerActions>
+                        <x-slot:footer>
                             <div x-data="{ preview: false, validating: false, saving: false }"
                                 @compose-validate-finished.window="validating = false"
-                                @compose-save-finished.window="saving = false" class="flex items-center gap-2">
+                                @compose-save-finished.window="saving = false"
+                                class="flex flex-wrap items-center justify-end gap-2">
                                 <x-forms.button
                                     @click="preview = !preview; $dispatch('compose-preview-toggle')">
                                     <x-reicon name="eye" class="size-3.5" />
@@ -33,7 +34,7 @@
                                     Save changes
                                 </x-forms.button>
                             </div>
-                        </x-slot:headerActions>
+                        </x-slot:footer>
                         <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                     </x-modal-input>
                 @endcan

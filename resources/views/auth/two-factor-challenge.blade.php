@@ -2,6 +2,14 @@
     <x-auth.shell title="Coolify" description="Verify your identity to finish signing in.">
         <div class="flex flex-col gap-4" x-data="{
             showRecovery: false,
+            submitting: false,
+            handleSubmit(event) {
+                if (this.submitting) {
+                    event.preventDefault();
+                }
+
+                this.submitting = true;
+            },
             submitAuthenticatorCode(event) {
                 event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
 
@@ -30,7 +38,8 @@
                 <p x-show="showRecovery" x-cloak>Enter one of the recovery codes you saved when setting up two-factor authentication.</p>
             </div>
 
-            <form x-ref="challengeForm" action="/two-factor-challenge" method="POST" class="flex flex-col gap-4">
+            <form x-ref="challengeForm" action="/two-factor-challenge" method="POST" class="flex flex-col gap-4"
+                @submit="handleSubmit($event)">
                 @csrf
 
                 <div x-show="!showRecovery" class="flex flex-col gap-3">
@@ -54,7 +63,7 @@
                     </button>
                 </div>
 
-                <x-forms.button class="w-full justify-center" type="submit" isHighlighted>
+                <x-forms.button class="w-full justify-center" type="submit" x-bind:disabled="submitting" isHighlighted>
                     Verify and continue
                 </x-forms.button>
             </form>

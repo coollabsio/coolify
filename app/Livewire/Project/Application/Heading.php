@@ -5,12 +5,15 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Application $application;
 
@@ -28,13 +31,13 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
             'compose_loaded' => '$refresh',
             'update_links' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => '$refresh',
+            ]),
         ];
     }
 
@@ -77,6 +80,19 @@ class Heading extends Component
     public function manualCheckStatus()
     {
         $this->checkStatus();
+    }
+
+    /**
+     * Log-page URL of the deployment currently running for this application, so a
+     * "Deploying… View log" indicator can link back to it after the user navigates
+     * away. Re-evaluated on the heading's 10s poll. Null when nothing is running.
+     */
+    public function getRunningDeploymentUrlProperty(): ?string
+    {
+        return ApplicationDeploymentQueue::where('application_id', $this->application->id)
+            ->whereIn('status', ['in_progress', 'queued'])
+            ->orderByDesc('id')
+            ->value('deployment_url');
     }
 
     public function force_deploy_without_cache()
@@ -156,6 +172,11 @@ class Heading extends Component
 
             $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
             StopApplication::dispatch($this->application, false, $this->docker_cleanup);
+            auditLog('ui.application.stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

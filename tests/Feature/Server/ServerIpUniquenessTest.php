@@ -1,23 +1,26 @@
 <?php
 
+use App\Livewire\Server\New\ByIp;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+
     $this->user = User::factory()->create();
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
 
-    $this->privateKey = PrivateKey::create([
-        'name' => 'Test Key',
-        'private_key' => 'test-key-content',
+    $this->privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,
     ]);
 });
@@ -49,24 +52,26 @@ it('detects duplicate ip from another team', function () {
     expect($foundServer->team_id)->not->toBe($this->team->id);
 });
 
-it('shows correct error message for same team duplicate in boarding', function () {
+it('rejects a duplicate ip from the same team when adding a server', function () {
     Server::factory()->create([
         'ip' => '1.2.3.4',
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
     ]);
 
-    $foundServer = Server::whereIp('1.2.3.4')->first();
-    if ($foundServer->team_id === currentTeam()->id) {
-        $message = 'A server with this IP/Domain already exists in your team.';
-    } else {
-        $message = 'A server with this IP/Domain is already in use by another team.';
-    }
+    Livewire::test(ByIp::class, [
+        'private_keys' => collect([$this->privateKey]),
+        'limit_reached' => false,
+    ])
+        ->set('ip', '1.2.3.4')
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertDispatched('error', 'A server with this IP/Domain already exists.');
 
-    expect($message)->toBe('A server with this IP/Domain already exists in your team.');
+    expect(Server::where('ip', '1.2.3.4')->count())->toBe(1);
 });
 
-it('shows correct error message for other team duplicate in boarding', function () {
+it('rejects a duplicate ip from another team without revealing the owner team', function () {
     $otherTeam = Team::factory()->create();
 
     Server::factory()->create([
@@ -74,14 +79,17 @@ it('shows correct error message for other team duplicate in boarding', function 
         'team_id' => $otherTeam->id,
     ]);
 
-    $foundServer = Server::whereIp('5.6.7.8')->first();
-    if ($foundServer->team_id === currentTeam()->id) {
-        $message = 'A server with this IP/Domain already exists in your team.';
-    } else {
-        $message = 'A server with this IP/Domain is already in use by another team.';
-    }
+    Livewire::test(ByIp::class, [
+        'private_keys' => collect([$this->privateKey]),
+        'limit_reached' => false,
+    ])
+        ->set('ip', '5.6.7.8')
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertDispatched('error', 'A server with this IP/Domain already exists.')
+        ->assertNotDispatched('error', 'A server with this IP/Domain is already in use by another team.');
 
-    expect($message)->toBe('A server with this IP/Domain is already in use by another team.');
+    expect(Server::where('ip', '5.6.7.8')->count())->toBe(1);
 });
 
 it('allows adding ip that does not exist globally', function () {

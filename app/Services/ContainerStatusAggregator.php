@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -18,14 +19,13 @@ use Illuminate\Support\Facades\Log;
  * State Priority (highest to lowest):
  * 1. Degraded (from sub-resources) → degraded:unhealthy
  * 2. Restarting → degraded:unhealthy (or restarting:unknown if preserveRestarting=true)
- * 3. Crash Loop (exited with restarts) → degraded:unhealthy
- * 4. Mixed (running + exited) → degraded:unhealthy
- * 5. Mixed (running + starting) → starting:unknown
- * 6. Running → running:healthy/unhealthy/unknown
- * 7. Dead/Removing → degraded:unhealthy
- * 8. Paused → paused:unknown
- * 9. Starting/Created → starting:unknown
- * 10. Exited → exited
+ * 3. Mixed (running + exited) → degraded:unhealthy
+ * 4. Mixed (running + starting) → starting:unknown
+ * 5. Running → running:healthy/unhealthy/unknown
+ * 6. Dead/Removing → degraded:unhealthy
+ * 7. Paused → paused:unknown
+ * 8. Starting/Created → starting:unknown
+ * 9. Exited → exited
  *
  * The $preserveRestarting parameter controls whether "restarting" containers should be
  * reported as "restarting:unknown" (true) or "degraded:unhealthy" (false, default).
@@ -36,6 +36,44 @@ use Illuminate\Support\Facades\Log;
  */
 class ContainerStatusAggregator
 {
+    use CalculatesExcludedStatus;
+
+    /**
+     * Status string of one container from `docker container inspect` output
+     * (e.g. "running:healthy", "restarting:unknown", "exited").
+     *
+     * Every status writer (the full server check and the targeted check after a start)
+     * uses this, so they store the same strings.
+     */
+    public static function containerStatus(array|object $container): string
+    {
+        $state = data_get($container, 'State.Status');
+        if ($state === 'exited') {
+            return $state;
+        }
+
+        return $state.':'.(data_get($container, 'State.Health.Status') ?? 'unknown');
+    }
+
+    /**
+     * Aggregate the container statuses of one Compose-based resource (application, service
+     * application or service database). Containers excluded from health checks in the Compose
+     * file are ignored; when every container is excluded, the result has the :excluded suffix.
+     *
+     * @param  Collection<string, string>  $containerStatuses  Status strings keyed by Compose service name
+     */
+    public function aggregateForCompose(Collection $containerStatuses, ?string $dockerComposeRaw, int $maxRestartCount = 0): string
+    {
+        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
+        $relevantStatuses = $containerStatuses->reject(fn ($status, $containerName) => $excludedContainers->contains($containerName));
+
+        if ($relevantStatuses->isEmpty()) {
+            return $this->calculateExcludedStatusFromStrings($containerStatuses);
+        }
+
+        return $this->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
+    }
+
     /**
      * Aggregate container statuses from status strings into a single status.
      *
@@ -228,23 +266,18 @@ class ContainerStatusAggregator
             return $preserveRestarting ? 'restarting:unknown' : 'degraded:unhealthy';
         }
 
-        // Priority 3: Crash loop detection (exited with restart count > 0)
-        if ($hasExited && $maxRestartCount > 0) {
-            return 'degraded:unhealthy';
-        }
-
-        // Priority 4: Mixed state (some running, some exited = degraded)
+        // Priority 3: Mixed state (some running, some exited = degraded)
         if ($hasRunning && $hasExited) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 5: Mixed state (some running, some starting = still starting)
+        // Priority 4: Mixed state (some running, some starting = still starting)
         // If any component is still starting, the entire service stack is not fully ready
         if ($hasRunning && $hasStarting) {
             return 'starting:unknown';
         }
 
-        // Priority 6: Running containers (check health status)
+        // Priority 5: Running containers (check health status)
         if ($hasRunning) {
             if ($hasUnhealthy) {
                 return 'running:unhealthy';
@@ -255,22 +288,22 @@ class ContainerStatusAggregator
             }
         }
 
-        // Priority 7: Dead or removing containers
+        // Priority 6: Dead or removing containers
         if ($hasDead) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 8: Paused containers
+        // Priority 7: Paused containers
         if ($hasPaused) {
             return 'paused:unknown';
         }
 
-        // Priority 9: Starting/created containers
+        // Priority 8: Starting/created containers
         if ($hasStarting) {
             return 'starting:unknown';
         }
 
-        // Priority 10: All containers exited (no restart count = truly stopped)
+        // Priority 9: All containers exited
         return 'exited';
     }
 }

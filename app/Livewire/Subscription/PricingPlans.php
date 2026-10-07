@@ -2,22 +2,28 @@
 
 namespace App\Livewire\Subscription;
 
-use Illuminate\Support\Facades\Auth;
+use App\Actions\Stripe\CreateCheckoutSession;
+use App\Exceptions\CheckoutUnavailableException;
 use Livewire\Component;
-use Stripe\Checkout\Session;
-use Stripe\Stripe;
+use RuntimeException;
+use Stripe\Exception\ApiErrorException;
 
 class PricingPlans extends Component
 {
-    public function subscribeStripe($type)
+    public function subscribeStripe(string $type): mixed
     {
-        if (currentTeam()->subscription?->stripe_invoice_paid) {
-            $this->dispatch('error', 'Team already has an active subscription.');
+        $team = currentTeam();
+        $user = auth()->user();
 
-            return;
+        if (! $team || ! $user?->isAdminOfTeam($team->id)) {
+            abort(403);
         }
 
-        Stripe::setApiKey(config('subscription.stripe_api_key'));
+        if ($team->subscription?->stripe_invoice_paid) {
+            $this->dispatch('error', 'Team already has an active subscription.');
+
+            return null;
+        }
 
         $priceId = match ($type) {
             'dynamic-monthly' => config('subscription.stripe_price_id_dynamic_monthly'),
@@ -28,48 +34,29 @@ class PricingPlans extends Component
         if (! $priceId) {
             $this->dispatch('error', 'Price ID not found! Please contact the administrator.');
 
-            return;
+            return null;
         }
-        $payload = [
-            'allow_promotion_codes' => true,
-            'billing_address_collection' => 'required',
-            'client_reference_id' => Auth::id().':'.currentTeam()->id,
-            'line_items' => [[
-                'price' => $priceId,
-                'adjustable_quantity' => [
-                    'enabled' => true,
-                    'minimum' => 2,
-                ],
-                'quantity' => 2,
-            ]],
-            'tax_id_collection' => [
-                'enabled' => true,
-            ],
-            'automatic_tax' => [
-                'enabled' => true,
-            ],
-            'subscription_data' => [
-                'metadata' => [
-                    'user_id' => Auth::id(),
-                    'team_id' => currentTeam()->id,
-                ],
-            ],
-            'payment_method_collection' => 'if_required',
-            'mode' => 'subscription',
-            'success_url' => route('dashboard', ['success' => true]),
-            'cancel_url' => route('subscription.index', ['cancelled' => true]),
-        ];
+        try {
+            $session = app(CreateCheckoutSession::class)->execute($team, $user, $priceId);
+        } catch (ApiErrorException $exception) {
+            report($exception);
+            $this->dispatch('error', 'Unable to confirm checkout with Stripe. Please try again shortly.');
 
-        $customer = currentTeam()->subscription?->stripe_customer_id ?? null;
-        if ($customer) {
-            $payload['customer'] = $customer;
-            $payload['customer_update'] = [
-                'name' => 'auto',
-            ];
-        } else {
-            $payload['customer_email'] = Auth::user()->email;
+            return null;
+        } catch (CheckoutUnavailableException $exception) {
+            $message = $exception->getMessage();
+            if ($exception->billingPortalUrl) {
+                $message .= ' <a href="'.e($exception->billingPortalUrl).'" target="_blank" rel="noopener noreferrer" class="underline">Open billing portal</a>';
+            }
+            $this->dispatch('error', $message);
+
+            return null;
+        } catch (RuntimeException $exception) {
+            report($exception);
+            $this->dispatch('error', 'Unable to start checkout. Please try again shortly.');
+
+            return null;
         }
-        $session = Session::create($payload);
 
         return redirect($session->url, 303);
     }

@@ -25,11 +25,6 @@ it('detects PORT environment variable when present', function () {
     $portEnvVar = Mockery::mock(EnvironmentVariable::class);
     $portEnvVar->shouldReceive('getAttribute')->with('real_value')->andReturn('3000');
 
-    $envVars = new Collection([$portEnvVar]);
-    $application->shouldReceive('getAttribute')
-        ->with('environment_variables')
-        ->andReturn($envVars);
-
     // Mock the firstWhere method to return our PORT env var
     $envVars = Mockery::mock(Collection::class);
     $envVars->shouldReceive('firstWhere')->with('key', 'PORT')->andReturn($portEnvVar);

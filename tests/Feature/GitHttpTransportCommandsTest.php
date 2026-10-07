@@ -69,6 +69,28 @@ it('applies http 1 transport to https fetches after clone', function () {
         ->toContain("git -c http.version=HTTP/1.1 -c advice.detachedHead=false checkout 'abc123def456abc123def456abc123def456abc1'");
 });
 
+it('rewrites generic ssh submodule remotes to https for public clones', function () {
+    $application = applicationWithGitSettings(shallow: false);
+    $application->settings->is_git_submodules_enabled = true;
+
+    $source = new GithubApp;
+    $source->forceFill([
+        'html_url' => 'https://github.com',
+        'api_url' => 'https://api.github.com',
+        'is_public' => true,
+    ]);
+    $application->setRelation('source', $source);
+
+    $result = $application->generateGitImportCommands(
+        deployment_uuid: 'test-deployment',
+        exec_in_docker: false,
+    );
+
+    expect($result['commands'])
+        ->toContain('sed -i "s#[A-Za-z0-9._-]*@\(.*\):#https://\\1/#g"')
+        ->not->toContain('s#git@\(.*\):#https://\\1/#g');
+});
+
 it('does not add http transport config to ssh deploy key clones', function () {
     $application = applicationWithGitSettings();
     $application->private_key_id = 1;

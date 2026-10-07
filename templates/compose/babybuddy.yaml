@@ -3,6 +3,7 @@
 # category: productivity
 # tags: baby, parents, health, growth, activities
 # logo: svgs/babybuddy.png
+# port: 8000
 
 services:
   babybuddy:

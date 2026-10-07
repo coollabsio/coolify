@@ -111,38 +111,14 @@ class Select extends Component
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
-            $default_logo = 'svgs/default.webp';
-            $logo = data_get($service, 'logo');
-
-            if (is_string($logo) && str_starts_with($logo, 'svg/')) {
-                $normalizedLogo = 'svgs/'.str($logo)->after('svg/');
-                if (file_exists(public_path($normalizedLogo))) {
-                    $logo = $normalizedLogo;
-                }
-            }
-
-            $hasLogo = is_string($logo)
-                && basename($logo) !== basename($default_logo)
-                && file_exists(public_path($logo));
-
-            if (! $hasLogo) {
-                $logo = $default_logo;
-            }
-
-            $local_logo_path = public_path($logo);
             $serviceKey = (string) $key;
 
             return [
                 'id' => $serviceKey,
                 'name' => str($serviceKey)->headline(),
                 'docsSlug' => str($serviceKey)->lower()->value(),
-                'has_logo' => $hasLogo,
-                'logo' => asset($logo),
-                'logo_github_url' => file_exists($local_logo_path)
-                    ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
-                    : asset($default_logo),
                 'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
-            ] + (array) $service;
+            ] + service_logo_urls(data_get($service, 'logo')) + (array) $service;
         })->all();
 
         // Extract unique categories from services
@@ -279,6 +255,13 @@ class Select extends Component
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
                 'logo' => asset('svgs/resources/clickhouse.svg'),
             ],
+            [
+                'id' => 'sqlite',
+                'name' => 'SQLite',
+                'description' => 'A lightweight relational database stored in a single file.',
+                'logo' => asset('svgs/resources/sqlite.svg'),
+                'experimental' => true,
+            ],
 
         ];
 
@@ -298,7 +281,7 @@ class Select extends Component
             $this->servers = $this->allServers;
         } else {
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }
@@ -393,10 +376,11 @@ class Select extends Component
             case 'dragonfly':
             case 'clickhouse':
             case 'mongodb':
+            case 'sqlite':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {
-                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
                 } else {
                     $this->servers = $this->allServers;
                 }
@@ -406,7 +390,7 @@ class Select extends Component
             $this->isDatabase = true;
             $this->includeSwarm = false;
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }

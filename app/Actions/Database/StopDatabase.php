@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Actions\Server\CleanupDocker;
 use App\Events\ServiceStatusChanged;
+use App\Models\BaseModel;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -12,13 +13,14 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $dockerCleanup = true)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true, bool $keepAnonymousDataVolume = true): string
     {
         try {
             $server = $database->destination->server;
@@ -26,18 +28,25 @@ class StopDatabase
                 return 'Server is not functional';
             }
 
-            $this->stopContainer($database, $database->uuid, 30);
+            // A removed container loses the link to the unnamed volume that holds the current data.
+            if ($removeContainer && $keepAnonymousDataVolume && $database instanceof StandaloneClickhouse && $database->anonymousDataVolume() !== null) {
+                $removeContainer = false;
+            }
+
+            $this->stopContainer($database, $database->uuid, 30, $removeContainer);
 
             // Reset restart tracking when database is manually stopped
-            $database->update([
-                'status' => 'exited',
-                'restart_count' => 0,
-                'last_restart_at' => null,
-                'last_restart_type' => null,
-            ]);
+            $database->update(['status' => 'exited']);
+            if ($resetRestartCount) {
+                $database->update([
+                    'restart_count' => 0,
+                    'last_restart_at' => null,
+                    'last_restart_type' => null,
+                ]);
+            }
 
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, false, false);
+                CleanupDocker::dispatchAfterStop($server);
             }
 
             if ($database->is_public) {
@@ -53,12 +62,13 @@ class StopDatabase
 
     }
 
-    private function stopContainer($database, string $containerName, int $timeout = 30): void
+    private function stopContainer(BaseModel $database, string $containerName, int $timeout = 30, bool $removeContainer = true): void
     {
         $server = $database->destination->server;
-        instant_remote_process(command: [
-            dockerStopCommand($timeout, $containerName, $server),
-            "docker rm -f $containerName",
-        ], server: $server, throwError: false);
+        $commands = [dockerStopCommand($timeout, $containerName, $server)];
+        if ($removeContainer) {
+            $commands[] = "docker rm -f $containerName";
+        }
+        instant_remote_process(command: $commands, server: $server, throwError: false);
     }
 }

@@ -3,6 +3,7 @@
 # category: productivity
 # tags: groceries, household, management, grocery, shopping
 # logo: svgs/grocy.svg
+# port: 80
 
 services:
   grocy:

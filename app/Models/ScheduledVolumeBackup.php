@@ -31,6 +31,7 @@ class ScheduledVolumeBackup extends BaseModel
         'retention_days_s3',
         'retention_max_storage_s3',
         'timeout',
+        'missing_backup_notification_days',
     ];
 
     protected function casts(): array
@@ -47,6 +48,7 @@ class ScheduledVolumeBackup extends BaseModel
             'retention_days_s3' => 'integer',
             'retention_max_storage_s3' => 'float',
             'timeout' => 'integer',
+            'missing_backup_notification_days' => 'integer',
         ];
     }
 

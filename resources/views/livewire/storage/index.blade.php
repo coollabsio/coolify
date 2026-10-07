@@ -48,7 +48,7 @@
         <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($s3 as $storage)
                 <a x-show="matches(@js([$storage->name, $storage->description ?: 'S3-compatible storage', $storage->is_usable ? 'Connected' : 'Not usable']))" {{ wireNavigate() }} href="/storages/{{ $storage->uuid }}"
-                    class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                    class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                     <div class="flex items-start gap-3">
                         <div
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
@@ -74,8 +74,8 @@
                 </a>
             @endforeach
         </div>
-        <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
-            <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.8fr)_9rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint"><div>Storage</div><div>Description</div><div>Status</div></div>
+        <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
+            <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.8fr)_9rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint"><div>Storage</div><div>Description</div><div>Status</div></div>
             @foreach ($s3 as $storage)
                 <a x-show="matches(@js([$storage->name, $storage->description ?: 'S3-compatible storage', $storage->is_usable ? 'Connected' : 'Not usable']))" {{ wireNavigate() }} href="/storages/{{ $storage->uuid }}" class="grid min-h-14 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.8fr)_9rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                     <div class="truncate font-semibold text-black dark:text-fg">{{ $storage->name }}</div>

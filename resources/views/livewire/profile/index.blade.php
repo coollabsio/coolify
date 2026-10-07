@@ -91,7 +91,7 @@
                     <img x-cloak x-show="preview" :src="preview" alt="Profile picture preview"
                         class="h-full w-full object-cover">
                     @if (auth()->user()->avatar_path)
-                        <img src="{{ route('profile.avatar', ['v' => auth()->user()->updated_at->timestamp]) }}"
+                        <img src="{{ profile_avatar_url(auth()->user()) }}"
                             x-show="!preview" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                     @else
                         <span x-show="!preview">
@@ -134,15 +134,22 @@
                     <div class="flex items-end gap-2">
                         <x-forms.input id="email" label="Email" readonly />
                         <x-forms.button @click="openEmailModal()" type="button"
-                            x-bind:disabled="emailModalOpen">
+                            :disabled="$uses_sso" x-bind:disabled="emailModalOpen || {{ $uses_sso ? 'true' : 'false' }}">
                             Change
                         </x-forms.button>
                     </div>
                 </div>
-            </section>
-        </form>
+             </section>
+         </form>
 
-        <template x-teleport="body">
+         @if ($uses_sso)
+             <x-callout type="info" title="Email managed by SSO">
+                 Signed in with SSO @if ($sso_provider_label) ({{ $sso_provider_label }}) @endif. Email is managed by your SSO provider.
+             </x-callout>
+         @endif
+
+         @if (! $uses_sso)
+         <template x-teleport="body">
             <div x-show="emailModalOpen" x-cloak
                 class="fixed inset-0 z-99 flex h-screen w-screen items-center justify-center p-4">
                 <div class="absolute inset-0 h-full w-full bg-black/55 backdrop-blur-[3px]"></div>
@@ -191,7 +198,8 @@
                     @endif
                 </div>
             </div>
-        </template>
+         </template>
+         @endif
 
         <form wire:submit="resetPassword">
             <section class="application-settings-section">
@@ -218,8 +226,9 @@
                     <h2>Two-factor authentication</h2>
                     <p>Add a time-based one-time password to protect your account.</p>
                 </div>
-                @if (! request()->user()->two_factor_confirmed_at
-                        && session('status') !== 'two-factor-authentication-enabled')
+                @if (request()->user()->two_factor_confirmed_at)
+                    <x-status-badge status="Enabled" type="success" />
+                @elseif (session('status') !== 'two-factor-authentication-enabled')
                     <form action="/user/two-factor-authentication" method="POST">
                         @csrf
                         <x-forms.button type="submit">Configure 2FA</x-forms.button>
@@ -241,17 +250,18 @@
                                 </p>
                             </div>
                             <form action="/user/confirmed-two-factor-authentication" method="POST"
-                                class="flex items-end gap-2">
+                                class="flex items-end gap-2"
+                                x-init="$nextTick(() => $el.querySelector('input[name=code]')?.focus())">
                                 @csrf
-                                <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code"
+                                <x-forms.input name="code" type="text" inputmode="numeric" pattern="[0-9]*" id="code"
                                     label="One-time code" required />
                                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
                             </form>
                             <div x-data="{ showCode: false }">
                                 <div x-cloak x-show="showCode" class="space-y-2 pb-3">
-                                    <x-forms.copy-button
-                                        text="{{ decrypt(request()->user()->two_factor_secret) }}" />
-                                    <x-forms.copy-button text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
+                                    <x-forms.copy-input
+                                        :text="decrypt(request()->user()->two_factor_secret)" />
+                                    <x-forms.copy-input :text="request()->user()->twoFactorQrCodeUrl()" />
                                 </div>
                                 <x-forms.button type="button" x-on:click="showCode = !showCode">
                                     <span x-text="showCode ? 'Hide manual setup' : 'Show manual setup'"></span>
@@ -275,7 +285,7 @@
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')
                             <div
-                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.05] dark:text-fg-dim">
                                 @foreach (request()->user()->recoveryCodes() as $code)
                                     <div>{{ $code }}</div>
                                 @endforeach
@@ -287,6 +297,51 @@
                         description="Configure an authenticator app to add another sign-in check."
                         icon-name="keys" />
                 @endif
+            </div>
+        </section>
+
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Danger zone</h2>
+                    <p>Destructive actions for your account cannot be undone.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body">
+                <x-danger-zone title="Delete account">
+                    @if ($accountDeletionBlockers === [])
+                        <p>
+                            Permanently delete your account from Coolify. This action cannot be undone.
+                        </p>
+                        <ul class="space-y-1 text-xs">
+                            <li>• Teams where you are the only member are deleted.</li>
+                            <li>• You are removed from all other teams.</li>
+                            <li>• Your API tokens and sessions are revoked.</li>
+                        </ul>
+                    @else
+                        <p>Before you can delete your account:</p>
+                        <ul class="space-y-1">
+                            @foreach ($accountDeletionBlockers as $blocker)
+                                <li>• {{ $blocker }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <x-slot:action>
+                        @if ($accountDeletionBlockers === [])
+                            <x-modal-confirmation title="Confirm Account Deletion?" buttonTitle="Delete account"
+                                isErrorButton submitAction="deleteAccount"
+                                :actions="$accountDeletionActions"
+                                confirmationText="{{ $email }}"
+                                confirmationLabel="Enter your email address to confirm permanent deletion"
+                                shortConfirmationLabel="Email" step3ButtonText="Permanently Delete" />
+                        @else
+                            <x-forms.button isError disabled
+                                tooltip="Resolve the requirements shown before deleting your account.">
+                                Delete account
+                            </x-forms.button>
+                        @endif
+                    </x-slot:action>
+                </x-danger-zone>
             </div>
         </section>
 

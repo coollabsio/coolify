@@ -1,16 +1,23 @@
 <?php
 
-it('renders a reusable compact copy button', function () {
+it('renders a self-contained clipboard button for backend-provided values', function () {
     $html = $this->blade('<x-copy-button value="backup/path.sql" label="Copy backup path" />');
 
     $html->assertSee('Copy backup path')
         ->assertSee('backup\/path.sql', false)
-        ->assertSee('window.copyToClipboard', false)
-        ->assertSee('size-6', false);
+        ->assertSee('x-data="copyButton"', false)
+        ->assertDontSee('window.copyToClipboard', false);
 });
 
-it('uses the reusable copy button for database backup paths', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
+it('disables the button when no backend value is available', function () {
+    $html = $this->blade('<x-copy-button :value="null" />');
 
-    expect($view)->toContain('<x-copy-button :value="data_get($execution, \'filename\', \'\')" label="Copy backup path" />');
+    $html->assertSee('disabled', false);
+});
+
+it('evaluates a resolve expression at click time instead of a static value', function () {
+    $html = $this->blade('<x-copy-button resolve="$wire.copyValue()" />');
+
+    $html->assertSee('await ($wire.copyValue())', false)
+        ->assertDontSee('disabled', false);
 });

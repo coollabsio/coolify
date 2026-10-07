@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Helpers\SSLHelper;
+use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\Team;
 use App\Notifications\SslExpirationNotification;
@@ -55,7 +55,7 @@ class RegenerateSslCertJob implements ShouldBeEncrypted, ShouldQueue
 
                     return;
                 }
-                SSLHelper::generateSslCertificate(
+                SslHelper::generateSslCertificate(
                     commonName: $certificate->common_name,
                     subjectAlternativeNames: $certificate->subject_alternative_names,
                     resourceType: $certificate->resource_type,
@@ -65,8 +65,12 @@ class RegenerateSslCertJob implements ShouldBeEncrypted, ShouldQueue
                     mountPath: $certificate->mount_path,
                     caCert: $caCert->ssl_certificate,
                     caKey: $caCert->ssl_private_key,
+                    isPemKeyFileRequired: $certificate->requiresPemKeyFile(),
                 );
-                $regenerated->push($certificate);
+                $resource = $certificate->database;
+                if ($resource) {
+                    $regenerated->push($resource);
+                }
             } catch (\Exception $e) {
                 Log::error('Failed to regenerate SSL certificate: '.$e->getMessage());
             }

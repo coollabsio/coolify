@@ -149,7 +149,11 @@
                         :events="[
                             ['property' => 'deploymentSuccessEmailNotifications', 'label' => 'Deployment success', 'enabled' => $deploymentSuccessEmailNotifications],
                             ['property' => 'deploymentFailureEmailNotifications', 'label' => 'Deployment failure', 'enabled' => $deploymentFailureEmailNotifications],
-                            ['property' => 'statusChangeEmailNotifications', 'label' => 'Container status changes', 'enabled' => $statusChangeEmailNotifications],
+                        ]" />
+                    <x-notification.event-multiselect :settings="$settings" id="resource-email-events" label="Resources"
+                        :events="[
+                            ['property' => 'statusChangeEmailNotifications', 'label' => 'Resource status changes', 'enabled' => $statusChangeEmailNotifications],
+                            ['property' => 'restartLimitReachedEmailNotifications', 'label' => 'Restart limit reached', 'enabled' => $restartLimitReachedEmailNotifications],
                         ]" />
                     <x-notification.event-multiselect :settings="$settings" id="backup-email-events" label="Backups"
                         :events="[

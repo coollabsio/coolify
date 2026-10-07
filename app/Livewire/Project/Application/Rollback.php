@@ -3,12 +3,14 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Rollback extends Component
 {
+    use AuditsApplicationSettings;
     use AuthorizesRequests;
 
     public Application $application;
@@ -38,7 +40,7 @@ class Rollback extends Component
             $this->authorize('update', $this->application);
             $this->validate();
             $this->application->settings->docker_images_to_keep = $this->dockerImagesToKeep;
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

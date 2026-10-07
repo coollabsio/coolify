@@ -5,11 +5,14 @@ namespace App\Livewire\Project\Application\Deployment;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use ListensToTeamChannel;
+
     public Application $application;
 
     public ?Collection $deployments;
@@ -60,11 +63,9 @@ class Index extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
-        ];
+        return $this->teamChannelListeners([
+            'ServiceChecked' => '$refresh',
+        ]);
     }
 
     public function mount()
@@ -261,13 +262,15 @@ class Index extends Component
             ->where('application_id', $this->application->id)
             ->where('pull_request_id', '>', 0)
             ->distinct()
-            ->orderByDesc('pull_request_id')
             ->pluck('pull_request_id')
+            ->merge($this->application->previews()->pluck('pull_request_id'))
             ->map(fn ($pullRequestId) => (string) $pullRequestId)
+            ->unique()
+            ->sortByDesc(fn (string $pullRequestId) => (int) $pullRequestId)
             ->values();
 
         if ($this->pull_request_id && ! $pullRequestIds->contains($this->pull_request_id)) {
-            $this->pull_request_id = null;
+            $pullRequestIds->prepend($this->pull_request_id);
         }
 
         $this->pullRequestOptions = collect([

@@ -169,11 +169,12 @@ it('quotes dump all restore command temp paths with spaces', function (string $m
     $escapedTmpPath = escapeshellarg($tmpPath);
     $restoreCommand = $component->buildRestoreCommand($tmpPath);
 
+    // The path appears once, as a quoted assignment; the script only uses "$backup".
     expect($restoreCommand)
-        ->toContain("gunzip -cf {$escapedTmpPath}")
-        ->toContain("cat {$escapedTmpPath}")
-        ->not->toContain("gunzip -cf {$tmpPath}")
-        ->not->toContain("cat {$tmpPath}");
+        ->toStartWith("backup={$escapedTmpPath}\n")
+        ->and(substr_count($restoreCommand, $tmpPath))->toBe(1)
+        ->and($restoreCommand)->toContain('gunzip -c "$backup"')
+        ->toContain('cat "$backup"');
 })->with([
     'mariadb' => StandaloneMariadb::class,
     'mysql' => StandaloneMysql::class,

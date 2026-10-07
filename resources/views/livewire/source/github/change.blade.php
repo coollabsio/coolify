@@ -43,7 +43,8 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <aside class="application-settings-navigation min-w-0 xl:self-start">
+                    <aside class="application-settings-navigation min-w-0 xl:self-start"
+                        data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                             <div class="nav-section hidden xl:block">Settings</div>
@@ -104,7 +105,14 @@
                                 <x-application.settings-section title="General"
                                     description="Connection and authentication settings for this private GitHub source.">
                                     <x-slot:actions>
-                                        <x-forms.button type="button" wire:click.prevent="updateGithubAppName">
+                                        @if ($isConnected)
+                                            <x-forms.button type="button" canGate="view" :canResource="$github_app"
+                                                wire:click.prevent="testConnection">
+                                                Test connection
+                                            </x-forms.button>
+                                        @endif
+                                        <x-forms.button type="button" canGate="update" :canResource="$github_app"
+                                            wire:click.prevent="updateGithubAppName">
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Sync name
                                         </x-forms.button>
@@ -170,27 +178,18 @@
                             <div class="application-settings-form">
                                 <x-application.settings-section id="github-app-danger-section" title="Danger zone"
                                     helper="Destructive actions for this GitHub App source cannot be undone.">
-                                    <div
-                                        class="rounded-lg border border-red-300 bg-red-50 p-4 ring-1 ring-inset ring-red-200/60 dark:border-error/30 dark:bg-error/[0.08] dark:ring-error/10">
-                                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                            <div class="min-w-0">
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <h4 class="text-sm font-semibold text-red-700 dark:text-error">Delete GitHub App</h4>
-                                                    <x-status-badge status="Permanent" type="error" />
-                                                </div>
-                                                <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                    <x-danger-zone title="Delete GitHub App">
+                                                <p>
                                                     Permanently delete
                                                     <strong class="font-semibold text-black dark:text-fg">{{ $name ?: 'this GitHub App' }}</strong>
                                                     from Coolify. Applications using this source will need another Git provider configured.
                                                 </p>
-                                                <ul class="mt-3 space-y-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                                <ul class="space-y-1 text-xs">
                                                     <li>• The App registration on GitHub is not removed automatically.</li>
                                                     <li>• Linked applications keep their Git settings until you change them.</li>
                                                     <li>• This source cannot be restored from Coolify after deletion.</li>
                                                 </ul>
-                                            </div>
-
-                                            <div class="shrink-0">
+                                            <x-slot:action>
                                                 @can('delete', $github_app)
                                                     <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton
                                                         buttonTitle="Delete" submitAction="delete"
@@ -200,13 +199,13 @@
                                                         shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
                                                         step2ButtonText="Permanently Delete" />
                                                 @else
-                                                    <x-forms.button disabled tooltip="You do not have permission to delete this GitHub App.">
+                                                    <x-forms.button isError disabled canGate="delete" :canResource="$github_app"
+                                                        tooltip="You do not have permission to delete this GitHub App.">
                                                         Delete
                                                     </x-forms.button>
                                                 @endcan
-                                            </div>
-                                        </div>
-                                    </div>
+                                            </x-slot:action>
+                                    </x-danger-zone>
 
                                     @cannot('delete', $github_app)
                                         <div class="mt-4">
@@ -262,19 +261,19 @@
             @endphp
 
             <div class="grid gap-4 lg:grid-cols-2">
-                <div class="application-settings-form"
+                <div class="application-settings-form flex"
                     x-data="{
                         webhookEndpoint: $wire.entangle('webhook_endpoint').live,
                         useCustomWebhookEndpoint: $wire.entangle('use_custom_webhook_endpoint').live,
                         customWebhookEndpoint: $wire.entangle('custom_webhook_endpoint').live,
                     }">
-                    <x-application.settings-section title="Automated installation"
+                    <x-application.settings-section title="Automated installation" class="[&>.application-settings-section-body]:flex [&>.application-settings-section-body]:flex-1 [&>.application-settings-section-body]:flex-col"
                         description="Register through GitHub's manifest flow with permissions and webhooks preconfigured.">
                         <x-slot:actions>
                             <x-status-badge label="Recommended" type="success" />
                         </x-slot:actions>
 
-                        <div class="flex min-h-[24rem] flex-col gap-4">
+                        <div class="flex min-h-[24rem] flex-1 flex-col gap-4">
                             @if (!isCloud() || isDev())
                                 <x-forms.listbox id="use_custom_webhook_endpoint" label="Webhook endpoint"
                                     :live="true" :options="[
@@ -300,7 +299,7 @@
                             @endif
 
                             <div
-                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
                                 <p class="font-medium text-black dark:text-fg">Mandatory permissions</p>
                                 <p class="mt-1">Contents: read · Metadata: read · Email: read</p>
                             </div>
@@ -312,23 +311,33 @@
                                 ]"
                                 helper="Write access lets Coolify post deployment status and links on pull requests." />
 
+                            <x-forms.listbox id="github_runners" label="GitHub Actions runners"
+                                :disabled="blank($github_app->organization)"
+                                :options="[
+                                    ['value' => false, 'label' => 'Do not run workflow jobs'],
+                                    ['value' => true, 'label' => 'Run workflow jobs on your servers'],
+                                ]"
+                                :helper="filled($github_app->organization)
+                                    ? 'Adds the organization Self-hosted runners (write) and Actions (read) permissions and the Workflow job webhook event.'
+                                    : 'Only GitHub Apps that belong to an organization can run workflow jobs. Delete this source and create a new one with an organization.'" />
+
                             <button type="button"
                                 class="button mt-auto w-full justify-center button-highlighted"
-                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, {{ Illuminate\Support\Js::from($preview_deployment_permissions) }}, {{ Illuminate\Support\Js::from($administration) }})">
+                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, $wire.preview_deployment_permissions, {{ Illuminate\Support\Js::from($administration) }}, $wire.github_runners)">
                                 Register with GitHub
                             </button>
                         </div>
                     </x-application.settings-section>
                 </div>
 
-                <div class="application-settings-form">
-                    <x-application.settings-section title="Manual installation"
+                <div class="application-settings-form flex">
+                    <x-application.settings-section title="Manual installation" class="[&>.application-settings-section-body]:flex [&>.application-settings-section-body]:flex-1 [&>.application-settings-section-body]:flex-col"
                         description="Enter GitHub App credentials manually for GitHub Enterprise or custom permission sets.">
                         <x-slot:actions>
                             <x-status-badge label="Advanced" type="neutral" />
                         </x-slot:actions>
 
-                        <div class="flex min-h-[24rem] flex-col">
+                        <div class="flex min-h-[24rem] flex-1 flex-col">
                             <div
                                 class="flex size-10 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
                                 <x-reicon name="settings" class="size-5" />
@@ -354,7 +363,7 @@
 
         <script>
             function createGithubApp(webhook_endpoint, use_custom_webhook_endpoint, custom_webhook_endpoint,
-                preview_deployment_permissions, administration) {
+                preview_deployment_permissions, administration, github_runners) {
                 const {
                     organization,
                     html_url
@@ -362,11 +371,11 @@
                 const selectedEndpoint = webhook_endpoint ? webhook_endpoint.trim() : '';
                 const customEndpoint = custom_webhook_endpoint ? custom_webhook_endpoint.trim() : '';
                 if (use_custom_webhook_endpoint && !customEndpoint) {
-                    alert('Please enter a custom webhook endpoint.');
+                    window.toast('Error', { type: 'danger', description: 'Please enter a custom webhook endpoint.' });
                     return;
                 }
                 if (!use_custom_webhook_endpoint && !selectedEndpoint) {
-                    alert('Please enter a webhook endpoint.');
+                    window.toast('Error', { type: 'danger', description: 'Please enter a webhook endpoint.' });
                     return;
                 }
                 let baseUrl = (use_custom_webhook_endpoint ? customEndpoint : selectedEndpoint).replace(/\/+$/, '');
@@ -393,6 +402,11 @@
                 }
                 if (administration) {
                     default_permissions.administration = 'write';
+                }
+                if (github_runners && organization) {
+                    default_permissions.organization_self_hosted_runners = 'write';
+                    default_permissions.actions = 'read';
+                    default_events.push('workflow_job');
                 }
 
                 const data = {

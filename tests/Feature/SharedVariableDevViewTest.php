@@ -10,6 +10,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -168,3 +169,121 @@ test('server shared variable dev view updates existing variable', function () {
     expect($var->value)->toBe('new_value')
         ->and($var->comment)->toBe('updated comment');
 });
+
+test('server shared variables display built-ins as read-only rows', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSee('COOLIFY_SERVER_UUID')
+        ->assertSee('COOLIFY_SERVER_NAME')
+        ->assertSee('Built-in · Read-only')
+        ->assertDontSee('Add a variable to make it available to resources in this scope.')
+        ->assertDontSee('data-env-settings-trigger', false)
+        ->assertSet('variables', '')
+        ->call('switch')
+        ->assertSee('COOLIFY_SERVER_UUID')
+        ->assertSee('COOLIFY_SERVER_NAME')
+        ->assertSet('variables', '')
+        ->set('variables', "COOLIFY_SERVER_UUID=changed\nCOOLIFY_SERVER_NAME=changed\nCUSTOM=value")
+        ->call('submit');
+
+    expect($server->environment_variables()->pluck('value', 'key')->all())
+        ->toMatchArray(['COOLIFY_SERVER_UUID' => $server->uuid, 'COOLIFY_SERVER_NAME' => $server->name, 'CUSTOM' => 'value']);
+});
+
+test('server built-ins are visible to team members but not other teams', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSee('COOLIFY_SERVER_UUID')
+        ->assertDontSee('Add variable');
+
+    $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $otherServer->uuid])
+        ->assertRedirect(route('dashboard'))
+        ->assertDontSee($otherServer->uuid);
+});
+
+test('server shared variable values are only visible to admins', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    SharedEnvironmentVariable::create([
+        'key' => 'SERVER_TOKEN',
+        'value' => 'stored-server-variable-value',
+        'type' => 'server',
+        'server_id' => $server->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSet('variables', 'SERVER_TOKEN=stored-server-variable-value');
+
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+
+    $component = Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSet('variables', 'SERVER_TOKEN=(Hidden, only admins can view)')
+        ->call('switch')
+        ->call('refreshEnvs')
+        ->assertSet('variables', 'SERVER_TOKEN=(Hidden, only admins can view)');
+
+    expect(json_encode($component->snapshot).$component->html())->not->toContain('stored-server-variable-value');
+});
+
+/**
+ * Mounts as a member of $this->team, then switches the session to a team the user owns.
+ */
+function sharedVarsSwitchToOwnedTeam(User $user): Team
+{
+    $ownTeam = Team::factory()->create();
+    $user->teams()->attach($ownTeam, ['role' => 'owner']);
+    $user->load('teams');
+    session(['currentTeam' => $ownTeam]);
+    Cache::flush();
+
+    return $ownTeam;
+}
+
+dataset('shared variable scopes', [
+    'project' => fn () => [App\Livewire\SharedVariables\Project\Show::class, ['project_uuid' => test()->project->uuid], ['type' => 'project', 'project_id' => test()->project->id]],
+    'environment' => fn () => [Show::class, ['project_uuid' => test()->project->uuid, 'environment_uuid' => test()->environment->uuid], ['type' => 'environment', 'environment_id' => test()->environment->id, 'project_id' => test()->project->id]],
+    'server' => function () {
+        $server = Server::factory()->create(['team_id' => test()->team->id]);
+
+        return [App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid], ['type' => 'server', 'server_id' => $server->id]];
+    },
+    'team' => fn () => [Index::class, [], ['type' => 'team']],
+]);
+
+test('shared variable values stay hidden from a member of the owning team after switching to an owned team', function (array $scope) {
+    [$component, $params, $attributes] = $scope;
+    SharedEnvironmentVariable::create([...$attributes, 'key' => 'ZZ_SECRET', 'value' => 'owning-team-secret', 'team_id' => $this->team->id]);
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+    $this->user->refresh();
+
+    $livewire = Livewire::test($component, $params)
+        ->assertSet('variables', 'ZZ_SECRET=(Hidden, only admins can view)');
+
+    $ownTeam = sharedVarsSwitchToOwnedTeam($this->user);
+    expect(currentTeam()->id)->toBe($ownTeam->id);
+
+    $livewire->call('switch')
+        ->call('refreshEnvs')
+        ->assertSet('variables', 'ZZ_SECRET=(Hidden, only admins can view)');
+
+    expect(json_encode($livewire->snapshot).$livewire->html())->not->toContain('owning-team-secret');
+})->with('shared variable scopes');
+
+test('shared variables created after switching teams belong to the owning team', function (array $scope) {
+    [$component, $params] = $scope;
+
+    $livewire = Livewire::test($component, $params);
+    sharedVarsSwitchToOwnedTeam($this->user);
+
+    $livewire->call('saveKey', ['key' => 'ZZ_SAVED', 'value' => 'one', 'is_multiline' => false, 'is_literal' => false])
+        ->set('variables', "ZZ_SAVED=one\nZZ_BULK=two")
+        ->call('submit');
+
+    expect(SharedEnvironmentVariable::whereIn('key', ['ZZ_SAVED', 'ZZ_BULK'])->pluck('team_id', 'key')->sortKeys()->all())
+        ->toBe(['ZZ_BULK' => $this->team->id, 'ZZ_SAVED' => $this->team->id]);
+})->with('shared variable scopes');

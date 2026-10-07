@@ -63,7 +63,8 @@ YAML;
 
     $serviceApp->refresh();
 
-    expect($serviceApp->fqdn)->toBe('http://git.example.com:80')
+    expect($serviceApp->fqdn)->toBe('http://git.example.com')
+        ->and($serviceApp->domain_port_overrides['http://git.example.com'] ?? null)->toBe(80)
         ->and($serviceApp->fqdn)->not->toContain('//:80')
         ->and(fn () => Url::fromString($serviceApp->fqdn))->not->toThrow(Throwable::class);
 

@@ -1,31 +1,38 @@
 <?php
 
-it('publishes v4 branch builds under the commit sha with a traceable internal version', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-sha-build.yml');
+it('publishes main builds under rolling and commit sha tags with a traceable internal version', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-main-build.yml');
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $constants = file_get_contents(dirname(__DIR__, 2).'/config/constants.php');
     $versions = json_decode(file_get_contents(dirname(__DIR__, 2).'/versions.json'), true, flags: JSON_THROW_ON_ERROR);
     $nightlyVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/nightly/versions.json'), true, flags: JSON_THROW_ON_ERROR);
 
     expect($workflow)
-        ->toContain('name: Build Coolify (SHA)')
+        ->toContain('name: Build Coolify Main')
         ->toContain('branches: ["main"]')
         ->not->toContain('v4.x')
+        ->toContain('group: coolify-main-build')
+        ->toContain('cancel-in-progress: false')
+        ->toContain('IMAGE_NAME }}:main-${{ matrix.arch }}')
+        ->toContain('--tag "${IMAGE}:main"')
         ->toContain('short_sha=${GITHUB_SHA::7}')
-        ->toContain('sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}')
         ->toContain('SHA: ${{ needs.build-push.outputs.short_sha }}')
-        ->not->toContain('sha-${{ github.sha }}')
+        ->toContain('--tag "${IMAGE}:sha-${SHA}"')
+        ->not->toContain('sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}')
+        ->toContain('org.opencontainers.image.revision=${{ github.sha }}')
         ->toContain('php bootstrap/getVersion.php')
         ->toContain('version=${BASE_VERSION}-dev.${GITHUB_SHA::9}')
         ->toContain('COOLIFY_VERSION=${{ steps.version.outputs.version }}')
+        ->toContain('sarisia/actions-status-discord@v1')
+        ->toContain('webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}')
         ->not->toContain('IMAGE_NAME }}:latest')
         ->and($dockerfile)
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.11'")
-        ->and($versions['coolify']['v4']['version'])->toBe('4.3.11')
-        ->and($versions['coolify']['nightly']['version'])->toBe('4.4-rc.1')
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '{$versions['coolify']['v4']['version']}'")
+        ->and($versions['coolify']['nightly']['version'])->toMatch('/^\d+\.\d+-rc\.\d+$/')
+        ->and(version_compare($versions['coolify']['v4']['version'], $versions['coolify']['nightly']['version'], '<'))->toBeTrue()
         ->and($nightlyVersions)->toBe($versions);
 });
 
@@ -70,13 +77,13 @@ it('runs support image workflows from main', function (string $workflowFile) {
         ->not->toContain('v4.x');
 })->with([
     'helper' => 'coolify-helper.yml',
-    'realtime' => 'coolify-realtime.yml',
 ]);
 
 it('prevents the stable helper workflow from publishing an existing version', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-helper.yml');
 
     expect($workflow)
+        ->toContain('workflow_dispatch:')
         ->toContain('check-version:')
         ->toContain('needs: check-version')
         ->toContain('VERSION="${BASE_VERSION}"')
@@ -87,19 +94,22 @@ it('prevents the stable helper workflow from publishing an existing version', fu
         ->toContain('cancel-in-progress: false');
 });
 
-it('prevents the stable realtime workflow from publishing an existing version', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-realtime.yml');
+it('publishes the testing host only to Docker Hub', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-testing-host.yml');
+    $cleanupWorkflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/cleanup-ghcr-untagged.yml');
+    $windowsCompose = file_get_contents(dirname(__DIR__, 2).'/docker-compose.windows.yml');
+    $developmentCompose = file_get_contents(dirname(__DIR__, 2).'/docker-compose.dev.yml');
 
     expect($workflow)
-        ->toContain('check-version:')
-        ->toContain('needs: check-version')
-        ->toContain('php bootstrap/getRealtimeVersion.php')
-        ->toContain('VERSION="${BASE_VERSION}"')
-        ->toContain('docker buildx imagetools inspect "$IMAGE"')
-        ->toContain('Version $VERSION already exists in $registry')
-        ->toContain('Version $VERSION is available in both registries')
-        ->toContain('Could not verify $IMAGE')
-        ->toContain('cancel-in-progress: false');
+        ->toContain('DOCKER_REGISTRY: docker.io')
+        ->toContain('IMAGE_NAME: "coollabsio/coolify-testing-host"')
+        ->toContain('docker/testing-host/Dockerfile')
+        ->not->toContain('ghcr.io')
+        ->not->toContain('GITHUB_REGISTRY')
+        ->and($cleanupWorkflow)->not->toContain('coolify-testing-host')
+        ->and($windowsCompose)->toContain('docker.io/coollabsio/coolify-testing-host:latest')
+        ->and($developmentCompose)->toContain('image: coolify-testing-host:dev')
+        ->toContain('dockerfile: ./docker/testing-host/Dockerfile');
 });
 
 it('generates the production changelog from main', function () {
@@ -123,6 +133,8 @@ it('publishes traceable rolling builds from next without creating an exact rc ta
         ->toContain('--tag "${IMAGE}:sha-${SHA}"')
         ->toContain('--tag "${IMAGE}:${VERSION}"')
         ->toContain('--tag "${IMAGE}:next"')
+        ->toContain('sarisia/actions-status-discord@v1')
+        ->toContain('webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}')
         ->not->toContain('--tag "${IMAGE}:${RC_VERSION}"')
         ->not->toContain('--tag "${IMAGE}:latest"');
 });

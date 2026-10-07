@@ -43,7 +43,7 @@ class Show extends Component
 
             $this->storage->delete();
 
-            return redirect()->route('storage.index');
+            return redirectRoute($this, 'storage.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

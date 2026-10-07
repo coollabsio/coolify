@@ -3,6 +3,7 @@
 # category: cms
 # tags: cms, blog, content, management, mysql
 # logo: svgs/wordpress.svg
+# port: 80
 
 services:
   wordpress:

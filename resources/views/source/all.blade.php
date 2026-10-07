@@ -75,7 +75,7 @@
             <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($sources as $source)
                     @if ($source->getMorphClass() === 'App\Models\GithubApp')
-                        <a x-show="matches(@js([$source->name, 'GitHub', $source->organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                        <a x-show="matches(@js([$source->name, 'GitHub', $source->organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}
                             href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
                             <div class="flex items-start gap-3">
@@ -102,7 +102,7 @@
                             </div>
                         </a>
                     @elseif ($source->getMorphClass() === 'App\Models\GitlabApp')
-                        <a x-show="matches(@js([$source->name, 'GitLab', $source->group_name, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                        <a x-show="matches(@js([$source->name, 'GitLab', $source->group_name, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}
                             href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
                             <div class="flex items-start gap-3">
@@ -131,8 +131,8 @@
                     @endif
                 @endforeach
             </div>
-            <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
-                <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint"><div>Source</div><div>Provider</div><div>Status</div></div>
+            <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
+                <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint"><div>Source</div><div>Provider</div><div>Status</div></div>
                 @foreach ($sources as $source)
                     @php
                         $isGithub = $source->getMorphClass() === 'App\\Models\\GithubApp';

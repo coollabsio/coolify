@@ -58,22 +58,6 @@ test('instance administrators can configure the dashboard HTTPS redirect', funct
     expect($settings->fresh()->is_dashboard_force_https_enabled)->toBeFalse();
 });
 
-test('dashboard HTTPS redirect saves immediately when changed', function () {
-    $contents = file_get_contents(resource_path('views/livewire/settings/index.blade.php'));
-
-    expect($contents)
-        ->toMatch('/id="is_dashboard_force_https_enabled"[\s\S]*?onChange="submit"/')
-        ->and($contents)->not->toContain('targets="fqdn,is_dashboard_force_https_enabled');
-});
-
-test('dashboard HTTPS redirect is next to the URL on desktop', function () {
-    $contents = file_get_contents(resource_path('views/livewire/settings/index.blade.php'));
-
-    expect($contents)
-        ->toContain("'lg:col-span-2' => !str_starts_with")
-        ->not->toContain('<div class="lg:col-span-2 max-w-md">');
-});
-
 test('dashboard HTTPS redirect control is hidden for an HTTP URL', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);

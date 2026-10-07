@@ -20,7 +20,7 @@
                 description="Add a provider token to provision new cloud servers." icon-name="keys" size="sm" />
         @else
             <div>
-                <div class="grid grid-cols-[minmax(0,1fr)_8rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_1.75rem] dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                <div class="grid grid-cols-[minmax(0,1fr)_8rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_1.75rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div class="pl-11">Token</div>
                     <div class="text-center">Provider</div>
                     <div class="hidden sm:block">Description</div>

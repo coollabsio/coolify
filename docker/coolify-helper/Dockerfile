@@ -15,11 +15,7 @@ ARG NIXPACKS_VERSION=1.41.0
 ARG RAILPACK_VERSION=0.23.0
 # https://github.com/jdx/mise/releases — must match railpack's pinned version (https://raw.githubusercontent.com/railwayapp/railpack/refs/heads/main/core/mise/version.txt)
 ARG MISE_VERSION=2026.3.17
-# https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
-
-
-FROM minio/mc:${MINIO_VERSION} AS minio-client
+FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 
 FROM ${BASE_IMAGE} AS base
 

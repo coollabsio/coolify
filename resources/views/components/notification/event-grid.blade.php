@@ -9,10 +9,17 @@
         'Deployments' => [
             ['key' => 'deploymentSuccess', 'label' => 'Deployment success'],
             ['key' => 'deploymentFailure', 'label' => 'Deployment failure'],
+        ],
+        'Resources' => [
             [
                 'key' => 'statusChange',
-                'label' => 'Container status changes',
-                'helper' => 'Notify when a container stops or restarts.',
+                'label' => 'Resource status changes',
+                'helper' => 'Notify when a resource stops or Coolify automatically restarts it.',
+            ],
+            [
+                'key' => 'restartLimitReached',
+                'label' => 'Restart limit reached',
+                'helper' => 'Notify when a resource is stopped after reaching its restart limit.',
             ],
         ],
         'Backups' => [

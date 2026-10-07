@@ -1,8 +1,8 @@
 name: Sync main to next
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -48,15 +48,18 @@ jobs:
           sync_branch='automation/sync-main-to-next'
           existing_pr=$(gh pr list --base next --head "$sync_branch" --state open --json url --jq '.[0].url')
           if [ -n "$existing_pr" ]; then
-            echo "A main to next pull request already exists: $existing_pr"
-          else
-            git push --force origin origin/main:"refs/heads/$sync_branch"
-            gh pr create \
-              --base next \
-              --head "$sync_branch" \
-              --title 'chore: merge main into next' \
-              --body 'This pull request was created automatically because main could not be merged into next without conflicts. Resolve conflicts on this temporary branch; never update main with next.'
+            # The conflict was already reported when this pull request was opened.
+            # Stay green until it is merged instead of failing every scheduled run.
+            echo "::notice title=main to next sync blocked::main still conflicts with next; resolve the open pull request: $existing_pr"
+            exit 0
           fi
 
-          echo 'main could not be merged into next without conflicts.'
+          git push --force origin origin/main:"refs/heads/$sync_branch"
+          gh pr create \
+            --base next \
+            --head "$sync_branch" \
+            --title 'chore: merge main into next' \
+            --body 'This pull request was created automatically because main could not be merged into next without conflicts. Resolve conflicts on this temporary branch; never update main with next.'
+
+          echo '::error title=main to next sync blocked::main could not be merged into next without conflicts; a pull request was opened to resolve them.'
           exit 1

@@ -20,7 +20,7 @@
 
 <div class="w-full">
     <div
-        class="grid grid-cols-4 overflow-hidden rounded-[10px] border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.025]">
+        class="grid grid-cols-4 overflow-hidden rounded-[10px] border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.05]">
         @foreach ($steps as $stepNumber => $label)
             <div
                 class="flex min-h-10 items-center justify-center gap-2 border-r border-neutral-200 px-2 text-[11px] font-medium last:border-r-0 dark:border-white/[0.08] sm:px-3"
