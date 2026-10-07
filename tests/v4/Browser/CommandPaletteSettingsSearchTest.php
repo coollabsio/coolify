@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\GithubApp;
+use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -70,4 +73,95 @@ it('focuses the search input when the palette is opened from the mobile menu', f
         ->assertScript("document.activeElement === document.querySelector('.command-palette-input')")
         ->assertVisible('.command-palette-scope')
         ->screenshot(filename: 'command-palette-mobile');
+});
+
+function commandPaletteSettingsPageUrl(string $page, array $stack): string
+{
+    return match ($page) {
+        'instance settings' => '/settings/oauth',
+        'team' => '/team',
+        'keys and tokens' => '/security/private-key',
+        'notifications' => '/notifications/email',
+        'shared variables' => '/shared-variables',
+        'destination' => '/destination/'.$stack['destination']->uuid,
+        's3 storage' => '/storages/'.S3Storage::create([
+            'team_id' => 0, 'name' => 'Palette S3', 'region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret',
+            'bucket' => 'bucket', 'endpoint' => 'https://s3.example.com',
+        ])->uuid,
+        'github app' => '/source/github/'.GithubApp::create([
+            'name' => 'palette-app', 'organization' => 'acme', 'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com', 'custom_user' => 'git', 'custom_port' => 22, 'app_id' => 1234,
+            'installation_id' => 5678, 'webhook_secret' => 'secret', 'private_key_id' => $stack['privateKey']->id,
+            'team_id' => 0, 'is_system_wide' => false,
+        ])->uuid,
+        'database backup' => (function () use ($stack): string {
+            $database = createBrowserPostgresql($stack, ['uuid' => 'db-palette-backup']);
+            $backup = ScheduledDatabaseBackup::create([
+                'team_id' => 0, 'frequency' => '0 0 * * *', 'database_type' => $database->getMorphClass(),
+                'database_id' => $database->id,
+            ]);
+
+            return "/project/{$stack['project']->uuid}/environment/{$stack['environment']->uuid}/database/{$database->uuid}/backups/{$backup->uuid}";
+        })(),
+    };
+}
+
+it('searches the sidebar pages of other settings pages', function (string $pageType, string $expectedLabel) {
+    $url = commandPaletteSettingsPageUrl($pageType, $this->stack);
+
+    loginAndSkipBoarding();
+
+    $page = visit($url);
+    $page->assertVisible('button:visible:has-text("Search page & global")');
+    $page->script("window.dispatchEvent(new Event('open-global-search'))");
+
+    $page->assertVisible('.command-palette-scope')
+        ->keys('.command-palette-input', 'Tab')
+        ->assertSeeIn('.command-palette-body', $expectedLabel)
+        ->screenshot(filename: 'command-palette-page-'.str($pageType)->slug());
+})->with([
+    ['instance settings', 'Updates'],
+    ['team', 'Members'],
+    ['keys and tokens', 'API Tokens'],
+    ['notifications', 'Telegram'],
+    ['shared variables', 'Environments'],
+    ['destination', 'Danger Zone'],
+    ['s3 storage', 'Resources'],
+    ['github app', 'Permissions'],
+    ['database backup', 'Retention'],
+]);
+
+it('searches the sections of a page without a settings sidebar and scrolls to them', function () {
+    loginAndSkipBoarding();
+
+    $page = visit('/profile');
+    $page->assertVisible('button:visible:has-text("Search page & global")');
+    $page->script("window.dispatchEvent(new Event('open-global-search'))");
+
+    $page->assertVisible('.command-palette-scope')
+        ->keys('.command-palette-input', 'Tab')
+        ->type('.command-palette-input', 'two-factor')
+        ->assertSeeIn('.command-palette-body', 'Two-factor authentication')
+        ->click('.command-palette-body a.search-result-item')
+        ->assertMissing('.command-palette-input')
+        ->wait(1)
+        ->assertScript(<<<'JS'
+            () => {
+                const heading = [...document.querySelectorAll('.application-settings-section h2')]
+                    .find(el => el.textContent.includes('Two-factor authentication'));
+                const top = heading.getBoundingClientRect().top;
+
+                return top >= 0 && top < window.innerHeight;
+            }
+            JS)
+        ->screenshot(filename: 'command-palette-profile-section');
+});
+
+it('lists a section once when the sidebar already links to it', function () {
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application));
+    $page->assertSee('Palette App');
+
+    expect($page->script("window.currentPageSearchItems().filter(item => item.label === 'Container labels').length"))->toBe(1);
 });

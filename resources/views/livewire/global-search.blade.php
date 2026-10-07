@@ -11,8 +11,8 @@
     searchQuery: '',
     creatableItems: [],
     isCreateMode: false,
-    // Settings of the open resource page (from its sidebar). 'global' shows them above
-    // the global results; 'page' shows only them. Tab switches the scope.
+    // Items of the open page: its sidebar pages and its sections. 'global' shows them
+    // above the global results; 'page' shows only them. Tab switches the scope.
     pageItems: [],
     scope: 'global',
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
@@ -41,14 +41,6 @@
         return this.scope === 'page' ? results : results.slice(0, 5);
     },
 
-    readPageItems() {
-        try {
-            return JSON.parse(document.querySelector('[data-settings-search-items]')?.dataset.settingsSearchItems || '[]');
-        } catch (e) {
-            return [];
-        }
-    },
-
     setScope(scope) {
         this.scope = scope;
         this.selectedIndex = -1;
@@ -72,9 +64,14 @@
     },
 
     openPageItem(item) {
-        const url = new URL(item.href, window.location.href);
         this.closeModal();
+        if (item.element) {
+            if (item.element.id) history.replaceState(null, '', '#' + item.element.id);
+            window.scrollToSettingsSection?.(item.element);
+            return;
+        }
 
+        const url = new URL(item.href, window.location.href);
         if (url.pathname === window.location.pathname && url.hash) {
             history.replaceState(null, '', url.hash);
             window.scrollToSettingsSection?.(url.hash.slice(1));
@@ -160,7 +157,7 @@
         this.isLoadingInitialData = true;
         this.showLoadingSpinner = false;
         this.searchQuery = '';
-        this.pageItems = this.readPageItems();
+        this.pageItems = window.currentPageSearchItems?.() ?? [];
         this.scope = 'global';
         // Only show the spinner when loading takes longer than 150ms, so fast (cached) loads do not flash the icon
         this.spinnerTimer = setTimeout(() => {
@@ -672,7 +669,7 @@
                         <div class="command-palette-section">
                             <div class="command-palette-group-label">This page</div>
                             <template x-for="item in pageResults" :key="item.href">
-                                <a :href="item.href" @click.prevent="openPageItem(item)"
+                                <a :href="item.element ? (item.element.id ? '#' + item.element.id : '#') : item.href" @click.prevent="openPageItem(item)"
                                     class="search-result-item command-palette-item">
                                     <div class="command-palette-item-main">
                                         <div class="command-palette-item-title">
