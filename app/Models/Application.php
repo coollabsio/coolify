@@ -2397,7 +2397,7 @@ class Application extends BaseModel
 
         $customLabels = decodeBase64EncodedLabels($storedLabels);
         if ($customLabels === null && ! isBase64Encoded($storedLabels)) {
-            $customLabels = str($storedLabels)->replace(',', "\n")->value();
+            $customLabels = $storedLabels;
         } elseif ($customLabels === null) {
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }

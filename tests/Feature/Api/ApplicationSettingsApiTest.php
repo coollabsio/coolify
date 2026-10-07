@@ -287,6 +287,14 @@ test('deployment parsing repairs historically nested custom labels', function ()
         ->and($this->application->fresh()->custom_labels)->toBe(base64_encode($labels));
 });
 
+test('deployment parsing keeps commas in raw custom label values', function () {
+    $labels = "traefik.enable=true\ntraefik.http.routers.web.middlewares=gzip,redirect-to-https";
+    $this->application->update(['custom_labels' => $labels]);
+
+    expect($this->application->parseContainerLabels())->toBe($labels)
+        ->and($this->application->fresh()->custom_labels)->toBe(base64_encode($labels));
+});
+
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
