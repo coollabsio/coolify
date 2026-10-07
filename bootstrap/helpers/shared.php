@@ -4452,6 +4452,49 @@ function wireNavigate(): string
 }
 
 /**
+ * Flattens a grouped settings sidebar into the items that the command palette
+ * shows for the current page: every page, its child pages, and its in-page sections.
+ *
+ * @param  iterable<string, iterable<array{label: string, route: string, navigate?: bool, visible?: bool, children?: array<int, array{label: string, route: string, navigate?: bool, visible?: bool}>}>>  $groupedItems
+ * @param  array<string, string>  $routeParameters
+ * @param  array<string, array<int, array{id: string, label: string}>>  $pageSections  In-page sections keyed by page route
+ * @return array<int, array{label: string, breadcrumb: string, search_text: string, href: string, navigate: bool}>
+ */
+function settingsSearchItems(iterable $groupedItems, array $routeParameters, array $pageSections = []): array
+{
+    $spaNavigation = wireNavigate() !== '';
+    $items = [];
+    $add = function (string $label, string $breadcrumb, string $href, bool $navigate) use (&$items, $spaNavigation): void {
+        $items[] = [
+            'label' => $label,
+            'breadcrumb' => $breadcrumb,
+            'search_text' => $label.' '.$breadcrumb,
+            'href' => $href,
+            'navigate' => $navigate && $spaNavigation,
+        ];
+    };
+
+    foreach ($groupedItems as $groupLabel => $groupItems) {
+        foreach ($groupItems as $item) {
+            $href = route($item['route'], $routeParameters);
+            $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
+
+            foreach ($item['children'] ?? [] as $child) {
+                if ($child['visible'] ?? true) {
+                    $add($child['label'], $groupLabel.' · '.$item['label'], route($child['route'], $routeParameters), $child['navigate'] ?? true);
+                }
+            }
+
+            foreach ($pageSections[$item['route']] ?? [] as $section) {
+                $add($section['label'], $groupLabel.' · '.$item['label'], $href.'#'.$section['id'], true);
+            }
+        }
+    }
+
+    return $items;
+}
+
+/**
  * Redirect to a named route with SPA navigation support.
  * Automatically uses wire:navigate when is_wire_navigate_enabled is true.
  */

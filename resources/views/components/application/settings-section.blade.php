@@ -5,7 +5,7 @@
     'flush' => false,
 ])
 
-<section {{ $attributes->merge(['class' => 'application-settings-section']) }}>
+<section {{ $attributes->merge(['class' => 'application-settings-section', 'data-settings-section-title' => $title]) }}>
     <header>
         <div class="min-w-0 py-0.5">
             @if (filled($description ?? $helper))
