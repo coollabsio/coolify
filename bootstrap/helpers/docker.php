@@ -2109,7 +2109,7 @@ function injectDockerComposeBuildArgs(string $command, string $buildArgsString):
  */
 function railpackBuilderLockedScript(string $command): string
 {
-    return 'exec 9>/root/.docker/buildx/coolify-railpack.lock; flock -s 9; '
+    return 'exec 9>/root/.docker/buildx/coolify-railpack.lock; if flock -s 9; then :; else exit $?; fi; '
         ."{$command}; status=\$?; "
         .'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi; '
         .'exit $status';

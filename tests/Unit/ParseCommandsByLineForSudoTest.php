@@ -836,7 +836,7 @@ test('railpack builder helper command gets sudo only outside the helper script',
     // The SSH user's shell must expand $HOME, so the line must not be wrapped in `sudo bash -c`.
     expect($parsed)->toBe(
         'sudo docker run --rm -v $HOME/.docker/buildx:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock coolify-helper:1.0.0'
-        ." bash -c 'exec 9>/root/.docker/buildx/coolify-railpack.lock; flock -s 9; docker buildx prune --builder coolify-railpack -af; status=$?;"
+        ." bash -c 'exec 9>/root/.docker/buildx/coolify-railpack.lock; if flock -s 9; then :; else exit $?; fi; docker buildx prune --builder coolify-railpack -af; status=$?;"
         .' if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi;'
         ." exit \$status' 2>/dev/null || sudo true"
     );
