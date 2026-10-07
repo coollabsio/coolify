@@ -50,10 +50,35 @@
     @else
         <div class="grid grid-cols-1 items-stretch gap-4 border-b border-neutral-200 p-4 lg:grid-cols-[2fr_3fr] dark:border-white/[0.07]">
             {{-- Interactive dotted globe (40%). wire:ignore so live-poll morphs never tear
-                 down the WebGL canvas. --}}
-            <div wire:ignore class="flex items-center justify-center">
+                 down the WebGL canvas. Mounted via Alpine, not Livewire's script directive:
+                 it ran before the lazy-loaded canvas was in the DOM, and only once per
+                 component, so a globe inserted by a later render (no data -> data after a
+                 range change or live poll) never mounted either. Alpine's
+                 init()/destroy() run each time this element enters or leaves the DOM. --}}
+            <div wire:ignore class="flex items-center justify-center"
+                x-data="{
+                    controller: null,
+                    refreshCleanup: null,
+                    isDark() { return document.documentElement.classList.contains('dark'); },
+                    init() {
+                        const canvas = this.$refs.canvas;
+                        if (typeof window.mountTrafficGlobe !== 'function') { return; }
+                        this.controller = window.mountTrafficGlobe(canvas, @js($geoInit), this.isDark());
+                        // Expose for row-hover focus() from the Alpine list scope.
+                        canvas._trafficGlobe = this.controller;
+                        this.refreshCleanup = Livewire.on('refreshChartData-{!! $chartId !!}-status', payload => {
+                            const data = Array.isArray(payload) ? payload[0] : payload;
+                            if (data && Array.isArray(data.geo)) { this.controller.update(data.geo, this.isDark()); }
+                        });
+                    },
+                    destroy() {
+                        if (this.refreshCleanup) { this.refreshCleanup(); this.refreshCleanup = null; }
+                        if (this.controller) { this.controller.destroy(); this.controller = null; }
+                        if (this.$refs.canvas) { this.$refs.canvas._trafficGlobe = null; }
+                    },
+                }">
                 <div class="relative aspect-square w-full max-w-[320px]">
-                    <canvas id="{!! $globeId !!}"
+                    <canvas id="{!! $globeId !!}" x-ref="canvas"
                         class="h-full w-full [touch-action:none]"
                         style="width: 100%; height: 100%;"></canvas>
                 </div>
@@ -108,31 +133,5 @@
                 {{ $attribution }}
             </p>
         @endif
-
-        @script
-        <script>
-            (() => {
-                const canvas = document.getElementById('{!! $globeId !!}');
-                if (!canvas || typeof window.mountTrafficGlobe !== 'function') { return; }
-
-                const isDark = () => document.documentElement.classList.contains('dark');
-                const controller = window.mountTrafficGlobe(canvas, @json($geoInit), isDark());
-                // Expose for row-hover focus() from the Alpine list scope.
-                canvas._trafficGlobe = controller;
-
-                Livewire.on('refreshChartData-{!! $chartId !!}-status', payload => {
-                    const data = Array.isArray(payload) ? payload[0] : payload;
-                    if (data && Array.isArray(data.geo)) {
-                        controller.update(data.geo, isDark());
-                    }
-                });
-
-                // Tear down the WebGL context when navigating away (wire:navigate).
-                document.addEventListener('livewire:navigating', () => {
-                    if (canvas._trafficGlobe) { canvas._trafficGlobe.destroy(); canvas._trafficGlobe = null; }
-                }, { once: true });
-            })();
-        </script>
-        @endscript
     @endif
 </div>
