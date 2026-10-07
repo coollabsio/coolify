@@ -250,22 +250,16 @@ class StartDragonfly
     {
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->dragonfly_password;
+        $passwordVariable = $this->database->serverPasswordEnvironmentVariable();
         foreach ($this->database->runtime_environment_variables as $env) {
-            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
-            if ($env->key === 'REDIS_PASSWORD' && ! $env->is_shared && ! $usesSecretManager) {
-                $env->update(['value' => $this->database->dragonfly_password]);
-            }
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
-            // Credentials below are placed directly in the compose file (healthcheck, command).
-            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
-            if ($env->key === 'REDIS_PASSWORD') {
-                if ($env->is_shared && ! $usesSecretManager) {
-                    $this->database->update(['dragonfly_password' => $rawValue]);
-                }
-                $this->resolvedRedisPassword = $composeFileValue;
-                $this->redisPasswordFromSecretManager = $usesSecretManager;
+            // A REDIS_PASSWORD variable overrides the stored password, which stays unchanged.
+            if ($passwordVariable?->is($env) && $rawValue !== '') {
+                // Credentials below are placed directly in the compose file (healthcheck, command).
+                $this->resolvedRedisPassword = $this->database->formatComposeFileValue($env, $rawValue);
+                $this->redisPasswordFromSecretManager = $this->database->environmentVariableUsesSecretManager($env);
             }
         }
 

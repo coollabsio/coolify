@@ -66,6 +66,8 @@ class StandaloneRedis extends BaseModel
         'redis_password',
         'internal_db_url',
         'external_db_url',
+        // Internal start-command state, not part of the API.
+        'legacy_password_quoting',
     ];
 
     protected $casts = [
@@ -74,6 +76,7 @@ class StandaloneRedis extends BaseModel
         'health_check_timeout' => 'integer',
         'health_check_retries' => 'integer',
         'health_check_start_period' => 'integer',
+        'legacy_password_quoting' => 'boolean',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
@@ -313,7 +316,7 @@ class StandaloneRedis extends BaseModel
             get: function () {
                 $redis_version = $this->getRedisVersion();
                 $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
-                $encodedPass = rawurlencode($this->redis_password);
+                $encodedPass = rawurlencode($this->connectionPassword());
                 $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                 $port = $this->enable_ssl ? 6380 : 6379;
                 $url = "{$scheme}://{$username_part}{$encodedPass}@{$this->uuid}:{$port}/0";
@@ -338,7 +341,7 @@ class StandaloneRedis extends BaseModel
                     }
                     $redis_version = $this->getRedisVersion();
                     $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
-                    $encodedPass = rawurlencode($this->redis_password);
+                    $encodedPass = rawurlencode($this->connectionPassword());
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverIp}:{$this->public_port}/0";
 
@@ -381,6 +384,60 @@ class StandaloneRedis extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
+    /**
+     * Uses the loaded runtime_environment_variables relation when present, so lists that eager
+     * load it do not run a query per database.
+     */
+    private function runtimeEnvironmentVariable(string $key): ?EnvironmentVariable
+    {
+        if ($this->relationLoaded('runtime_environment_variables')) {
+            return $this->runtime_environment_variables->firstWhere('key', $key);
+        }
+
+        return $this->runtime_environment_variables()->where('key', $key)->first();
+    }
+
+    /**
+     * The REDIS_PASSWORD variable whose resolved value sets the server password. Databases created
+     * before this release (legacy_password_quoting) keep their v4.3.23 server password, the stored
+     * value as it is, unless the variable reads a remote secret.
+     */
+    public function serverPasswordEnvironmentVariable(): ?EnvironmentVariable
+    {
+        $environmentVariable = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
+
+        if (! $environmentVariable) {
+            return null;
+        }
+
+        if ($this->legacy_password_quoting && ! $this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return null;
+        }
+
+        return $environmentVariable;
+    }
+
+    /**
+     * The server password for connection URLs. A remote secret is not fetched here, so the URL
+     * shows its reference instead of a stale or wrong password.
+     */
+    public function connectionPassword(): string
+    {
+        $environmentVariable = $this->serverPasswordEnvironmentVariable();
+
+        if ($environmentVariable) {
+            $password = $this->environmentVariableUsesSecretManager($environmentVariable)
+                ? (string) $environmentVariable->value
+                : (string) $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+            if ($password !== '') {
+                return $password;
+            }
+        }
+
+        return (string) $this->redis_password;
+    }
+
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
@@ -400,7 +457,7 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $password = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+                $password = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
                 if (! $password) {
                     return null;
                 }
@@ -415,7 +472,9 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
+                // A loaded relation does not hold a variable created by an earlier read, so check the table before creating one.
+                $username = $this->runtimeEnvironmentVariable('REDIS_USERNAME')
+                    ?? $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
                     $this->runtime_environment_variables()->create([
                         'key' => 'REDIS_USERNAME',

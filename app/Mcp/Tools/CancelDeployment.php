@@ -84,7 +84,7 @@ class CancelDeployment extends Tool
 
         try {
             $deploymentServer = Server::whereTeamId($teamId)->find($deployment->server_id);
-            next_after_cancel($deploymentServer);
+            next_after_cancel($deploymentServer, $application);
         } catch (\Throwable $e) {
             \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
         }

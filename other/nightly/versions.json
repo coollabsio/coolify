@@ -1,7 +1,7 @@
 {
     "coolify": {
         "v4": {
-            "version": "main"
+            "version": "4.4.2"
         },
         "nightly": {
             "version": "4.5-rc.1"
@@ -10,7 +10,11 @@
             "version": "1.0.18"
         },
         "sentinel": {
-            "version": "1.0.1"
+            "version": "1.0.2"
+        },
+        "sentinel-host": {
+            "version": "1.0.2",
+            "digest": "sha256:ef4a41f2dfaf20c91c165244508bda12f9b66eb046fd8ae8b575158ccd61262e"
         }
     },
     "traefik": {

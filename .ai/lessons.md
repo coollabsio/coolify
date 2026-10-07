@@ -58,6 +58,7 @@
 ## Trace infrastructure changes end to end
 - For container image changes, inspect Compose services and every relevant Dockerfile build stage.
 - Pin a stable release tag instead of using a floating `latest` tag.
+- Never give a test build an official image tag (for example `coollabsio/sentinel:<version>`) in the host Docker. Dev instances that use `testing-host` share the host Docker socket and run that tag without a pull. Load such a tag only inside a dev VM, and give the build the same version string, or Coolify's Sentinel check restarts it every minute.
 - A successful image pull does not prove that the complete application build no longer uses the old image.
 - Do not use `docker compose up --wait` for a stack with one-shot services; wait for the required long-running service's health instead.
 

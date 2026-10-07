@@ -22,7 +22,9 @@ class AuditLog extends Component
 
     public function boot(): void
     {
-        abort_unless(auth()->user()->isAdminOfTeam(currentTeam()->id), 403);
+        $team = currentTeam();
+
+        abort_unless($team && auth()->user()->isAdminOfTeam($team->id), 403);
     }
 
     public function updatedSearch(): void

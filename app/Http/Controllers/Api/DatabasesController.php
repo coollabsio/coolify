@@ -20,11 +20,15 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -133,6 +137,19 @@ class DatabasesController extends Controller
         }
 
         return $storage;
+    }
+
+    /**
+     * Store numeric resource limits (e.g. 0 or 1.5) as the strings the string limit columns expect.
+     */
+    private function normalizeNumericLimits(Request $request): void
+    {
+        foreach (['limits_memory', 'limits_memory_swap', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset'] as $field) {
+            $value = $request->input($field);
+            if (is_int($value) || is_float($value)) {
+                $request->offsetSet($field, (string) $value);
+            }
+        }
     }
 
     private function removeSensitiveData($database, bool $loadNestedServerSecrets = false)
@@ -275,6 +292,14 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases($databaseRelations));
         }
 
+        if ($request->attributes->get('can_read_sensitive', false) === true) {
+            // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
+            $databases
+                ->filter(fn ($database) => $database instanceof StandaloneRedis || $database instanceof StandaloneKeydb || $database instanceof StandaloneDragonfly)
+                ->groupBy(fn ($database) => $database::class)
+                ->each(fn ($group) => (new EloquentCollection($group->all()))->load('runtime_environment_variables'));
+        }
+
         $databaseIds = $databases->pluck('id')->toArray();
 
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
@@ -284,6 +309,7 @@ class DatabasesController extends Controller
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
             $database->backup_configs = $backupConfigs->get($database->getMorphClass().':'.$database->id, collect())->values();
+            $database->makeHidden('runtime_environment_variables');
 
             return $this->removeSensitiveData($database);
         });
@@ -2010,6 +2036,7 @@ class DatabasesController extends Controller
                 return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
+        $this->normalizeNumericLimits($request);
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',

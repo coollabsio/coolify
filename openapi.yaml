@@ -62,6 +62,7 @@ paths:
               properties:
                 pull_request_id:
                   type: integer
+                  maximum: 2147483647
                   minimum: 1
                   example: 42
                 pull_request_html_url:
@@ -622,7 +623,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -677,7 +678,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1031,7 +1032,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -1086,7 +1087,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1440,7 +1441,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -1495,7 +1496,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1790,7 +1791,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -1845,7 +1846,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -2126,7 +2127,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -2181,7 +2182,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -2635,7 +2636,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -3840,6 +3841,86 @@ paths:
       security:
         -
           bearerAuth: []
+  /audit-events:
+    get:
+      tags:
+        - 'Audit Events'
+      summary: List
+      description: 'List audit events of the team. Only team admins and owners can view audit events. Actor e-mail, token, metadata, changes, IP address, and user agent are returned only for tokens with the read:sensitive or root permission.'
+      operationId: list-audit-events
+      parameters:
+        -
+          name: per_page
+          in: query
+          description: 'Items per page.'
+          required: false
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+            minimum: 1
+        -
+          name: page
+          in: query
+          description: 'Page number.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: search
+          in: query
+          description: 'Search text.'
+          required: false
+          schema:
+            type: string
+            maxLength: 255
+        -
+          name: action
+          in: query
+          description: 'Filter by action. Use all for every action.'
+          required: false
+          schema:
+            type: string
+            maxLength: 255
+        -
+          name: source
+          in: query
+          description: 'Filter by source.'
+          required: false
+          schema:
+            type: string
+            enum:
+              - all
+              - ui
+              - api
+              - mcp
+              - webhook
+              - system
+              - scheduler
+      responses:
+        '200':
+          description: 'A page of audit events, newest first.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  current_page: { type: integer }
+                  data: { type: array, items: { type: object, properties: { id: { type: integer }, team_id: { type: integer, nullable: true }, event: { type: string }, source: { type: string }, action: { type: string }, level: { type: string }, actor_type: { type: string, nullable: true }, actor_id: { type: integer, nullable: true }, actor_name: { type: string, nullable: true }, resource_type: { type: string, nullable: true }, resource_uuid: { type: string, nullable: true }, resource_name: { type: string, nullable: true }, description: { type: string, nullable: true }, created_at: { type: string, format: date-time } } } }
+                  per_page: { type: integer }
+                  last_page: { type: integer }
+                  total: { type: integer }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can view audit logs.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /cloud-init-scripts:
     get:
       tags:
@@ -3994,7 +4075,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr, hostinger] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -4022,7 +4103,7 @@ paths:
               properties:
                 provider:
                   type: string
-                  enum: [hetzner, digitalocean, vultr]
+                  enum: [hetzner, digitalocean, vultr, hostinger]
                   example: hetzner
                   description: 'The cloud provider.'
                 token:
@@ -6038,6 +6119,8 @@ paths:
           $ref: '#/components/responses/404'
         '409':
           description: 'Another start, restart or import of this database is already in progress.'
+        '422':
+          description: 'The database cannot start yet, for example because a CA certificate is missing.'
       security:
         -
           bearerAuth: []
@@ -6113,6 +6196,8 @@ paths:
           $ref: '#/components/responses/404'
         '409':
           description: 'Another start, restart or import of this database is already in progress.'
+        '422':
+          description: 'The database cannot start yet, for example because a CA certificate is missing.'
       security:
         -
           bearerAuth: []
@@ -6856,12 +6941,14 @@ paths:
           description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.'
           schema:
             type: integer
+            maximum: 2147483647
         -
           name: pull_request_id
           in: query
           description: 'Preview deployment identifier. Alias of pr.'
           schema:
             type: integer
+            maximum: 2147483647
         -
           name: docker_tag
           in: query
@@ -8157,6 +8244,124 @@ paths:
           $ref: '#/components/responses/422'
         '429':
           $ref: '#/components/responses/429'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/data-centers:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS data centers'
+      operationId: get-hostinger-data-centers
+      responses:
+        '200':
+          description: 'List of Hostinger VPS data centers.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/catalog:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS plans and prices'
+      operationId: get-hostinger-catalog
+      responses:
+        '200':
+          description: 'List of Hostinger VPS plans and prices.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/templates:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS operating system templates'
+      operationId: get-hostinger-templates
+      responses:
+        '200':
+          description: 'List of Hostinger VPS templates.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/ssh-keys:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger account SSH keys'
+      operationId: get-hostinger-ssh-keys
+      responses:
+        '200':
+          description: 'List of Hostinger account SSH keys.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/post-install-scripts:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger post-install scripts'
+      operationId: get-hostinger-post-install-scripts
+      responses:
+        '200':
+          description: 'List of Hostinger post-install scripts.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /servers/hostinger:
+    post:
+      tags:
+        - Hostinger
+      summary: 'Purchase a Hostinger VPS and create a linked server'
+      operationId: create-hostinger-server
+      responses:
+        '201':
+          description: 'Hostinger VPS purchased and linked to a Coolify server.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -9894,46 +10099,6 @@ paths:
       security:
         -
           bearerAuth: []
-    patch:
-      tags:
-        - 'Private Keys'
-      summary: Update
-      description: 'Update a private key.'
-      operationId: update-private-key
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              required:
-                - private_key
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                private_key:
-                  type: string
-              type: object
-              additionalProperties: false
-      responses:
-        '201':
-          description: "The updated private key's UUID."
-          content:
-            application/json:
-              schema:
-                properties:
-                  uuid: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '422':
-          $ref: '#/components/responses/422'
-      security:
-        -
-          bearerAuth: []
   '/security/keys/{uuid}':
     get:
       tags:
@@ -10002,6 +10167,56 @@ paths:
                 properties:
                   message: { type: string, example: 'Private Key is in use and cannot be deleted.' }
                 type: object
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Private Keys'
+      summary: Update
+      description: 'Update a private key.'
+      operationId: update-private-key
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Private Key UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - private_key
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                private_key:
+                  type: string
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: "The updated private key's UUID."
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          description: 'Private Key not found.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -10799,6 +11014,7 @@ paths:
                   traffic_retention_1d_days: { type: integer }
                   is_geoip_enabled: { type: boolean }
                   geoip_refresh_days: { type: integer }
+                  traffic_ip_mode: { description: 'How Sentinel stores client IPs for the Top IPs breakdown.', type: string, enum: [full, anonymized, 'off'] }
                   geoip_maxmind_license_key: { description: 'Only present with read:sensitive.', type: string }
                 type: object
         '401':
@@ -10869,6 +11085,10 @@ paths:
                   minimum: 1
                 geoip_maxmind_license_key:
                   type: [string, 'null']
+                traffic_ip_mode:
+                  description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'
+                  type: string
+                  enum: [full, anonymized, 'off']
               type: object
       responses:
         '200':
@@ -14782,6 +15002,12 @@ components:
           default: 36000
           maximum: 36000
           minimum: 60
+        missing_backup_notification_days:
+          description: 'Alert after this many days without an execution; 0 disables alerts'
+          type: integer
+          default: 0
+          maximum: 365
+          minimum: 0
       type: object
       additionalProperties: false
     VolumeBackupScheduleResponse:
@@ -14802,6 +15028,7 @@ components:
         - retention_days_s3
         - retention_max_storage_s3
         - timeout
+        - missing_backup_notification_days
       properties:
         uuid:
           type: string
@@ -14843,6 +15070,8 @@ components:
           type: number
           format: float
         timeout:
+          type: integer
+        missing_backup_notification_days:
           type: integer
       type: object
     Application:
@@ -15624,6 +15853,12 @@ components:
           type: boolean
         geoip_refresh_days:
           type: integer
+        traffic_ip_mode:
+          type: string
+          enum:
+            - full
+            - anonymized
+            - 'off'
         is_reachable:
           type: boolean
         is_sentinel_enabled:
@@ -15932,6 +16167,9 @@ tags:
     name: 'Secret Managers'
     description: 'Secret Managers'
   -
+    name: 'Audit Events'
+    description: 'Audit Events'
+  -
     name: 'Cloud-init Scripts'
     description: 'Cloud-init Scripts'
   -
@@ -15958,6 +16196,9 @@ tags:
   -
     name: Hetzner
     description: Hetzner
+  -
+    name: Hostinger
+    description: Hostinger
   -
     name: Settings
     description: Settings

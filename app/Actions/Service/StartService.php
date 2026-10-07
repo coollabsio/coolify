@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Symfony\Component\Yaml\Yaml;
@@ -42,16 +43,20 @@ class StartService
         $commands[] = "touch {$workdir}/.env";
         $commands = array_merge($commands, EnsureContentFilesOnServer::echoCommands($this->contentFileStorages($service), $service->server));
         $commands = array_merge($commands, self::composeVolumeWarningCommands($service));
+        // The script reaches the server on stdin. Compose prompts (for example "Volume ... exists but
+        // doesn't match configuration. Recreate?") would read the next script lines as the answer.
+        // Give Compose no stdin so it uses the default answer (keep the volume). Never pass --yes:
+        // it recreates the volume and deletes its data.
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
-            $commands[] = "docker compose --project-directory {$workdir} pull";
+            $commands[] = "docker compose --project-directory {$workdir} pull < /dev/null";
         }
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         }
         $commands[] = 'echo Starting service.';
-        $commands[] = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid} up -d --remove-orphans --force-recreate --build";
+        $commands[] = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid} up -d --remove-orphans --force-recreate --build < /dev/null";
         $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         if (data_get($service, 'connect_to_docker_network')) {
             $compose = data_get($service, 'docker_compose', []);
@@ -63,6 +68,14 @@ class StartService
             }
         }
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
+        if ($service->is_maintenance_enabled) {
+            // Domains can change with the compose file, so the maintenance routes follow them.
+            try {
+                $service->syncMaintenancePage();
+            } catch (\Throwable $e) {
+                Log::warning('Maintenance page update failed while starting service.', ['service_uuid' => $service->uuid, 'error' => $e->getMessage()]);
+            }
+        }
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
     }

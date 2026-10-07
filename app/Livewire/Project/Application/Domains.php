@@ -77,9 +77,11 @@ class Domains extends Component
     public ?string $editingGeneratedHost = null;
 
     /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool}> */
+    #[Locked]
     public array $domainRows = [];
 
     /** When set, the next addSuggestedDomain call for this index skips the DNS block. */
+    #[Locked]
     public ?int $forceAddSuggestedIndex = null;
 
     /** @var array<int, string> */
@@ -122,6 +124,7 @@ class Domains extends Component
 
     public bool $isCheckingDns = false;
 
+    #[Locked]
     public bool $dnsValidationEnabled = true;
 
     /** Resolved or literal IP users should point DNS at. */

@@ -199,7 +199,7 @@ test('redis remote passwords are escaped the same way in the environment and the
     $startCommand = (new ReflectionMethod($action, 'buildStartCommand'))->invoke($action);
 
     expect($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
-        ->and($startCommand)->toContain('--requirepass p4$$word');
+        ->and($startCommand)->toContain("--requirepass 'p4\$\$word'");
 });
 
 test('a service restart keeps the service running when remote secrets cannot be fetched', function () {

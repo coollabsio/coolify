@@ -4,8 +4,16 @@ use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Server::flushIdentityMap();
+    // Changing is_metrics_enabled queues a Sentinel restart (ServerSetting::booted()); these tests
+    // only check the enabled state, so keep the sync queue from starting Sentinel.
+    Queue::fake();
+});
 
 it('treats Sentinel as enabled for regular servers even when the legacy flag and metrics are disabled', function () {
     DB::table('instance_settings')->insert(['id' => 0]);

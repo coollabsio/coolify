@@ -480,14 +480,14 @@ describe('workflow_job webhook', function () {
 });
 
 describe('provisioning', function () {
-    it('starts a runner on the least busy matching build server', function () {
+    it('starts a runner on the least busy matching server that can build', function () {
         Queue::fake();
         fakeRunnerGithubApi($this->githubApp);
         Process::fake(['*' => Process::result(output: '29.8.0')]);
         $busyServer = runnerTestServer($this->team);
         $busyConfig = runnerTestConfig($busyServer, $this->githubApp);
         runnerTestExecution($this->githubApp, ['status' => GithubRunnerStatus::Running, 'server_id' => $busyServer->id, 'github_runner_config_id' => $busyConfig->id]);
-        $freeServer = runnerTestServer($this->team);
+        $freeServer = runnerTestServer($this->team, 'both');
         runnerTestConfig($freeServer, $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
 
@@ -615,7 +615,7 @@ describe('provisioning', function () {
         Process::assertNothingRan();
     });
 
-    it('does not use servers without the build role, disabled configs, or other labels', function (string $role, array $configAttributes) {
+    it('does not use deployments only servers, disabled configs, or other labels', function (string $role, array $configAttributes) {
         Queue::fake();
         Process::fake();
         $server = runnerTestServer($this->team, $role);
@@ -627,7 +627,7 @@ describe('provisioning', function () {
         expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Queued);
         Process::assertNothingRan();
     })->with([
-        'combined role' => ['both', []],
+        'deployments only role' => ['deployment', []],
         'disabled config' => ['build', ['is_enabled' => false]],
         'other labels' => ['build', ['labels' => ['gpu']]],
     ]);

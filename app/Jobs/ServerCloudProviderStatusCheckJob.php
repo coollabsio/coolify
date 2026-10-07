@@ -47,6 +47,9 @@ class ServerCloudProviderStatusCheckJob implements ShouldBeEncrypted, ShouldQueu
                 'digitalocean' => $this->server->digitalocean_droplet_id
                     ? $this->server->refreshDigitalOceanState()
                     : null,
+                'hostinger' => $this->server->hostinger_virtual_machine_id
+                    ? $this->server->refreshHostingerState()
+                    : null,
                 default => null,
             };
         } catch (\Throwable $e) {

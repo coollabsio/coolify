@@ -134,7 +134,7 @@
                     <div class="flex items-end gap-2">
                         <x-forms.input id="email" label="Email" readonly />
                         <x-forms.button @click="openEmailModal()" type="button"
-                            :disabled="$uses_sso" x-bind:disabled="emailModalOpen || @js($uses_sso)">
+                            :disabled="$uses_sso" x-bind:disabled="emailModalOpen || {{ $uses_sso ? 'true' : 'false' }}">
                             Change
                         </x-forms.button>
                     </div>

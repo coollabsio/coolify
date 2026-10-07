@@ -19,7 +19,7 @@ use Illuminate\Support\Sleep;
 use RuntimeException;
 
 /**
- * Starts one ephemeral runner for a queued execution on the least busy matching build server.
+ * Starts one ephemeral runner for a queued execution on the least busy matching server.
  * When no server has free capacity, the execution stays queued and is retried by
  * CleanupGithubRunnerJob or ReconcileGithubRunnersJob. A runner that fails to start is removed and
  * started again, possibly on another server, up to MAX_ATTEMPTS times.
@@ -191,7 +191,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->filter(fn (GithubRunnerConfig $config) => $config->server !== null
                     && $config->matchesLabels($execution->labels ?? [])
                     && ($config->allow_pull_requests || ! $execution->is_pull_request)
-                    && $config->server->isBuildServer()
+                    && $config->server->canBuildApplications()
                     && ! $config->server->isLocalhost()
                     && $config->server->isFunctional())
                 ->map(fn (GithubRunnerConfig $config) => ['config' => $config, 'occupied' => $config->occupiedRunnerCount()])

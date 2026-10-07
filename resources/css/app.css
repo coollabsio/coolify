@@ -1425,7 +1425,7 @@ html[data-theme="custom"] [class~="dark:hover:text-coollabs"]:hover {
 }
 
 /* Light custom theme reaches raw neutral utilities too. Dark mode tints
-   everything through the pervasive dark:bg-*/dark:border-* utilities (which
+   everything through the pervasive dark:bg-* and dark:border-* utilities (which
    resolve to --color-* vars the block overrides); light mode has no equivalent,
    so components fall back to hardcoded neutrals. Remap the dominant light
    surface/border utilities to the tinted custom vars so the color reaches the

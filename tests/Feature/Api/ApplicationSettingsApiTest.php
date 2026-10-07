@@ -380,6 +380,7 @@ test('PATCH /api/v1/applications/{uuid} accepts Docker-compatible custom interna
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
             'custom_internal_name' => $name,
+            'is_consistent_container_name_enabled' => true,
         ])
         ->assertOk();
 

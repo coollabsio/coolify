@@ -22,11 +22,10 @@ use Symfony\Component\Yaml\Yaml;
  * This should be called BEFORE saving to database to prevent malicious data from being stored.
  *
  * @param  string  $composeYaml  The raw Docker Compose YAML content
- * @param  string|null  $resourceDirectory  The resource directory, if the resource exists (see validateComposeContentVolumeSource())
  *
  * @throws Exception If the compose file contains command injection attempts
  */
-function validateDockerComposeForInjection(string $composeYaml, ?string $resourceDirectory = null): void
+function validateDockerComposeForInjection(string $composeYaml): void
 {
     try {
         $parsed = Yaml::parse($composeYaml);
@@ -79,7 +78,7 @@ function validateDockerComposeForInjection(string $composeYaml, ?string $resourc
                             }
                         }
                     }
-                    validateComposeContentVolumeSource($volume, $resourceDirectory);
+                    validateComposeContentVolumeSource($volume);
                 }
             }
         }
@@ -130,55 +129,27 @@ function composeResourceDirectory(Application|Service $resource): string
 }
 
 /**
- * Coolify writes the `content:` of a Compose bind volume to the host, so that file must be inside
- * the resource directory. The source must be a `./` path that stays inside the resource directory,
- * or an absolute path inside $resourceDirectory. Sources with `~`, `..` or variables are rejected,
- * because their host path is not known before the write. Bind volumes without `content:` are not
- * changed: an administrator can mount any host path.
+ * Coolify writes the `content:` of a Compose bind volume to the source path on the host. Only
+ * administrators can edit a Compose file, and they can mount any host path, so the source can be
+ * any path, also outside the resource directory. It must exist and be safe to
+ * use in a shell command; Coolify escapes it in every remote command.
  *
  * @param  array<string, mixed>  $volume  A long-syntax Compose volume
  *
- * @throws Exception If Coolify would write the content outside the resource directory
+ * @throws Exception If the source is missing or contains shell metacharacters
  */
-function validateComposeContentVolumeSource(array $volume, ?string $resourceDirectory = null): void
+function validateComposeContentVolumeSource(array $volume): void
 {
     if (! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
         return;
     }
 
     $source = $volume['source'] ?? null;
-    $displaySource = is_scalar($source) && (string) $source !== '' ? (string) $source : '(empty)';
-    $error = new Exception(
-        "Volume source {$displaySource} with content must be inside the resource directory. Use a relative path such as ./config/app.conf."
-    );
-
-    if (! is_string($source) || str_contains($source, '$') || str_contains($source, '\\')) {
-        throw $error;
-    }
-    if (in_array('..', explode('/', $source), true)) {
-        throw $error;
+    if (! is_string($source) || trim($source) === '') {
+        throw new Exception('Invalid Docker volume definition (array syntax): A bind volume with content needs a source path.');
     }
 
-    if (str_starts_with($source, './')) {
-        $baseDirectory = $resourceDirectory ?? '/coolify-resource-directory';
-        $path = $baseDirectory.'/'.substr($source, 2);
-    } elseif (str_starts_with($source, '/') && $resourceDirectory !== null) {
-        $baseDirectory = $resourceDirectory;
-        $path = $source;
-    } else {
-        throw $error;
-    }
-
-    try {
-        $baseDirectory = normalizeUnixPath($baseDirectory);
-        $path = normalizeUnixPath($path);
-    } catch (Exception) {
-        throw $error;
-    }
-
-    if (! str_starts_with($path, $baseDirectory.'/')) {
-        throw $error;
-    }
+    validateComposeArrayVolumeSource($source);
 }
 
 /**
@@ -342,8 +313,9 @@ function isComposeExternalVolume(mixed $declaration): bool
 /**
  * Returns the top-level declaration of a volume source when the Compose file declares it as
  * external, and null for all other sources. The parsers use an external volume as written: no
- * "{uuid}_" prefix, no preview suffix and no LocalPersistentVolume row, so that Coolify never
- * removes a volume that it does not own.
+ * "{uuid}_" prefix and no LocalPersistentVolume row, so that Coolify never removes a volume that it
+ * does not own. A preview deployment never uses an external volume; it gets its own volume
+ * "{uuid}_{volume}-pr-{id}" like any other named volume.
  *
  * @param  iterable<array-key, mixed>  $topLevelVolumes
  * @return array<string, mixed>|null
@@ -364,9 +336,11 @@ function composeExternalVolumeDeclaration(iterable $topLevelVolumes, string $sou
 /**
  * Tells if a parser uses the volume source as written because it is an external volume.
  *
+ * Only for production deployments: a preview deployment always gets its own volume.
+ *
  * Before Coolify used external volumes as written, the parsers renamed them like all other
- * volumes (the old name, for example "{uuid}_{volume}" or "{uuid}_{volume}-pr-{id}"), so the
- * resource wrote its data into the renamed volume. When the owner still has the storage entry
+ * volumes (the old name, for example "{uuid}_{volume}"), so the resource wrote its data into the
+ * renamed volume. When the owner still has the storage entry
  * with the old name, the parser must keep the old name, or the resource loses its data. Then
  * this function records a warning on the resource and returns false. When the user deletes that
  * storage entry, the next parse uses the external volume.
@@ -431,7 +405,8 @@ function legacyApplicationRenamedVolumeDeclaration(string $name): array
  * Records a warning when a legacy Compose application (parser version 1 or 2) does not use an
  * external volume as written. These parsers keep the old volume name (see
  * legacyApplicationComposeVolumeName()), so the resource keeps its data. The parser version 1 keeps
- * the name of a production volume, so it uses the external volume and gets no warning.
+ * the name of a production volume, so it uses the external volume and gets no warning. A preview
+ * always uses its own volume, so it gets no warning either.
  *
  * The volume names are not validated here, so that the legacy parsers keep their old behavior. The
  * warning shows the Docker volume name only when it is a literal, valid Docker volume name.
@@ -440,6 +415,9 @@ function legacyApplicationRenamedVolumeDeclaration(string $name): array
  */
 function warnLegacyApplicationComposeExternalVolume(Application $resource, iterable $topLevelVolumes, string $source, int $pull_request_id): void
 {
+    if ($pull_request_id !== 0) {
+        return;
+    }
     $declaration = collect($topLevelVolumes)->get($source);
     if (! isComposeExternalVolume($declaration)) {
         return;
@@ -1331,6 +1309,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     }
 
     // Parse the rest of the services
+    $previewOwnVolumes = collect([]);
     foreach ($services as $serviceName => $service) {
         $image = data_get_str($service, 'image');
         $restart = data_get_str($service, 'restart', RESTART_MODE);
@@ -1411,7 +1390,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
                     }
-                    validateComposeContentVolumeSource($volume, composeResourceDirectory($resource));
+                    validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
@@ -1481,22 +1460,28 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
-                    $legacyName = "{$uuid}_".Str::slug($source, '-');
-                    if ($isPullRequest) {
-                        $legacyName = addPreviewDeploymentSuffix($legacyName, $pull_request_id);
-                    }
-                    if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), $legacyName)) {
-                        // Previews share the external volume. It gets no row, so Coolify never removes it.
+                    // A preview never mounts an external or network (NFS, CIFS) volume: two deployments
+                    // that write into the same data directory (for example two databases) can corrupt it.
+                    // The preview gets its own volume with the name that older Coolify versions gave
+                    // it, so it keeps its data, and the preview cleanup removes it.
+                    $declaration = $topLevel->get('volumes')->get($source->value());
+                    $isNetworkVolume = in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true);
+                    $isPreviewOwnVolume = $isPullRequest
+                        && ($isNetworkVolume || composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null);
+                    if (! $isPullRequest && useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
+                        // The external volume gets no row, so Coolify never removes it.
                         $volumesParsed->put($index, $volume);
 
                         continue;
                     }
-                    $declaration = $topLevel->get('volumes')->get($source->value());
-                    if (in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
+                    if (! $isPullRequest && $isNetworkVolume) {
                         // Network volumes are used as written.
                         $volumesParsed->put($index, $volume);
 
                         continue;
+                    }
+                    if ($isPreviewOwnVolume) {
+                        $previewOwnVolumes->put($source->value(), true);
                     }
                     $slugWithoutUuid = Str::slug($source, '-');
                     $name = "{$uuid}_{$slugWithoutUuid}";
@@ -1529,7 +1514,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             'resource_type' => get_class($originalResource),
                         ]
                     );
-                    $topLevel->get('volumes')->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
+                    $topLevel->get('volumes')->put($name, $isPreviewOwnVolume
+                        ? ['name' => $name]
+                        : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
@@ -2134,6 +2121,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
         $parsedServices->put($serviceName, $payload);
     }
+    // The preview mounts its own volumes instead of these external and network volumes (see above), so it does not declare them.
+    $topLevel->put('volumes', $topLevel->get('volumes')->except($previewOwnVolumes->keys()->all()));
     $topLevel->put('services', $parsedServices);
 
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
@@ -2773,7 +2762,7 @@ function serviceParser(Service $resource): Collection
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
                     }
-                    validateComposeContentVolumeSource($volume, composeResourceDirectory($resource));
+                    validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');

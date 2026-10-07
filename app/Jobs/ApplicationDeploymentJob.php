@@ -623,6 +623,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
         }
 
+        // Domains can change with a deployment, so the maintenance routes follow them.
+        if ($this->pull_request_id === 0 && $this->application->is_maintenance_enabled) {
+            try {
+                $this->application->syncMaintenancePage();
+            } catch (Exception $e) {
+                \Log::warning('Maintenance page update failed for '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+        }
+
     }
 
     private function deploy_simple_dockerfile()
@@ -646,6 +655,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
 
         // Save build-time .env file BEFORE the build
         $this->save_buildtime_environment_variables();
@@ -792,6 +802,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->generate_image_names();
         $this->cleanup_git();
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
 
         $this->generate_build_env_variables();
 
@@ -1108,6 +1119,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->cleanup_git();
         $this->generate_compose_file();
 
@@ -1141,6 +1153,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_nixpacks_confs();
@@ -1174,6 +1187,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
@@ -1205,6 +1219,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
@@ -2280,24 +2295,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * Build-time names go into shell and Docker build commands, so they must be valid when the
-     * deployment builds an image. Runtime-only variables only go into the .env file: existing ones
-     * with names that new variables can no longer use (such as my-var) keep working, unless the
-     * name would break a .env line. Deployments without a build step (Docker image) treat
-     * build-time variables the same way, because no build receives them.
+     * deployment builds an image ($buildsImage, checked right before the build steps). Restarts and
+     * deployments that reuse an existing image do not pass them to a build, so handle() only warns.
+     * Runtime-only variables only go into the .env file: existing ones with names that new variables
+     * can no longer use (such as my-var) keep working, unless the name would break a .env line.
+     * Deployments without a build step (Docker image) never validate build-time names.
      */
-    private function validateDeploymentEnvironmentVariableKeys(): void
+    private function validateDeploymentEnvironmentVariableKeys(bool $buildsImage = false): void
     {
         $environmentVariables = $this->pull_request_id === 0
             ? $this->application->environment_variables()->get(['key', 'is_buildtime', 'is_runtime'])
             : $this->application->environment_variables_preview()->get(['key', 'is_buildtime', 'is_runtime']);
-        $passesBuildtimeVariables = $this->deploymentPassesBuildtimeVariables();
+        $validatesBuildtimeKeys = $buildsImage && $this->deploymentPassesBuildtimeVariables();
 
         foreach ($environmentVariables as $environmentVariable) {
             $key = (string) $environmentVariable->key;
             $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
-            if (($environmentVariable->is_buildtime && $passesBuildtimeVariables) || ! $isEnvFileSafe) {
+            if (($environmentVariable->is_buildtime && $validatesBuildtimeKeys) || ! $isEnvFileSafe) {
                 $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
 
+                continue;
+            }
+            // The deployment start already logged the warnings.
+            if ($buildsImage) {
                 continue;
             }
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
@@ -2325,7 +2345,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
 
         if ($isBuildtime) {
-            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. This deployment does not build an image, so it is not used as a build-time variable. Rename it before you use it in a build.", 'stderr');
+            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. It is not used as a build-time variable unless the deployment builds an image, and that build fails until you rename it.", 'stderr');
         }
         if ($isRuntime) {
             $this->application_deployment_queue->addLogEntry("⚠️ Runtime variable {$displayKey} uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.", 'stderr');
@@ -2665,6 +2685,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->check_git_if_build_needed();
         $this->clone_repository();
         $this->cleanup_git();
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         if ($this->application->build_pack === 'nixpacks') {
             $this->generate_nixpacks_confs();
         }
@@ -2795,7 +2816,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * @return int The number of deployments that Coolify queued on additional servers
+     * @return int The number of deployments that Coolify created on additional servers, including ones that failed to dispatch
      */
     private function deploy_to_additional_destinations(): int
     {
@@ -2827,18 +2848,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             $deployment_uuid = new_public_id();
-            // Deploy the exact commit and image tag of the main server, also for a rollback.
-            $result = queue_application_deployment(
-                deployment_uuid: $deployment_uuid,
-                application: $this->application,
-                commit: $this->commit,
-                no_questions_asked: true,
-                server: $server,
-                destination: $destination,
-                rollback: $this->rollback,
-                docker_registry_image_tag: $this->application_deployment_queue->docker_registry_image_tag,
-                parent_deployment_uuid: $this->deployment_uuid,
-            );
+            try {
+                // Deploy the exact commit and image tag of the main server, also for a rollback.
+                $result = queue_application_deployment(
+                    deployment_uuid: $deployment_uuid,
+                    application: $this->application,
+                    commit: $this->commit,
+                    no_questions_asked: true,
+                    server: $server,
+                    destination: $destination,
+                    rollback: $this->rollback,
+                    docker_registry_image_tag: $this->application_deployment_queue->docker_registry_image_tag,
+                    parent_deployment_uuid: $this->deployment_uuid,
+                );
+            } catch (Throwable $e) {
+                \Log::warning("Deployment {$this->deployment_uuid} could not queue the deployment to {$server->name}: {$e->getMessage()}");
+                $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} could not be started: {$e->getMessage()}", 'stderr');
+                // A deployment that failed to dispatch is already failed; it counts for the combined notification.
+                if (ApplicationDeploymentQueue::query()->where('deployment_uuid', $deployment_uuid)->exists()) {
+                    $queued++;
+                }
+
+                continue;
+            }
             if ($result['status'] !== 'queued') {
                 $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} was not queued: {$result['message']}", 'stderr');
 
@@ -4883,7 +4915,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->generate_env_variables();
         }
 
-        $variables = $this->env_args;
+        // Invalid names stay out of the helper container: a build fails on them before it starts,
+        // and restarts or deployments that reuse an image do not need them.
+        $variables = $this->env_args->filter(fn ($value, $key): bool => ValidationPatterns::isValidEnvironmentVariableKey((string) $key));
 
         if ($this->build_pack === 'railpack') {
             $variables = $this->without_reserved_docker_client_variables($variables);
@@ -5675,7 +5709,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         try {
-            queue_next_deployment($this->application);
+            queue_next_deployment($this->application, $this->application_deployment_queue->server_id);
         } catch (Throwable $e) {
             $this->logStatusTransitionSideEffectFailure('Starting the next queued deployment failed', $e);
         }

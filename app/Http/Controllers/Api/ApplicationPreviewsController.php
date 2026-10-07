@@ -91,7 +91,7 @@ class ApplicationPreviewsController extends Controller
         $this->authorize('view', $application);
 
         $pullRequestIdRaw = $request->route('pull_request_id');
-        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
             return response()->json(['message' => 'Invalid pull_request_id.'], 422);
         }
 
@@ -116,7 +116,7 @@ class ApplicationPreviewsController extends Controller
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['pull_request_id'],
             properties: [
-                new OA\Property(property: 'pull_request_id', type: 'integer', minimum: 1, example: 42),
+                new OA\Property(property: 'pull_request_id', type: 'integer', minimum: 1, maximum: 2147483647, example: 42),
                 new OA\Property(property: 'pull_request_html_url', type: 'string', nullable: true, example: 'https://github.com/org/repo/pull/42'),
                 new OA\Property(property: 'git_type', type: 'string', nullable: true, enum: self::GIT_TYPES, description: 'Git provider that hosts the pull request. Sets the ref Coolify fetches (pull/{id}/head or merge-requests/{id}/head).'),
                 new OA\Property(property: 'commit', type: 'string', nullable: true, description: 'Commit SHA to deploy. Required for Bitbucket.'),
@@ -186,7 +186,7 @@ class ApplicationPreviewsController extends Controller
         }
 
         $rules = [
-            'pull_request_id' => 'required|integer|min:1',
+            'pull_request_id' => 'required|integer|min:1|max:2147483647',
             'pull_request_html_url' => 'nullable|url|max:2048',
             'force' => 'boolean',
             'instant_deploy' => 'boolean',

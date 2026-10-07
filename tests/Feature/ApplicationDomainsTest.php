@@ -2316,7 +2316,7 @@ it('regenerates an application domain as a draft while preserving its url settin
         ->assertSet('editingDomainParts.path', '/api');
 
     expect($component->get('editingDomainParts')['host'])
-        ->toEndWith('.sslip.io')
+        ->toEndWith('.wildcard.example.net')
         ->not->toBe('old.example.com')
         ->and($this->application->fresh()->fqdn)->toBe('http://old.example.com/api')
         ->and($this->application->fresh()->domain_port_overrides)->toMatchArray([

@@ -68,8 +68,6 @@ class TrafficAnalyticsAggregator
 
     /**
      * Fetch every shape for one app key (or the whole server when null) and merge it in.
-     * The series fetch is isolated: a failure (or an older Sentinel without the endpoint)
-     * never discards the other data; an empty series flips the chart to the donut.
      *
      * @param  callable(string): ?string  $domainForKey  resolves a path row's app key to its domain
      */
@@ -104,7 +102,7 @@ class TrafficAnalyticsAggregator
     private function collectScope(SentinelTrafficClient $client, ?string $key, bool $resourceScope, string $from, string $to, string $range, callable $domainForKey, int $limit): void
     {
         $this->addOverview($resourceScope ? $client->resourceOverview($key, $from, $to) : $client->overview($key, $from, $to));
-        $this->addPaths($resourceScope ? $client->resourcePaths($key, $from, $to, $limit) : $client->paths($key, $from, $to, $limit), $key, $domainForKey);
+        $this->addPaths($resourceScope ? $client->resourcePaths($key, $from, $to, $limit) : $client->paths($key, $from, $to, $limit), $domainForKey);
 
         foreach ($this->dimensions as $dimension) {
             $this->addBreakdown($dimension, $resourceScope
@@ -114,11 +112,7 @@ class TrafficAnalyticsAggregator
 
         $this->attribution ??= $client->attribution();
 
-        try {
-            $this->addSeries($resourceScope ? $client->resourceSeries($key, $range) : $client->series($key, $range));
-        } catch (\Throwable) {
-            // Leave this source out of the series; the donut fallback covers it.
-        }
+        $this->addSeries($resourceScope ? $client->resourceSeries($key, $range) : $client->series($key, $range));
     }
 
     public function addOverview(TrafficOverviewData $overview): void
@@ -128,24 +122,22 @@ class TrafficAnalyticsAggregator
 
     /**
      * Merge path rows keyed by (app, path), so the same path under two apps stays two
-     * rows, each with its own domain. Sentinel's per-row `app` wins; older Sentinel omits
-     * it, so a key-scoped fetch falls back to the key it queried.
+     * rows, each with the domain of the row's Sentinel `app` key.
      *
      * @param  iterable<int, mixed>  $paths
      * @param  callable(string): ?string  $domainForKey
      */
-    public function addPaths(iterable $paths, ?string $fallbackAppKey, callable $domainForKey): void
+    public function addPaths(iterable $paths, callable $domainForKey): void
     {
         foreach ($paths as $path) {
             $data = $path->toArray();
             $pathStr = (string) ($data['path'] ?? '');
             $appId = (string) ($data['app'] ?? '');
-            $resolveId = $appId !== '' ? $appId : ($fallbackAppKey ?? '');
-            $key = $resolveId."\n".$pathStr;
+            $key = $appId."\n".$pathStr;
 
             $this->paths[$key] ??= [
                 'path' => $pathStr,
-                'domain' => $resolveId !== '' ? $domainForKey($resolveId) : null,
+                'domain' => $appId !== '' ? $domainForKey($appId) : null,
                 'requests' => 0, 'bytesOut' => 0, 's4xx' => 0, 's5xx' => 0, 'p95' => 0.0,
             ];
             $this->paths[$key]['requests'] += (int) ($data['requests'] ?? 0);

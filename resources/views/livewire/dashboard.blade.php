@@ -15,6 +15,23 @@
     @endphp
 
     <div class="flex min-w-0 flex-col gap-8">
+        @if ($pendingInvitations->isNotEmpty())
+            <div class="flex min-w-0 flex-col gap-2">
+                @foreach ($pendingInvitations as $invitation)
+                    <x-callout type="info" title="Pending team invitation"
+                        wire:key="dashboard-invitation-{{ $invitation->uuid }}">
+                        <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                            <span class="min-w-0">Team <span class="font-semibold">{{ $invitation->team->name }}</span>
+                                invited you as {{ ucfirst($invitation->role) }}.</span>
+                            <a href="{{ route('team.invitation.show', $invitation->uuid) }}" class="button shrink-0">
+                                Review invitation
+                            </a>
+                        </div>
+                    </x-callout>
+                @endforeach
+            </div>
+        @endif
+
         <livewire:dashboard.active-deployments />
 
         @if ($hasTrafficAnalytics)
