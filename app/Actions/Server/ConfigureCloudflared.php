@@ -11,6 +11,8 @@ class ConfigureCloudflared
 {
     use AsAction;
 
+    public const DIRECTORY = '/data/coolify/cloudflared';
+
     public function handle(Server $server, string $cloudflare_token, string $ssh_domain): Activity
     {
         try {
@@ -39,8 +41,8 @@ class ConfigureCloudflared
             $config = Yaml::dump($config, 12, 2);
             $docker_compose_yml_base64 = base64_encode($config);
             $commands = collect([
-                'mkdir -p /tmp/cloudflared',
-                'cd /tmp/cloudflared',
+                'mkdir -p '.self::DIRECTORY,
+                'cd '.self::DIRECTORY,
                 "echo '$docker_compose_yml_base64' | base64 -d | tee docker-compose.yml > /dev/null",
                 'echo Pulling latest Cloudflare Tunnel image.',
                 'docker compose pull',

@@ -13,15 +13,15 @@
             <x-application.settings-section id="server-cloudflare-overview-section" title="Cloudflare Tunnel"
                 helper="Proxy SSH traffic through Cloudflare so the server SSH port can remain closed.">
                 <x-slot:actions>
-                    <x-status-badge :status="$isCloudflareTunnelsEnabled ? 'Enabled' : 'Disabled'"
-                        :type="$isCloudflareTunnelsEnabled ? 'success' : 'neutral'" />
-                </x-slot:actions>
-
-                @if ($isCloudflareTunnelsEnabled)
-                    <x-callout type="warning" title="Disabling the tunnel can interrupt server access">
-                        The server IP must be restored to its direct address after disabling the tunnel.
-                    </x-callout>
-                    <div class="mt-4">
+                    @if ($isCloudflareTunnelsEnabled && auth()->user()->can('update', $server))
+                        <x-forms.button wire:click="updateCloudflareTunnel">Update Cloudflare Tunnel</x-forms.button>
+                        <x-process-dialog @cloudflare-tunnel-update-started.window="processDialogOpen = true"
+                            closeWithX size="xl">
+                            <x-slot:title>Cloudflare Tunnel Update</x-slot:title>
+                            <x-slot:content>
+                                <livewire:activity-monitor header="Logs" fullHeight />
+                            </x-slot:content>
+                        </x-process-dialog>
                         <x-modal-confirmation title="Disable Cloudflare Tunnel?"
                             buttonTitle="Disable Cloudflare Tunnel" isErrorButton
                             submitAction="toggleCloudflareTunnels" :actions="$server->ip_previous
@@ -37,7 +37,16 @@
                             confirmationText="DISABLE CLOUDFLARE TUNNEL"
                             confirmationLabel="Type the confirmation text to disable Cloudflare Tunnel."
                             shortConfirmationLabel="Confirmation text" />
-                    </div>
+                    @else
+                        <x-status-badge :status="$isCloudflareTunnelsEnabled ? 'Enabled' : 'Disabled'"
+                            :type="$isCloudflareTunnelsEnabled ? 'success' : 'neutral'" />
+                    @endif
+                </x-slot:actions>
+
+                @if ($isCloudflareTunnelsEnabled)
+                    <x-callout type="warning" title="Disabling the tunnel can interrupt server access">
+                        The server IP must be restored to its direct address after disabling the tunnel.
+                    </x-callout>
                 @elseif (!$server->isFunctional())
                     <x-callout type="info" title="Validate the server for automated setup">
                         Automated configuration requires a validated server, a Cloudflare token, and an SSH domain.
