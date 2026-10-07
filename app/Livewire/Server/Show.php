@@ -11,6 +11,7 @@ use App\Rules\ValidServerIp;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\HostingerService;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -267,9 +268,8 @@ class Show extends Component
 
             $this->server->settings->connection_timeout = $this->connectionTimeout;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
-            $role = ServerRole::from($this->serverRole);
-            $this->server->settings->server_role = $role;
-            $this->server->settings->is_build_server = $role === ServerRole::BUILD;
+            // The role is only changed through requestServerRoleChange()/confirmServerRoleChange().
+            $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
@@ -285,7 +285,9 @@ class Show extends Component
                 $this->server->settings->server_timezone = $this->serverTimezone;
             }
 
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->name = $this->server->name;
             $this->description = $this->server->description;
@@ -302,7 +304,7 @@ class Show extends Component
             $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = auth()->user()->can('update', $this->server)
-                ? $this->server->settings->sentinel_token
+                ? $this->server->settings->ensureValidSentinelToken()
                 : '';
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
             $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
@@ -315,6 +317,25 @@ class Show extends Component
             $this->serverTimezone = $this->server->settings->server_timezone;
             $this->isValidating = $this->server->is_validating ?? false;
         }
+    }
+
+    /**
+     * Server columns are audited by the model. Settings live on ServerSetting, so record their names here.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.settings_updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function refresh()
@@ -371,6 +392,45 @@ class Show extends Component
         }
     }
 
+    public function toggleManagement(ServerTransferClaimer $claimer): void
+    {
+        abort_unless(isDev(), 404);
+        $this->authorize('update', $this->server);
+
+        if ($this->server->isLocalhost()) {
+            $this->dispatch('error', 'The Coolify host cannot be transferred.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway() && $this->server->team->serverOverflow()) {
+            $this->dispatch('error', 'Your team is over its server limit. Upgrade your subscription or remove a server first.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway()) {
+            $claimer->claim($this->server);
+            $event = 'ui.server.management_enabled';
+            $message = 'This Coolify instance now manages the server.';
+        } else {
+            $claimer->markTransferred($this->server, managementDisabled: true);
+            $event = 'ui.server.management_disabled';
+            $message = 'Server automations are disabled on this Coolify instance.';
+        }
+
+        $this->server->refresh();
+        $this->syncData();
+
+        auditLog($event, [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ]);
+
+        $this->dispatch('success', $message);
+    }
+
     public function checkLocalhostConnection()
     {
         try {
@@ -411,8 +471,8 @@ class Show extends Component
     public function updatedIsSentinelDebugEnabled($value)
     {
         try {
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
             $this->submit();
-            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -421,8 +481,8 @@ class Show extends Component
     public function updatedIsMetricsEnabled($value)
     {
         try {
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
             $this->submit();
-            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -434,6 +494,13 @@ class Show extends Component
             $this->authorize('update', $this->server);
             $newRole = ServerRole::from($this->serverRole);
             $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
+
+            if ($newRole === ServerRole::DEPLOYMENT && $this->server->hasEnabledGithubRunners()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Disable the GitHub runners before you set this server to deployments only.');
+
+                return;
+            }
 
             if ($newRole === ServerRole::BUILD && ! $this->server->isEmpty()) {
                 $this->serverRole = $currentRole->value;
@@ -478,6 +545,8 @@ class Show extends Component
     private function saveServerRole(ServerRole $role): void
     {
         $this->serverRole = $role->value;
+        $this->server->settings->server_role = $role;
+        $this->server->settings->is_build_server = $role === ServerRole::BUILD;
         if ($role === ServerRole::BUILD && $this->server->isSentinelEnabled()) {
             $this->isMetricsEnabled = false;
             $this->isSentinelDebugEnabled = false;
@@ -494,6 +563,11 @@ class Show extends Component
         try {
             $this->authorize('manageSentinel', $this->server);
             $this->server->settings->generateSentinelToken();
+            auditLog('ui.server.sentinel.token_regenerated', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
             $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -562,6 +636,7 @@ class Show extends Component
     public function checkVultrInstanceStatus(bool $manual = false)
     {
         try {
+            $this->authorize('view', $this->server);
             if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
 
@@ -778,21 +853,21 @@ class Show extends Component
 
     public function loadHetznerTokens(): void
     {
-        $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableHetznerTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'hetzner')
             ->get();
     }
 
     public function loadVultrTokens(): void
     {
-        $this->availableVultrTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableVultrTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'vultr')
             ->get();
     }
 
     public function loadDigitalOceanTokens(): void
     {
-        $this->availableDigitalOceanTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableDigitalOceanTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'digitalocean')
             ->get();
     }

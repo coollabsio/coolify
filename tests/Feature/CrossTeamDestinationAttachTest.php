@@ -3,6 +3,7 @@
 use App\Actions\Docker\GetContainersStatus;
 use App\Livewire\Project\Shared\Destination;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -254,5 +255,66 @@ describe('Destination::removeServer', function () {
             ->where('standalone_docker_id', $this->destinationA2->id)
             ->where('server_id', $this->serverA2->id)
             ->exists())->toBeFalse();
+    });
+});
+
+describe('Destination after the user switches the session team', function () {
+    beforeEach(function () {
+        Server::flushIdentityMap();
+        $this->userA->teams()->attach($this->teamB, ['role' => 'owner']);
+        foreach ([$this->serverA2, $this->serverB] as $server) {
+            $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+        }
+
+        $this->component = Livewire::test(Destination::class, ['resource' => $this->applicationA]);
+        session(['currentTeam' => $this->teamB]);
+    });
+
+    test('lists only networks of the application team', function () {
+        $networkIds = $this->component->call('loadData')->get('networks')->pluck('id');
+
+        expect($networkIds)->toContain($this->destinationA2->id)
+            ->not->toContain($this->destinationB->id);
+    });
+
+    test('cannot attach a server of the session team to the application', function () {
+        try {
+            $this->component->call('addServer', $this->destinationB->id, $this->serverB->id);
+        } catch (Throwable $e) {
+        }
+
+        expect($this->applicationA->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('can attach a server of the application team', function () {
+        $this->component->call('addServer', $this->destinationA2->id, $this->serverA2->id);
+
+        expect($this->applicationA->fresh()->additional_networks->pluck('id')->all())->toBe([$this->destinationA2->id]);
+    });
+
+    test('cannot promote a network of the session team', function () {
+        try {
+            $this->component->call('promote', $this->destinationB->id, $this->serverB->id);
+        } catch (Throwable $e) {
+        }
+
+        expect($this->applicationA->fresh()->destination_id)->toBe($this->destinationA->id);
+    });
+
+    test('can promote a network of the application team', function () {
+        $this->applicationA->additional_networks()->attach($this->destinationA2->id, ['server_id' => $this->serverA2->id]);
+
+        $this->component->call('promote', $this->destinationA2->id, $this->serverA2->id);
+
+        expect($this->applicationA->fresh()->destination_id)->toBe($this->destinationA2->id);
+    });
+
+    test('cannot redeploy to a server of the session team', function () {
+        try {
+            $this->component->call('redeploy', $this->destinationB->id, $this->serverB->id);
+        } catch (Throwable $e) {
+        }
+
+        expect(ApplicationDeploymentQueue::query()->where('server_id', $this->serverB->id)->exists())->toBeFalse();
     });
 });

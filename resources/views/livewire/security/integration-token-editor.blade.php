@@ -7,7 +7,11 @@
                 <x-forms.input type="password" id="newToken"
                     label="{{ $integrationToken->provider === 'infisical' ? 'New client secret' : 'New API token' }}"
                     placeholder="Leave blank to keep the current token"
-                    helper="Paste a replacement token to rotate this credential." />
+                    helper="{{ match ($integrationToken->provider) {
+                        'infisical' => 'Paste a replacement client secret to rotate this credential. Required when you change the base URL or the client ID.',
+                        'vault' => 'Paste a replacement token to rotate this credential. Required when you change the base URL or the namespace.',
+                        default => 'Paste a replacement token to rotate this credential.',
+                    } }}" />
             </div>
         </div>
 

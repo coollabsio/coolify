@@ -194,7 +194,7 @@
                                 class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                 x-on:click="typeFilter = option.value; close()">
                                 <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
+                                <svg x-show="typeFilter === option.value" class="size-3.5 text-black dark:text-fg"
                                     viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                     <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                         stroke-linecap="round" stroke-linejoin="round" />
@@ -216,7 +216,7 @@
                                 class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                 x-on:click="sortBy = option.value; close()">
                                 <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                     viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                     <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                         stroke-linecap="round" stroke-linejoin="round" />
@@ -268,7 +268,7 @@
                                 default => 'neutral',
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
-                            $databaseS3 = $databaseBackup->s3?->team_id === currentTeam()->id ? $databaseBackup->s3 : null;
+                            $databaseS3 = $databaseBackup->s3?->team_id === $serviceTeamId ? $databaseBackup->s3 : null;
                             $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3 ? 'S3 storage: '.$databaseS3->name.' (bucket: '.$databaseS3->bucket.')' : 'S3 storage: Unavailable');
                         @endphp
                         <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
@@ -308,7 +308,7 @@
                     @foreach ($backups as $backup)
                         @php
                             $latestExecution = $backup->latestExecution;
-                            $volumeS3 = $backup->s3?->team_id === currentTeam()->id ? $backup->s3 : null;
+                            $volumeS3 = $backup->s3?->team_id === $serviceTeamId ? $backup->s3 : null;
                             $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3 ? 'S3 storage: '.$volumeS3->name.' (bucket: '.$volumeS3->bucket.')' : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {

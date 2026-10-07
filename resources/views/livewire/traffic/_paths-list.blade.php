@@ -18,6 +18,16 @@
         icon-name="unordered-list" />
 @else
     <div x-data="{ page: 0, per: 10, total: {{ count($paths) }} }">
+        <div class="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.07] dark:text-fg-dim">
+            <span class="min-w-0 flex-1">Path</span>
+            <span class="hidden w-16 shrink-0 text-right sm:inline" title="Request volume relative to the busiest row in this list">Volume</span>
+            <span class="w-16 shrink-0 text-right">Requests</span>
+            <span class="hidden w-14 shrink-0 text-right sm:inline" title="HTTP 4xx client-error responses">4xx errors</span>
+            <span class="w-14 shrink-0 text-right" title="HTTP 5xx server-error responses">5xx errors</span>
+            <span class="hidden w-12 shrink-0 text-right lg:inline" title="Percentage of requests with a 4xx or 5xx response">Error %</span>
+            <span class="hidden w-16 shrink-0 text-right sm:inline" title="Total response data sent">Bandwidth</span>
+            <span class="hidden w-16 shrink-0 text-right md:inline" title="95% of requests completed within this response time">p95 latency</span>
+        </div>
         @foreach ($paths as $path)
             @php
                 $domain = $path['domain'] ?? null;
@@ -41,7 +51,7 @@
                 <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
                     <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
                 </div>
-                <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                <span class="w-16 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
                     title="{{ number_format($requests) }} requests">{{ compactNumber($requests) }}</span>
                 <span class="hidden w-14 shrink-0 text-right text-[11px] font-medium tabular-nums text-pink-600 sm:inline dark:text-pink-400"
                     title="{{ number_format($s4xx) }} client-error responses">{{ compactNumber($s4xx) }} 4xx</span>

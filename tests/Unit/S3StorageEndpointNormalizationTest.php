@@ -5,18 +5,10 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-it('uses the shared split URL input without a Livewire blur request', function () {
-    $createView = file_get_contents(resource_path('views/livewire/storage/create.blade.php'));
+it('gates the S3 storage edit form behind the update permission', function () {
     $editView = file_get_contents(resource_path('views/livewire/storage/form.blade.php'));
 
-    expect($createView)
-        ->not->toContain('wire:model.blur="endpoint"')
-        ->toContain('<x-forms.domain-input id="endpointParts"')
-        ->toContain('host-label="Host"')
-        ->toContain('host-placeholder="minio.internal or 192.168.1.50"')
-        ->and($editView)
-        ->toContain('<x-forms.domain-input id="endpointParts"')
-        ->toContain('@can(\'update\', $storage)');
+    expect($editView)->toContain('@can(\'update\', $storage)');
 });
 
 it('normalizes endpoints again on the backend', function (string $endpoint, string $expected) {

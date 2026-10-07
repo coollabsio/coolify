@@ -338,7 +338,7 @@ describe('Destination/Show team scope', function () {
         Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
             ->assertSee('General')
             ->assertSee('Resources')
-            ->assertDontSee('Search resources...')
+            ->assertDontSeeHtml('placeholder="Search resources"')
             ->assertDontSee('No resources use this destination');
     });
 
@@ -365,10 +365,10 @@ describe('Destination/Show team scope', function () {
         ]));
 
         Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
-            ->assertSee('Search resources...')
+            ->assertSeeHtml('placeholder="Search resources"')
             ->assertSee('Project')
             ->assertSee('Environment')
-            ->assertSee('Name')
+            ->assertSee('Resource')
             ->assertSee('Type')
             ->assertSee('application-on-destination')
             ->assertSee('service-on-destination')

@@ -8,12 +8,14 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
 use App\Support\ResourceStartActivity;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $database;
 
@@ -27,14 +29,14 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'activityFinished',
             'refresh' => '$refresh',
             'compose_loaded' => '$refresh',
             'update_links' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => 'activityFinished',
+            ]),
         ];
     }
 
@@ -156,6 +158,7 @@ class Heading extends Component
                 return;
             }
             $this->auditDatabaseAction('ui.database.restarted');
+            $this->dispatch('info', 'Restarting database.');
             $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);

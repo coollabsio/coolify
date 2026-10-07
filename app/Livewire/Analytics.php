@@ -2,15 +2,19 @@
 
 namespace App\Livewire;
 
+use App\Enums\TrafficIpMode;
 use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Models\Server;
+use App\Models\Service;
 use App\Services\SentinelTrafficClient;
 use App\Services\TrafficAnalyticsAggregator;
+use App\Services\TrafficResource;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -20,8 +24,10 @@ class Analytics extends Component
 {
     use BuildsTrafficChartPayload;
 
+    #[Locked]
     public string $chartId = 'global-analytics';
 
+    #[Locked]
     public ?string $scopedServerUuid = null;
 
     /** Traffic-enabled servers owned by the current team. */
@@ -30,12 +36,12 @@ class Analytics extends Component
     /** @var array<string, string> uuid => name, for the server filter */
     public array $serverOptions = [];
 
-    /** @var array<string, string> uuid => name, for the application filter (scoped to the selected server) */
+    /** @var array<string, string> uuid => name, for the application/service filter (scoped to the selected server) */
     public array $appOptions = [];
 
     /**
-     * Listbox options for the application filter, grouped under project headers so
-     * it's clear which application belongs to which project.
+     * Listbox options for the application/service filter, grouped under project headers so
+     * it's clear which resource belongs to which project. Services carry a "(Service)" suffix.
      *
      * @var array<int, array{value: string, label: string, header?: bool}>
      */
@@ -74,16 +80,17 @@ class Analytics extends Component
 
     public ?string $attribution = null;
 
+    /** Effective TrafficIpMode of the queried servers; decides how the IP breakdown renders. */
+    #[Locked]
+    public string $ipMode = 'full';
+
     /**
      * Per-bucket status-class time series for the stacked area chart, summed across
-     * target servers and sorted by bucket. Empty when no target Sentinel exposes the
-     * series endpoint (older builds), which flips the chart back to the status donut.
+     * target servers and sorted by bucket.
      *
      * @var array<int, array{bucket: int, s2xx: int, s3xx: int, s4xx: int, s5xx: int}>
      */
     public array $series = [];
-
-    public bool $hasSeries = false;
 
     /**
      * Servers that could run traffic analytics but have it off — drives the nudge banner.
@@ -105,12 +112,20 @@ class Analytics extends Component
     protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
 
     /**
-     * Per-request cache of app uuid => display metadata, so resolving a name/domain/link
-     * for the leaderboard and path domains hits the DB at most once per app.
+     * Per-request cache of Sentinel key => display metadata, so resolving a name/domain/link
+     * for the leaderboard and path domains runs at most once per key.
      *
-     * @var array<string, array{name: string, domain: ?string, link: ?string}>
+     * @var array<string, array{uuid: string, name: string, domain: ?string, rowDomain: ?string, link: ?string, isService: bool}>
      */
     protected array $appMetaCache = [];
+
+    /**
+     * Per-request map of every team Application and Service by uuid; the only source used
+     * to name Sentinel keys, so a key never resolves to another team's resource.
+     *
+     * @var array<string, TrafficResource>|null
+     */
+    protected ?array $teamResources = null;
 
     public function mount(?string $scopedServerUuid = null): void
     {
@@ -223,9 +238,9 @@ class Analytics extends Component
     {
         $enabledUuids = $this->servers->pluck('uuid');
 
-        $apps = Application::ownedByCurrentTeam()->with(['environment.project', 'destination.server'])->get()
-            ->filter(function (Application $app) use ($enabledUuids): bool {
-                $serverUuid = $app->destination?->server?->uuid;
+        $resources = collect($this->teamResources())
+            ->filter(function (TrafficResource $resource) use ($enabledUuids): bool {
+                $serverUuid = $resource->server()?->uuid;
 
                 if (! $serverUuid || ! $enabledUuids->contains($serverUuid)) {
                     return false;
@@ -235,24 +250,59 @@ class Analytics extends Component
             });
 
         // Flat uuid => name map, used to validate a bookmarked ?app= filter.
-        $options = $apps->mapWithKeys(fn (Application $app) => [$app->uuid => $app->name])->all();
+        $options = $resources->mapWithKeys(fn (TrafficResource $resource) => [$resource->uuid() => $resource->name()])->all();
         asort($options);
         $this->appOptions = $options;
 
-        // Grouped listbox options: a header row per project, then its apps (both alpha-sorted).
+        // Grouped listbox options: a header row per project, then its applications and
+        // services (both alpha-sorted by name).
         $grouped = [];
-        $byProject = $apps
-            ->groupBy(fn (Application $app) => (string) (data_get($app, 'environment.project.name') ?: 'Ungrouped'))
+        $byProject = $resources
+            ->groupBy(fn (TrafficResource $resource) => $resource->projectName())
             ->sortKeys();
 
-        foreach ($byProject as $projectName => $projectApps) {
+        foreach ($byProject as $projectName => $projectResources) {
             $grouped[] = ['value' => '__group_'.md5($projectName), 'label' => $projectName, 'header' => true];
-            foreach ($projectApps->sortBy('name') as $app) {
-                $grouped[] = ['value' => $app->uuid, 'label' => $app->name];
+            foreach ($projectResources->sortBy(fn (TrafficResource $resource) => $resource->name()) as $resource) {
+                $grouped[] = [
+                    'value' => $resource->uuid(),
+                    'label' => $resource->isService() ? $resource->name().' (Service)' : $resource->name(),
+                ];
             }
         }
 
         $this->appGroupedOptions = $grouped;
+    }
+
+    /**
+     * Every Application and Service of the current team, keyed by uuid. Loaded once per
+     * request with the relations the filter, links, and domain lookups need.
+     *
+     * @return array<string, TrafficResource>
+     */
+    protected function teamResources(): array
+    {
+        if ($this->teamResources !== null) {
+            return $this->teamResources;
+        }
+
+        $resources = [];
+        foreach (Application::ownedByCurrentTeam()->with(['environment.project', 'destination.server'])->get() as $application) {
+            $resources[$application->uuid] = TrafficResource::for($application);
+        }
+        foreach (Service::ownedByCurrentTeam()->with(['environment.project', 'server', 'applications'])->get() as $service) {
+            $resources[$service->uuid] = TrafficResource::for($service);
+        }
+
+        return $this->teamResources = $resources;
+    }
+
+    /**
+     * The team resource selected in the application/service filter, or null.
+     */
+    protected function selectedResource(): ?TrafficResource
+    {
+        return $this->appUuid !== '' ? ($this->teamResources()[$this->appUuid] ?? null) : null;
     }
 
     /**
@@ -265,8 +315,7 @@ class Analytics extends Component
         }
 
         if ($this->appUuid !== '') {
-            $server = Application::ownedByCurrentTeam()->whereUuid($this->appUuid)->first()
-                ?->destination?->server;
+            $server = $this->selectedResource()?->server();
 
             return $server && $this->servers->contains(fn (Server $s) => $s->uuid === $server->uuid)
                 ? collect([$server])
@@ -282,116 +331,84 @@ class Analytics extends Component
 
     public function loadData(): void
     {
+        $this->resetData();
+
+        foreach ($this->servers as $server) {
+            $this->authorize('view', $server);
+        }
+
         if ($this->servers->isEmpty()) {
             return;
         }
 
         [$from, $to] = $this->window();
-        $appKey = $this->appUuid !== '' ? $this->appUuid : null;
+        // A selected application or service is queried in Sentinel's resource scope, or under
+        // all of its keys on a Sentinel without resource routes (before 1.0.2).
+        $resource = $this->selectedResource();
         $servers = $this->targetServers();
+        $domainForKey = fn (string $key): ?string => $this->appMeta($key)['domain'];
+        $ipMode = TrafficIpMode::forServers($servers);
+        $this->ipMode = $ipMode->value;
+        $dimensions = $ipMode->breakdownDimensions($this->breakdownDimensions);
 
-        $overviews = [];
+        $aggregator = new TrafficAnalyticsAggregator($dimensions);
         $appRows = [];
-        $pathTotals = [];
-        $breakdownTotals = array_fill_keys($this->breakdownDimensions, []);
-        $seriesByBucket = [];
-        $attribution = null;
+        $hostTotals = [];
 
         foreach ($servers as $server) {
             try {
                 $client = $this->trafficClient($server);
 
-                // Warm every server-wide endpoint in one docker exec instead of ~15 serial
-                // SSH round-trips; the per-call methods below then read from cache.
-                $leaderboardUuids = $client->prefetchServerWide($appKey, $from, $to, $this->breakdownDimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
+                if ($resource !== null) {
+                    // One server in Sentinel's resource scope is exact; a merge across servers
+                    // or the per-key fallback (Sentinel before 1.0.2) stays approximate.
+                    $aggregator->collectResource($client, $resource->uuid(), $from, $to, $this->range, $domainForKey);
 
-                // Per-application leaderboard only makes sense when not already filtered to one app.
-                if ($appKey === null && $leaderboardUuids !== []) {
-                    if (count($leaderboardUuids) > self::MAX_LEADERBOARD_APPS) {
-                        Log::warning('Traffic analytics leaderboard truncated', [
-                            'server' => $server->uuid,
-                            'total' => count($leaderboardUuids),
-                            'shown' => self::MAX_LEADERBOARD_APPS,
-                        ]);
-                        $leaderboardUuids = array_slice($leaderboardUuids, 0, self::MAX_LEADERBOARD_APPS);
-                    }
-                    // Warm the leaderboard's per-app overviews in a second batched exec.
-                    $client->prefetchAppOverviews($leaderboardUuids, $from, $to);
+                    continue;
                 }
 
-                $overviews[] = $client->overview($appKey, $from, $to);
+                // Warm every server-wide endpoint, including the leaderboard's per-key
+                // overviews, in one dashboard fetch; the per-call methods below then read
+                // from cache.
+                $leaderboardKeys = $client->prefetchServerWide(null, $from, $to, $dimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
 
-                if ($appKey === null) {
-                    foreach ($leaderboardUuids as $uuid) {
-                        $appOverview = $client->overview($uuid, $from, $to)->toArray();
-                        $meta = $this->appMeta($uuid);
-
-                        $appRows[] = [
-                            'uuid' => $uuid,
-                            'name' => $meta['name'],
-                            'domain' => $meta['domain'],
-                            'link' => $meta['link'],
-                            'requests' => (int) ($appOverview['requests'] ?? 0),
-                            'bandwidth' => (int) ($appOverview['bytesIn'] ?? 0) + (int) ($appOverview['bytesOut'] ?? 0),
-                        ];
-                    }
+                if (count($leaderboardKeys) > self::MAX_LEADERBOARD_APPS) {
+                    Log::warning('Traffic analytics leaderboard truncated', [
+                        'server' => $server->uuid,
+                        'total' => count($leaderboardKeys),
+                        'shown' => self::MAX_LEADERBOARD_APPS,
+                    ]);
+                    $leaderboardKeys = array_slice($leaderboardKeys, 0, self::MAX_LEADERBOARD_APPS);
                 }
 
-                foreach ($client->paths($appKey, $from, $to, 50) as $path) {
-                    $data = $path->toArray();
-                    $pathStr = (string) ($data['path'] ?? '');
-                    // Prefer the per-path app from Sentinel; fall back to the active app filter
-                    // (older Sentinel omits `app`, but a filtered view still knows the app).
-                    $appId = (string) ($data['app'] ?? '');
-                    $resolveId = $appId !== '' ? $appId : ($appKey ?? '');
-                    // Key by (app, path) so the same path under two apps stays two rows, each
-                    // carrying its own domain.
-                    $key = $resolveId."\n".$pathStr;
-                    $domain = $resolveId !== '' ? ($this->appMeta($resolveId)['domain'] ?? null) : null;
+                $aggregator->collect($client, null, $from, $to, $this->range, $domainForKey);
 
-                    $pathTotals[$key] ??= ['path' => $pathStr, 'domain' => $domain, 'requests' => 0, 'bytesOut' => 0, 's4xx' => 0, 's5xx' => 0, 'p95' => 0.0];
-                    $pathTotals[$key]['requests'] += (int) ($data['requests'] ?? 0);
-                    $pathTotals[$key]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
-                    $pathTotals[$key]['s4xx'] += (int) ($data['s4xx'] ?? 0);
-                    $pathTotals[$key]['s5xx'] += (int) ($data['s5xx'] ?? 0);
-                    $pathTotals[$key]['p95'] = max($pathTotals[$key]['p95'], (float) ($data['p95'] ?? 0));
-                }
+                // Leaderboard: fold every key into its owning team resource (compose services
+                // and previews into their application or service); unknown keys stay raw.
+                foreach ($leaderboardKeys as $key) {
+                    $keyOverview = $client->overview($key, $from, $to)->toArray();
+                    $requests = (int) ($keyOverview['requests'] ?? 0);
+                    $bandwidth = (int) ($keyOverview['bytesIn'] ?? 0) + (int) ($keyOverview['bytesOut'] ?? 0);
+                    $meta = $this->appMeta($key);
 
-                foreach ($this->breakdownDimensions as $dimension) {
-                    foreach ($client->breakdown($appKey, $dimension, $from, $to, 50) as $row) {
-                        $data = $row->toArray();
-                        $value = (string) ($data['value'] ?? '');
+                    $appRows[$meta['uuid']] ??= [
+                        'uuid' => $meta['uuid'],
+                        'name' => $meta['name'],
+                        'domain' => $meta['rowDomain'],
+                        'link' => $meta['link'],
+                        'isService' => $meta['isService'],
+                        'requests' => 0,
+                        'bandwidth' => 0,
+                    ];
+                    $appRows[$meta['uuid']]['requests'] += $requests;
+                    $appRows[$meta['uuid']]['bandwidth'] += $bandwidth;
 
-                        $breakdownTotals[$dimension][$value] ??= ['value' => $value, 'requests' => 0, 'bytesOut' => 0];
-                        $breakdownTotals[$dimension][$value]['requests'] += (int) ($data['requests'] ?? 0);
-                        $breakdownTotals[$dimension][$value]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
-                    }
-                }
-
-                $attribution ??= $client->attribution();
-
-                // Per-bucket status series; summed by bucket across servers. Isolated so a
-                // series hiccup (or an older Sentinel lacking the endpoint) never discards a
-                // server's other data — an empty result simply flips the chart to the donut.
-                try {
-                    foreach ($client->series($appKey, $this->range) as $bucket) {
-                        $data = $bucket->toArray();
-                        $ts = (int) ($data['bucket'] ?? 0);
-
-                        $seriesByBucket[$ts] ??= ['bucket' => $ts, 's2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0, 'requests' => 0, 'bytesIn' => 0, 'bytesOut' => 0, 'uniqueVisitors' => 0, 'p95' => 0.0];
-                        $seriesByBucket[$ts]['s2xx'] += (int) ($data['s2xx'] ?? 0);
-                        $seriesByBucket[$ts]['s3xx'] += (int) ($data['s3xx'] ?? 0);
-                        $seriesByBucket[$ts]['s4xx'] += (int) ($data['s4xx'] ?? 0);
-                        $seriesByBucket[$ts]['s5xx'] += (int) ($data['s5xx'] ?? 0);
-                        $seriesByBucket[$ts]['requests'] += (int) ($data['requests'] ?? 0);
-                        $seriesByBucket[$ts]['bytesIn'] += (int) ($data['bytesIn'] ?? 0);
-                        $seriesByBucket[$ts]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
-                        // Uniques summed across servers (approximate); p95 takes the worst bucket.
-                        $seriesByBucket[$ts]['uniqueVisitors'] += (int) ($data['uniqueVisitors'] ?? 0);
-                        $seriesByBucket[$ts]['p95'] = max($seriesByBucket[$ts]['p95'], (float) ($data['p95'] ?? 0));
-                    }
-                } catch (\Throwable $e) {
-                    // Leave this server out of the series; donut fallback covers it.
+                    // Top hosts: fold per-key volume up to the served hostname. Keys without
+                    // a configured domain collapse into one "Unknown host" row.
+                    $host = $meta['domain'] ?? '';
+                    $hostTotals[$host] ??= ['host' => $host, 'requests' => 0, 'bandwidth' => 0];
+                    $hostTotals[$host]['requests'] += $requests;
+                    $hostTotals[$host]['bandwidth'] += $bandwidth;
                 }
             } catch (\Throwable $e) {
                 // Skip unreachable/failed servers so one bad server doesn't break the whole view.
@@ -399,7 +416,7 @@ class Analytics extends Component
             }
         }
 
-        if (empty($overviews)) {
+        if (! $aggregator->hasOverview()) {
             $this->resetData();
             // The chart lives under wire:ignore, so it only updates via this event — dispatch
             // even when cleared so a previously-populated chart flips to its no-data state
@@ -409,71 +426,32 @@ class Analytics extends Component
             return;
         }
 
-        $result = TrafficAnalyticsAggregator::sumOverviews($overviews);
+        $result = $aggregator->overview();
         $this->overview = $result['overview']->toArray();
         $this->latencyApproximate = $result['latencyApproximate'];
         $this->uniquesApproximate = $result['uniquesApproximate'];
 
-        usort($appRows, fn ($a, $b) => $b['requests'] <=> $a['requests']);
-        $this->topApps = array_slice($appRows, 0, 50);
-
-        // Top hosts: fold per-app volume up to the served hostname (an app's primary
-        // domain). Apps without a configured FQDN collapse into one "Unknown host" row.
-        $hostTotals = [];
-        foreach ($appRows as $row) {
-            $host = $row['domain'] ?? '';
-            $hostTotals[$host] ??= ['host' => $host, 'requests' => 0, 'bandwidth' => 0];
-            $hostTotals[$host]['requests'] += (int) $row['requests'];
-            $hostTotals[$host]['bandwidth'] += (int) $row['bandwidth'];
-        }
-        $hosts = array_values($hostTotals);
-        usort($hosts, fn ($a, $b) => $b['requests'] <=> $a['requests']);
-        $this->topHosts = array_slice($hosts, 0, 50);
-
-        $paths = array_values($pathTotals);
-        usort($paths, fn ($a, $b) => $b['requests'] <=> $a['requests']);
-        $this->topPaths = array_slice($paths, 0, 50);
-
-        $breakdowns = [];
-        foreach ($this->breakdownDimensions as $dimension) {
-            $rows = array_values($breakdownTotals[$dimension]);
-            usort($rows, fn ($a, $b) => $b['requests'] <=> $a['requests']);
-            if ($dimension === 'referer') {
-                $rows = groupRefererBreakdownRows($rows);
-            }
-            $breakdowns[$dimension] = array_slice($rows, 0, 50);
-        }
-        $this->breakdowns = $breakdowns;
-
-        $this->attribution = $attribution;
-
-        ksort($seriesByBucket);
-        $this->series = array_values($seriesByBucket);
-        $this->hasSeries = $this->series !== [];
+        $this->topApps = TrafficAnalyticsAggregator::topByRequests(array_values($appRows));
+        $this->topHosts = TrafficAnalyticsAggregator::topByRequests(array_values($hostTotals));
+        $this->topPaths = $aggregator->topPaths();
+        $this->breakdowns = $aggregator->breakdowns();
+        $this->attribution = $aggregator->attribution();
+        $this->series = $aggregator->series();
 
         $this->dispatch("refreshChartData-{$this->chartId}-status", $this->chartPayload());
     }
 
     /**
-     * Payload for the status chart: the stacked-area time series when available,
-     * plus the donut totals as a fallback for older Sentinel builds.
+     * Payload for the status chart: the stacked-area time series and the KPI sparklines.
      *
      * @return array<string, mixed>
      */
     protected function chartPayload(): array
     {
         $device = $this->deviceChartData();
-        $overview = $this->overview ?? [];
 
         return [
-            'hasSeries' => $this->hasSeries,
             'range' => $this->range,
-            'seriesData' => [
-                $overview['s2xx'] ?? 0,
-                $overview['s3xx'] ?? 0,
-                $overview['s4xx'] ?? 0,
-                $overview['s5xx'] ?? 0,
-            ],
             'timeSeries' => [
                 'categories' => array_column($this->series, 'bucket'),
                 'requests' => $this->requestsSpark(),
@@ -505,7 +483,6 @@ class Analytics extends Component
         $this->breakdowns = [];
         $this->attribution = null;
         $this->series = [];
-        $this->hasSeries = false;
     }
 
     public function errorRate(): float
@@ -534,39 +511,47 @@ class Analytics extends Component
     }
 
     /**
-     * Resolve an app uuid to its display name, primary domain, and analytics-page link,
-     * memoized per request. Returns the uuid as the name for apps not owned by the team
-     * so a Sentinel-reported uuid never discloses another team's application name.
+     * Resolve a Sentinel key to its owning team resource: row id (resource uuid), name,
+     * key-specific domain (compose service / preview), primary domain for the leaderboard
+     * row, and analytics link. Memoized per request. A key that no team resource owns
+     * keeps the raw key as its name and no domain or link, so a Sentinel-reported key
+     * never discloses another team's resource.
      *
-     * @return array{name: string, domain: ?string, link: ?string}
+     * @return array{uuid: string, name: string, domain: ?string, rowDomain: ?string, link: ?string, isService: bool}
      */
-    protected function appMeta(string $uuid): array
+    protected function appMeta(string $key): array
     {
-        if (isset($this->appMetaCache[$uuid])) {
-            return $this->appMetaCache[$uuid];
+        if (isset($this->appMetaCache[$key])) {
+            return $this->appMetaCache[$key];
         }
 
-        $app = Application::ownedByCurrentTeam()->with('environment.project')->whereUuid($uuid)->first();
-
-        $domain = null;
-        if ($app) {
-            $first = collect($app->fqdns)->first();
-            $domain = $first ? (parse_url($first, PHP_URL_HOST) ?: null) : null;
+        $resources = $this->teamResources();
+        $owner = null;
+        foreach (SentinelTrafficClient::candidateOwnerUuids($key) as $candidate) {
+            if (isset($resources[$candidate])) {
+                $owner = $resources[$candidate];
+                break;
+            }
         }
 
-        $link = null;
-        if ($app && data_get($app, 'environment.project.uuid')) {
-            $link = route('project.application.analytics', [
-                'project_uuid' => $app->environment->project->uuid,
-                'environment_uuid' => $app->environment->uuid,
-                'application_uuid' => $app->uuid,
-            ]);
+        if ($owner === null) {
+            return $this->appMetaCache[$key] = [
+                'uuid' => $key,
+                'name' => $key,
+                'domain' => null,
+                'rowDomain' => null,
+                'link' => null,
+                'isService' => false,
+            ];
         }
 
-        return $this->appMetaCache[$uuid] = [
-            'name' => $app?->name ?? $uuid,
-            'domain' => $domain,
-            'link' => $link,
+        return $this->appMetaCache[$key] = [
+            'uuid' => $owner->uuid(),
+            'name' => $owner->name(),
+            'domain' => $owner->domainForKey($key),
+            'rowDomain' => $owner->primaryDomain(),
+            'link' => $owner->analyticsLink(),
+            'isService' => $owner->isService(),
         ];
     }
 
@@ -575,14 +560,7 @@ class Analytics extends Component
      */
     private function window(): array
     {
-        $to = now();
-        $from = match ($this->range) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
-        };
-
-        return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+        return SentinelTrafficClient::rangeWindow($this->range);
     }
 
     public function placeholder(array $params = []): View

@@ -13,14 +13,10 @@ class CloudProviderTokens extends Component
 
     public $tokens;
 
-    public function mount()
+    public function mount(): void
     {
-        try {
-            $this->authorize('viewAny', CloudProviderToken::class);
-            $this->loadTokens();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->authorize('viewAny', CloudProviderToken::class);
+        $this->loadTokens();
     }
 
     public function getListeners()
@@ -173,6 +169,8 @@ class CloudProviderTokens extends Component
 
     public function render()
     {
-        return view('livewire.security.cloud-provider-tokens');
+        return view('livewire.security.cloud-provider-tokens', [
+            'tokens' => $this->tokens ?? collect(),
+        ]);
     }
 }

@@ -64,12 +64,17 @@ use App\Livewire\Server\CreatePage as ServerCreatePage;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\DockerCleanup;
+use App\Livewire\Server\DockerImages;
+use App\Livewire\Server\DockerRegistries as ServerDockerRegistries;
+use App\Livewire\Server\GithubRunners;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
+use App\Livewire\Server\Proxy\CertificatesShow as ProxyCertificatesShow;
 use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfigurations;
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
+use App\Livewire\Server\Registries as ServerRegistries;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
@@ -339,6 +344,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
         Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
         Route::get('/logs', Logs::class)->name('project.service.logs');
+        Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
         Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
@@ -368,6 +374,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
+    Route::get('/registries', ServerDockerRegistries::class)->name('registries.index');
     Route::get('/servers/import', ServerTransferImport::class)->name('server.transfer.import')->middleware('can:create,'.Server::class);
     Route::get('/servers/new', ServerCreatePage::class)->name('server.create')->middleware('can:create,'.Server::class);
     Route::get('/servers/new/{type}/{token_uuid}', ServerCreatePage::class)->name('server.create.token')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger']);
@@ -391,10 +398,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/transfer', ServerTransfer::class)->name('server.transfer');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
+        Route::get('/proxy/certificates', ProxyCertificatesShow::class)->name('server.proxy.certificates');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
+        Route::get('/images', DockerImages::class)->name('server.docker-images');
+        Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
+        Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
         Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
         Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
         Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');

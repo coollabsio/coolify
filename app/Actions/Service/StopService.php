@@ -30,8 +30,9 @@ class StopService
                     $activity->save();
                 });
 
-            $server = $service->destination->server;
-            if (! $server->isFunctional()) {
+            // The server is null once it is deleted (for example "Delete server" with all resources).
+            $server = $service->destination?->server;
+            if (! $server?->isFunctional()) {
                 return 'Server is not functional';
             }
 
@@ -61,12 +62,15 @@ class StopService
                 $service->deleteConnectedNetworks();
             }
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, false, false);
+                CleanupDocker::dispatchAfterStop($server);
             }
         } catch (\Exception $e) {
             return $e->getMessage();
         } finally {
-            ServiceStatusChanged::dispatch($service->environment->project->team->id);
+            $teamId = $service->environment?->project?->team?->id;
+            if ($teamId !== null) {
+                ServiceStatusChanged::dispatch($teamId);
+            }
         }
     }
 
@@ -74,7 +78,7 @@ class StopService
     {
         $timeout = count($containersToStop) > 5 ? 10 : 30;
         $commands = [];
-        $containerList = implode(' ', $containersToStop);
+        $containerList = implode(' ', array_map('escapeshellarg', $containersToStop));
         $commands[] = dockerStopCommand($timeout, $containerList, $server);
         $commands[] = "docker rm -f $containerList";
         instant_remote_process(

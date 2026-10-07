@@ -166,11 +166,20 @@ function assertGithubClockInSync(string $apiUrl): void
     }
 }
 
+function githubAppPrivateKey(GithubApp $source): ?PrivateKey
+{
+    $privateKey = $source->privateKey;
+
+    return $privateKey?->team_id === $source->team_id ? $privateKey : null;
+}
+
 function generateGithubToken(GithubApp $source, string $type)
 {
+    $privateKey = githubAppPrivateKey($source) ?? throw new RuntimeException('Private key not found for this GitHub App.');
+
     assertGithubClockInSync($source->api_url);
 
-    $signingKey = InMemory::plainText($source->privateKey->private_key);
+    $signingKey = InMemory::plainText($privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
     $now = CarbonImmutable::now()->setTimezone('UTC');
@@ -279,7 +288,7 @@ function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
             return null;
         }
 
-        $privateKey = $source->privateKey ?: PrivateKey::find($source->private_key_id);
+        $privateKey = githubAppPrivateKey($source);
 
         if (! $privateKey) {
             return null;

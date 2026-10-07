@@ -5,24 +5,28 @@
                 [
                     'name' => 'GitHub',
                     'url' => $githubManualWebhook,
+                    'key' => 'github',
                     'secret' => 'githubManualWebhookSecret',
                     'description' => 'Accepts JSON or form-urlencoded webhook payloads.',
                 ],
                 [
                     'name' => 'GitLab',
                     'url' => $gitlabManualWebhook,
+                    'key' => 'gitlab',
                     'secret' => 'gitlabManualWebhookSecret',
                     'description' => 'Use the same secret when configuring the webhook in GitLab.',
                 ],
                 [
                     'name' => 'Bitbucket',
                     'url' => $bitbucketManualWebhook,
+                    'key' => 'bitbucket',
                     'secret' => 'bitbucketManualWebhookSecret',
                     'description' => 'Use the same secret when configuring the webhook in Bitbucket.',
                 ],
                 [
                     'name' => 'Gitea',
                     'url' => $giteaManualWebhook,
+                    'key' => 'gitea',
                     'secret' => 'giteaManualWebhookSecret',
                     'description' => 'Use the same secret when configuring the webhook in Gitea.',
                 ],
@@ -72,10 +76,17 @@
                                     <div class="grid gap-4 md:grid-cols-2">
                                         <x-forms.copy-input label="Webhook URL" :text="$provider['url'] ?? ''" />
                                         @can('update', $resource)
-                                            <x-forms.input type="password" :id="$provider['secret']"
-                                                label="Webhook secret"
-                                                helper="Must exactly match the secret configured in {{ $provider['name'] }}."
-                                                autocomplete="new-password" />
+                                            <div class="flex items-end gap-2">
+                                                <x-forms.input type="password" :id="$provider['secret']"
+                                                    label="Webhook secret"
+                                                    helper="Must exactly match the secret configured in {{ $provider['name'] }}. New secrets need at least 16 characters. Leave empty to disable this webhook."
+                                                    autocomplete="new-password" copyable />
+                                                <x-forms.button type="button"
+                                                    x-on:click="$wire.generateSecret('{{ $provider['key'] }}').then((secret) => { if (typeof secret === 'string') { $wire.set('{{ $provider['secret'] }}', secret, false); } })"
+                                                    aria-label="Generate {{ $provider['name'] }} webhook secret">
+                                                    Generate
+                                                </x-forms.button>
+                                            </div>
                                         @else
                                             <x-forms.input disabled label="Webhook secret"
                                                 value="Hidden (only administrators can view)" />

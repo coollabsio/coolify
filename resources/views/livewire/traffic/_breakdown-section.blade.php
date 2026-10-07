@@ -31,6 +31,7 @@
                         : match ($dimension) {
                             'device' => deviceLabel($value),
                             'referer' => $host ?? 'Direct / none',
+                            'status' => $value === '0' ? 'No response status (0)' : ($value !== '' ? $value : 'Unknown'),
                             default => $value !== '' ? $value : 'Unknown',
                         };
                     $requests = (int) ($row['requests'] ?? 0);

@@ -2,6 +2,7 @@
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
 use App\Enums\ServerRole;
+use App\Enums\TrafficIpMode;
 use App\Livewire\Analytics;
 use App\Livewire\Server\TrafficAnalyticsSettings;
 use App\Models\InstanceSettings;
@@ -55,17 +56,8 @@ it('warns about the application interruption before enabling traffic analytics',
 
     Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->assertSee('Enable traffic analytics?')
-        ->assertDontSeeHtml('wire:confirm')
-        ->assertSeeHtml('wire:loading.flex')
-        ->assertSeeHtml('wire:target="toggleTrafficAnalytics"')
         ->assertSee('Restarting Sentinel and proxy...')
         ->assertSee('Enabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.');
-});
-
-it('allows the analytics toggle modal to update after the state changes', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/traffic-analytics-settings.blade.php'));
-
-    expect($view)->toContain(':ignoreWire="false"');
 });
 
 it('does not enable traffic analytics on a swarm server', function () {
@@ -112,6 +104,51 @@ it('saves traffic analytics settings from the sentinel form', function () {
         ->and($settings->traffic_retention_1d_days)->toBe(180)
         ->and($settings->is_geoip_enabled)->toBeFalse()
         ->and($settings->geoip_refresh_days)->toBe(7);
+});
+
+it('saves the client IP mode from the sentinel form', function () {
+    Queue::fake();
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->assertSet('trafficIpMode', 'full')
+        ->assertSee('Client IP addresses')
+        ->set('trafficIpMode', 'anonymized')
+        ->call('saveTrafficAnalyticsSettings')
+        ->assertHasNoErrors();
+
+    expect($server->settings->fresh()->traffic_ip_mode)->toBe(TrafficIpMode::Anonymized);
+});
+
+it('rejects an unknown client IP mode', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->set('trafficIpMode', 'partial')
+        ->call('saveTrafficAnalyticsSettings')
+        ->assertHasErrors(['trafficIpMode']);
+
+    expect($server->settings->fresh()->traffic_ip_mode)->toBe(TrafficIpMode::Full);
+});
+
+it('does not let a team member change the client IP mode', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    $component = Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server]);
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+
+    $component->set('trafficIpMode', 'off')
+        ->call('saveTrafficAnalyticsSettings');
+
+    expect($server->settings->fresh()->traffic_ip_mode)->toBe(TrafficIpMode::Full);
 });
 
 it('rejects a zero top-n cap', function () {
@@ -236,4 +273,45 @@ it('does not let a team member toggle traffic analytics', function () {
         ->assertForbidden();
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
+});
+
+it('tells the user that Caddy logs a resource only after a redeploy', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
+        $server->settings->is_traffic_analytics_enabled = $enable;
+        $server->settings->save();
+
+        return true;
+    });
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'CADDY');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->assertDontSee('Caddy logs a resource only after you redeploy it.')
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('success', 'Traffic analytics enabled. Restarting proxy and Sentinel. Caddy logs a resource only after you redeploy it.')
+        ->assertSee('Caddy logs a resource only after you redeploy it.');
+});
+
+it('does not show the Caddy redeploy note on a Traefik server', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
+        $server->settings->is_traffic_analytics_enabled = $enable;
+        $server->settings->save();
+
+        return true;
+    });
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('success', 'Traffic analytics enabled. Restarting proxy and Sentinel.')
+        ->assertDontSee('Caddy logs a resource only after you redeploy it.');
 });

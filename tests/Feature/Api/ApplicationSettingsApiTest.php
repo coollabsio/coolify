@@ -267,6 +267,35 @@ test('http basic auth updates preserve user-managed labels', function () {
     expect(base64_decode($this->application->fresh()->custom_labels))->toBe('sentinel-label=true');
 });
 
+test('http basic auth hash settings are saved and applied to managed labels', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => true,
+        'http_basic_auth_username' => 'api-user',
+        'http_basic_auth_password' => 'api-password',
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['http_basic_auth_bcrypt_cost' => 4])
+        ->assertOk();
+
+    expect($this->application->fresh()->parseContainerLabels())->toContain('.basicauth.users=api-user:$2y$04$');
+});
+
+test('rejects http basic auth settings that are not supported', function (string $field, mixed $value) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [$field => $value])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors($field);
+})->with([
+    'Argon2id on a proxy without it' => ['http_basic_auth_hash_algorithm', 'argon2id'],
+    'unknown algorithm' => ['http_basic_auth_hash_algorithm', 'md5'],
+    'bcrypt cost above 14' => ['http_basic_auth_bcrypt_cost', 15],
+    'Argon2id memory above 256 MiB' => ['http_basic_auth_argon2id_memory_cost', 262145],
+    'Argon2id iterations above 12' => ['http_basic_auth_argon2id_time_cost', 13],
+    'password longer than 72 characters' => ['http_basic_auth_password', str_repeat('a', 73)],
+]);
+
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -351,6 +380,7 @@ test('PATCH /api/v1/applications/{uuid} accepts Docker-compatible custom interna
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
             'custom_internal_name' => $name,
+            'is_consistent_container_name_enabled' => true,
         ])
         ->assertOk();
 
@@ -544,6 +574,35 @@ test('PATCH /api/v1/applications/{uuid} rejects a container name prefix that is 
 
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'shared-prefix'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});
+
+test('application creation rejects a non-string container name prefix with 422', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/prefix-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'custom_container_name_prefix' => ['nested' => 'value'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect(Application::query()->where('git_repository', 'like', '%prefix-test%')->exists())->toBeFalse();
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a non-string container name prefix with 422', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => ['a', 'b']])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('custom_container_name_prefix');
 

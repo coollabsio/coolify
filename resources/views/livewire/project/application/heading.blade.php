@@ -1,29 +1,4 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
-    @php
-        $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
-        // Settings covers all configuration sub-pages (General, Webhooks, Domains, …),
-        // not only project.application.configuration. Primary tabs that are NOT settings:
-        // backups, console, deployment logs, runtime logs.
-        $isSettingsRoute = $routeIs('project.application.*')
-            && ! $routeIs([
-                'project.application.backup.*',
-                'project.application.command',
-                'project.application.deployment.*',
-                'project.application.logs',
-            ]);
-        $applicationMenuItems = [
-            [
-                'label' => 'Settings',
-                'route' => 'project.application.configuration',
-                'active' => $isSettingsRoute,
-            ],
-        ];
-
-        $applicationMenuItems = array_values(array_filter(
-            $applicationMenuItems,
-            fn (array $item): bool => $item['visible'] ?? true,
-        ));
-    @endphp
     <div>
         <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-col items-start gap-2">
@@ -31,7 +6,8 @@
                     {{ $application->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$application->status" align="right" />
+                    <x-status-summary :status="$application->status" align="right"
+                        :healthcheck-url="route('project.application.healthcheck', $parameters)" />
                     <x-applications.links :application="$application" compact />
                     @if ($this->runningDeploymentUrl)
                         <x-deploying-indicator :href="$this->runningDeploymentUrl" />

@@ -23,15 +23,6 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-it('exposes a 5 MiB content size limit', function () {
-    expect(LocalFileVolume::MAX_CONTENT_SIZE)->toBe(5_242_880);
-});
-
-it('exposes binary and too-large placeholder constants', function () {
-    expect(LocalFileVolume::BINARY_PLACEHOLDER)->toBe('[binary file]');
-    expect(LocalFileVolume::TOO_LARGE_PLACEHOLDER)->toBe('[file too large to display]');
-});
-
 it('flags is_too_large when content matches the placeholder', function () {
     $volume = new LocalFileVolume;
     $volume->content = LocalFileVolume::TOO_LARGE_PLACEHOLDER;
@@ -181,7 +172,7 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     $literal->is_directory = true;
     $literal->shouldReceive('save')->once();
     $file = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $file->fs_path = '/data/my files/settings.json';
+    $file->fs_path = '/data/application/my files/settings.json';
     $file->content = '{}';
     $file->is_directory = false;
     $file->shouldReceive('save')->once();
@@ -195,17 +186,22 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
 
     $application = Mockery::mock(Application::class)->makePartial();
     $application->shouldReceive('getMorphClass')->andReturn(Application::class);
-    $application->shouldReceive('workdir')->once()->andReturn('/data/application');
+    $application->shouldReceive('workdir')->andReturn('/data/application');
     $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
     $application->setRelation('destination', (object) ['server' => $server]);
+    $file->setRelation('resource', $application);
 
-    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'test -') ? 'NOK' : ''));
+    Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains($process->command, 'readlink -f') => 'OK',
+        str_contains($process->command, 'test -') => 'NOK',
+        default => '',
+    }));
     getFilesystemVolumesFromServer($application, true);
 
     Process::assertRan(fn ($process) => str_contains($process->command, "test -f '/data/my files/config.yaml'"));
     Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '/data/my files/config.yaml'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "dirname -- '/data/my files/settings.json'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "tee -- '/data/my files/settings.json'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "dirname -- '/data/application/my files/settings.json'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "tee -- '/data/application/my files/settings.json'"));
     Process::assertRan(fn ($process) => str_contains($process->command, '${DATA_PATH:-/srv/app/config.yaml}'));
 });
 

@@ -14,6 +14,8 @@ beforeEach(function () {
     copy(base_path('scripts/dev'), $main.'/scripts/dev');
     chmod($main.'/scripts/dev', 0755);
     copy(base_path('docker-compose.dev-multi.yml'), $main.'/docker-compose.dev-multi.yml');
+    mkdir($main.'/config');
+    copy(base_path('config/development-qemu.php'), $main.'/config/development-qemu.php');
     file_put_contents($main.'/.gitignore', ".env\n.dev-instances/\n");
 
     $git = Process::fromShellCommandline(implode(' && ', [
@@ -45,6 +47,23 @@ BASH;
         file_put_contents($this->devRoot.'/bin/'.$binary, $fake);
         chmod($this->devRoot.'/bin/'.$binary, 0755);
     }
+
+    $this->limaConfig = $this->devRoot.'/lima.yaml';
+    $this->fakeLima = function (): void {
+        file_put_contents($this->devRoot.'/bin/limactl', <<<'BASH'
+#!/usr/bin/env bash
+printf 'limactl %s\n' "$*" >> "$DEV_TEST_LOG"
+case "$*" in
+  create*) cat > "$DEV_TEST_LIMA_CONFIG" ;;
+  *SSHLocalPort*) echo 53022 ;;
+  *'{{.Name}} {{.Status}}'*) printf '%s\n' 'coolify-dev-2-debian-root Running' 'coolify-dev-2-ubuntu-root Stopped' 'coolify-dev-21-debian-root Running' 'other Running' ;;
+esac
+exit 0
+BASH);
+        file_put_contents($this->devRoot.'/bin/uname', "#!/usr/bin/env bash\necho Darwin\n");
+        chmod($this->devRoot.'/bin/limactl', 0755);
+        chmod($this->devRoot.'/bin/uname', 0755);
+    };
 });
 
 afterEach(function () {
@@ -58,6 +77,7 @@ function runDevScript(string $directory, array $arguments, array $env = []): Pro
         'DEV_TEST_LOG' => test()->devLog,
         'DEVELOPMENT_QEMU_STORAGE_PATH' => test()->qemuStorage,
         'COOLIFY_DEV_SERVER_BACKEND' => 'testing-host',
+        'DEV_TEST_LIMA_CONFIG' => test()->limaConfig,
         ...$env,
     ]);
     $process->run();
@@ -247,6 +267,61 @@ BASH);
 
     expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
         ->and(devScriptLog())->toContain('php artisan dev:qemu ubuntu-root --as-localhost ENV=local CACHE=');
+});
+
+it('starts a lima vm as localhost on macos and seeds its forwarded ssh port', function () {
+    ($this->fakeLima)();
+    runDevScript('main', ['start']);
+    file_put_contents($this->devLog, '');
+
+    $process = runDevScript('wt', ['start', 'debian-non-root'], ['COOLIFY_DEV_SERVER_BACKEND' => 'auto']);
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(devScriptLog())
+        ->toContain('limactl create --tty=false --name=coolify-dev-2-debian-non-root -')
+        ->toContain('limactl start --tty=false coolify-dev-2-debian-non-root')
+        ->toContain('exec -T coolify php artisan dev:qemu:seed debian-non-root --as-localhost --ip=host.docker.internal --port=53022')
+        ->not->toContain('--profile testing-host up')
+        ->not->toContain('dev:qemu debian-non-root')
+        ->and(file_get_contents($this->limaConfig))
+        ->toContain('base: template:_images/debian-12')
+        ->toContain('mounts: []')
+        ->toContain("user='coolify'")
+        ->toContain(config('development-qemu.public_key'))
+        ->toContain('"$user ALL=(ALL) NOPASSWD:ALL"');
+});
+
+it('rejects an unknown lima profile before it creates a vm', function () {
+    ($this->fakeLima)();
+
+    $process = runDevScript('wt', ['start', 'arch-root'], ['COOLIFY_DEV_SERVER_BACKEND' => 'lima']);
+
+    expect($process->isSuccessful())->toBeFalse()
+        ->and($process->getErrorOutput())->toContain("Unknown profile 'arch-root'")
+        ->and(devScriptLog())->not->toContain('limactl create');
+});
+
+it('stops and destroys only the lima vms of the instance slot', function () {
+    ($this->fakeLima)();
+    runDevScript('main', ['start']);
+    runDevScript('wt', ['start']);
+    file_put_contents($this->devLog, '');
+
+    $stop = runDevScript('wt', ['stop'], ['COOLIFY_DEV_SERVER_BACKEND' => 'lima']);
+    $stopLog = devScriptLog();
+    $destroy = runDevScript('main', ['destroy', 'fix-some_thing']);
+
+    expect($stop->isSuccessful())->toBeTrue($stop->getErrorOutput())
+        ->and($destroy->isSuccessful())->toBeTrue($destroy->getErrorOutput())
+        ->and($stopLog)
+        ->toContain('limactl stop coolify-dev-2-debian-root')
+        ->not->toContain('limactl stop coolify-dev-2-ubuntu-root')
+        ->not->toContain('limactl stop coolify-dev-21-debian-root')
+        ->and(devScriptLog())
+        ->toContain('limactl delete --force coolify-dev-2-debian-root')
+        ->toContain('limactl delete --force coolify-dev-2-ubuntu-root')
+        ->not->toContain('delete --force coolify-dev-21-debian-root')
+        ->not->toContain('delete --force other');
 });
 
 it('keeps fresh worktree instances writable and stable during the first composer install', function () {

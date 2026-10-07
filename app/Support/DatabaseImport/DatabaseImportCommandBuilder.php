@@ -22,16 +22,53 @@ is_tar() { [ "$(stream | head -c 262 | tail -c 5)" = ustar ]; }
 is_text() { [ "$(stream | head -c 65536 | tr -d '\000' | wc -c | tr -d ' ')" = "$(stream | head -c 65536 | wc -c | tr -d ' ')" ]; }
 extract_tar() { work=$(mktemp -d) && trap 'rm -rf "$work"' EXIT && stream | tar -xf - -C "$work" || fail 'The tar backup cannot be extracted.'; }
 use_single_tar_member() { [ "$(find "$work" -type f | wc -l | tr -d ' ')" = 1 ] && backup=$(find "$work" -type f); }
+if is_gzip; then
+  gunzip -t "$backup" || fail 'The gzip backup is corrupt or incomplete. Nothing was changed.'
+fi
 
 SH;
 
-    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false): string
+    /**
+     * Streams an all-databases MySQL or MariaDB dump without its system databases. The mysql
+     * database holds the users and their passwords (user and global_priv), so restoring it
+     * would give the target the source passwords after its next restart. Everything from a
+     * switch to a system database (`-- Current Database:` or USE) up to the next switch to
+     * another database is dropped, as are the CREATE DATABASE statements of system databases.
+     */
+    private const MYSQL_SYSTEM_DATABASE_FILTER = <<<'AWK'
+function database(line) {
+  if (index(line, "`") > 0) { sub(/^[^`]*`/, "", line); sub(/`.*$/, "", line); return tolower(line) }
+  gsub(/\/\*[^*]*\*\//, " ", line)
+  line = tolower(line)
+  sub(/^[ \t]*(use|create[ \t]+(database|schema))[ \t]+/, "", line)
+  sub(/^if[ \t]+not[ \t]+exists[ \t]+/, "", line)
+  sub(/[ \t;].*$/, "", line)
+  return line
+}
+function is_system(name) { return name == "mysql" || name == "sys" || name == "performance_schema" || name == "information_schema" }
+/^-- Current Database: `/ { skip = is_system(database($0)) }
+tolower($0) ~ /^[ \t]*use[ \t]/ { skip = is_system(database($0)) }
+tolower($0) ~ /^[ \t]*create[ \t]+(database|schema)[ \t]/ { if (is_system(database($0))) { next } skip = 0 }
+/^\/\*!40103 SET TIME_ZONE=@OLD_TIME_ZONE/ { skip = 0 }
+!skip { print }
+AWK;
+
+    /**
+     * @param  bool  $keepOwners  PostgreSQL archives: restore object owners and privileges. Off by default,
+     *                            because roles from another host (for example RDS) usually do not exist here.
+     * @param  string|null  $sqliteDatabase  SQLite: the database file to restore into, validated by the resource.
+     * @param  bool  $restoreMysqlUsers  MySQL and MariaDB all-databases backups: also restore the system databases
+     *                                   (users, passwords and privileges). Off by default, because the source
+     *                                   passwords would replace the ones Coolify stores for this database.
+     */
+    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false, bool $keepOwners = false, ?string $sqliteDatabase = null, bool $restoreMysqlUsers = false): string
     {
         $script = match ($this->databaseType($resource)) {
-            'postgresql' => $dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting),
-            'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll),
-            'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll),
+            'postgresql' => $dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting, $keepOwners),
+            'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll, $restoreMysqlUsers),
+            'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll, $restoreMysqlUsers),
             'mongodb' => $this->mongodb($replaceExisting),
+            'sqlite' => $this->sqlite($resource->databaseFilePath($sqliteDatabase)),
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
         };
 
@@ -120,7 +157,7 @@ SH;
 
     public function supports(object $resource): bool
     {
-        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb'], true);
+        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb', 'sqlite'], true);
     }
 
     public function databaseType(object $resource): string
@@ -135,6 +172,7 @@ SH;
             str_contains($type, 'mariadb') => 'mariadb',
             str_contains($type, 'mysql') => 'mysql',
             str_contains($type, 'mongo') => 'mongodb',
+            str_contains($type, 'sqlite') => 'sqlite',
             default => 'unsupported',
         };
     }
@@ -143,24 +181,28 @@ SH;
      * pg_dump custom and tar archives are restored with pg_restore, SQL dumps with psql.
      * pg_restore cannot read gzip files, so both clients receive the backup on stdin.
      * SQL cannot replace single objects, so replacing recreates the target database.
+     * Archives skip owners and privileges unless they are kept, because a single missing
+     * role would roll back the whole single-transaction restore.
      */
-    private function postgresqlSingle(bool $replaceExisting): string
+    private function postgresqlSingle(bool $replaceExisting, bool $keepOwners): string
     {
         // Every restore runs in one transaction, so a failure part-way rolls back and leaves the
         // current data as it was, also when --clean dropped objects first.
+        $owners = $keepOwners ? '' : ' --no-owner --no-acl';
         $clean = $replaceExisting ? ' --clean --if-exists' : '';
-        $sqlRestore = $replaceExisting ? <<<'SH'
+        $suffix = bin2hex(random_bytes(16));
+        $sqlRestore = $replaceExisting ? "\n  new=coolify_restore_new_{$suffix}\n  old=coolify_restore_old_{$suffix}\n".<<<'SH'
 
   echo 'SQL backups cannot replace single objects. The backup is restored into a new database first; the current database is replaced only when that restore succeeds.'
-  new=coolify_restore_new
-  old=coolify_restore_old
-  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new" || exit 1
+  if ! existing=$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname IN (:'new', :'old');" | psql -v ON_ERROR_STOP=1 -At -v new="$new" -v old="$old" -U $POSTGRES_USER -d template1); then
+    fail 'The temporary database names could not be checked. Nothing was changed.'
+  fi
+  [ -z "$existing" ] || fail 'A temporary database name is already in use. Nothing was changed.'
   createdb -U $POSTGRES_USER "$new" || exit 1
   if ! stream | psql -v ON_ERROR_STOP=1 --single-transaction -U $POSTGRES_USER -d "$new"; then
     PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new"
     fail 'The SQL restore failed. The current database was not changed.'
   fi
-  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$old" || exit 1
   if ! printf '%s\n' "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'db' AND pid <> pg_backend_pid();" 'ALTER DATABASE :"db" RENAME TO :"old";' 'ALTER DATABASE :"new" RENAME TO :"db";' | psql -v ON_ERROR_STOP=1 -v db="$db" -v old="$old" -v new="$new" -U $POSTGRES_USER -d template1 >/dev/null; then
     # Undo a half-done swap: the current database keeps its name and data.
     printf '%s\n' 'ALTER DATABASE :"old" RENAME TO :"db";' | psql -v db="$db" -v old="$old" -U $POSTGRES_USER -d template1 >/dev/null 2>&1
@@ -176,7 +218,7 @@ SH;
         return <<<SH
 db=\${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}
 if [ "\$(stream | head -c 5)" = PGDMP ] || is_tar; then
-  stream | pg_restore --exit-on-error --single-transaction{$clean} -U \$POSTGRES_USER -d "\$db"
+  stream | pg_restore --exit-on-error --single-transaction{$owners}{$clean} -U \$POSTGRES_USER -d "\$db"
 elif ! is_text; then
   fail 'Unsupported PostgreSQL backup format. Use a pg_dump archive (custom or tar format) or an SQL file.'
 elif stream | head -c 4096 | grep -q 'PostgreSQL database cluster dump'; then
@@ -215,9 +257,10 @@ SH;
 
     /**
      * MySQL and MariaDB restore SQL dumps. A tar backup must wrap exactly one dump.
-     * The all-databases mode checks the backup before it drops any database.
+     * The all-databases mode checks the backup before it drops any database and skips
+     * the system databases unless their users and privileges are restored as well.
      */
-    private function mysql(string $binary, string $prefix, bool $dumpAll): string
+    private function mysql(string $binary, string $prefix, bool $dumpAll, bool $restoreMysqlUsers = false): string
     {
         $preflight = <<<'SH'
 if is_tar; then
@@ -240,11 +283,20 @@ SH;
         $root = "{$binary} -u root -p\${{$prefix}_ROOT_PASSWORD}";
         $database = "\${{$prefix}_DATABASE:-default}";
 
+        if ($restoreMysqlUsers) {
+            $source = 'stream';
+        } else {
+            // Without pipefail a failing filter would feed an empty restore, so it ends the
+            // input with an invalid statement and the client fails instead.
+            $preflight .= "command -v awk >/dev/null 2>&1 || fail 'awk is required to skip the system databases of the backup. Nothing was changed.'\n";
+            $source = '{ stream | awk '.escapeshellarg(self::MYSQL_SYSTEM_DATABASE_FILTER)." || echo 'Coolify could not filter the system databases of the backup;'; }";
+        }
+
         return $preflight.<<<SH
 for pid in \$({$root} -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do {$root} -e "KILL \$pid" 2>/dev/null || true; done
 {$root} -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \\`',schema_name,'\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | {$root} || exit 1
 {$root} -e "CREATE DATABASE IF NOT EXISTS \\`{$database}\\`;" || exit 1
-stream | {$root} {$database}
+{$source} | {$root} {$database}
 SH;
     }
 
@@ -270,6 +322,22 @@ if is_tar; then
 fi
 [ "\$(header 4)" = 6de29981 ] || fail 'Unsupported MongoDB backup format. Use a mongodump archive or a dump directory packed as tar. Single .bson files are not supported. Nothing was changed.'
 if is_gzip; then restore --gzip --archive="\$backup"; else restore --archive="\$backup"; fi
+SH;
+    }
+
+    /**
+     * SQLite restores a plain or gzip-compressed database file into the selected database
+     * file with .restore, which replaces its contents. SQLite reads an empty file (for
+     * example from a failed dump) as an empty database, so only real database files are restored.
+     */
+    private function sqlite(string $file): string
+    {
+        $file = escapeshellarg($file);
+
+        return <<<SH
+stream > "\$backup.db" || fail 'The backup cannot be read. Nothing was changed.'
+[ "\$(head -c 15 "\$backup.db")" = 'SQLite format 3' ] || { rm -f "\$backup.db"; fail 'The backup is not a SQLite database. Nothing was changed.'; }
+sqlite3 -bail {$file} '.timeout 10000' ".restore \$backup.db"; status=\$?; rm -f "\$backup.db"; exit \$status
 SH;
     }
 }

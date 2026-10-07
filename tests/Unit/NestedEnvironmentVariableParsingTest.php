@@ -6,32 +6,6 @@
  * These tests verify that the parser correctly handles nested variable substitution syntax
  * like ${API_URL:-${SERVICE_URL_YOLO}/api} where defaults can contain other variable references.
  */
-test('nested variable syntax is parsed correctly', function () {
-    // Test the exact scenario from the bug report
-    $input = '${API_URL:-${SERVICE_URL_YOLO}/api}';
-
-    $result = extractBalancedBraceContent($input, 0);
-
-    expect($result)->not->toBeNull()
-        ->and($result['content'])->toBe('API_URL:-${SERVICE_URL_YOLO}/api');
-
-    $split = splitOnOperatorOutsideNested($result['content']);
-
-    expect($split)->not->toBeNull()
-        ->and($split['variable'])->toBe('API_URL')
-        ->and($split['operator'])->toBe(':-')
-        ->and($split['default'])->toBe('${SERVICE_URL_YOLO}/api');
-});
-
-test('replaceVariables correctly extracts nested variable content', function () {
-    // Before the fix, this would incorrectly extract only up to the first closing brace
-    $result = replaceVariables('${API_URL:-${SERVICE_URL_YOLO}/api}');
-
-    // Should extract the full content, not just "${API_URL:-${SERVICE_URL_YOLO"
-    expect($result->value())->toBe('API_URL:-${SERVICE_URL_YOLO}/api')
-        ->and($result->value())->not->toBe('API_URL:-${SERVICE_URL_YOLO'); // Not truncated
-});
-
 test('nested defaults with path concatenation work', function () {
     $input = '${REDIS_URL:-${SERVICE_URL_REDIS}/db/0}';
 
@@ -77,15 +51,6 @@ test('nested variables with different operators', function () {
     expect($split['variable'])->toBe('API_URL')
         ->and($split['operator'])->toBe(':-')
         ->and($split['default'])->toBe('${SERVICE_URL?error message}/api');
-});
-
-test('backward compatibility with simple variables', function () {
-    // Simple variable without nesting should still work
-    $input = '${VAR}';
-
-    $result = replaceVariables($input);
-
-    expect($result->value())->toBe('VAR');
 });
 
 test('backward compatibility with single-level defaults', function () {

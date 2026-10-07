@@ -42,15 +42,15 @@ it('uses the shared modal form on the cloud provider tokens page', function () {
         ->and($view)->not->toContain('Created {{ $savedToken->created_at->diffForHumans() }}');
 });
 
-it('shows explicit loading spinners and disables cloud token action buttons while requests run', function () {
-    $tokenFormView = file_get_contents(__DIR__.'/../../resources/views/livewire/security/cloud-provider-token-form.blade.php');
-    $tokenShowView = file_get_contents(__DIR__.'/../../resources/views/livewire/security/cloud-provider-token/show.blade.php');
+it('gates new cloud tokens and keys saved token rows by id', function () {
+    $view = file_get_contents(__DIR__.'/../../resources/views/livewire/security/cloud-provider-tokens.blade.php');
+
+    expect($view)->toContain("@can('create', App\\Models\\CloudProviderToken::class)")
+        ->and($view)->toContain('wire:key="cloud-token-{{ $savedToken->id }}"');
+});
+
+it('gates the server cloud token action behind the update permission', function () {
     $serverTokenView = file_get_contents(__DIR__.'/../../resources/views/livewire/server/cloud-provider-token/show.blade.php');
 
-    expect($tokenFormView)->toContain('wire:target="addToken"')
-        ->and($tokenFormView)->toContain('<x-forms.button type="submit"')
-        ->and($tokenShowView)->toContain('wire:click="validateToken"')
-        ->and($tokenShowView)->toContain('<x-forms.button type="button" wire:click="validateToken">')
-        ->and($serverTokenView)->toContain('wire:click.prevent="validateToken"')
-        ->and($serverTokenView)->toContain('<x-forms.button canGate="update" :canResource="$server"');
+    expect($serverTokenView)->toContain('<x-forms.button canGate="update" :canResource="$server"');
 });

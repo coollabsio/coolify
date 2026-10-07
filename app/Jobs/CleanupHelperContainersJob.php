@@ -17,7 +17,20 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Release the per-server lock after an hour if a worker dies before finishing.
+     */
+    public int $uniqueFor = 3600;
+
     public function __construct(public Server $server) {}
+
+    /**
+     * Keep the lock per server; a class-wide lock queued only one server per cleanup run.
+     */
+    public function uniqueId(): string
+    {
+        return $this->server->uuid;
+    }
 
     private static function helperContainersCommand(): string
     {

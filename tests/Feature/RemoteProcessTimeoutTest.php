@@ -101,3 +101,40 @@ it('uses the configured default timeout in instant_remote_process when no timeou
 
     Process::assertRan(fn ($process) => str_starts_with($process->command, 'timeout 1234 ssh '));
 });
+
+it('does not replay a command batch when a remote command fails with connection text in its output', function () {
+    config([
+        'constants.ssh.mux_enabled' => false,
+        'constants.ssh.max_retries' => 3,
+        'constants.ssh.retry_base_delay' => 0,
+    ]);
+    $server = makeTimeoutTestServer();
+
+    Process::fake([
+        '*' => Process::result(errorOutput: 'mc: <ERROR> Unable to initialize new alias. dial tcp 10.0.0.5:9000: connect: connection refused', exitCode: 1),
+    ]);
+
+    expect(fn () => instant_remote_process(['docker run -d --name backup-of-x minio/mc', 'docker exec backup-of-x mc alias set temporary http://s3 k s'], $server, disableMultiplexing: true))
+        ->toThrow(RuntimeException::class, 'connection refused');
+
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh '), 1);
+});
+
+it('retries a command batch when the ssh connection itself fails', function () {
+    config([
+        'constants.ssh.mux_enabled' => false,
+        'constants.ssh.max_retries' => 3,
+        'constants.ssh.retry_base_delay' => 0,
+    ]);
+    $server = makeTimeoutTestServer();
+
+    Process::fake([
+        '*' => Process::sequence()
+            ->push(Process::result(errorOutput: 'kex_exchange_identification: read: Connection reset by peer', exitCode: 255))
+            ->push(Process::result(output: 'ok')),
+    ]);
+
+    expect(instant_remote_process(['echo ok'], $server, disableMultiplexing: true))->toBe('ok');
+
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh '), 2);
+});

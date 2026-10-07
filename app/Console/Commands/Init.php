@@ -110,10 +110,10 @@ class Init extends Command
             $interruptedStartCount = ResourceStartActivity::failInterrupted();
 
             if ($interruptedStartCount > 0) {
-                echo "Marked {$interruptedStartCount} interrupted database/service starts as failed\n";
+                echo "Marked {$interruptedStartCount} interrupted database/service starts and database imports as failed\n";
             }
         } catch (\Throwable $e) {
-            echo "Could not cleanup interrupted database/service starts: {$e->getMessage()}\n";
+            echo "Could not cleanup interrupted database/service starts and database imports: {$e->getMessage()}\n";
         }
 
         try {
@@ -257,10 +257,8 @@ class Init extends Command
                 $database = StandalonePostgresql::withTrashed()->find(0);
                 if ($database && $database->trashed()) {
                     $database->restore();
-                    $scheduledBackup = ScheduledDatabaseBackup::find(0);
-                    if (! $scheduledBackup) {
+                    if (! $database->scheduledBackups()->exists()) {
                         ScheduledDatabaseBackup::create([
-                            'id' => 0,
                             'enabled' => true,
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',

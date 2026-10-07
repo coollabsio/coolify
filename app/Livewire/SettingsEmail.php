@@ -92,7 +92,7 @@ class SettingsEmail extends Component
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
-            $this->settings->save();
+            $this->saveAndAudit();
         } else {
             $this->smtpEnabled = $this->settings->smtp_enabled;
             $this->smtpHost = $this->settings->smtp_host;
@@ -137,7 +137,7 @@ class SettingsEmail extends Component
                 $this->submitResend();
                 $this->smtpEnabled = $this->settings->smtp_enabled = false;
             }
-            $this->settings->save();
+            $this->saveAndAudit();
 
         } catch (\Throwable $e) {
             if ($type === 'SMTP') {
@@ -163,6 +163,7 @@ class SettingsEmail extends Component
     public function toggleSmtp()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->resetErrorBag();
 
             if ($this->smtpEnabled) {
@@ -185,6 +186,7 @@ class SettingsEmail extends Component
     public function toggleResend()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->resetErrorBag();
 
             if ($this->resendEnabled) {
@@ -225,7 +227,7 @@ class SettingsEmail extends Component
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
 
-            $this->settings->save();
+            $this->saveAndAudit();
 
             $this->dispatch('success', 'SMTP settings updated.');
         } catch (\Throwable $e) {
@@ -250,7 +252,7 @@ class SettingsEmail extends Component
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
 
-            $this->settings->save();
+            $this->saveAndAudit();
 
             $this->dispatch('success', 'Resend settings updated.');
         } catch (\Throwable $e) {
@@ -258,6 +260,26 @@ class SettingsEmail extends Component
 
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Save the instance email settings and record the changed field names (never their values).
+     */
+    private function saveAndAudit(): void
+    {
+        $changedFields = auditChangedFields($this->settings);
+        $this->settings->save();
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.settings.email.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'section' => 'email',
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     private function validateSmtpSettings(): void
@@ -317,7 +339,7 @@ class SettingsEmail extends Component
 
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
-            $this->settings->save();
+            $this->saveAndAudit();
 
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,

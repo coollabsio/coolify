@@ -2,7 +2,7 @@
     <form wire:submit.prevent="saveTrafficAnalyticsSettings" class="contents">
         @if ($isTrafficAnalyticsEnabled)
             <x-unsaved-bar action="saveTrafficAnalyticsSettings"
-                targets="trafficTopn,trafficSampleThreshold,trafficRetention1hDays,trafficRetention1dDays,isGeoipEnabled,geoipRefreshDays,geoipMaxmindLicenseKey" />
+                targets="trafficTopn,trafficSampleThreshold,trafficRetention1hDays,trafficRetention1dDays,isGeoipEnabled,geoipRefreshDays,geoipMaxmindLicenseKey,trafficIpMode" />
         @endif
 
         <x-application.settings-section id="server-traffic-analytics-settings-section" title="Traffic analytics"
@@ -26,7 +26,14 @@
                 @endif
             </x-slot:actions>
 
+            @if ($outdatedCaddyImage)
+                <x-server.caddy-image-outdated-callout :image="$outdatedCaddyImage" />
+            @endif
+
             @if ($isTrafficAnalyticsEnabled)
+                @if ($caddyRedeployNote)
+                    <x-callout type="info" title="Redeploy to start logging">{{ $caddyRedeployNote }}</x-callout>
+                @endif
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="trafficTopn" label="Top-N cap" required
@@ -47,6 +54,14 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]"
                         helper="Country enrichment from visitor IPs. Disable to skip GeoIP lookups." />
+                    <x-forms.listbox canGate="update" :canResource="$server"
+                        id="trafficIpMode" label="Client IP addresses"
+                        :options="[
+                            ['value' => 'full', 'label' => 'Full'],
+                            ['value' => 'anonymized', 'label' => 'Anonymized (/24 IPv4, /48 IPv6)'],
+                            ['value' => 'off', 'label' => 'Disabled'],
+                        ]"
+                        helper="How Sentinel stores visitor IPs for the Top IPs list. Anonymized keeps only the network. Disabled does not store IPs. When you change this setting, Sentinel deletes the stored IPs that the new setting does not allow." />
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="geoipRefreshDays" label="GeoIP refresh interval" required
                         helper="Days between GeoIP database update checks." />

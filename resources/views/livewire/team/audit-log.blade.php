@@ -44,8 +44,9 @@
                             <span class="text-right">Time</span>
                         </div>
                         @foreach ($events as $event)
-                            <div wire:key="audit-event-{{ $event->id }}"
-                                class="grid min-w-[760px] grid-cols-[14rem_minmax(0,1fr)_12rem_9rem] gap-4 border-b border-neutral-200 px-4 py-3 last:border-b-0 dark:border-white/[0.07]">
+                            <div wire:key="audit-event-{{ $event->id }}" x-data="{ expanded: false }"
+                                class="min-w-[760px] border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
+                            <div class="grid grid-cols-[14rem_minmax(0,1fr)_12rem_9rem] gap-4 px-4 py-3">
                                 <div class="min-w-0">
                                     <div class="truncate text-[12px] font-medium text-black dark:text-fg">
                                         {{ $event->actor_name ?: Str::headline($event->actor_type) }}
@@ -69,6 +70,13 @@
                                     <div class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $event->event }}
                                     </div>
+                                    @if (filled($event->changes))
+                                        <button type="button" @click="expanded = ! expanded"
+                                            class="mt-1 text-[11px] font-medium text-accent hover:underline"
+                                            :aria-expanded="expanded">
+                                            <span x-text="expanded ? 'Hide changes' : 'View changes'">View changes</span>
+                                        </button>
+                                    @endif
                                 </div>
                                 <div class="flex items-center gap-2 text-[12px] text-neutral-500 dark:text-fg-dim">
                                     <span class="rounded-md bg-neutral-100 px-2 py-1 dark:bg-white/[0.06]">
@@ -81,6 +89,24 @@
                                     class="self-center text-right text-[11px] text-neutral-500 dark:text-fg-faint">
                                     {{ $event->created_at->diffForHumans() }}
                                 </time>
+                            </div>
+                            @if (filled($event->changes))
+                                <div x-cloak x-show="expanded" x-collapse
+                                    class="border-t border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/[0.07] dark:bg-white/[0.02]">
+                                    <div class="grid grid-cols-[12rem_minmax(0,1fr)_minmax(0,1fr)] gap-4 pb-2 text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:text-fg-faint">
+                                        <span>Field</span>
+                                        <span>Previous value</span>
+                                        <span>New value</span>
+                                    </div>
+                                    @foreach ($event->changes as $field => $change)
+                                        <div class="grid grid-cols-[12rem_minmax(0,1fr)_minmax(0,1fr)] gap-4 border-t border-neutral-200 py-2 text-[12px] dark:border-white/[0.07]">
+                                            <span class="font-medium text-black dark:text-fg">{{ Str::headline($field) }}</span>
+                                            <span class="break-words whitespace-pre-wrap text-neutral-600 dark:text-fg-dim">{{ is_array($change['old']) ? json_encode($change['old'], JSON_UNESCAPED_SLASHES) : (is_bool($change['old']) ? ($change['old'] ? 'True' : 'False') : ($change['old'] ?? 'None')) }}</span>
+                                            <span class="break-words whitespace-pre-wrap text-neutral-600 dark:text-fg-dim">{{ is_array($change['new']) ? json_encode($change['new'], JSON_UNESCAPED_SLASHES) : (is_bool($change['new']) ? ($change['new'] ? 'True' : 'False') : ($change['new'] ?? 'None')) }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                             </div>
                         @endforeach
                     </div>
