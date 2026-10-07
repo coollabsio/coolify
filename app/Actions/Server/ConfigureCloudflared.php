@@ -11,6 +11,8 @@ class ConfigureCloudflared
 {
     use AsAction;
 
+    public const DIRECTORY = '/data/coolify/cloudflared';
+
     public function handle(Server $server, string $cloudflare_token, string $ssh_domain): Activity
     {
         try {
@@ -31,6 +33,7 @@ class ConfigureCloudflared
                             'interval' => '5s',
                             'timeout' => '30s',
                             'retries' => 5,
+                            'start_period' => '120s',
                         ],
                     ],
                 ],
@@ -38,15 +41,15 @@ class ConfigureCloudflared
             $config = Yaml::dump($config, 12, 2);
             $docker_compose_yml_base64 = base64_encode($config);
             $commands = collect([
-                'mkdir -p /tmp/cloudflared',
-                'cd /tmp/cloudflared',
+                'mkdir -p '.self::DIRECTORY,
+                'cd '.self::DIRECTORY,
                 "echo '$docker_compose_yml_base64' | base64 -d | tee docker-compose.yml > /dev/null",
                 'echo Pulling latest Cloudflare Tunnel image.',
                 'docker compose pull',
                 'echo Stopping existing Cloudflare Tunnel container.',
                 'docker rm -f coolify-cloudflared || true',
                 'echo Starting new Cloudflare Tunnel container.',
-                'docker compose up --wait --wait-timeout 15 --remove-orphans || docker logs coolify-cloudflared',
+                'docker compose up --wait --wait-timeout 180 --remove-orphans || docker logs coolify-cloudflared',
             ]);
 
             return remote_process($commands, $server, callEventOnFinish: 'CloudflareTunnelChanged', callEventData: [

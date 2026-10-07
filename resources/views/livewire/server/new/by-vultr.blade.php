@@ -131,14 +131,11 @@
                         @endif
 
                         <div class="flex flex-col gap-4">
-                            <x-forms.datalist label="Extra SSH keys" id="selectedVultrSshKeyIds"
-                                helper="Existing keys from the Vultr account." :multiple="true"
-                                :disabled="count($vultrSshKeys) === 0"
-                                :placeholder="count($vultrSshKeys) ? 'Search SSH keys' : 'No account keys found'">
-                                @foreach ($vultrSshKeys as $sshKey)
-                                    <option value="{{ $sshKey['id'] }}">{{ $sshKey['name'] }}</option>
-                                @endforeach
-                            </x-forms.datalist>
+                            <x-forms.listbox label="Extra SSH keys" id="selectedVultrSshKeyIds"
+                                helper="Existing keys from the Vultr account." multiple searchable
+                                :disabled="count($vultrSshKeys) === 0" searchPlaceholder="Search SSH keys…"
+                                :placeholder="count($vultrSshKeys) ? 'Select SSH keys' : 'No account keys found'"
+                                :options="collect($vultrSshKeys)->map(fn ($sshKey) => ['value' => $sshKey['id'], 'label' => $sshKey['name']])->values()->all()" />
 
                             <div class="grid gap-3 lg:grid-cols-2">
                                 <x-forms.checkbox id="enable_ipv6" label="Enable IPv6" fullWidth />
