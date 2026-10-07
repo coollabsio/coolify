@@ -141,6 +141,56 @@ function composeResourceDirectory(Application|Service $resource): string
 }
 
 /**
+ * Renders a long-syntax bind with its resolved source. It keeps the options that Docker Compose
+ * accepts, such as read_only and bind, and removes other keys, which Compose rejects. Without
+ * `bind.create_host_path`, a missing source is created, as with short syntax: Docker Compose
+ * before v2.30 does not do that for long syntax.
+ *
+ * @param  array<string, mixed>  $volume
+ * @return array<string, mixed>
+ */
+function composeLongBindVolume(array $volume, string $source): array
+{
+    $volume = array_filter(
+        $volume,
+        fn ($key) => in_array($key, ['type', 'source', 'target', 'read_only', 'consistency', 'bind'], true) || str_starts_with((string) $key, 'x-'),
+        ARRAY_FILTER_USE_KEY
+    );
+    $volume['source'] = $source;
+    $volume['bind'] = is_array($volume['bind'] ?? null) ? $volume['bind'] : [];
+    $volume['bind']['create_host_path'] ??= true;
+
+    return $volume;
+}
+
+/**
+ * A long-syntax bind with `bind.create_host_path: false` must fail when its host path is missing.
+ * Coolify must not create that path, so it does not add a file storage for it. A volume with
+ * `content:` is still written by Coolify.
+ */
+function composeBindKeepsMissingHostPath(mixed $volume): bool
+{
+    return is_array($volume)
+        && data_get($volume, 'bind.create_host_path') === false
+        && ! array_key_exists('content', $volume);
+}
+
+/**
+ * Removes the file storage that an earlier save created for a bind that now keeps its missing host
+ * path. Otherwise, the storage jobs still create that path. The files on the server stay. A storage
+ * with a backup schedule stays, because it cannot be deleted before its schedule.
+ */
+function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase $resource, string $mountPath): void
+{
+    $resource->fileStorages()
+        ->where('mount_path', $mountPath)
+        ->where('is_host_file', false)
+        ->whereDoesntHave('scheduledBackups')
+        ->get()
+        ->each->delete();
+}
+
+/**
  * Coolify writes the `content:` of a Compose bind volume to the source path on the host. Only
  * administrators can edit a Compose file, and they can mount any host path, so the source can be
  * any path, also outside the resource directory. It must exist and be safe to
@@ -1426,15 +1476,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
                 }
                 if ($type->value() === 'bind') {
-                    if ($source->value() === '/var/run/docker.sock') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
-                        }
-                    } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                    if (in_array($source->value(), ['/var/run/docker.sock', '/tmp', '/tmp/'], true)) {
+                        if (is_string($volume)) {
+                            $volume = $source->value().':'.$target->value();
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
+                        } else {
+                            $volume = composeLongBindVolume($volume, $source->value());
                         }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
@@ -1449,26 +1498,35 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         if ($isPullRequest && $isPreviewSuffixEnabled) {
                             $source = str(addPreviewDeploymentSuffix($source, $pull_request_id));
                         }
-                        LocalFileVolume::updateOrCreate(
-                            [
-                                'mount_path' => $target,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ],
-                            [
-                                'fs_path' => $source,
-                                'mount_path' => $target,
-                                'content' => $content,
-                                'is_directory' => $isDirectory,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ]
-                        );
+                        // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
+                        if (! composeBindKeepsMissingHostPath($volume)) {
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $target,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ],
+                                [
+                                    'fs_path' => $source,
+                                    'mount_path' => $target,
+                                    'content' => $content,
+                                    'is_directory' => $isDirectory,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ]
+                            );
+                        } else {
+                            forgetComposeBindStorage($originalResource, $target->value());
+                        }
                         // The file storage keeps the path that Coolify writes; the Docker daemon may need another one.
                         $source = $source->replace($mainDirectory, devHostDockerPath($server, $mainDirectory->value()));
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                        if (is_array($volume)) {
+                            $volume = composeLongBindVolume($volume, $source->value());
+                        } else {
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
                         }
                     }
                 } elseif ($type->value() === 'volume') {
@@ -2798,15 +2856,14 @@ function serviceParser(Service $resource): Collection
                     }
                 }
                 if ($type->value() === 'bind') {
-                    if ($source->value() === '/var/run/docker.sock') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
-                        }
-                    } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                    if (in_array($source->value(), ['/var/run/docker.sock', '/tmp', '/tmp/'], true)) {
+                        if (is_string($volume)) {
+                            $volume = $source->value().':'.$target->value();
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
+                        } else {
+                            $volume = composeLongBindVolume($volume, $source->value());
                         }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
@@ -2815,26 +2872,35 @@ function serviceParser(Service $resource): Collection
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
-                        LocalFileVolume::updateOrCreate(
-                            [
-                                'mount_path' => $target,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ],
-                            [
-                                'fs_path' => $source,
-                                'mount_path' => $target,
-                                'content' => $content,
-                                'is_directory' => $isDirectory,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ]
-                        );
+                        // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
+                        if (! composeBindKeepsMissingHostPath($volume)) {
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $target,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ],
+                                [
+                                    'fs_path' => $source,
+                                    'mount_path' => $target,
+                                    'content' => $content,
+                                    'is_directory' => $isDirectory,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ]
+                            );
+                        } else {
+                            forgetComposeBindStorage($originalResource, $target->value());
+                        }
                         // The file storage keeps the path that Coolify writes; the Docker daemon may need another one.
                         $source = $source->replace($mainDirectory, devHostDockerPath($server, $mainDirectory->value()));
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                        if (is_array($volume)) {
+                            $volume = composeLongBindVolume($volume, $source->value());
+                        } else {
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
                         }
                     }
                 } elseif ($type->value() === 'volume') {
