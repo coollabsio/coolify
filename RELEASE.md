@@ -28,7 +28,7 @@ feature/* → release/v4.x → RC
 
 1. Merge feature branches into `release/v4.x`.
 2. Set `coolify.nightly.version` in both version files to the intended RC, such as `4.5-rc.1`.
-3. Regular `release/v4.x` builds publish `sha-<short-sha>`, `4.5-rc.1.<short-sha>`, and the moving `next` image tag. They never publish the exact `4.5-rc.1` tag.
+3. Every push to `release/v4.x` runs **Build Coolify Release Branch**. It calculates the version from the branch name and publishes `4.5-dev.<short-sha>` and the moving `4.5-dev` tag. It never publishes an RC or stable tag.
 4. Create a reviewed draft GitHub Release named `v4.5-rc.1` and mark it as a prerelease.
 5. Run **Release Coolify RC** manually from `release/v4.x` and enter `v4.5-rc.1`.
 6. The workflow validates the draft and configured nightly version, builds the exact RC, publishes `4.5-rc.1`, updates the `next` image tag, and publishes the draft prerelease.
@@ -69,7 +69,9 @@ main → hotfix/X.Y.Z → main → release/v4.x
 | Tag | Meaning |
 | --- | --- |
 | `latest` | Latest stable release |
-| `next` | Latest successful `release/v4.x` build |
+| `next` | Latest successful `next` build (legacy branch) |
+| `X.Y-dev` | Latest successful `release/vX.Y` build |
+| `X.Y-dev.<short-sha>` | Exact `release/vX.Y` commit build |
 | `X.Y.Z` | Exact stable release |
 | `X.Y-rc.N` | Exact RC release |
 | `sha-<commit>` | Exact commit build |
