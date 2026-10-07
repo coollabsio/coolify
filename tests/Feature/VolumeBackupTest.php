@@ -18,6 +18,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
+use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -29,6 +30,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
+use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1142,6 +1144,19 @@ it('does not change S3 storage when another volume backup setting is invalid', f
         ->and($backup->frequency)->toBe('daily');
 });
 
+it('rejects a missing volume backup alert period above one year', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('missingBackupNotificationDays', 366)
+        ->call('save')
+        ->assertHasErrors(['missingBackupNotificationDays' => 'max']);
+
+    expect(ScheduledVolumeBackup::query()->exists())->toBeFalse();
+});
+
 function createVolumeBackupApplication(Team $team): array
 {
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
@@ -1208,12 +1223,14 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->set('retentionDaysLocally', 14)
         ->set('retentionMaxStorageLocally', 1.5)
         ->set('stopDuringBackup', true)
+        ->set('missingBackupNotificationDays', 3)
         ->call('save')
         ->assertDispatched('success');
 
     $backup = ScheduledVolumeBackup::query()->sole();
 
     expect($backup->backupable->is($volume))->toBeTrue()
+        ->and($backup->missing_backup_notification_days)->toBe(3)
         ->and($backup->team_id)->toBe($team->id)
         ->and($backup->frequency)->toBe('daily')
         ->and($backup->retention_amount_locally)->toBe(5)
@@ -2850,3 +2867,37 @@ it('sends volume backup success with a warning through the backup failure channe
     'without warning' => [null, 'backup_success'],
     'with warning' => ['S3 upload failed: denied', 'backup_failure'],
 ]);
+
+it('records a missed volume backup that is too old to run late as a failed execution and notifies the team once', function () {
+    config(['broadcasting.default' => 'null']);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-volume-backup:{$backup->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 16, 0, 0, 0, 'UTC'),
+        'job_type' => 'volume-backup',
+        'resource_id' => $backup->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1),
+    ]);
+
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($execution->status)->toBe('failed')
+        ->and($execution->message)->toBe('Skipped: the queued job did not start within 60 minutes.')
+        ->and($execution->finished_at)->not->toBeNull()
+        ->and($occurrence->fresh()->status)->toBe('failed');
+    Queue::assertNotPushed(VolumeBackupJob::class);
+    Notification::assertSentToTimes($team, BackupFailed::class, 1);
+    Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
+});

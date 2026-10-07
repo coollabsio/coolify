@@ -13,6 +13,7 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
@@ -24,6 +25,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Notifications\Database\BackupFailed;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Services\ScheduledJobDeliveryService;
@@ -750,6 +752,31 @@ it('records a missed Docker cleanup as a failed execution and notifies the team 
         ->and(app(ScheduledJobDeliveryService::class)->claim($occurrence->uuid, 'original-job'))->toBeFalse();
     Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
     Event::assertDispatched(DockerCleanupDone::class, 1);
+});
+
+it('records a missed database backup that is too old to run late as a failed execution and notifies the team once', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([BackupCreated::class]);
+    $backup = createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => 'daily']);
+    $backup->team->emailNotificationSettings->update(['smtp_enabled' => true, 'backup_failure_email_notifications' => true]);
+    $occurrence = createStaleEnqueuedOccurrence("scheduled-backup:{$backup->id}", 'database-backup', $backup->id, Carbon::create(2026, 9, 16, 0, 0, 0, 'UTC'));
+
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    $executions = ScheduledDatabaseBackupExecution::query()->where('scheduled_database_backup_id', $backup->id)->get();
+    expect($executions)->toHaveCount(1)
+        ->and($executions->first()->status)->toBe('failed')
+        ->and($executions->first()->message)->toBe('Skipped: the queued job did not start within 60 minutes.')
+        ->and($executions->first()->finished_at)->not->toBeNull()
+        ->and($occurrence->fresh()->status)->toBe('failed');
+    Queue::assertNotPushed(DatabaseBackupJob::class);
+    Notification::assertSentToTimes($backup->team, BackupFailed::class, 1);
+    Notification::assertSentTo($backup->team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
+    Event::assertDispatched(BackupCreated::class);
 });
 
 it('sends at most one missed-run notification per hour for the same schedule', function (string $jobType) {

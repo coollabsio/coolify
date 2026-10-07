@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\CheckMissingDatabaseBackupsJob;
+use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use Illuminate\Support\Facades\Queue;
@@ -14,6 +15,7 @@ dataset('scheduled instance jobs', [
     'orphaned preview containers cleanup' => [CleanupOrphanedPreviewContainersJob::class, 600],
     'instance cleanup' => [CleanupInstanceStuffsJob::class, 60],
     'missing database backups check' => [CheckMissingDatabaseBackupsJob::class, 1800],
+    'missing volume backups check' => [CheckMissingVolumeBackupsJob::class, 1800],
 ]);
 
 it('does not queue the job again while its unique lock is held', function (string $jobClass, int $lockSeconds) {
