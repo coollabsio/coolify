@@ -623,6 +623,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
         }
 
+        // Domains can change with a deployment, so the maintenance routes follow them.
+        if ($this->pull_request_id === 0 && $this->application->is_maintenance_enabled) {
+            try {
+                $this->application->syncMaintenancePage();
+            } catch (Exception $e) {
+                \Log::warning('Maintenance page update failed for '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+        }
+
     }
 
     private function deploy_simple_dockerfile()

@@ -766,6 +766,19 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
+/**
+ * Caddy site address of a domain. Maintenance blocks in the base Caddyfile must use the same
+ * address as the labels, so caddy-docker-proxy merges them into one site block.
+ */
+function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnabled): string
+{
+    if ($scheme === 'https' && ! $isForceHttpsEnabled) {
+        return "http://{$host}, https://{$host}";
+    }
+
+    return "{$scheme}://{$host}";
+}
+
 function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [])
 {
     $labels = collect([]);
@@ -790,10 +803,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $path = $url->getPath();
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
-        $siteAddress = "{$schema}://{$host}";
-        if ($schema === 'https' && ! $is_force_https_enabled) {
-            $siteAddress = "http://{$host}, https://{$host}";
-        }
+        $siteAddress = caddySiteAddress($schema, $host, $is_force_https_enabled);
         $portlessDomain = ServiceApplication::withoutPort($domain);
         $port = $url->getPort() ?? ($domainPortOverrides[$portlessDomain] ?? null);
         $handle = 'handle_path';

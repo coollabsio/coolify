@@ -9,6 +9,7 @@ use App\Support\ResourceStartActivity;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
+use App\Traits\HasMaintenancePage;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -45,7 +46,7 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -78,6 +79,13 @@ class Service extends BaseModel
         'docker_compose',
         'docker_compose_raw',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_maintenance_enabled' => 'boolean',
+        ];
+    }
 
     protected static function booted()
     {
@@ -1514,6 +1522,29 @@ class Service extends BaseModel
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
+    }
+
+    /**
+     * Domains of every application in the service stack.
+     *
+     * @return Collection<int, array{url: string, force_https: bool}>
+     */
+    public function maintenanceDomains(): Collection
+    {
+        return $this->applications()->get()
+            ->flatMap(fn (ServiceApplication $application) => collect($application->fqdns)
+                ->map(fn ($url) => trim((string) $url))
+                ->filter()
+                ->map(fn (string $url) => ['url' => $url, 'force_https' => $application->isForceHttpsEnabled()]))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    public function maintenanceServers(): Collection
+    {
+        return collect([$this->server])->filter()->values();
     }
 
     public function databases()
