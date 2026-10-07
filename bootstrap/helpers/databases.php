@@ -316,8 +316,7 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
 
 function removeOldBackups($backup): void
 {
-    // With disable_local_backup, the only local files left are dumps whose upload to a destination failed. Local
-    // retention also applies to them, so they do not fill the server disk.
+    // When local backups are disabled, retain the local file until an S3 copy is available.
     $localBackupsToDelete = deleteOldBackupsLocally($backup);
     if ($localBackupsToDelete->isNotEmpty()) {
         $backup->executions()
@@ -388,6 +387,10 @@ function deleteOldBackupsLocally($backup): Collection
     $successfulBackups = $backup->executions()
         ->where('status', 'success')
         ->where('local_storage_deleted', false)
+        ->when($backup->disable_local_backup, fn ($query) => $query
+            ->whereHas('s3Replicas', fn ($query) => $query
+                ->where('s3_uploaded', true)
+                ->where('s3_storage_deleted', false)))
         ->orderBy('created_at', 'desc')
         ->orderBy('id', 'desc')
         ->get();

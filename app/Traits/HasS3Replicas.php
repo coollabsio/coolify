@@ -26,7 +26,10 @@ trait HasS3Replicas
 
         try {
             foreach ($replicas as $replica) {
-                if ($replica->s3 && filled($this->filename)) {
+                if (! $replica->s3) {
+                    throw new \RuntimeException('The S3 storage used by an existing backup is unavailable.');
+                }
+                if (filled($this->filename)) {
                     deleteBackupsS3($this->filename, $replica->s3);
                 }
                 $replica->update(['s3_storage_deleted' => true]);

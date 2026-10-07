@@ -270,6 +270,37 @@ describe('backup job', function () {
             ->and($commands->contains(fn (string $command) => str_contains($command, 'rm -f') && str_contains($command, $execution->filename)))->toBeTrue();
     });
 
+    it('continues to later destinations and keeps the local file when a replica write fails', function (array $failingStorages) {
+        $event = 'eloquent.creating: '.DatabaseBackupS3Replica::class;
+        Event::listen($event, function (DatabaseBackupS3Replica $replica): void {
+            if (S3Storage::find($replica->s3_storage_id)?->name === 'First') {
+                throw new RuntimeException('replica persistence failed');
+            }
+        });
+
+        try {
+            [$execution, $commands] = runMultiS3BackupJob($failingStorages);
+        } finally {
+            Event::forget($event);
+        }
+
+        $replica = $execution->s3Replicas()->with('s3')->sole();
+        expect($replica->s3->name)->toBe('Second')
+            ->and($replica->s3_uploaded)->toBeTrue()
+            ->and($execution->s3_storage_deleted)->toBeFalse()
+            ->and($execution->s3_uploaded)->toBeFalse()
+            ->and($execution->local_storage_deleted)->toBeFalse()
+            ->and($execution->message)->toContain('First: replica persistence failed')
+            ->and($commands->contains(fn (string $command) => str_contains($command, 'rm -f') && str_contains($command, $execution->filename)))->toBeFalse();
+
+        if ($failingStorages !== []) {
+            expect($execution->message)->toContain('First: access denied');
+        }
+    })->with([
+        'successful upload' => [[]],
+        'failed upload' => [['First']],
+    ]);
+
     it('keeps the local file and names the failed destination when one upload fails', function () {
         [$execution, $commands] = runMultiS3BackupJob(['Second']);
 
@@ -351,7 +382,7 @@ it('copies the destinations of the same team to a cloned schedule', function () 
     expect($copy->s3Storages()->pluck('s3_storages.id')->sort()->values()->all())->toBe([$first->id, $second->id]);
 });
 
-it('applies local retention to dumps kept after a failed upload when local backups are disabled', function () {
+it('requires a live S3 copy for local retention only when local backups are disabled', function (bool $disabled, ?array $replica, bool $deleted) {
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
@@ -364,7 +395,7 @@ it('applies local retention to dumps kept after a failed upload when local backu
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
-        'disable_local_backup' => true,
+        'disable_local_backup' => $disabled,
         'database_backup_retention_amount_locally' => 1,
         'database_type' => $database->getMorphClass(),
         'database_id' => $database->id,
@@ -372,6 +403,12 @@ it('applies local retention to dumps kept after a failed upload when local backu
     ]);
     $older = multiS3Execution($backup, 'older', ['local_storage_deleted' => false, 'created_at' => now()->subDay()]);
     $newer = multiS3Execution($backup, 'newer', ['local_storage_deleted' => false]);
+    if ($replica !== null) {
+        $storage = multiS3Storage($team, 'Retention');
+        foreach ([$older, $newer] as $execution) {
+            $execution->s3Replicas()->create(['s3_storage_id' => $storage->id, ...$replica]);
+        }
+    }
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
         $commands->push(is_array($process->command) ? implode(' ', $process->command) : $process->command);
@@ -381,7 +418,17 @@ it('applies local retention to dumps kept after a failed upload when local backu
 
     removeOldBackups($backup);
 
-    expect($commands->contains(fn (string $command): bool => str_contains($command, '/backup/older.dmp')))->toBeTrue()
-        ->and($older->fresh())->toBeNull()
-        ->and($newer->fresh()->local_storage_deleted)->toBeFalse();
-});
+    expect($commands->contains(fn (string $command): bool => str_contains($command, '/backup/older.dmp')))->toBe($deleted);
+    if ($deleted && $replica === null) {
+        $this->assertModelMissing($older);
+    } else {
+        expect($older->fresh()->local_storage_deleted)->toBe($deleted);
+    }
+    expect($newer->fresh()->local_storage_deleted)->toBeFalse();
+})->with([
+    'no replica' => [true, null, false],
+    'failed upload' => [true, ['s3_uploaded' => false], false],
+    'deleted replica' => [true, ['s3_uploaded' => true, 's3_storage_deleted' => true], false],
+    'live replica' => [true, ['s3_uploaded' => true, 's3_storage_deleted' => false], true],
+    'normal local retention' => [false, null, true],
+]);

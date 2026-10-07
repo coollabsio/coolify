@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Jobs\VolumeBackupJob;
 use App\Jobs\VolumeBackupRecoveryJob;
 use App\Models\Application;
@@ -9,6 +10,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -16,6 +18,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -192,6 +195,47 @@ it('applies S3 retention to each destination separately', function () {
         ->and($latest->s3Replicas()->where('s3_storage_id', $first->id)->sole()->s3_storage_deleted)->toBeFalse();
 });
 
+it('continues retention and execution cleanup when a replica storage is missing', function () {
+    $this->freezeTime();
+    [$backup, , $second, $server] = createMultiDestinationVolumeBackup([
+        'retention_amount_locally' => 0,
+        'retention_days_locally' => 0,
+        'retention_max_storage_locally' => 0,
+        'retention_amount_s3' => 0,
+        'retention_days_s3' => 7,
+        'retention_max_storage_s3' => 0,
+    ]);
+    $executions = collect([false, true])->map(function (bool $localDeleted) use ($backup, $second): ScheduledVolumeBackupExecution {
+        $execution = $backup->executions()->create([
+            'status' => 'success',
+            'filename' => '/data/coolify/backups/volumes/test/'.($localDeleted ? 'deleted' : 'local').'.tar.gz',
+            'local_storage_deleted' => $localDeleted,
+        ]);
+        $execution->forceFill(['created_at' => now()->subDays(10)])->save();
+        $execution->s3Replicas()->create(['s3_storage_id' => null, 's3_uploaded' => true]);
+        $execution->s3Replicas()->create(['s3_storage_id' => $second->id, 's3_uploaded' => true]);
+        $execution->refreshS3Summary();
+
+        return $execution;
+    });
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->with(Mockery::on(
+        fn (array $filenames): bool => count($filenames) === 2
+            && in_array($executions[0]->filename, $filenames, true)
+            && in_array($executions[1]->filename, $filenames, true),
+    ))->andReturnTrue();
+    Storage::shouldReceive('build')->once()
+        ->with(Mockery::on(fn (array $config): bool => $config['key'] === 'second-key'))
+        ->andReturn($disk);
+    $job = new VolumeBackupJob($backup);
+
+    (new ReflectionClass($job))->getMethod('removeExpiredBackups')->invoke($job, $server);
+
+    expect($executions[0]->fresh()->s3_storage_deleted)->toBeTrue()
+        ->and($executions[0]->s3Replicas()->where('s3_storage_deleted', false)->count())->toBe(0);
+    $this->assertModelMissing($executions[1]);
+});
+
 it('cleans an interrupted upload from every destination whose copy did not finish', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup();
     $execution = ScheduledVolumeBackupExecution::create([
@@ -266,4 +310,77 @@ it('moves the primary destination to a remaining storage when the primary storag
         ->and($backup->s3Storages()->pluck('s3_storages.id')->all())->toBe([$second->id])
         ->and($execution->fresh()->s3_storage_deleted)->toBeFalse()
         ->and($execution->hasLiveS3Copies())->toBeTrue();
+});
+
+it('preserves the schedule and uploaded replica when its S3 storage is unavailable', function () {
+    [$backup] = createMultiDestinationVolumeBackup();
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/archive.tar.gz',
+        'local_storage_deleted' => true,
+    ]);
+    $replica = $execution->s3Replicas()->create([
+        's3_storage_id' => null,
+        's3_uploaded' => true,
+        's3_storage_deleted' => false,
+    ]);
+    $execution->refreshS3Summary();
+
+    expect(fn () => (new DeleteScheduledVolumeBackup)->handle($backup, deleteLocalArchives: false))
+        ->toThrow(RuntimeException::class, 'The S3 storage used by an existing backup is unavailable.');
+
+    expect($backup->fresh())->not->toBeNull();
+    expect($replica->fresh()->s3_storage_deleted)->toBeFalse();
+    expect($execution->fresh()->s3_storage_deleted)->toBeFalse();
+    expect($execution->hasLiveS3Copies())->toBeTrue();
+});
+
+it('rolls back all backup detachment changes when an execution update fails', function () {
+    [$backup, $storage] = createMultiDestinationVolumeBackup();
+    $backup->syncS3Storages([$storage->id]);
+    $databaseBackup = ScheduledDatabaseBackup::create([
+        'frequency' => 'daily',
+        'save_s3' => true,
+        'database_type' => 'App\\Models\\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => $storage->team_id,
+    ]);
+    $databaseBackup->syncS3Storages([$storage->id]);
+    $databaseExecution = $databaseBackup->executions()->create([
+        'uuid' => 'rollback-database',
+        'database_name' => 'app',
+        'status' => 'success',
+        's3_uploaded' => true,
+    ]);
+    $databaseReplica = $databaseExecution->s3Replicas()->create([
+        's3_storage_id' => $storage->id,
+        's3_uploaded' => true,
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $storage->id,
+        'status' => 'failed',
+        's3_cleanup_pending' => true,
+    ]);
+    $replica = $execution->s3Replicas()->create([
+        's3_storage_id' => $storage->id,
+        's3_uploaded' => false,
+    ]);
+    Event::listen('eloquent.updating: '.ScheduledVolumeBackupExecution::class, function (): void {
+        throw new RuntimeException('Execution update failed');
+    });
+
+    expect(fn () => $storage->delete())->toThrow(RuntimeException::class, 'Execution update failed');
+
+    $this->assertModelExists($storage);
+    foreach ([$databaseBackup, $backup] as $schedule) {
+        expect($schedule->fresh()->s3_storage_id)->toBe($storage->id)
+            ->and((bool) $schedule->fresh()->save_s3)->toBeTrue()
+            ->and($schedule->s3Storages()->pluck('s3_storages.id')->all())->toBe([$storage->id]);
+    }
+    expect($databaseReplica->fresh()->s3_storage_deleted)->toBeFalse()
+        ->and($databaseExecution->fresh()->s3_storage_deleted)->toBeFalse()
+        ->and($replica->fresh()->s3_storage_deleted)->toBeFalse()
+        ->and($execution->fresh()->s3_cleanup_pending)->toBeTrue();
 });

@@ -512,7 +512,10 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $replicas = $executions->map(fn (ScheduledVolumeBackupExecution $execution): VolumeBackupS3Replica => $execution->s3Replicas->firstWhere('s3_storage_id', $storageId));
                 $s3 = $replicas->first()->s3;
                 if (! $s3) {
-                    throw new \RuntimeException('The S3 storage used by an existing backup is unavailable.');
+                    VolumeBackupS3Replica::query()->whereKey($replicas->pluck('id')->all())->update(['s3_storage_deleted' => true]);
+                    $executions->each(fn (ScheduledVolumeBackupExecution $execution) => $execution->refreshS3Summary());
+
+                    continue;
                 }
 
                 $filenames = $executions->pluck('filename')->filter()->all();

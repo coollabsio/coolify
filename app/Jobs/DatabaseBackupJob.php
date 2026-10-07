@@ -861,18 +861,23 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $failures = [];
         foreach ($storages as $storage) {
+            $uploaded = false;
+            $uploadError = null;
             try {
                 $this->upload_to_s3($storage);
+                $uploaded = true;
+            } catch (Throwable $e) {
+                $uploadError = $e->getMessage();
+                $failures[] = "{$storage->name}: {$uploadError}";
+            }
+
+            try {
                 $this->backup_log->s3Replicas()->create([
                     's3_storage_id' => $storage->id,
-                    's3_uploaded' => true,
+                    's3_uploaded' => $uploaded,
+                    'message' => $uploadError,
                 ]);
             } catch (Throwable $e) {
-                $this->backup_log->s3Replicas()->create([
-                    's3_storage_id' => $storage->id,
-                    's3_uploaded' => false,
-                    'message' => $e->getMessage(),
-                ]);
                 $failures[] = "{$storage->name}: {$e->getMessage()}";
             }
         }
