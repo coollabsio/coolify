@@ -11,7 +11,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
-use Symfony\Component\Yaml\Yaml;
 
 class StartService
 {
@@ -61,7 +60,7 @@ class StartService
         if (data_get($service, 'connect_to_docker_network')) {
             $compose = data_get($service, 'docker_compose', []);
             $safeNetwork = escapeshellarg($service->destination->network);
-            $serviceNames = data_get(Yaml::parse($compose), 'services', []);
+            $serviceNames = data_get(parseDockerComposeYaml($compose), 'services', []);
             foreach ($serviceNames as $serviceName => $serviceConfig) {
                 $containerName = escapeshellarg("{$serviceName}-{$service->uuid}");
                 $commands[] = "docker network connect --alias {$containerName} {$safeNetwork} {$containerName} >/dev/null 2>&1 || true";

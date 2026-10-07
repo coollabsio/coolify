@@ -15,7 +15,19 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+
+/**
+ * Parses Docker Compose YAML with a higher collection alias limit than the Symfony default (128),
+ * because large Compose files (for example Sentry self-hosted) reuse YAML anchors many times.
+ *
+ * @throws ParseException If the YAML is invalid or exceeds the alias limit
+ */
+function parseDockerComposeYaml(string $compose): mixed
+{
+    return Yaml::parse($compose, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
+}
 
 /**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
@@ -28,7 +40,7 @@ use Symfony\Component\Yaml\Yaml;
 function validateDockerComposeForInjection(string $composeYaml): void
 {
     try {
-        $parsed = Yaml::parse($composeYaml);
+        $parsed = parseDockerComposeYaml($composeYaml);
     } catch (Exception $e) {
         throw new Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
     }
@@ -515,7 +527,7 @@ function composeExternalVolumeDockerNames(?string $compose): array
         return [];
     }
     try {
-        $volumes = data_get(Yaml::parse($compose), 'volumes');
+        $volumes = data_get(parseDockerComposeYaml($compose), 'volumes');
     } catch (Throwable) {
         return [];
     }
@@ -542,7 +554,7 @@ function composeExternalVolumeMounts(?string $compose): array
         return [];
     }
     try {
-        $yaml = Yaml::parse($compose);
+        $yaml = parseDockerComposeYaml($compose);
     } catch (Throwable) {
         return [];
     }
@@ -985,7 +997,7 @@ function removeComposeVolumeFieldsPreservingComments(string $source, array $clea
 
     $candidate = implode('', $result);
     try {
-        if (Yaml::parse($candidate) === $cleanedYaml) {
+        if (parseDockerComposeYaml($candidate) === $cleanedYaml) {
             return $candidate;
         }
     } catch (Exception) {
@@ -1010,7 +1022,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $isPullRequest = $pullRequestId == 0 ? false : true;
     $server = data_get($resource, 'destination.server');
     try {
-        $yaml = Yaml::parse($compose);
+        $yaml = parseDockerComposeYaml($compose);
     } catch (Exception) {
         return collect([]);
     }
@@ -2150,7 +2162,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     // This keeps the original user input clean while preventing content reapplication
     // Parse the original compose again to create a clean version without Coolify additions
     try {
-        $originalYaml = Yaml::parse($originalCompose);
+        $originalYaml = parseDockerComposeYaml($originalCompose);
         $originalYamlBeforeCleanup = $originalYaml;
         // Remove content, isDirectory, and is_directory from all volume definitions
         if (isset($originalYaml['services'])) {
@@ -2197,7 +2209,7 @@ function serviceParser(Service $resource): Collection
     $server = data_get($resource, 'server');
 
     try {
-        $yaml = Yaml::parse($compose);
+        $yaml = parseDockerComposeYaml($compose);
     } catch (Exception) {
         return collect([]);
     }
@@ -3383,7 +3395,7 @@ function serviceParser(Service $resource): Collection
     // This keeps the original user input clean while preventing content reapplication
     // Parse the original compose again to create a clean version without Coolify additions
     try {
-        $originalYaml = Yaml::parse($originalCompose);
+        $originalYaml = parseDockerComposeYaml($originalCompose);
         $originalYamlBeforeCleanup = $originalYaml;
         // Remove content, isDirectory, and is_directory from all volume definitions
         if (isset($originalYaml['services'])) {

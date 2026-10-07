@@ -163,7 +163,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $docker_compose;
 
-    private $docker_compose_base64;
+    private ?string $generated_docker_compose = null;
 
     private ?string $nixpacks_plan = null;
 
@@ -840,11 +840,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
-        $this->docker_compose_base64 = base64_encode($yaml);
+        $this->generated_docker_compose = $yaml;
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
+            "docker exec -i {$this->deployment_uuid} tee {$this->workdir}{$this->docker_compose_location} > /dev/null",
+            'input' => $yaml,
             'hidden' => true,
-            'skip_command_log' => true,
         ]);
 
         // Modify Dockerfiles for ARGs and build secrets
@@ -1262,7 +1262,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server = $this->build_server;
             }
         }
-        if (isset($this->docker_compose_base64)) {
+        if (isset($this->generated_docker_compose)) {
             if ($this->use_build_server) {
                 $this->server = $this->mainServer;
             }
@@ -1283,8 +1283,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "mkdir -p $mainDir",
                 ],
                 [
-                    "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
-                    'skip_command_log' => true,
+                    "tee $composeFileName > /dev/null",
+                    'input' => $this->generated_docker_compose,
                 ],
                 [
                     "echo '{$readme}' | tee $mainDir/README.md > /dev/null",
@@ -1726,9 +1726,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Generate SERVICE_NAME for dockercompose services from processed compose
                 if ($this->application->settings->is_raw_compose_deployment_enabled) {
-                    $dockerCompose = Yaml::parse($this->application->docker_compose_raw);
+                    $dockerCompose = parseDockerComposeYaml($this->application->docker_compose_raw);
                 } else {
-                    $dockerCompose = Yaml::parse($this->application->docker_compose);
+                    $dockerCompose = parseDockerComposeYaml($this->application->docker_compose);
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
@@ -1796,7 +1796,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 // Generate SERVICE_NAME for dockercompose services
-                $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
+                $rawDockerCompose = parseDockerComposeYaml($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
@@ -2035,9 +2035,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->pull_request_id === 0) {
                 // Generate SERVICE_NAME for dockercompose services from processed compose
                 if ($this->application->settings->is_raw_compose_deployment_enabled) {
-                    $dockerCompose = Yaml::parse($this->application->docker_compose_raw);
+                    $dockerCompose = parseDockerComposeYaml($this->application->docker_compose_raw);
                 } else {
-                    $dockerCompose = Yaml::parse($this->application->docker_compose);
+                    $dockerCompose = parseDockerComposeYaml($this->application->docker_compose);
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
@@ -2061,7 +2061,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             } else {
                 // Generate SERVICE_NAME for preview deployments
-                $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
+                $rawDockerCompose = parseDockerComposeYaml($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
                     $envs_dict['SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
@@ -4109,8 +4109,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
-        $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true, 'skip_command_log' => true]);
+        $this->generated_docker_compose = $this->docker_compose;
+        $this->execute_remote_command([
+            "docker exec -i {$this->deployment_uuid} tee {$this->workdir}/docker-compose.yaml > /dev/null",
+            'input' => $this->docker_compose,
+            'hidden' => true,
+        ]);
     }
 
     private function generate_local_persistent_volumes()

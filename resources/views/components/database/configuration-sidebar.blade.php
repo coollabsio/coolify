@@ -63,7 +63,8 @@
         : [];
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start">
+<aside class="application-settings-navigation min-w-0 xl:self-start"
+    data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $databaseRouteParameters, ['project.database.configuration' => $pageSections])) }}">
     <nav aria-label="Database settings"
         x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.database' })"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">

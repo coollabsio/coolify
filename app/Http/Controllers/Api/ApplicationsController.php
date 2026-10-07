@@ -36,7 +36,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
 
 class ApplicationsController extends Controller
 {
@@ -2787,7 +2786,7 @@ class ApplicationsController extends Controller
         $dockerComposeDomainsResponse = null;
         if ($isCompose) {
             try {
-                $compose = Yaml::parse($application->docker_compose_raw ?? '');
+                $compose = parseDockerComposeYaml($application->docker_compose_raw ?? '');
             } catch (\Throwable) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -3519,7 +3518,7 @@ class ApplicationsController extends Controller
                 }
             }
 
-            $yaml = Yaml::parse($application->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($application->docker_compose_raw);
             $services = data_get($yaml, 'services', []);
             $existingDockerComposeDomains = json_decode($application->docker_compose_domains ?? '[]', true) ?? [];
             $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson, $existingDockerComposeDomains) {

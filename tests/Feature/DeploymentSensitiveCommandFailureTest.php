@@ -411,7 +411,7 @@ it('hides the Nixpacks plan write command that contains build-time values', func
     'not static' => [false],
 ]);
 
-it('hides the compose file write command because compose files can contain secrets', function () {
+it('streams the compose file over stdin so its content stays out of commands, errors, and logs', function () {
     [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob();
     $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
     setSensitiveFailureJobProperties($job, $reflection, [
@@ -419,12 +419,10 @@ it('hides the compose file write command because compose files can contain secre
         'production_image_name' => 'example/app:latest',
     ]);
 
-    $payloads = [];
-    Process::fake(function (PendingProcess $process) use (&$payloads) {
-        preg_match_all('~[A-Za-z0-9+/]{16,}={0,2}~', $process->command, $matches);
-        $composePayloads = array_filter($matches[0], fn (string $candidate): bool => str_contains((string) base64_decode($candidate, true), 'services:'));
-        if ($composePayloads !== []) {
-            $payloads = array_merge($payloads, $composePayloads);
+    $composeWrite = null;
+    Process::fake(function (PendingProcess $process) use (&$composeWrite) {
+        if (str_contains((string) $process->input, 'services:')) {
+            $composeWrite = $process;
 
             return Process::result(errorOutput: 'tee: docker-compose.yaml: No space left on device', exitCode: 1);
         }
@@ -434,15 +432,14 @@ it('hides the compose file write command because compose files can contain secre
 
     $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'generate_compose_file'));
 
-    expect($payloads)->not->toBeEmpty();
-    expect($exception->getMessage())
-        ->toContain('[command hidden because it contains sensitive data]')
-        ->toContain('No space left on device');
-    $storedLogs = (string) $queue->fresh()->logs;
-    foreach ($payloads as $payload) {
-        expect($exception->getMessage())->not->toContain($payload);
-        expect($storedLogs)->not->toContain($payload);
-    }
+    $compose = (string) readSensitiveFailureJobProperty($job, $reflection, 'docker_compose');
+    expect($composeWrite)->not->toBeNull()
+        ->and($composeWrite->input)->toBe($compose)
+        ->and($composeWrite->command)->toEndWith(escapeshellarg('docker exec -i sensitive-failure-deployment tee /artifacts/sensitive-failure/docker-compose.yaml > /dev/null'))
+        ->and($composeWrite->command)->not->toContain('services:')
+        ->and($exception->getMessage())->toContain('No space left on device')
+        ->and($exception->getMessage())->not->toContain('services:')
+        ->and((string) $queue->fresh()->logs)->not->toContain('services:');
 });
 
 function readSensitiveFailureJobProperty(object $job, ReflectionClass $reflection, string $property): mixed
