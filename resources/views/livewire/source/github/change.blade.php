@@ -314,7 +314,7 @@
                                 :disabled="blank($github_app->organization)"
                                 :options="[
                                     ['value' => false, 'label' => 'Do not run workflow jobs'],
-                                    ['value' => true, 'label' => 'Run workflow jobs on build servers'],
+                                    ['value' => true, 'label' => 'Run workflow jobs on your servers'],
                                 ]"
                                 :helper="filled($github_app->organization)
                                     ? 'Adds the organization Self-hosted runners (write) and Actions (read) permissions and the Workflow job webhook event.'

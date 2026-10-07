@@ -238,11 +238,11 @@
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.listbox canGate="update" :canResource="$server" id="serverRole"
                                     label="Server role" onChange="requestServerRoleChange"
-                                    helper="Builds can use large amounts of CPU and memory. Deployments on the same server can become slow or unreachable during a build. GitHub Actions runners need the Builds only role."
+                                    helper="Builds can use large amounts of CPU and memory. Deployments on the same server can become slow or unreachable during a build. GitHub Actions runners need the Builds only or the Deployments and builds role."
                                     :disabled="$isValidating" :options="[
                                         ['value' => 'deployment', 'label' => 'Deployments only', 'description' => 'Runs your resources. Images are built on a build server.'],
-                                        ['value' => 'build', 'label' => 'Builds only', 'description' => 'Builds images for other servers. Required for GitHub Actions runners.'],
-                                        ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs your resources on this server.'],
+                                        ['value' => 'build', 'label' => 'Builds only', 'description' => 'Builds images for other servers and runs GitHub Actions runners.'],
+                                        ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs your resources on this server. Can also run GitHub Actions runners.'],
                                     ]" />
                             </div>
                         @endif

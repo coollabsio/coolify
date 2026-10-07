@@ -10,7 +10,7 @@
         <x-server.sidebar :server="$server" activeMenu="github-runners" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
-            @if (!$server->isBuildServer())
+            @if (! $server->canBuildApplications())
                 <x-application.settings-section id="github-runners-section" title="GitHub Actions runners"
                     helper="Each workflow job runs in a new container that is deleted after the job.">
                     <x-slot:actions>
@@ -22,13 +22,13 @@
                         </a>
                     </x-slot:actions>
                     <x-empty size="sm" title="This server is not enabled for builds"
-                        description="GitHub Actions runners only run on servers with the Builds only role. Change the server role in the General settings."
+                        description="GitHub Actions runners need the Builds only or the Deployments and builds role. Change the server role in the General settings."
                         icon-name="play-circle" />
                 </x-application.settings-section>
             @elseif ($this->githubApps->isEmpty())
                 <x-callout type="info" title="No organization GitHub App">
                     Runners are registered at organization level. Add a GitHub App that belongs to an organization
-                    under Sources, and select "Run workflow jobs on build servers" when you register it.
+                    under Sources, and select "Run workflow jobs on your servers" when you register it.
                 </x-callout>
             @elseif (! $this->config?->is_enabled)
                 <x-application.settings-section id="github-runners-section" title="GitHub Actions runners"
@@ -40,10 +40,24 @@
                         description="Enable runners to take GitHub Actions workflow jobs on this server."
                         icon-name="play-circle">
                         <x-slot:contents>
-                            <x-forms.button canGate="update" :canResource="$server" isHighlighted
-                                wire:click="toggleEnabled" wire:loading.attr="disabled" wire:target="toggleEnabled">
-                                Enable runners
-                            </x-forms.button>
+                            @if ($server->isBuildServer())
+                                <x-forms.button canGate="update" :canResource="$server" isHighlighted
+                                    wire:click="toggleEnabled" wire:loading.attr="disabled" wire:target="toggleEnabled">
+                                    Enable runners
+                                </x-forms.button>
+                            @else
+                                <x-modal-confirmation title="Enable runners on this server?"
+                                    submitAction="toggleEnabled" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Enable runners"
+                                    warningMessage="This server also runs your resources. We do not recommend GitHub Actions runners here: workflow jobs use the same CPU, memory, and disk, and a heavy job can slow down or stop your resources. Use a server with the Builds only role for runners when you can."
+                                    :actions="['Workflow jobs of the GitHub organization will run on this server next to your resources.']">
+                                    <x-slot:trigger>
+                                        <x-forms.button type="button" canGate="update" :canResource="$server" isHighlighted>
+                                            Enable runners
+                                        </x-forms.button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
+                            @endif
                         </x-slot:contents>
                     </x-empty>
                 </x-application.settings-section>
@@ -63,6 +77,13 @@
                             @endcan
                         </x-slot:actions>
 
+                        @if (! $server->isBuildServer())
+                            <x-callout type="warning" title="Runners share this server with your resources" class="mb-4">
+                                Workflow jobs use the same CPU, memory, and disk as the resources on this server. A heavy
+                                job can slow down or stop them. Use a server with the Builds only role for runners when
+                                you can.
+                            </x-callout>
+                        @endif
                         <div x-cloak x-show="$wire.dockerMode === 'dind'">
                             <x-callout type="warning" title="Use only for trusted repositories">
                                 In the privileged Docker mode, a malicious workflow can take control of this server.
@@ -99,12 +120,14 @@
                             <x-forms.input id="labels" label="Labels" required canGate="update" :canResource="$server"
                                 placeholder="coolify"
                                 helper="Comma-separated custom labels. Coolify also registers self-hosted and linux. Jobs must ask for at least one custom label." />
-                            <x-forms.listbox id="isDedicated" label="Application builds" canGate="update"
-                                :canResource="$server" :options="[
-                                    ['value' => false, 'label' => 'Also build applications'],
-                                    ['value' => true, 'label' => 'Dedicated to runners'],
-                                ]"
-                                helper="Dedicated servers are not used for application builds while runners are enabled." />
+                            @if ($server->isBuildServer())
+                                <x-forms.listbox id="isDedicated" label="Application builds" canGate="update"
+                                    :canResource="$server" :options="[
+                                        ['value' => false, 'label' => 'Also build applications'],
+                                        ['value' => true, 'label' => 'Dedicated to runners'],
+                                    ]"
+                                    helper="Dedicated servers are not used for application builds while runners are enabled." />
+                            @endif
                             <x-forms.listbox id="allowPullRequests" label="Pull request jobs" canGate="update"
                                 :canResource="$server" :options="[
                                     ['value' => false, 'label' => 'Refuse pull request jobs'],
@@ -189,7 +212,7 @@
                 @endcan
             @endif
 
-            @if ($server->isBuildServer() && $this->config?->is_enabled)
+            @if ($server->canBuildApplications() && $this->config?->is_enabled)
                 <x-application.settings-section id="github-runners-executions-section" title="Recent runners"
                     helper="Queued jobs, active runners, and their results. The list updates every 10 seconds." flush>
                     <livewire:server.github-runner-executions :server="$server" />

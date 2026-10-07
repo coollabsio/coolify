@@ -476,9 +476,9 @@ class Show extends Component
             $newRole = ServerRole::from($this->serverRole);
             $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
 
-            if ($newRole !== ServerRole::BUILD && $this->server->hasEnabledGithubRunners()) {
+            if ($newRole === ServerRole::DEPLOYMENT && $this->server->hasEnabledGithubRunners()) {
                 $this->serverRole = $currentRole->value;
-                $this->dispatch('error', 'Disable the GitHub runners before you change the role of this server.');
+                $this->dispatch('error', 'Disable the GitHub runners before you set this server to deployments only.');
 
                 return;
             }

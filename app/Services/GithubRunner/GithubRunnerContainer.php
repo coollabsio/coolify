@@ -162,7 +162,7 @@ class GithubRunnerContainer
             #!/bin/bash
             case "\${GITHUB_EVENT_NAME:-}" in
               {$events}|"")
-                echo "::error::This Coolify runner does not run pull request jobs. Allow pull request jobs in the GitHub runner settings of the build server to run them."
+                echo "::error::This Coolify runner does not run pull request jobs. Allow pull request jobs in the GitHub runner settings of the server to run them."
                 exit 1
                 ;;
             esac
