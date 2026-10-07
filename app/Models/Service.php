@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Service model',
@@ -1629,7 +1628,7 @@ class Service extends BaseModel
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = Yaml::parse($this->docker_compose);
+                $dockerCompose = parseDockerComposeYaml($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);

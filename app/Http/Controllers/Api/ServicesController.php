@@ -26,7 +26,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
-use Symfony\Component\Yaml\Yaml;
 
 class ServicesController extends Controller
 {
@@ -729,7 +728,7 @@ class ServicesController extends Controller
                     ],
                 ], 422);
             }
-            Yaml::parse($dockerComposeRaw);
+            parseDockerComposeYaml($dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             try {
@@ -1278,7 +1277,7 @@ class ServicesController extends Controller
                     ],
                 ], 422);
             }
-            Yaml::parse($dockerComposeRaw);
+            parseDockerComposeYaml($dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             try {

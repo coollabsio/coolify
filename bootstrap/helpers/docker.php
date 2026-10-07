@@ -908,7 +908,7 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
     }
 
     try {
-        $services = data_get(Yaml::parse($compose), 'services', []);
+        $services = data_get(parseDockerComposeYaml($compose), 'services', []);
     } catch (Throwable) {
         return [];
     }
@@ -1813,7 +1813,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         if (! $server) {
             throw new Exception('Server not found');
         }
-        $yaml_compose = Yaml::parse($compose);
+        $yaml_compose = parseDockerComposeYaml($compose);
 
         // Remove Coolify's custom fields before Docker validation
         $yaml_compose = stripCoolifyCustomFields($yaml_compose);

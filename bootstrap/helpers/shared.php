@@ -1736,7 +1736,7 @@ function getTopLevelNetworks(Service|Application $resource): Collection
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
             } catch (Exception $e) {
                 // If the docker-compose.yml file is not valid, we will return the network name as the key
                 $topLevelNetworks = collect([
@@ -1802,7 +1802,7 @@ function getTopLevelNetworks(Service|Application $resource): Collection
         }
     } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
         } catch (Exception $e) {
             // If the docker-compose.yml file is not valid, we will return the network name as the key
             $topLevelNetworks = collect([
@@ -2742,7 +2742,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $envComments = extractYamlEnvironmentComments($resource->docker_compose_raw);
 
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
             } catch (Exception $e) {
                 throw new RuntimeException($e->getMessage());
             }
@@ -3534,7 +3534,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
     } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
         } catch (Exception) {
             return;
         }
@@ -4406,8 +4406,9 @@ function convertToKeyValueCollection($environment)
                         $key = $parts[0];
                         $realValue = $parts[1] ?? '';
                         $changedEnvironment->put($key, $realValue);
-                    } else {
-                        $changedEnvironment->put($key, $value);
+                    } elseif (is_string($value) && $value !== '') {
+                        // A bare name (for example a list-style build arg) is the same as `NAME:` without a value.
+                        $changedEnvironment->put($value, $changedEnvironment->get($value));
                     }
                 } else {
                     $changedEnvironment->put($key, $value);
@@ -4448,6 +4449,49 @@ function wireNavigate(): string
     } catch (Exception $e) {
         return 'wire:navigate';
     }
+}
+
+/**
+ * Flattens a grouped settings sidebar into the items that the command palette
+ * shows for the current page: every page, its child pages, and its in-page sections.
+ *
+ * @param  iterable<string, iterable<array{label: string, route: string, navigate?: bool, visible?: bool, children?: array<int, array{label: string, route: string, navigate?: bool, visible?: bool}>}>>  $groupedItems
+ * @param  array<string, string>  $routeParameters
+ * @param  array<string, array<int, array{id: string, label: string}>>  $pageSections  In-page sections keyed by page route
+ * @return array<int, array{label: string, breadcrumb: string, search_text: string, href: string, navigate: bool}>
+ */
+function settingsSearchItems(iterable $groupedItems, array $routeParameters, array $pageSections = []): array
+{
+    $spaNavigation = wireNavigate() !== '';
+    $items = [];
+    $add = function (string $label, string $breadcrumb, string $href, bool $navigate) use (&$items, $spaNavigation): void {
+        $items[] = [
+            'label' => $label,
+            'breadcrumb' => $breadcrumb,
+            'search_text' => $label.' '.$breadcrumb,
+            'href' => $href,
+            'navigate' => $navigate && $spaNavigation,
+        ];
+    };
+
+    foreach ($groupedItems as $groupLabel => $groupItems) {
+        foreach ($groupItems as $item) {
+            $href = route($item['route'], $routeParameters);
+            $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
+
+            foreach ($item['children'] ?? [] as $child) {
+                if ($child['visible'] ?? true) {
+                    $add($child['label'], $groupLabel.' · '.$item['label'], route($child['route'], $routeParameters), $child['navigate'] ?? true);
+                }
+            }
+
+            foreach ($pageSections[$item['route']] ?? [] as $section) {
+                $add($section['label'], $groupLabel.' · '.$item['label'], $href.'#'.$section['id'], true);
+            }
+        }
+    }
+
+    return $items;
 }
 
 /**
@@ -5052,7 +5096,7 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
     }
 
     try {
-        $yaml = Yaml::parse($dockerComposeRaw);
+        $yaml = parseDockerComposeYaml($dockerComposeRaw);
     } catch (Exception $e) {
         // Malformed YAML - return empty collection
         return collect([]);
