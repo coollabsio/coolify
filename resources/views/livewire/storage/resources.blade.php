@@ -43,6 +43,8 @@
                                     ]);
                                 }
                             }
+                        } elseif ($database instanceof \App\Models\StandalonePostgresql && $database->id === 0) {
+                            $resourceLink = route('settings.backup');
                         } elseif ($database) {
                             $environment = $database->environment;
                             $project = $environment?->project;
