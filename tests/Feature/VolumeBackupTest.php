@@ -27,6 +27,8 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\VolumeBackup\BackupFailed;
+use App\Notifications\VolumeBackup\BackupSuccess;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +39,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -2786,3 +2789,64 @@ it('stops S3 upload cleanup when the S3 storage no longer exists', function () {
         ->and($execution->fresh()->s3_storage_deleted)->toBeFalsy()
         ->and($execution->fresh()->message)->toContain('S3 upload cleanup was skipped');
 });
+
+it('notifies the team when a volume backup succeeds', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    Process::fake([
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    Notification::assertSentToTimes($team, BackupSuccess::class, 1);
+    Notification::assertSentTo($team, BackupSuccess::class, fn (BackupSuccess $notification) => $notification->warning === null
+        && $notification->resourceName === $application->name
+        && $notification->target === 'Volume '.$volume->name
+        && str_contains((string) $notification->toMail()->render(), 'was successful'));
+    Notification::assertNotSentTo($team, BackupFailed::class);
+});
+
+it('notifies the team once when a volume backup fails', function () {
+    Process::fake();
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    (new VolumeBackupJob($backup))->failed(new RuntimeException('Archive command failed'));
+
+    Notification::assertSentToTimes($team, BackupFailed::class, 1);
+    Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Archive command failed'
+        && str_contains((string) $notification->toMail()->render(), 'Archive command failed'));
+    Notification::assertNotSentTo($team, BackupSuccess::class);
+});
+
+it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $notifiable = Mockery::mock();
+    $notifiable->shouldReceive('getEnabledChannels')->once()->with($event)->andReturn([]);
+
+    (new BackupSuccess($backup, $warning))->via($notifiable);
+})->with([
+    'without warning' => [null, 'backup_success'],
+    'with warning' => ['S3 upload failed: denied', 'backup_failure'],
+]);
