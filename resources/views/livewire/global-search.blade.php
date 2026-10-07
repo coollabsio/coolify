@@ -11,12 +11,10 @@
     searchQuery: '',
     creatableItems: [],
     isCreateMode: false,
-    // macOS/iOS use ⌘; Windows/Linux use Ctrl+
-    modKeyLabel: (() => {
-        const platform = navigator.userAgentData?.platform || navigator.platform || '';
-        const ua = navigator.userAgent || '';
-        return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
-    })(),
+    // Settings of the open resource page (from its sidebar). 'global' shows them above
+    // the global results; 'page' shows only them. Tab switches the scope.
+    pageItems: [],
+    scope: 'global',
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
     developerCommandsEnabled: @js(app()->environment('local')),
 
@@ -33,9 +31,63 @@
         this.closeModal();
     },
 
+    get pageResults() {
+        const query = this.searchQuery.toLowerCase().trim();
+        if (this.scope !== 'page' && !query) {
+            return [];
+        }
+
+        const results = this.pageItems.filter(item => item.search_text.toLowerCase().includes(query));
+        return this.scope === 'page' ? results : results.slice(0, 5);
+    },
+
+    readPageItems() {
+        try {
+            return JSON.parse(document.querySelector('[data-settings-search-items]')?.dataset.settingsSearchItems || '[]');
+        } catch (e) {
+            return [];
+        }
+    },
+
+    setScope(scope) {
+        this.scope = scope;
+        this.selectedIndex = -1;
+        this.$refs.searchInput?.focus();
+    },
+
+    toggleScope() {
+        this.setScope(this.scope === 'page' ? 'global' : 'page');
+    },
+
+    // Mobile browsers (iOS Safari) open the keyboard only when focus happens inside the
+    // tap handler. The palette is still hidden here, so focus a temporary input now and
+    // move the focus to the search input when the palette shows. The keyboard stays open.
+    holdKeyboardFocus() {
+        const holder = document.createElement('input');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;';
+        document.body.appendChild(holder);
+        holder.focus();
+        setTimeout(() => holder.remove(), 1000);
+    },
+
+    openPageItem(item) {
+        const url = new URL(item.href, window.location.href);
+        this.closeModal();
+
+        if (url.pathname === window.location.pathname && url.hash) {
+            history.replaceState(null, '', url.hash);
+            window.scrollToSettingsSection?.(url.hash.slice(1));
+        } else if (item.navigate && window.Livewire?.navigate) {
+            window.Livewire.navigate(url.href);
+        } else {
+            window.location.assign(url.href);
+        }
+    },
+
     // Client-side search function
     get searchResults() {
-        if (!this.searchQuery || this.searchQuery.length < 1) {
+        if (this.scope === 'page' || !this.searchQuery || this.searchQuery.length < 1) {
             return [];
         }
 
@@ -55,7 +107,7 @@
     },
 
     get filteredCreatableItems() {
-        if (!this.searchQuery || this.searchQuery.length < 1) {
+        if (this.scope === 'page' || !this.searchQuery || this.searchQuery.length < 1) {
             return [];
         }
 
@@ -102,11 +154,14 @@
         }
         clearTimeout(this.closeResetTimer);
         clearTimeout(this.spinnerTimer);
+        this.holdKeyboardFocus();
         this.modalOpen = true;
         this.selectedIndex = -1;
         this.isLoadingInitialData = true;
         this.showLoadingSpinner = false;
         this.searchQuery = '';
+        this.pageItems = this.readPageItems();
+        this.scope = 'global';
         // Only show the spinner when loading takes longer than 150ms, so fast (cached) loads do not flash the icon
         this.spinnerTimer = setTimeout(() => {
             if (this.isLoadingInitialData) this.showLoadingSpinner = true;
@@ -207,7 +262,7 @@
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
                 'new redis', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new sqlite'
             ];
-            if (exactMatchCommands.includes(trimmed)) {
+            if (this.scope === 'global' && exactMatchCommands.includes(trimmed)) {
                 const matchingItem = this.creatableItems.find(item => {
                     const itemSearchText = `new ${item.name}`.toLowerCase();
                     const itemType = `new ${item.type}`.toLowerCase();
@@ -271,6 +326,14 @@
                 }
             }
         };
+        // Capture phase, so the focus trap of the open palette does not move focus first
+        const tabKeyHandler = (e) => {
+            if (e.key !== 'Tab' || !this.modalOpen || this.pageItems.length === 0) return;
+            if (document.activeElement !== this.$refs.searchInput) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            this.toggleScope();
+        };
         const arrowKeyHandler = (e) => {
             if (!this.modalOpen) return;
             if (e.key === 'ArrowDown') {
@@ -288,6 +351,7 @@
         document.addEventListener('keydown', cmdKHandler);
         document.addEventListener('keydown', escapeKeyHandler);
         document.addEventListener('keydown', arrowKeyHandler);
+        document.addEventListener('keydown', tabKeyHandler, true);
 
         // Cleanup on component destroy
         this.$el.addEventListener('alpine:destroy', () => {
@@ -296,6 +360,7 @@
             document.removeEventListener('keydown', cmdKHandler);
             document.removeEventListener('keydown', escapeKeyHandler);
             document.removeEventListener('keydown', arrowKeyHandler);
+            document.removeEventListener('keydown', tabKeyHandler, true);
         });
 
         // Watch for auto-open resource (only if $wire is available)
@@ -358,20 +423,21 @@
                         </svg>
                     </span>
                     <input type="text" x-model="searchQuery"
-                        placeholder="Search resources, paths, everything (type new for create)..." x-ref="searchInput"
+                        :placeholder="scope === 'page' ? 'Search this page…' : 'Search resources, paths, everything (type new for create)...'"
+                        x-ref="searchInput"
                         x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
                         class="command-palette-input" autocomplete="off" spellcheck="false" />
-                    <div class="command-palette-shortcuts">
-                        <span class="command-palette-kbd">/</span>
-                        <span class="command-palette-kbd" x-text="modKeyLabel + 'K'"></span>
-                        <button type="button" @click="closeModal()" class="command-palette-kbd" title="Close">
-                            ESC
-                        </button>
+                    <div x-show="pageItems.length > 0" x-cloak class="command-palette-scope" role="group"
+                        aria-label="Search scope" title="Press Tab to switch between global search and this page">
+                        <button type="button" @click="setScope('global')" :aria-pressed="scope === 'global'"
+                            class="command-palette-scope-option">Global</button>
+                        <button type="button" @click="setScope('page')" :aria-pressed="scope === 'page'"
+                            class="command-palette-scope-option">This page</button>
                     </div>
                 </div>
 
                 <!-- Search results -->
-                <div x-show="searchQuery.length >= 1" x-cloak class="command-palette-body relative">
+                <div x-show="searchQuery.length >= 1 || scope === 'page'" x-cloak class="command-palette-body relative">
                     @if (app()->environment('local'))
                         <div x-show="showServerTimingCommand && !$wire.isSelectingResource"
                             class="command-palette-section">
@@ -602,9 +668,31 @@
                     @endif
 
                     <div wire:ignore>
+                        <template x-if="pageResults.length > 0 && !$wire.isSelectingResource">
+                        <div class="command-palette-section">
+                            <div class="command-palette-group-label">This page</div>
+                            <template x-for="item in pageResults" :key="item.href">
+                                <a :href="item.href" @click.prevent="openPageItem(item)"
+                                    class="search-result-item command-palette-item">
+                                    <div class="command-palette-item-main">
+                                        <div class="command-palette-item-title">
+                                            <span class="command-palette-item-name" x-text="item.label"></span>
+                                        </div>
+                                        <div class="command-palette-item-meta" x-text="item.breadcrumb"></div>
+                                    </div>
+                                    <svg class="command-palette-item-chevron" viewBox="0 0 24 24" fill="none"
+                                        aria-hidden="true">
+                                        <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </a>
+                            </template>
+                        </div>
+                        </template>
+
                         <template x-if="searchQuery.length >= 1 && searchResults.length > 0 && !$wire.isSelectingResource">
                         <div class="command-palette-section">
-                            <template x-if="filteredCreatableItems.length > 0">
+                            <template x-if="filteredCreatableItems.length > 0 || pageResults.length > 0">
                                 <div class="command-palette-group-label">Existing resources</div>
                             </template>
                             <template x-for="(result, index) in searchResults" :key="index">
@@ -704,11 +792,20 @@
                         </template>
 
                         <template
-                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !showServerTimingCommand && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
+                            x-if="scope === 'global' && searchQuery.length >= 2 && pageResults.length === 0 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !showServerTimingCommand && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
                             <div class="command-palette-empty">
                                 <p class="command-palette-empty-title">No results found</p>
                                 <p class="command-palette-empty-desc">
                                     Try different keywords, or type <span class="font-medium">new</span> to create a resource.
+                                </p>
+                            </div>
+                        </template>
+
+                        <template x-if="scope === 'page' && pageResults.length === 0">
+                            <div class="command-palette-empty">
+                                <p class="command-palette-empty-title">Nothing on this page</p>
+                                <p class="command-palette-empty-desc">
+                                    Press <span class="font-medium">Tab</span> to search everything.
                                 </p>
                             </div>
                         </template>
