@@ -2281,6 +2281,17 @@ class Application extends BaseModel
     }
 
     /**
+     * One shell command that clones the repository without a checkout into $checkoutDir on the server,
+     * with the same credentials (GitHub App token, GitLab token, or deploy key) as a deployment.
+     */
+    public function serverCheckoutCommand(string $uuid, string $checkoutDir): string
+    {
+        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
+
+        return str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand));
+    }
+
+    /**
      * Commands that check out only the Compose file on the server and print it. They run on the
      * server itself, not in a helper container, so the checkout uses an absolute folder in /tmp.
      *
@@ -2289,8 +2300,7 @@ class Application extends BaseModel
     private function composeFileReadCommands(string $uuid, string $gitVersion): Collection
     {
         $checkoutDir = "/tmp/{$uuid}/checkout";
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
-        $cloneCommand = str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand));
+        $cloneCommand = $this->serverCheckoutCommand($uuid, $checkoutDir);
         $workdir = rtrim($this->base_directory, '/');
         $fileList = collect([".{$workdir}{$this->docker_compose_location}"]);
         $composeFilePath = escapeshellarg(".{$workdir}{$this->docker_compose_location}");

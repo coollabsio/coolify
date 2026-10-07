@@ -29,10 +29,26 @@ test('getSuggestedBuildPack returns dockerfile when only dockerfiles found', fun
     expect($result->getSuggestedBuildPack())->toBe(BuildPackTypes::DOCKERFILE);
 });
 
-test('getSuggestedBuildPack returns nixpacks when nothing found', function () {
+test('getSuggestedBuildPack returns null when nothing found', function () {
     $result = RepositoryDetectionResult::none();
 
-    expect($result->getSuggestedBuildPack())->toBe(BuildPackTypes::NIXPACKS);
+    expect($result->getSuggestedBuildPack())->toBeNull();
+});
+
+test('getSuggestedBuildPack ignores files in subdirectories', function () {
+    $result = new RepositoryDetectionResult(
+        dockerfiles: ['Dockerfile', 'apps/api/Dockerfile'],
+        dockerComposeFiles: ['examples/demo/docker-compose.yml'],
+    );
+
+    expect($result->getSuggestedBuildPack())->toBe(BuildPackTypes::DOCKERFILE);
+
+    $nestedOnly = new RepositoryDetectionResult(
+        dockerfiles: ['apps/api/Dockerfile'],
+        dockerComposeFiles: ['examples/demo/docker-compose.yml'],
+    );
+
+    expect($nestedOnly->getSuggestedBuildPack())->toBeNull();
 });
 
 test('hasDockerfile returns true when dockerfiles present', function () {

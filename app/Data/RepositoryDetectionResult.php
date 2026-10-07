@@ -25,17 +25,31 @@ class RepositoryDetectionResult extends Data
         return new self;
     }
 
-    public function getSuggestedBuildPack(): BuildPackTypes
+    /**
+     * Build pack for the files in the base directory. Files in subdirectories are often examples,
+     * tests, or other services, so they do not select a build pack.
+     */
+    public function getSuggestedBuildPack(): ?BuildPackTypes
     {
-        if (count($this->dockerComposeFiles) > 0) {
+        if ($this->baseDirectoryFile($this->dockerComposeFiles)) {
             return BuildPackTypes::DOCKERCOMPOSE;
         }
 
-        if (count($this->dockerfiles) > 0) {
+        if ($this->baseDirectoryFile($this->dockerfiles)) {
             return BuildPackTypes::DOCKERFILE;
         }
 
-        return BuildPackTypes::NIXPACKS;
+        return null;
+    }
+
+    /**
+     * The first file that is directly in the base directory, not in a subdirectory.
+     *
+     * @param  array<int, string>  $files
+     */
+    public function baseDirectoryFile(array $files): ?string
+    {
+        return collect($files)->first(fn (string $file): bool => ! str_contains($file, '/'));
     }
 
     public function hasDockerfile(): bool

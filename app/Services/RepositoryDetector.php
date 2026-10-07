@@ -3,109 +3,85 @@
 namespace App\Services;
 
 use App\Data\RepositoryDetectionResult;
+use App\Models\Application;
 use App\Models\Server;
-use Illuminate\Support\Facades\Log;
-use Visus\Cuid2\Cuid2;
+use Illuminate\Support\Collection;
+use RuntimeException;
 
 class RepositoryDetector
 {
     /**
-     * Env file patterns considered safe to import (template/example files, not real secrets).
+     * Largest env template that is read from the repository, in bytes.
      */
-    private const ENV_FILE_PATTERN = '^\\.env\\.(example|sample|template|dist|local\\.example|development|production|staging|testing|test)$';
+    private const MAX_ENV_FILE_BYTES = 65536;
 
+    /**
+     * @param  Application  $application  Unsaved application with the repository, branch, and Git source or deploy key.
+     */
     public function __construct(
-        private string $repositoryUrl,
-        private string $branch,
+        private Application $application,
         private string $baseDirectory,
-        private int $serverId,
-        private int $teamId,
+        private Server $server,
     ) {}
 
+    /**
+     * @throws RuntimeException When the repository cannot be read.
+     */
     public function detect(): RepositoryDetectionResult
     {
-        $server = Server::query()
-            ->where('id', $this->serverId)
-            ->where('team_id', $this->teamId)
-            ->first();
-
-        if (! $server) {
-            Log::debug('Repository detection skipped: server not found', [
-                'serverId' => $this->serverId,
-                'teamId' => $this->teamId,
-            ]);
-
-            return RepositoryDetectionResult::none();
-        }
-
-        $uuid = (string) new Cuid2;
-        if (strlen($uuid) < 10 || ! preg_match('/^[a-z0-9]+$/', $uuid)) {
-            return RepositoryDetectionResult::none();
-        }
-
-        $tempDir = "/tmp/coolify-detect-{$uuid}";
-        $baseDir = rtrim($this->baseDirectory, '/');
-        if ($baseDir === '') {
-            $baseDir = '/';
-        }
-        $cdBase = $baseDir === '/' ? '' : $baseDir;
-
-        $workDir = escapeshellarg("{$tempDir}{$cdBase}");
-        $envPattern = self::ENV_FILE_PATTERN;
-
-        $escapedTempDir = escapeshellarg($tempDir);
-
-        $commands = collect([
-            'rm -rf -- '.$escapedTempDir,
-            "trap 'rm -rf -- {$escapedTempDir}' EXIT",
-            'git clone --depth 1 -b '.escapeshellarg($this->branch).' '.escapeshellarg($this->repositoryUrl).' '.escapeshellarg($tempDir).' >/dev/null 2>&1 || git clone --depth 1 '.escapeshellarg($this->repositoryUrl).' '.escapeshellarg($tempDir).' >/dev/null 2>&1',
-            "cd {$workDir}",
-            // Collect file lists into shell variables
-            'df_list=$(git ls-files | grep -iE \'(^|/)Dockerfile(\.[a-zA-Z0-9_-]+)?$\' || true)',
-            'compose_list=$(git ls-files | grep -iE \'(^|/)(docker-compose\.(yml|yaml)|compose\.(yml|yaml))$\' || true)',
-            'env_list=$(git ls-files | grep -iE \''.$envPattern.'\' || true)',
-            // Build env file contents as a JSON object (uses jq to safely encode file content)
-            'env_json=\'{}\'',
-            'for f in $env_list; do',
-            '  file_json=$(jq -Rs \'.\' "$f")',
-            '  env_json=$(echo "$env_json" | jq --arg k "$f" --argjson v "$file_json" \'. + {($k): $v}\')',
-            'done',
-            // Build dockerfile ports as a JSON object
-            'port_json=\'{}\'',
-            'for f in $df_list; do',
-            '  port=$(grep -m1 \'^EXPOSE\' "$f" 2>/dev/null | awk \'{print $2}\' || true)',
-            '  if [ -n "$port" ] && echo "$port" | grep -qE \'^[0-9]+$\'; then',
-            '    port_json=$(echo "$port_json" | jq --arg k "$f" --argjson v "$port" \'. + {($k): $v}\')',
-            '  else',
-            '    port_json=$(echo "$port_json" | jq --arg k "$f" \'. + {($k): null}\')',
-            '  fi',
-            'done',
-            // Output structured JSON
-            'jq -n \\',
-            '  --argjson dockerfiles "$(echo "$df_list" | jq -R -s \'split("\\n") | map(select(. != ""))\')" \\',
-            '  --argjson dockerComposeFiles "$(echo "$compose_list" | jq -R -s \'split("\\n") | map(select(. != ""))\')" \\',
-            '  --argjson envFiles "$env_json" \\',
-            '  --argjson dockerfilePorts "$port_json" \\',
-            '  \'$ARGS.named\'',
-        ]);
+        $uuid = new_public_id();
 
         try {
-            $output = instant_remote_process($commands, $server, throwError: false, timeout: 60);
-
-            if (! $output) {
-                return RepositoryDetectionResult::none();
-            }
-
-            return $this->parseOutput($output);
-        } catch (\Throwable $e) {
-            Log::debug('Repository detection failed', [
-                'error' => $e->getMessage(),
-                'repositoryUrl' => $this->repositoryUrl,
-                'branch' => $this->branch,
-            ]);
-
-            return RepositoryDetectionResult::none();
+            $output = instant_remote_process($this->scanCommands($uuid), $this->server, timeout: 60);
+        } finally {
+            instant_remote_process(["rm -rf /tmp/{$uuid}"], $this->server, false);
         }
+
+        return $this->parseOutput((string) str($output)->trim()->afterLast("\n"));
+    }
+
+    /**
+     * Clones the repository without a checkout and lists the files with `git ls-tree`, so no file is
+     * written to the disk. Each command is one line because non-root servers send every line through
+     * parseCommandsByLineForSudo().
+     *
+     * @return Collection<int, string>
+     */
+    protected function scanCommands(string $uuid): Collection
+    {
+        $checkoutDir = "/tmp/{$uuid}/checkout";
+        $baseDir = trim($this->baseDirectory, '/');
+        if (preg_match('~(^|/)\.\.?(/|$)~', $baseDir) || ! preg_match('~^[a-zA-Z0-9_./-]*$~', $baseDir)) {
+            throw new RuntimeException('Invalid repository base directory.');
+        }
+        $tree = escapeshellarg($baseDir === '' ? 'HEAD' : "HEAD:{$baseDir}");
+        $maxEnvBytes = self::MAX_ENV_FILE_BYTES;
+
+        $classifyFiles = <<<'AWK'
+{ split($1, meta, " "); if (meta[1] != "100644" && meta[1] != "100755") next; path = $2; lower = tolower(path); name = lower; sub(/.*\//, "", name); if (name ~ /^dockerfile(\.[a-z0-9_-]+)?$/) kind = "dockerfile"; else if (name ~ /^(docker-)?compose\.ya?ml$/) kind = "compose"; else if (lower ~ /^\.env\.(example|sample|template|dist|local\.example)$/) kind = "env"; else next; print kind "\t" meta[3] "\t" path }
+AWK;
+        $exposedPort = <<<'AWK'
+{ sub(/\r$/, "") } toupper($1) == "EXPOSE" { split($2, p, "/"); if (p[1] ~ /^[0-9]+$/ && p[1] + 0 > 0 && p[1] + 0 <= 65535) print p[1] + 0; exit }
+AWK;
+        $summary = '{dockerfiles: map(select(.kind == "dockerfile") | .file), dockerComposeFiles: map(select(.kind == "compose") | .file), envFiles: (map(select(.kind == "env") | {(.file): .content}) | add // {}), dockerfilePorts: (map(select(.kind == "dockerfile") | {(.file): .port}) | add // {})}';
+
+        $scan = 'tab=$(printf "\t"); '
+            ."git -c core.quotePath=false ls-tree -r {$tree} | awk -F '\\t' ".escapeshellarg($classifyFiles)
+            .' | while IFS="$tab" read -r kind object file; do case "$kind" in '
+            .'dockerfile) port=$(git cat-file blob "$object" | awk '.escapeshellarg($exposedPort).'); '
+            .'jq -nc --arg file "$file" --argjson port "${port:-null}" \'{kind: "dockerfile", file: $file, port: $port}\' ;; '
+            .'compose) jq -nc --arg file "$file" \'{kind: "compose", file: $file}\' ;; '
+            ."env) git cat-file blob \"\$object\" | head -c {$maxEnvBytes} | jq -Rsc --arg file \"\$file\" '{kind: \"env\", file: \$file, content: .}' ;; "
+            .'esac; done | jq -sc '.escapeshellarg($summary);
+
+        return collect([
+            "rm -rf /tmp/{$uuid}",
+            "mkdir -p /tmp/{$uuid}",
+            "cd /tmp/{$uuid}",
+            'sh -c '.escapeshellarg($this->application->serverCheckoutCommand($uuid, $checkoutDir)),
+            "cd {$checkoutDir}",
+            'sh -c '.escapeshellarg($scan),
+        ]);
     }
 
     protected function parseOutput(string $output): RepositoryDetectionResult
@@ -116,16 +92,38 @@ class RepositoryDetector
             return RepositoryDetectionResult::none();
         }
 
+        foreach (['dockerfiles', 'dockerComposeFiles', 'envFiles', 'dockerfilePorts'] as $key) {
+            if (isset($data[$key]) && ! is_array($data[$key])) {
+                return RepositoryDetectionResult::none();
+            }
+        }
+
         $dockerfilePorts = [];
         foreach ($data['dockerfilePorts'] ?? [] as $file => $port) {
-            $dockerfilePorts[$file] = is_numeric($port) ? (int) $port : null;
+            $dockerfilePorts[$file] = (is_int($port) || (is_string($port) && ctype_digit($port))) && (int) $port > 0 && (int) $port <= 65535 ? (int) $port : null;
         }
 
         return new RepositoryDetectionResult(
-            dockerfiles: $data['dockerfiles'] ?? [],
-            dockerComposeFiles: $data['dockerComposeFiles'] ?? [],
-            envFiles: $data['envFiles'] ?? [],
+            dockerfiles: $this->sortByPreference(array_filter($data['dockerfiles'] ?? [], 'is_string'), '/^dockerfile$/i'),
+            dockerComposeFiles: $this->sortByPreference(array_filter($data['dockerComposeFiles'] ?? [], 'is_string'), '/^docker-compose\.ya?ml$/i'),
+            envFiles: array_filter($data['envFiles'] ?? [], fn ($content) => is_string($content) || $content === null),
             dockerfilePorts: $dockerfilePorts,
         );
+    }
+
+    /**
+     * Puts the file nearest to the base directory first. At the same depth, a file with the default
+     * name (for example `Dockerfile`) comes before a variant. Other files keep the scan order.
+     *
+     * @param  array<int|string, string>  $files
+     * @return array<int, string>
+     */
+    private function sortByPreference(array $files, string $defaultNamePattern): array
+    {
+        $files = array_values($files);
+        usort($files, fn (string $a, string $b): int => [substr_count($a, '/'), ! preg_match($defaultNamePattern, basename($a))]
+            <=> [substr_count($b, '/'), ! preg_match($defaultNamePattern, basename($b))]);
+
+        return $files;
     }
 }

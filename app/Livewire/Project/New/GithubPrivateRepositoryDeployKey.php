@@ -3,19 +3,15 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
-use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
-use App\Services\RepositoryDetector;
 use App\Support\ValidationPatterns;
 use App\Traits\HasRepositoryDetection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -138,29 +134,16 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->current_step = 'repository';
     }
 
-    public function detectRepository(): void
+    protected function applicationForDetection(): Application
     {
-        $this->detectionRan = false;
-        $this->envImported = false;
+        $this->get_git_source();
 
-        try {
-            $serverId = data_get($this->query, 'server_id');
-            $teamId = currentTeam()->id;
-
-            $detector = new RepositoryDetector(
-                repositoryUrl: $this->repository_url,
-                branch: $this->branch ?? 'main',
-                baseDirectory: $this->base_directory ?? '/',
-                serverId: (int) $serverId,
-                teamId: $teamId,
-            );
-
-            $this->applyDetectionResult($detector->detect());
-        } catch (\Throwable $e) {
-            Log::debug('Repository detection failed in component', ['error' => $e->getMessage()]);
-        }
-
-        $this->detectionRan = true;
+        return $this->unsavedApplicationForDetection(
+            $this->git_repository,
+            $this->branch ?? 'main',
+            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp ? $this->git_source : null,
+            PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id),
+        );
     }
 
     public function submit()
@@ -217,18 +200,10 @@ class GithubPrivateRepositoryDeployKey extends Component
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
             }
-            if ($this->build_pack === 'dockerfile' && $this->selectedDockerfile) {
-                if (! empty($this->detectedDockerfiles) && ! in_array($this->selectedDockerfile, $this->detectedDockerfiles, true)) {
-                    $this->selectedDockerfile = $this->detectedDockerfiles[0];
-                }
-                $application_init['dockerfile_location'] = $this->selectedDockerfile;
+            if ($this->build_pack === 'dockerfile' && $dockerfileLocation = $this->selectedDockerfileLocation()) {
+                $application_init['dockerfile_location'] = $dockerfileLocation;
             }
             if ($this->build_pack === 'dockercompose') {
-                if (! empty($this->detectedDockerComposeFiles) && $this->selectedDockerComposeFile
-                    && ! in_array($this->selectedDockerComposeFile, $this->detectedDockerComposeFiles, true)) {
-                    $this->selectedDockerComposeFile = $this->detectedDockerComposeFiles[0];
-                    $this->docker_compose_location = '/'.$this->selectedDockerComposeFile;
-                }
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
@@ -242,20 +217,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->name = generate_random_name($application->uuid);
             $application->save();
 
-            // Import environment variables from .env.example
-            if ($this->envImported && count($this->envExampleVars) > 0) {
-                DB::transaction(function () use ($application): void {
-                    foreach ($this->envExampleVars as $key => $value) {
-                        EnvironmentVariable::create([
-                            'key' => $key,
-                            'value' => $value,
-                            'resourceable_type' => $application->getMorphClass(),
-                            'resourceable_id' => $application->id,
-                            'is_preview' => false,
-                        ]);
-                    }
-                });
-            }
+            $this->importDetectedEnvironmentVariables($application);
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

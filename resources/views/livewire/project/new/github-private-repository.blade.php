@@ -1,4 +1,4 @@
-<div x-data="{ envModalOpen: false }" class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
+<div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
     @if ($github_apps->isEmpty())
         <section class="application-settings-section">
             <div class="application-settings-section-header">
@@ -94,46 +94,6 @@
         </section>
 
         @if ($branches->isNotEmpty())
-            {{-- Repository Detection --}}
-            <section class="application-settings-section">
-                <div class="application-settings-section-header">
-                    <div>
-                        <h2>Smart Scan</h2>
-                        <p>Detected configuration from your repository.</p>
-                    </div>
-                </div>
-                <div class="application-settings-section-body">
-                    <div wire:loading.flex wire:target="detectRepository" class="items-center gap-2 py-3 text-sm dark:text-neutral-400">
-                        <x-loading /> Scanning repository for Dockerfiles and configuration...
-                    </div>
-
-                    @if ($detectionRan)
-                        <div wire:loading.remove wire:target="detectRepository">
-                            <div class="flex items-center gap-3 flex-wrap text-sm">
-                                @if (count($detectedDockerfiles))
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300">
-                                        <span class="badge badge-success"></span>
-                                        Dockerfile{{ count($detectedDockerfiles) > 1 ? 's' : '' }}
-                                        <span class="dark:text-neutral-400">({{ count($detectedDockerfiles) }})</span>
-                                    </span>
-                                @endif
-                                @if (count($detectedDockerComposeFiles))
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300">
-                                        <span class="badge badge-success"></span>
-                                        Docker Compose
-                                        <span class="dark:text-neutral-400">({{ count($detectedDockerComposeFiles) }})</span>
-                                    </span>
-                                @endif
-                                @include('livewire.project.new.partials.env-detection-badges')
-                                @if (!count($detectedDockerfiles) && !count($detectedDockerComposeFiles) && !count($detectedEnvFiles))
-                                    <span class="dark:text-neutral-400">No Dockerfile, Docker Compose, or env files detected.</span>
-                                @endif
-                            </div>
-                        </div>
-                    @endif
-                </div>
-            </section>
-
             <form wire:submit="submit">
                 <section class="application-settings-section">
                     <div class="application-settings-section-header">
@@ -144,6 +104,8 @@
                         <x-forms.button type="submit" wire:target="submit" isHighlighted>Continue</x-forms.button>
                     </div>
                     <div class="application-settings-section-body space-y-5">
+                        @include('livewire.project.new.partials.smart-scan-summary')
+
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.listbox searchable id="selected_branch_name" label="Branch" required
                                 searchPlaceholder="Search branches…"
@@ -174,24 +136,21 @@
                             @endif
                         </div>
 
-                        {{-- Dockerfile selector when multiple detected --}}
-                        @if ($build_pack === 'dockerfile' && count($detectedDockerfiles) > 1)
-                            <x-forms.select wire:model.live="selectedDockerfile" label="Dockerfile"
-                                helper="Multiple Dockerfiles were detected in your repository. Select which one to use.">
-                                @foreach ($detectedDockerfiles as $df)
-                                    <option value="{{ $df }}">{{ $df }}</option>
-                                @endforeach
-                            </x-forms.select>
+                        {{-- Dockerfile: pick a detected file or type a path --}}
+                        @if ($build_pack === 'dockerfile')
+                            <x-forms.listbox id="selectedDockerfile" label="Dockerfile" live searchable allowCustom placeholder="/Dockerfile"
+                                emptyText="No Dockerfiles detected. Type a path in the search field."
+                                searchPlaceholder="Search or type a path…"
+                                helper="Select a detected Dockerfile, or type a path relative to the base directory."
+                                :options="collect($detectedDockerfiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
                         @endif
 
-                        {{-- Docker Compose file selector when multiple detected --}}
-                        @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 1)
-                            <x-forms.select wire:model.live="selectedDockerComposeFile" label="Docker Compose File"
-                                helper="Multiple Docker Compose files were detected. Select which one to use.">
-                                @foreach ($detectedDockerComposeFiles as $cf)
-                                    <option value="{{ $cf }}">{{ $cf }}</option>
-                                @endforeach
-                            </x-forms.select>
+                        {{-- Docker Compose file selector: pick a detected file or type a path --}}
+                        @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 0)
+                            <x-forms.listbox id="selectedDockerComposeFile" label="Docker Compose File" live searchable allowCustom
+                                searchPlaceholder="Search or type a path…"
+                                helper="Select a detected Docker Compose file, or type a path relative to the base directory."
+                                :options="collect($detectedDockerComposeFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
                         @endif
 
                         @if ($build_pack === 'dockercompose')
@@ -224,9 +183,6 @@
                     </div>
                 </section>
             </form>
-
-            {{-- Environment Variables Import Modal --}}
-            @include('livewire.project.new.partials.env-import-modal')
         @endif
     @endif
 </div>
