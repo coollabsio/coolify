@@ -678,7 +678,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1087,7 +1087,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1496,7 +1496,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1846,7 +1846,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -2182,7 +2182,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -6119,6 +6119,8 @@ paths:
           $ref: '#/components/responses/404'
         '409':
           description: 'Another start, restart or import of this database is already in progress.'
+        '422':
+          description: 'The database cannot start yet, for example because a CA certificate is missing.'
       security:
         -
           bearerAuth: []
@@ -6194,6 +6196,8 @@ paths:
           $ref: '#/components/responses/404'
         '409':
           description: 'Another start, restart or import of this database is already in progress.'
+        '422':
+          description: 'The database cannot start yet, for example because a CA certificate is missing.'
       security:
         -
           bearerAuth: []
@@ -10892,6 +10896,7 @@ paths:
                   traffic_retention_1d_days: { type: integer }
                   is_geoip_enabled: { type: boolean }
                   geoip_refresh_days: { type: integer }
+                  traffic_ip_mode: { description: 'How Sentinel stores client IPs for the Top IPs breakdown.', type: string, enum: [full, anonymized, 'off'] }
                   geoip_maxmind_license_key: { description: 'Only present with read:sensitive.', type: string }
                 type: object
         '401':
@@ -10962,6 +10967,10 @@ paths:
                   minimum: 1
                 geoip_maxmind_license_key:
                   type: [string, 'null']
+                traffic_ip_mode:
+                  description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'
+                  type: string
+                  enum: [full, anonymized, 'off']
               type: object
       responses:
         '200':
@@ -14875,6 +14884,12 @@ components:
           default: 36000
           maximum: 36000
           minimum: 60
+        missing_backup_notification_days:
+          description: 'Alert after this many days without an execution; 0 disables alerts'
+          type: integer
+          default: 0
+          maximum: 365
+          minimum: 0
       type: object
       additionalProperties: false
     VolumeBackupScheduleResponse:
@@ -14895,6 +14910,7 @@ components:
         - retention_days_s3
         - retention_max_storage_s3
         - timeout
+        - missing_backup_notification_days
       properties:
         uuid:
           type: string
@@ -14936,6 +14952,8 @@ components:
           type: number
           format: float
         timeout:
+          type: integer
+        missing_backup_notification_days:
           type: integer
       type: object
     Application:
@@ -15717,6 +15735,12 @@ components:
           type: boolean
         geoip_refresh_days:
           type: integer
+        traffic_ip_mode:
+          type: string
+          enum:
+            - full
+            - anonymized
+            - 'off'
         is_reachable:
           type: boolean
         is_sentinel_enabled:

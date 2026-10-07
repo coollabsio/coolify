@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\TrafficIpMode;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
 use App\Models\ServerSetting;
@@ -26,6 +27,7 @@ class ServerSentinelController extends Controller
         'is_geoip_enabled',
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
+        'traffic_ip_mode',
     ];
 
     private function findServerForTeam(int $teamId, string $uuid): ?Server
@@ -55,6 +57,7 @@ class ServerSentinelController extends Controller
             'traffic_retention_1d_days' => (int) $settings->traffic_retention_1d_days,
             'is_geoip_enabled' => (bool) $settings->is_geoip_enabled,
             'geoip_refresh_days' => (int) $settings->geoip_refresh_days,
+            'traffic_ip_mode' => TrafficIpMode::forServer($server)->value,
         ];
 
         if ($this->canReadSensitive()) {
@@ -97,6 +100,7 @@ class ServerSentinelController extends Controller
                         new OA\Property(property: 'traffic_retention_1d_days', type: 'integer'),
                         new OA\Property(property: 'is_geoip_enabled', type: 'boolean'),
                         new OA\Property(property: 'geoip_refresh_days', type: 'integer'),
+                        new OA\Property(property: 'traffic_ip_mode', type: 'string', enum: ['full', 'anonymized', 'off'], description: 'How Sentinel stores client IPs for the Top IPs breakdown.'),
                         new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', description: 'Only present with read:sensitive.'),
                     ],
                     type: 'object',
@@ -152,6 +156,7 @@ class ServerSentinelController extends Controller
                     new OA\Property(property: 'is_geoip_enabled', type: 'boolean'),
                     new OA\Property(property: 'geoip_refresh_days', type: 'integer', minimum: 1),
                     new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', nullable: true),
+                    new OA\Property(property: 'traffic_ip_mode', type: 'string', enum: ['full', 'anonymized', 'off'], description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'),
                 ],
                 type: 'object',
             ),
@@ -198,6 +203,7 @@ class ServerSentinelController extends Controller
             'is_geoip_enabled' => 'boolean',
             'geoip_refresh_days' => 'integer|min:1',
             'geoip_maxmind_license_key' => 'nullable|string|max:255',
+            'traffic_ip_mode' => 'string|in:full,anonymized,off',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);

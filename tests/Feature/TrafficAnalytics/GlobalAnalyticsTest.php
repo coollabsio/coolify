@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TrafficIpMode;
 use App\Livewire\Analytics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -469,3 +470,52 @@ it('queries Sentinel with the same window for loads within one cache interval', 
         ->and($fake->urls)->not->toBeEmpty()
         ->and(array_values(array_diff($fake->urls, $firstUrls)))->toBe([]);
 });
+
+it('labels the IP breakdown by the client IP mode of the queried servers', function (string $mode, ?string $label) {
+    $server = bootEnabledGlobalServer();
+    $server->settings->traffic_ip_mode = $mode;
+    // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+    $server->settings->saveQuietly();
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = fakeGlobalAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $component = loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSet('ipMode', $mode)
+        ->assertSee('Top user agents');
+
+    if ($label === null) {
+        $component->assertDontSee('Top IPs')
+            ->assertDontSee('Top networks')
+            ->assertDontSee('203.0.113.7');
+        expect($component->instance()->breakdowns)->not->toHaveKey('ip');
+
+        return;
+    }
+
+    $component->assertSee($label)->assertSee('203.0.113.7');
+})->with([
+    'full' => ['full', 'Top IPs'],
+    'anonymized' => ['anonymized', 'Top networks'],
+    'off' => ['off', null],
+]);
+
+it('combines the client IP mode of several servers', function (array $modes, string $expected) {
+    $servers = collect($modes)->map(function (string $mode) {
+        $server = bootEnabledGlobalServer();
+        $server->settings->traffic_ip_mode = $mode;
+        // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+        $server->settings->saveQuietly();
+
+        return $server->fresh();
+    });
+
+    expect(TrafficIpMode::forServers($servers))->toBe(TrafficIpMode::from($expected));
+})->with([
+    'no servers' => [[], 'full'],
+    'all off' => [['off', 'off'], 'off'],
+    'anonymized and off' => [['anonymized', 'off'], 'anonymized'],
+    'full and anonymized' => [['full', 'anonymized'], 'full'],
+]);
