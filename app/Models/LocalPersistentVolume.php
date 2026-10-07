@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 
 class LocalPersistentVolume extends BaseModel
 {
@@ -191,7 +190,7 @@ class LocalPersistentVolume extends BaseModel
                 return true;
             }
 
-            $compose = Yaml::parse($composeContent);
+            $compose = parseDockerComposeYaml($composeContent);
             $services = data_get($compose, 'services', []);
             $topLevelVolumes = collect(data_get($compose, 'volumes') ?? []);
 
@@ -246,7 +245,7 @@ class LocalPersistentVolume extends BaseModel
                 return null;
             }
 
-            foreach (data_get(Yaml::parse($composeContent), 'volumes') ?? [] as $key => $declaration) {
+            foreach (data_get(parseDockerComposeYaml($composeContent), 'volumes') ?? [] as $key => $declaration) {
                 $key = (string) $key;
                 if (! isComposeExternalVolume($declaration)) {
                     continue;
@@ -293,7 +292,7 @@ class LocalPersistentVolume extends BaseModel
             }
 
             $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
-            foreach (data_get(Yaml::parse($composeContent), 'volumes') ?? [] as $key => $declaration) {
+            foreach (data_get(parseDockerComposeYaml($composeContent), 'volumes') ?? [] as $key => $declaration) {
                 if (! is_array($declaration) || isComposeExternalVolume($declaration)) {
                     continue;
                 }
@@ -334,7 +333,7 @@ class LocalPersistentVolume extends BaseModel
             }
 
             // Parse the docker-compose content
-            $compose = Yaml::parse($actualService->docker_compose_raw);
+            $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
             if (! isset($compose['services'])) {
                 return false;
             }

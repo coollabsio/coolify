@@ -2138,10 +2138,7 @@ class Application extends BaseModel
     public function oldRawParser()
     {
         try {
-            $yaml = Yaml::parse(
-                $this->docker_compose_raw,
-                maxAliasesForCollections: self::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES,
-            );
+            $yaml = parseDockerComposeYaml($this->docker_compose_raw);
         } catch (\Exception $e) {
             throw new RuntimeException($e->getMessage());
         }

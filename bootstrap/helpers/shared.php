@@ -1736,7 +1736,7 @@ function getTopLevelNetworks(Service|Application $resource): Collection
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
             } catch (Exception $e) {
                 // If the docker-compose.yml file is not valid, we will return the network name as the key
                 $topLevelNetworks = collect([
@@ -1802,7 +1802,7 @@ function getTopLevelNetworks(Service|Application $resource): Collection
         }
     } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
         } catch (Exception $e) {
             // If the docker-compose.yml file is not valid, we will return the network name as the key
             $topLevelNetworks = collect([
@@ -2742,7 +2742,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $envComments = extractYamlEnvironmentComments($resource->docker_compose_raw);
 
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
             } catch (Exception $e) {
                 throw new RuntimeException($e->getMessage());
             }
@@ -3534,7 +3534,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
     } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
         } catch (Exception) {
             return;
         }
@@ -4406,8 +4406,9 @@ function convertToKeyValueCollection($environment)
                         $key = $parts[0];
                         $realValue = $parts[1] ?? '';
                         $changedEnvironment->put($key, $realValue);
-                    } else {
-                        $changedEnvironment->put($key, $value);
+                    } elseif (is_string($value) && $value !== '') {
+                        // A bare name (for example a list-style build arg) is the same as `NAME:` without a value.
+                        $changedEnvironment->put($value, $changedEnvironment->get($value));
                     }
                 } else {
                     $changedEnvironment->put($key, $value);
@@ -5052,7 +5053,7 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
     }
 
     try {
-        $yaml = Yaml::parse($dockerComposeRaw);
+        $yaml = parseDockerComposeYaml($dockerComposeRaw);
     } catch (Exception $e) {
         // Malformed YAML - return empty collection
         return collect([]);
