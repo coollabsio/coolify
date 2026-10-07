@@ -7,6 +7,7 @@ use App\Enums\ProcessStatus;
 use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\RemoteProcessCommand;
 use App\Support\ResourceStartActivity;
@@ -127,8 +128,8 @@ class RunRemoteProcess
 
         $properties = [
             'exitCode' => $processResult->exitCode(),
-            'stdout' => $processResult->output(),
-            'stderr' => $processResult->errorOutput(),
+            'stdout' => $this->redact($processResult->output()),
+            'stderr' => $this->redact($processResult->errorOutput()),
             'status' => $status->value,
         ];
 
@@ -153,7 +154,7 @@ class RunRemoteProcess
             }
         }
         if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
-            throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
+            throw new \RuntimeException($this->redact($processResult->errorOutput()), $processResult->exitCode());
         }
 
         return $processResult;
@@ -215,7 +216,7 @@ class RunRemoteProcess
         $outputStack = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         $outputStack[] = [
             'type' => $type,
-            'output' => $output,
+            'output' => $this->redact($output),
             'timestamp' => hrtime(true),
             'batch' => ApplicationDeploymentJob::$batch_counter,
             'order' => $this->getLatestCounter(),
@@ -232,6 +233,11 @@ class RunRemoteProcess
         }
 
         return end($description)['order'] + 1;
+    }
+
+    private function redact(string $value): string
+    {
+        return resolve(SensitiveDataRedactor::class)->redactText($value);
     }
 
     /**

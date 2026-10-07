@@ -986,7 +986,7 @@ class ServicesController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = getContainerLogs($service->destination->server, $container['ID'], $lines, $showTimestamps);
+        $logs = sanitizeLogsForExport(getContainerLogs($service->destination->server, $container['ID'], $lines, $showTimestamps));
 
         return response()->json([
             'logs' => $logs,

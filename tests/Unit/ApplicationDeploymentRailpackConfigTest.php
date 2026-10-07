@@ -377,7 +377,7 @@ it('creates an empty build-time env file for railpack when there are no generate
     foreach ([
         'application_deployment_queue' => new class extends ApplicationDeploymentQueue
         {
-            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false): void {}
+            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false, ?string $command = null, int $batch = 1, array $knownSecrets = []): void {}
         },
         'build_pack' => 'railpack',
         'pull_request_id' => 0,

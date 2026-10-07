@@ -7,7 +7,7 @@ use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\EnvironmentVariable;
 use App\Models\Server;
-use Carbon\Carbon;
+use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Stringable;
@@ -22,52 +22,31 @@ trait ExecuteRemoteCommand
 
     public static int $batch_counter = 0;
 
-    private function redact_sensitive_info($text)
+    private function redact_sensitive_info(string $text): string
     {
         try {
-            $text = remove_iip($text);
-
-            if (! isset($this->application)) {
-                return $text;
+            $redactAllValues = isset($this->application) ? $this->application->redactsAllEnvValuesInLogs() : true;
+            $knownSecrets = isset($this->application)
+                ? EnvironmentVariable::logRedactionValuesFor($this->application->environment_variables, $redactAllValues)
+                : [];
+            if (isset($this->application, $this->pull_request_id) && $this->pull_request_id !== 0) {
+                $knownSecrets = array_merge($knownSecrets, EnvironmentVariable::logRedactionValuesFor($this->application->environment_variables_preview, $redactAllValues));
             }
-
-            $lockedVars = collect([]);
-
-            if (isset($this->application->environment_variables)) {
-                $lockedVars = $lockedVars->merge(
-                    $this->application->environment_variables
-                        ->where('is_shown_once', true)
-                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
-                        ->filter()
-                );
-            }
-
-            if (isset($this->pull_request_id) && $this->pull_request_id !== 0 && isset($this->application->environment_variables_preview)) {
-                $lockedVars = $lockedVars->merge(
-                    $this->application->environment_variables_preview
-                        ->where('is_shown_once', true)
-                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
-                        ->filter()
-                );
-            }
-
-            if (isset($this->remote_secrets_cache)) {
-                $lockedVars = $lockedVars->merge(EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache));
-            }
-
-            foreach ($lockedVars as $key => $value) {
-                $escapedValue = preg_quote($value, '/');
-                $text = preg_replace(
-                    '/'.$escapedValue.'/',
-                    REDACTED,
-                    $text
-                );
-            }
-
-            return is_string($text) ? $text : REDACTED;
         } catch (\Throwable) {
             return REDACTED;
         }
+
+        return app(SensitiveDataRedactor::class)->redactText($text, array_merge($knownSecrets, $this->remoteLogSecrets()));
+    }
+
+    /**
+     * Remote secrets are never stored in Coolify, so the deployment log model cannot find them.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function remoteLogSecrets(): array
+    {
+        return isset($this->remote_secrets_cache) ? EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache) : [];
     }
 
     public function execute_remote_command(...$commands)
@@ -184,41 +163,14 @@ trait ExecuteRemoteCommand
                 $log_output = "\n".$log_output;
             }
 
-            $new_log_entry = [
-                'command' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),
-                'output' => $this->redact_sensitive_info($skip_command_log ? $this->redactSensitiveCommandPayloads((string) $log_output, (string) $command) : $log_output),
-                'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
-                'timestamp' => Carbon::now('UTC'),
-                'hidden' => $hidden,
-                'batch' => static::$batch_counter,
-            ];
-            if (! $this->application_deployment_queue->logs) {
-                $new_log_entry['order'] = 1;
-            } else {
-                try {
-                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                } catch (\JsonException $e) {
-                    // If existing logs are corrupted, start fresh
-                    $previous_logs = [];
-                    $new_log_entry['order'] = 1;
-                }
-                if (is_array($previous_logs)) {
-                    $new_log_entry['order'] = count($previous_logs) + 1;
-                } else {
-                    $previous_logs = [];
-                    $new_log_entry['order'] = 1;
-                }
-            }
-            $previous_logs[] = $new_log_entry;
-
-            try {
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                // If JSON encoding still fails, use fallback with invalid sequences replacement
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_INVALID_UTF8_SUBSTITUTE);
-            }
-
-            $this->application_deployment_queue->save();
+            $this->application_deployment_queue->addLogEntry(
+                message: $skip_command_log ? $this->redactSensitiveCommandPayloads((string) $log_output, (string) $command) : (string) $log_output,
+                type: $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
+                hidden: $hidden,
+                command: $skip_command_log || $command_hidden ? null : $command,
+                batch: static::$batch_counter,
+                knownSecrets: $this->remoteLogSecrets(),
+            );
 
             $this->saveCommandOutput($sanitized_output, $append);
         });
@@ -319,40 +271,10 @@ trait ExecuteRemoteCommand
     {
         $retryMessage = "SSH connection failed. Retrying... (Attempt {$attempt}/{$maxRetries}, waiting {$delay}s)\nError: {$errorMessage}";
 
-        $new_log_entry = [
-            'output' => $this->redact_sensitive_info($retryMessage),
-            'type' => 'stdout',
-            'timestamp' => Carbon::now('UTC'),
-            'hidden' => false,
-            'batch' => static::$batch_counter,
-        ];
-
-        if (! $this->application_deployment_queue->logs) {
-            $new_log_entry['order'] = 1;
-            $previous_logs = [];
-        } else {
-            try {
-                $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                $previous_logs = [];
-                $new_log_entry['order'] = 1;
-            }
-            if (is_array($previous_logs)) {
-                $new_log_entry['order'] = count($previous_logs) + 1;
-            } else {
-                $previous_logs = [];
-                $new_log_entry['order'] = 1;
-            }
-        }
-
-        $previous_logs[] = $new_log_entry;
-
-        try {
-            $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_INVALID_UTF8_SUBSTITUTE);
-        }
-
-        $this->application_deployment_queue->save();
+        $this->application_deployment_queue->addLogEntry(
+            message: $retryMessage,
+            batch: static::$batch_counter,
+            knownSecrets: $this->remoteLogSecrets(),
+        );
     }
 }

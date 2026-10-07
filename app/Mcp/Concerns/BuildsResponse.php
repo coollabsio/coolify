@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Concerns;
 
+use App\Services\Security\SensitiveDataRedactor;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 
@@ -112,23 +113,7 @@ trait BuildsResponse
      */
     protected function redactLogText(string $text): string
     {
-        $text = remove_iip($text);
-
-        // password= / secret= / token= / "token":"..." style (shell or JSON; quoted or bare)
-        $text = preg_replace(
-            '/(?<![\w])["\']?(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token)["\']?\s*[=:]\s*["\']?[^\s"\']{3,}["\']?/i',
-            '$1='.REDACTED,
-            $text
-        ) ?? $text;
-
-        // export FOO=bar / "API_KEY":"..." style for sensitive-looking names
-        $text = preg_replace(
-            '/(?<![\w])(export\s+)?["\']?([A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)["\']?\s*[=:]\s*["\']?[^\s"\']{3,}["\']?/i',
-            '$1$2='.REDACTED,
-            $text
-        ) ?? $text;
-
-        return $text;
+        return app(SensitiveDataRedactor::class)->redactText($text);
     }
 
     /**

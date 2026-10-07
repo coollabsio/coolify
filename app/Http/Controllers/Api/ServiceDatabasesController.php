@@ -401,7 +401,7 @@ class ServiceDatabasesController extends Controller
         $lines = normalizeLogLines($request->query('lines'));
 
         return response()->json([
-            'logs' => getContainerLogs($server, $containerName, $lines),
+            'logs' => sanitizeLogsForExport(getContainerLogs($server, $containerName, $lines)),
         ]);
     }
 

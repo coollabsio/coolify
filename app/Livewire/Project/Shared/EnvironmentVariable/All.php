@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\Service;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
@@ -57,6 +58,8 @@ class All extends Component
 
     public bool $use_build_secrets = false;
 
+    public bool $redact_all_env_values_in_logs = true;
+
     /**
      * Environment variable rows are loaded after first paint via wire:init
      * so the surrounding configuration page can render immediately.
@@ -93,6 +96,9 @@ class All extends Component
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
+        if ($this->resource instanceof Application || $this->resource instanceof Service) {
+            $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+        }
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -118,6 +124,27 @@ class All extends Component
 
         if ($this->view === 'dev') {
             $this->getDevView();
+        }
+    }
+
+    public function saveLogRedactionSetting()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resource instanceof Application) {
+                $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->resource->settings->save();
+            } elseif ($this->resource instanceof Service) {
+                $this->resource->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->resource->save();
+            } else {
+                return;
+            }
+
+            $this->dispatch('success', 'Log redaction setting updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 

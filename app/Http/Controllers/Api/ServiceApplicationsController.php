@@ -528,7 +528,7 @@ class ServiceApplicationsController extends Controller
         }
 
         $lines = normalizeLogLines($request->query('lines'));
-        $logs = getContainerLogs($server, $containerName, $lines);
+        $logs = sanitizeLogsForExport(getContainerLogs($server, $containerName, $lines));
 
         return response()->json([
             'logs' => $logs,

@@ -2473,8 +2473,8 @@ test('redactLogText redacts JSON secret fields in log lines', function () {
         ->and($redacted)->toContain('ok')
         ->and($redacted)->not->toContain('redactme01')
         ->and($redacted)->not->toContain('redactme02')
-        ->and($redacted)->toContain('token=')
-        ->and($redacted)->toContain('API_KEY=')
+        ->and($redacted)->toContain('token')
+        ->and($redacted)->toContain('API_KEY')
         ->and($redacted)->toContain(REDACTED);
 
     // Shell-style still works alongside JSON

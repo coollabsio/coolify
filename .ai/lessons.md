@@ -101,3 +101,8 @@
 - In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`, `--project-directory <dir>`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs. scp also runs as the SSH user; stage files outside `/data/coolify`.
 - The parsers add sudo only to line starts (and after `&&`, `||`, `|`, `$(`). Put `if`/`else` branches on their own lines. When a redirect or `cd` must stay, make the whole line one `sh -c '...'` script; it runs as `sudo sh -c` without inner sudo or bash.
 - Tests that replace `DatabaseStartCommandExecutor` or use root servers miss non-root bugs. Test the parsed commands of a non-root server.
+
+## Redact sensitive output before every sink
+- Use one fail-closed redaction policy for database logs, framework logs, notifications, API output, exports, and MCP responses.
+- Replace known resource secrets before storage; format detection is only a second layer.
+- Keep read-time redaction for legacy records, but do not use it as the primary control.

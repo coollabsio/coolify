@@ -48,6 +48,17 @@
             @else
                 <p class="text-sm text-neutral-500 dark:text-fg-dim">Manage this resource's environment variables below.</p>
             @endif
+            @if (in_array($resourceClass, ['App\Models\Application', 'App\Models\Service'], true))
+                <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                    <x-forms.listbox id="redact_all_env_values_in_logs" label="Environment values in logs"
+                        onChange="saveLogRedactionSetting"
+                        helper="Hide every environment variable value in deployment and scheduled task logs. Locked variables and known secret formats are always hidden."
+                        :options="[
+                            ['value' => true, 'label' => 'Hide all values'],
+                            ['value' => false, 'label' => 'Hide locked values only'],
+                        ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                </div>
+            @endif
         @else
             <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
                 @can('manageEnvironment', $resource)

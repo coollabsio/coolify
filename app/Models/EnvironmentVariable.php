@@ -379,6 +379,20 @@ class EnvironmentVariable extends BaseModel
         return $values;
     }
 
+    /**
+     * Collect the values to hide in logs. A resource can limit this to locked variables.
+     *
+     * @param  iterable<self>|null  $variables
+     * @return array<int, string>
+     */
+    public static function logRedactionValuesFor(?iterable $variables, bool $redactAllValues = true): array
+    {
+        return collect($variables ?? [])
+            ->filter(fn (self $variable): bool => $redactAllValues || $variable->is_shown_once)
+            ->flatMap(fn (self $variable): array => $variable->logRedactionValues())
+            ->all();
+    }
+
     public function resolveReferencedValue(): ?string
     {
         $value = $this->value;

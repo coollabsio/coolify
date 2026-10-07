@@ -2670,7 +2670,7 @@ class ApplicationsController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps);
+        $logs = sanitizeLogsForExport(getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps));
 
         return response()->json([
             'logs' => $logs,

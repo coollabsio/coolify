@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -343,4 +344,47 @@ test('member keeps isValueHidden after switching to a team they own', function (
     ]);
 
     expect($component->get('isValueHidden'))->toBeTrue();
+});
+
+test('admin can limit log redaction to locked values for one application', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->assertSee('Environment values in logs')
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting')
+        ->assertHasNoErrors();
+
+    expect($this->application->settings->fresh()->redact_all_env_values_in_logs)->toBeFalse();
+});
+
+test('admin can limit log redaction to locked values for one service', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $service])
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    expect($service->fresh()->redact_all_env_values_in_logs)->toBeFalse();
+});
+
+test('member cannot change log redaction for an application', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    expect($this->application->settings->fresh()->redact_all_env_values_in_logs)->toBeTrue();
 });

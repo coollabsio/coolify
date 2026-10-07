@@ -60,6 +60,7 @@ class Service extends BaseModel
         'config_hash',
         'compose_parsing_version',
         'is_container_label_escape_enabled',
+        'redact_all_env_values_in_logs',
         'environment_id',
         'server_id',
         'destination_id',
@@ -67,6 +68,10 @@ class Service extends BaseModel
     ];
 
     protected $appends = ['server_status', 'status'];
+
+    protected $casts = [
+        'redact_all_env_values_in_logs' => 'boolean',
+    ];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
@@ -1567,6 +1572,14 @@ class Service extends BaseModel
     public function scheduled_tasks(): HasMany
     {
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
+    }
+
+    /**
+     * Whether logs hide every environment value, or only locked values.
+     */
+    public function redactsAllEnvValuesInLogs(): bool
+    {
+        return $this->redact_all_env_values_in_logs ?? true;
     }
 
     public function environment_variables()
