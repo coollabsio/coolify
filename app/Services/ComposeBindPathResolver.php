@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
+use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use RuntimeException;
@@ -12,12 +13,12 @@ use Symfony\Component\Yaml\Yaml;
 
 class ComposeBindPathResolver
 {
-    public static function resolve(LocalFileVolume $volume, ?string $composeFile = null, ?string $envFile = null, ?string $projectDirectory = null): string
+    public static function resolve(LocalFileVolume $volume, ?string $composeFile = null, ?string $envFile = null, ?string $projectDirectory = null, ?Server $server = null): string
     {
         $resource = $volume->resource;
         if ($resource instanceof Application) {
             $workdir = $resource->workdir();
-            $server = $resource->destination->server;
+            $server ??= $resource->destination->server;
             $composeFile ??= $workdir.'/docker-compose.yaml';
             $serviceName = null;
             $projectName = $resource->settings->is_raw_compose_deployment_enabled ? null : $resource->uuid;
@@ -39,7 +40,7 @@ class ComposeBindPathResolver
             }
         } elseif ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
             $workdir = $resource->service->workdir();
-            $server = $resource->service->server;
+            $server ??= $resource->service->server;
             $composeFile ??= $workdir.'/docker-compose.yml';
             $serviceName = $resource->name;
             $projectName = $resource->service->uuid;

@@ -91,7 +91,7 @@ test('file storage resolves its bind path again for each operation', function ()
     Process::assertRan(fn ($process) => str_contains($process->command, 'config --format json') && str_contains($process->command, '.env-main') && str_contains($process->command, '/artifacts/bind-path-test') && str_contains($process->command, '--no-env-resolution'));
     Process::assertRan(fn ($process) => str_contains($process->command, '/srv/first file') && str_contains($process->command, 'tee'));
     Process::assertRan(fn ($process) => str_contains($process->command, '/srv/second file') && str_contains($process->command, 'test -f'));
-    Process::assertRan(fn ($process) => str_contains($process->command, '/srv/second file') && str_contains($process->command, 'rm -rf'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '/srv/second file') && str_contains($process->command, 'rm -rf'));
     Process::assertNotRan(fn ($process) => ! str_contains($process->command, 'docker compose') && str_contains($process->command, '${DATA_PATH'));
 
     $source = '/tmp/x;id';
@@ -102,4 +102,17 @@ test('file storage resolves its bind path again for each operation', function ()
     $volume->fs_path = '/tmp/$(id)';
     expect(fn () => $volume->saveStorageOnServer())->toThrow(Exception::class);
     Process::assertNotRan(fn ($process) => str_contains($process->command, '/tmp/$(id)'));
+
+    $otherServer = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $key->id,
+        'ip' => '192.0.2.123',
+    ]);
+    $volume->fs_path = '${DATA_PATH:-./first}/file';
+    expect($volume->contentPathOnServer($otherServer))->toBe('/srv/safe');
+    expect($volume->initializeOnServer(server: $otherServer))->toBeNull();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "@'192.0.2.123'") && str_contains($process->command, 'config --format json'));
+    Process::assertRan(fn ($process) => str_contains($process->command, "@'192.0.2.123'") && str_contains($process->command, "tee '/srv/safe'"));
+
 });

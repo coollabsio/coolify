@@ -15,24 +15,63 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 600;
+    public $timeout = CleanupDocker::JOB_TIMEOUT;
 
     public $tries = 1;
 
     public ?string $usageBefore = null;
 
+    /**
+     * A manual run waits for a running cleanup (released and tried again), so its exceptions must not
+     * count as reasons to try again.
+     */
+    public $maxExceptions = 1;
+
+    /**
+     * Seconds a manual run waits before it tries again while another cleanup holds the server lock.
+     */
+    public const MANUAL_RELEASE_DELAY = 60;
+
     public ?DockerCleanupExecution $execution_log = null;
 
+    /**
+     * Shares the per-server lock with queued CleanupDocker runs, so two cleanups never run on
+     * one server at once. A scheduled run that finds the lock held marks its occurrence
+     * skipped (not missed); a stop-triggered run is dropped. A manual run is released and tried
+     * again until the running cleanup finishes (see retryUntil()). The lock outlives the job
+     * timeout, so a new run cannot start while a timed-out run is still finishing.
+     */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('docker-cleanup-'.$this->server->uuid))->expireAfter(600)->dontRelease()];
+        $withoutOverlapping = ScheduledJobDeliveryService::withoutOverlapping(CleanupDocker::overlapLockKey($this->server), $this->occurrenceUuid)
+            ->shared()
+            ->expireAfter(CleanupDocker::overlapLockExpiresAfter());
+
+        return [
+            $this->manualCleanup
+                ? $withoutOverlapping->releaseAfter(self::MANUAL_RELEASE_DELAY)
+                : $withoutOverlapping->dontRelease(),
+        ];
+    }
+
+    /**
+     * A manual run may wait for one full cleanup that holds the lock. Fixed at dispatch, so a manual run of a
+     * killed worker, which comes back after retry_after, fails instead of running late. Other runs try once.
+     */
+    public function retryUntil(): ?\DateTimeInterface
+    {
+        if (! $this->manualCleanup) {
+            return null;
+        }
+
+        return now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() + self::MANUAL_RELEASE_DELAY * 2);
     }
 
     public function __construct(
@@ -42,7 +81,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteUnusedNetworks = false,
         public ?string $occurrenceUuid = null,
     ) {
-        $this->onQueue('high');
+        $this->onQueue(maintenance_queue());
     }
 
     public function handle(): void
@@ -57,6 +96,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             $this->execution_log = DockerCleanupExecution::create([
                 'server_id' => $this->server->id,
             ]);
+            $this->rememberExecution();
 
             if (! $this->server->isFunctional()) {
                 $this->execution_log->update([
@@ -166,7 +206,29 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'finished_at' => Carbon::now()->toImmutable(),
                 ]);
             }
+
+            if (! $failed && $this->executionCacheKey()) {
+                Cache::forget($this->executionCacheKey());
+            }
         }
+    }
+
+    /**
+     * failed() runs on a fresh job copy built from the queue payload (for example after a worker timeout),
+     * so the execution this run created is kept under the queue job uuid instead of on the job.
+     */
+    private function rememberExecution(): void
+    {
+        if ($this->executionCacheKey()) {
+            Cache::put($this->executionCacheKey(), $this->execution_log->id, now()->addSeconds((int) config('queue.connections.redis.retry_after', 86400) + 3600));
+        }
+    }
+
+    private function executionCacheKey(): ?string
+    {
+        $jobUuid = $this->job?->uuid();
+
+        return $jobUuid ? 'docker-cleanup-execution:'.$jobUuid : null;
     }
 
     public function failed(?\Throwable $exception): void
@@ -175,12 +237,10 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
         }
 
-        $execution = DockerCleanupExecution::query()
-            ->where('server_id', $this->server->id)
-            ->where('status', 'running')
-            ->whereNull('finished_at')
-            ->latest('id')
-            ->first();
+        // Only this run's own execution. A run that never started (e.g. a manual run whose wait for the
+        // server lock ran out) created none and must not fail another running cleanup.
+        $executionId = $this->executionCacheKey() ? Cache::pull($this->executionCacheKey()) : null;
+        $execution = $executionId ? DockerCleanupExecution::query()->find($executionId) : null;
 
         if (! $execution) {
             return;

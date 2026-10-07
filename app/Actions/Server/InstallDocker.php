@@ -25,18 +25,7 @@ class InstallDocker
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-            $base64Cert = base64_encode($serverCert->ssl_certificate);
-
-            $commands = collect([
-                "mkdir -p $caCertPath",
-                "chown -R 9999:root $caCertPath",
-                "chmod -R 700 $caCertPath",
-                "rm -rf $caCertPath/coolify-ca.crt",
-                "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
-                "chmod 644 $caCertPath/coolify-ca.crt",
-            ]);
+            $commands = SslHelper::caCertificateFileCommands($serverCert->ssl_certificate);
             remote_process($commands, $server);
         }
 

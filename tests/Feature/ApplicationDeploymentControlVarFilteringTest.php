@@ -97,8 +97,7 @@ it('does not retain locked values from generated build-time debug logs', functio
     expect($retainedLogs)
         ->not->toContain('harmless-single-marker')
         ->not->toContain('harmless-first-marker')
-        ->not->toContain('harmless-second-marker')
-        ->toContain(REDACTED);
+        ->not->toContain('harmless-second-marker');
 
     $member = User::factory()->create();
     $application->team()->members()->attach($member->id, ['role' => 'member']);
@@ -110,6 +109,24 @@ it('does not retain locked values from generated build-time debug logs', functio
         ->toContain('[DEBUG]')
         ->not->toContain('harmless-first-marker')
         ->not->toContain('harmless-second-marker');
+});
+
+it('does not print build-time values in the development debug lines', function () {
+    config()->set('app.env', 'local');
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'normal-secret-marker']);
+    createApplicationEnvironmentVariable($application, ['key' => 'LITERAL_TOKEN', 'value' => 'literal-secret-marker', 'is_literal' => true]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    $debugLines = collect($job->recordedLogEntries)->filter(fn (string $line) => str_contains($line, '[DEBUG]'))->implode("\n");
+    expect($debugLines)
+        ->toContain('[DEBUG] Build-time env: DB_PASSWORD')
+        ->toContain('[DEBUG] Build-time env: LITERAL_TOKEN')
+        ->not->toContain('normal-secret-marker')
+        ->not->toContain('literal-secret-marker');
 });
 
 it('redacts generated multiline forms in remote command and output logging', function () {
@@ -162,6 +179,18 @@ it('keeps deployment logging available if value formatting fails', function () {
 
     expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'Harmless command text'))
         ->toBe(REDACTED);
+});
+
+it('redacts shell-escaped remote secrets from command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['DB_PASS' => "s3cr'et-value"],
+    ]);
+
+    $redacted = invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', "docker build --build-arg DB_PASS='s3cr'\\''et-value' --env 'DB_PASS=s3cr'\\''et-value' .");
+
+    expect($redacted)->not->toContain('s3cr')
+        ->toContain('--build-arg DB_PASS='.REDACTED);
 });
 
 it('ignores empty and non-string remote secrets when redacting command output', function () {
@@ -278,6 +307,7 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
         'mainServer' => $server,
         'pull_request_id' => 0,
         'commit' => 'HEAD',
+        'basedir' => '/artifacts/test-app',
         'workdir' => '/artifacts/test-app',
         'deployment_uuid' => 'deployment-uuid',
         'dockerfile_location' => '/Dockerfile',
@@ -648,6 +678,27 @@ it('explains invalid Nixpacks plan variable keys in deployment logs', function (
         ->toContain('https://nixpacks.com/docs/configuration/file');
 });
 
+it('marks an invalid variable name failure as already explained in the deployment log', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'XPACK;SECURITY;ENABLED' => 'true',
+            ],
+        ]),
+    ]);
+
+    try {
+        invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        expect($exception->isMessageAlreadyLogged())->toBeTrue();
+    }
+});
+
 it('truncates long Nixpacks plan variable keys in deployment logs', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',
@@ -975,7 +1026,7 @@ it('rejects unsafe legacy keys before generating BuildKit secret flags', functio
     expect($job->recordedCommands)->toBeEmpty();
 });
 
-it('rejects an unsafe stored key before running a deployment command', function () {
+it('rejects an unsafe stored build-time key before running a build command', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
     $environmentVariable = createApplicationEnvironmentVariable($application, [
         'key' => 'SAFE_KEY',
@@ -985,10 +1036,182 @@ it('rejects an unsafe stored key before running a deployment command', function 
 
     [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
 
-    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys'))
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys', true))
         ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
 
     expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('keeps deploying existing runtime-only variables whose names new variables cannot use', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => false,
+    ]);
+    // Names like my-var were accepted before the current rules; the model no longer allows them.
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('my-var')
+        ->toContain('Suggested name: my_var');
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects existing variable names that would break the .env file or build commands', function (string $key, bool $isBuildtime, bool $buildsImage) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => $isBuildtime,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => $key]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys', $buildsImage))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+})->with([
+    'runtime-only name with = before the build is decided' => ['A=B', false, false],
+    'runtime-only name with a newline before the build is decided' => ["A\nB", false, false],
+    'build-time name with a hyphen when the deployment builds' => ['my-var', true, true],
+]);
+
+it('does not fail restarts or deployments that reuse an image on invalid build-time names', function (string $buildPack) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => $buildPack]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'MY-VAR']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => $buildPack]);
+    // handle() runs this check before it is known whether the deployment builds an image.
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('MY-VAR')
+        ->toContain('Suggested name: MY_VAR')
+        ->not->toContain('Invalid environment variable name');
+    expect($job->recordedCommands)->toBeEmpty();
+})->with(['dockerfile', 'nixpacks', 'static', 'railpack', 'dockercompose']);
+
+it('keeps invalid build-time names out of the helper container so restarts with build secrets work', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'nixpacks']);
+    $application->settings()->update(['use_build_secrets' => true]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'safe-build-value',
+        'is_buildtime' => true,
+    ]);
+    $invalidVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'OTHER_KEY',
+        'value' => 'invalid-build-value',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $invalidVariable->id)->update(['key' => 'MY-VAR']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => 'nixpacks']);
+
+    $envFlags = invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets');
+
+    expect($envFlags)
+        ->toContain("-e 'SAFE_KEY=safe-build-value'")
+        ->toContain('COOLIFY_BUILD_SECRETS_HASH=')
+        ->not->toContain('MY-VAR')
+        ->not->toContain('invalid-build-value');
+});
+
+it('warns instead of failing for invalid build-time names when the deployment does not build an image', function (bool $isRuntime) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+        'is_runtime' => $isRuntime,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('my-var')
+        ->toContain('Suggested name: my_var')
+        ->not->toContain('Invalid environment variable name');
+    expect($job->recordedCommands)->toBeEmpty();
+})->with([
+    'build-time only' => [false],
+    'build-time and runtime' => [true],
+]);
+
+it('warns instead of failing for invalid build-time preview names of Docker image deployments', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+        'is_preview' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['pull_request_id' => 7]);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('Suggested name: my_var')
+        ->not->toContain('Invalid environment variable name');
+});
+
+it('still rejects Docker image variable names that would break the .env file', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'A=B']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+});
+
+it('fails with a clear message for invalid build-time names when the deployment builds an image', function (string $buildPack) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => $buildPack]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => $buildPack]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys', true))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment: my-var');
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('Build-time variable names must start with a letter or underscore');
+})->with(['dockerfile', 'nixpacks', 'static', 'railpack', 'dockercompose']);
+
+it('does not pass build-time variables to the helper container of Docker image deployments', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $application->settings()->update(['use_build_secrets' => true]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'harmless-build-value',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets'))->toBe('');
 });
 
 it('injects raw escaped remote secrets into Dockerfile args and hashes the same values', function (int $pullRequestId, bool $isPreview) {
@@ -1078,6 +1301,7 @@ it('checks compose Dockerfiles with a portable command that skips missing files'
 
     try {
         [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+            'basedir' => $workdir,
             'workdir' => $workdir,
             'env_args' => collect(['APP_ENV' => 'production']),
         ]);

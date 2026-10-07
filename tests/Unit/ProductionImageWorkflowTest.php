@@ -1,20 +1,25 @@
 <?php
 
-it('publishes v4 branch builds under the commit sha with a traceable internal version', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-sha-build.yml');
+it('publishes main builds under rolling and commit sha tags with a traceable internal version', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-main-build.yml');
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $constants = file_get_contents(dirname(__DIR__, 2).'/config/constants.php');
     $versions = json_decode(file_get_contents(dirname(__DIR__, 2).'/versions.json'), true, flags: JSON_THROW_ON_ERROR);
     $nightlyVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/nightly/versions.json'), true, flags: JSON_THROW_ON_ERROR);
 
     expect($workflow)
-        ->toContain('name: Build Coolify (SHA)')
+        ->toContain('name: Build Coolify Main')
         ->toContain('branches: ["main"]')
         ->not->toContain('v4.x')
+        ->toContain('group: coolify-main-build')
+        ->toContain('cancel-in-progress: false')
+        ->toContain('IMAGE_NAME }}:main-${{ matrix.arch }}')
+        ->toContain('--tag "${IMAGE}:main"')
         ->toContain('short_sha=${GITHUB_SHA::7}')
-        ->toContain('sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}')
         ->toContain('SHA: ${{ needs.build-push.outputs.short_sha }}')
-        ->not->toContain('sha-${{ github.sha }}')
+        ->toContain('--tag "${IMAGE}:sha-${SHA}"')
+        ->not->toContain('sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}')
+        ->toContain('org.opencontainers.image.revision=${{ github.sha }}')
         ->toContain('php bootstrap/getVersion.php')
         ->toContain('version=${BASE_VERSION}-dev.${GITHUB_SHA::9}')
         ->toContain('COOLIFY_VERSION=${{ steps.version.outputs.version }}')
@@ -25,9 +30,9 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.23'")
-        ->and($versions['coolify']['v4']['version'])->toBe('4.3.23')
-        ->and($versions['coolify']['nightly']['version'])->toBe('4.4-rc.1')
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '{$versions['coolify']['v4']['version']}'")
+        ->and($versions['coolify']['nightly']['version'])->toMatch('/^\d+\.\d+-rc\.\d+$/')
+        ->and(version_compare($versions['coolify']['v4']['version'], $versions['coolify']['nightly']['version'], '<'))->toBeTrue()
         ->and($nightlyVersions)->toBe($versions);
 });
 

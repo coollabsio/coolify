@@ -280,7 +280,7 @@ it('writes a new service mount before start after final Compose files exist', fu
     $service->saveComposeConfigs();
 
     Bus::assertNotDispatched(ServerStorageSaveJob::class);
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '{$hostPath}'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$hostPath}'"));
     expect($storage->fresh()->pending_initialization)->toBeFalse();
 });
 

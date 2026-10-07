@@ -85,7 +85,9 @@
             $activeServerMenuItem['route'],
             $serverRouteParameters,
         );
-        $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
+        $showSentinelStatus = $server->isFunctional()
+            && $server->isSentinelEnabled()
+            && auth()->user()?->can('viewSentinel', $server);
         $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
     @endphp
 
@@ -140,7 +142,7 @@
                                 :class="option.functional ? 'bg-success' : 'bg-error'"></span>
                             <span class="min-w-0 flex-1 truncate" x-text="option.name"></span>
                             <x-reicon name="check-circle"
-                                class="size-3.5 shrink-0 text-coollabs dark:text-warning"
+                                class="size-3.5 shrink-0 text-black dark:text-fg"
                                 x-show="option.uuid === '{{ $server->uuid }}'" />
                         </a>
                     </template>

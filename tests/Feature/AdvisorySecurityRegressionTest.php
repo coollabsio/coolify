@@ -60,10 +60,33 @@ it('does not apply the REST API allowlist to MCP and MCP switch routes', functio
         ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class);
 });
 
-it('throttles every manual webhook route', function (string $provider) {
+it('throttles only failed authentication on manual webhook routes', function (string $provider) {
     $route = Route::getRoutes()->match(Request::create("/webhooks/source/{$provider}/events/manual", 'POST'));
+    $request = Request::create("/webhooks/source/{$provider}/events/manual", 'POST', server: ['REMOTE_ADDR' => '192.0.2.44']);
+    $helper = new class
+    {
+        use MatchesManualWebhookApplications;
 
-    expect($route->gatherMiddleware())->toContain('throttle:60,1');
+        public function key(Request $request, string $provider): string
+        {
+            return $this->manualWebhookFailureRateLimitKey($request, $provider, 'test-org/test-repo', 'main');
+        }
+
+        public function reply(array $payloads, string $failureKey): int
+        {
+            return $this->manualWebhookResponse(collect($payloads), $failureKey, $this->manualWebhookTokenAttempt('wrong-token'))->getStatusCode();
+        }
+    };
+    $failureKey = $helper->key($request, $provider);
+
+    expect($route->gatherMiddleware())->not->toContain('throttle:60,1');
+    expect($failureKey)->toStartWith("manual-webhook-failures:{$provider}:192.0.2.44:");
+
+    $helper->reply([['status' => 'success', 'message' => 'queued']], $failureKey);
+    expect(RateLimiter::attempts($failureKey))->toBe(0);
+
+    $helper->reply([['status' => 'failed', 'message' => 'No matching application or invalid signature.']], $failureKey);
+    expect(RateLimiter::attempts($failureKey))->toBe(1);
 })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
 it('does not reveal how many applications share a manual webhook repository', function () {
@@ -73,14 +96,14 @@ it('does not reveal how many applications share a manual webhook repository', fu
 
         public function reply(array $payloads): string
         {
-            return $this->manualWebhookResponse(collect($payloads))->getContent();
+            return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test', $this->manualWebhookTokenAttempt('wrong-token'))->getContent();
         }
     };
-    $failure = ['status' => 'failed', 'message' => 'Invalid signature.'];
+    $failure = ['status' => 'failed', 'message' => 'No matching application or invalid signature.'];
 
     expect($helper->reply([$failure, $failure]))->toBe($helper->reply([$failure]));
     expect($helper->reply([$failure, ['status' => 'success', 'message' => 'queued']]))
-        ->not->toContain('Invalid signature.');
+        ->not->toContain('No matching application or invalid signature.');
 });
 
 it('never exposes a shown-once database variable even with sensitive read access', function () {

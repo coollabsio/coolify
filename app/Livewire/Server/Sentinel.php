@@ -47,7 +47,10 @@ class Sentinel extends Component
         $this->syncData();
     }
 
-    private function syncData(bool $toModel = false): void
+    /**
+     * @return array<int, string> Names of the settings that changed when saving to the model.
+     */
+    private function syncData(bool $toModel = false): array
     {
         if ($toModel) {
             $this->validate();
@@ -55,7 +58,10 @@ class Sentinel extends Component
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+
+            return $changedFields;
         } else {
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = $this->server->settings->sentinel_token;
@@ -64,6 +70,8 @@ class Sentinel extends Component
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->sentinelStatus = $this->server->sentinelStatus();
         }
+
+        return [];
     }
 
     public function handleSentinelRestarted($event)
@@ -179,8 +187,16 @@ class Sentinel extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            $this->syncData(true);
-            $this->restartSentinel();
+            $changedFields = $this->syncData(true);
+            if ($changedFields === []) {
+                return;
+            }
+            auditLog('ui.server.sentinel.updated', $this->auditContext([
+                'changed_fields' => $changedFields,
+            ]));
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
+            $this->setSentinelRestarting();
+            $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

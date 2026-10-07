@@ -148,7 +148,7 @@ class Slack extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->slackEnabled = false;
+            $this->slackEnabled = (bool) $this->settings->refresh()->slack_enabled;
 
             return handleError($e, $this);
         } finally {

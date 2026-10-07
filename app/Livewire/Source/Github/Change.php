@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
@@ -34,6 +35,8 @@ class Change extends Component
     public ?bool $preview_deployment_permissions = true;
 
     public ?bool $administration = false;
+
+    public ?bool $github_runners = false;
 
     public $parameters;
 
@@ -89,8 +92,8 @@ class Change extends Component
         return [
             'name' => 'required|string',
             'organization' => ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
-            'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
-            'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'apiUrl' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
+            'htmlUrl' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
             'customUser' => 'required|string',
             'customPort' => 'required|int',
             'appId' => 'nullable|int',
@@ -102,7 +105,7 @@ class Change extends Component
             'contents' => 'nullable|string',
             'metadata' => 'nullable|string',
             'pullRequests' => 'nullable|string',
-            'privateKeyId' => 'nullable|int',
+            'privateKeyId' => ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', $this->github_app->team_id)],
             'webhook_endpoint' => ['required', 'string', 'url'],
             'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
             'use_custom_webhook_endpoint' => ['required', 'bool'],
@@ -307,6 +310,10 @@ class Change extends Component
 
             // Sync data from model to properties
             $this->syncData(false);
+            if (! $this->github_app->app_id) {
+                $this->preview_deployment_permissions = request()->boolean('previews', true);
+                $this->github_runners = filled($this->github_app->organization) && request()->boolean('runners');
+            }
             $this->isConnected = $this->github_app->isConnected();
 
             // Override name with kebab case for display
@@ -390,7 +397,7 @@ class Change extends Component
                 return;
             }
 
-            if (! PrivateKey::ownedByCurrentTeam()->find($this->privateKeyId)) {
+            if (! PrivateKey::where('team_id', $this->github_app->team_id)->find($this->privateKeyId)) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;
@@ -449,6 +456,8 @@ class Change extends Component
         try {
             $this->authorize('update', $this->github_app);
 
+            $this->validateOnly('privateKeyId');
+
             $this->syncData(true);
             $this->github_app->save();
             $this->isConnected = $this->github_app->isConnected();
@@ -477,5 +486,17 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * After a delete, the confirmation modal refreshes the component before the redirect runs.
+     */
+    public function render()
+    {
+        if (! $this->github_app) {
+            return '<div></div>';
+        }
+
+        return view('livewire.source.github.change');
     }
 }

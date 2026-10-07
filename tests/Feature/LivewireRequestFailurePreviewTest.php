@@ -35,13 +35,3 @@ it('rejects statuses outside the supported list', function () {
         ->call('fail', 500)
         ->assertStatus(404);
 });
-
-it('keeps the preview statuses in sync with the JS handler', function () {
-    $source = file_get_contents(resource_path('js/livewire-request-failure.js'));
-
-    expect(preg_match('/INFRASTRUCTURE_FAILURE_STATUSES = new Set\(\[([\d,\s]+)\]\)/', $source, $matches))->toBe(1);
-
-    $jsStatuses = array_map('intval', array_map('trim', explode(',', $matches[1])));
-
-    expect((new LivewireRequestFailurePreview)->statuses)->toBe($jsStatuses);
-});

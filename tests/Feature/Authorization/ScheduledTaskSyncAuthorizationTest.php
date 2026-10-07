@@ -80,7 +80,7 @@ test('read-only member can view an existing scheduled task', function () {
     Livewire::test(Show::class)
         ->assertSuccessful()
         ->assertSet('name', 'validate-benign')
-        ->assertSet('command', 'echo scheduled-ok')
+        ->assertSet('command', 'Hidden (only admins can view)')
         ->assertSet('frequency', '0 0 * * *');
 });
 

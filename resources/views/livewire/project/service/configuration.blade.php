@@ -21,6 +21,7 @@
             ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
             ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
             ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+            ['label' => 'Analytics', 'route' => 'project.service.analytics', 'icon' => 'analytics'],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
@@ -35,7 +36,7 @@
 
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
             'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
         ];
@@ -47,7 +48,7 @@
                 ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
 
-        // Group that holds the current page — the only one expanded by default.
+        // Group that holds the current page — always kept open, even if collapsed before.
         $activeGroup = (string) $groupedItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
         $storageSections = $applications
@@ -60,7 +61,8 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-            <aside class="application-settings-navigation min-w-0 xl:self-start">
+            <aside class="application-settings-navigation min-w-0 xl:self-start"
+                data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
                 <nav aria-label="Service settings"
                     x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
@@ -190,6 +192,9 @@
                             @endforeach
                         </div>
                     </div>
+                @elseif ($currentRoute === 'project.service.analytics')
+                    <livewire:project.service.analytics :service="$service"
+                        :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
                 @elseif ($currentRoute === 'project.service.domains')
                     <livewire:project.service.domains :service="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')

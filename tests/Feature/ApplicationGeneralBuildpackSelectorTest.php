@@ -74,9 +74,10 @@ test('existing application buildpack selector lists railpack before nixpacks', f
 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
+        // The build strategy listbox renders its options as JSON-encoded Alpine data
         ->assertSeeInOrder([
-            '<option value="railpack">Railpack</option>',
-            '<option value="nixpacks">Nixpacks</option>',
+            '\u0022value\u0022:\u0022railpack\u0022,\u0022label\u0022:\u0022Railpack\u0022',
+            '\u0022value\u0022:\u0022nixpacks\u0022,\u0022label\u0022:\u0022Nixpacks\u0022',
         ], false);
 });
 

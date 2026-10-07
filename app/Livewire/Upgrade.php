@@ -79,6 +79,13 @@ class Upgrade extends Component
                     report($e);
                 }
             })->afterResponse();
+
+            auditLog('ui.instance.upgrade_started', [
+                'team_id' => null,
+                'resource' => 'instance',
+                'from_version' => config('constants.coolify.version'),
+                'to_version' => get_latest_version_of_coolify(),
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

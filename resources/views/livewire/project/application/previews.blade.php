@@ -7,7 +7,7 @@
             helper="Automatic pull request deployments and who can trigger them.">
             <x-slot:actions>
                 @can('update', $application)
-                    @if ($application->is_github_based())
+                    @if ($application->isGithubAppSource())
                         <x-modal-input title="Pull requests"
                             subtitle="Load open pull requests from GitHub, then configure or deploy a preview."
                             :wireIgnore="false" :isLarge="true">

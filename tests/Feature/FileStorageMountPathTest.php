@@ -89,15 +89,14 @@ test('livewire file storage rejects parent segments and does not create a local 
     expect(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('livewire directory storage rejects a server absolute path and has no side effects', function () {
+test('livewire directory storage accepts a server absolute path for an administrator', function () {
     Livewire::test(Storage::class, ['resource' => $this->application])
         ->set('file_storage_directory_source', '/root/.ssh')
         ->set('file_storage_directory_destination', '/data')
         ->call('submitFileStorageDirectory')
-        ->assertDispatched('error');
+        ->assertDispatched('success');
 
-    expect(LocalFileVolume::query()->count())->toBe(0);
-    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    expect(LocalFileVolume::query()->sole()->fs_path)->toBe('/root/.ssh');
 });
 
 test('livewire directory storage accepts a path inside the application root', function () {

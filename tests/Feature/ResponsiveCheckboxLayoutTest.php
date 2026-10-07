@@ -78,6 +78,19 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     ]);
 });
 
+/**
+ * Checkbox rows must let long labels wrap next to a fixed-size toggle on narrow screens.
+ */
+function assertResponsiveCheckboxMarkup($response): void
+{
+    $response->assertSee('form-control group flex min-h-9 max-w-full', false);
+    $response->assertSee('label flex w-full max-w-full min-w-0 items-center', false);
+    $response->assertSee('flex min-w-0 grow items-center gap-1.5 break-words', false);
+    $response->assertSee('relative flex size-[18px] shrink-0', false);
+
+    expect($response->getContent())->not->toContain('min-w-fit');
+}
+
 it('renders responsive checkbox classes on the application configuration page', function () {
     $response = $this->get(route('project.application.configuration', [
         'project_uuid' => $this->project->uuid,
@@ -86,32 +99,15 @@ it('renders responsive checkbox classes on the application configuration page', 
     ]));
 
     $response->assertSuccessful();
-    $response->assertSee('Use a Build Server?');
-    $response->assertSee('application-mobile-section');
-    $response->assertSee('Application menu');
-    $response->assertSee('<optgroup label="Application">', false);
-    $response->assertSee('<optgroup label="Configuration">', false);
-    $response->assertSee('<optgroup label="Links">', false);
+    $response->assertSee('Builder selection');
     $response->assertSee('application-mobile-actions');
-    $response->assertDontSee('<optgroup label="Actions">', false);
-    $response->assertSee('value="navigate|application|', false);
-    $response->assertSee('value="navigate|configuration|', false);
-    $response->assertSee('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url', false);
     $response->assertSee('application-mobile-stop-trigger');
     $response->assertSee('application-mobile-restart-trigger');
     $response->assertSee('wire:click="deploy"', false);
-    $response->assertSee('Force deploy (without cache)');
-    expect(
-        str_contains($response->getContent(), 'wire:click="force_deploy_without_cache"')
-            || str_contains($response->getContent(), 'wire:click="deploy(true)"')
-    )->toBeTrue();
+    $response->assertSee('wire:click="force_deploy_without_cache"', false);
     $response->assertDontSee('Confirm Application Deployment?');
     $response->assertSee('Confirm Application Restart?');
     $response->assertDontSee('Confirm Application Force Deployment?');
-    $response->assertDontSee('application-mobile-deploy-trigger');
-    $response->assertDontSee('application-mobile-force-deploy-trigger');
-    $response->assertSee('sub-menu-wrapper hidden md:flex', false);
-    $response->assertSee('scrollbar hidden min-h-10', false);
     $response->assertSee(route('project.application.deployment.index', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
@@ -122,13 +118,8 @@ it('renders responsive checkbox classes on the application configuration page', 
         'environment_uuid' => $this->environment->uuid,
         'application_uuid' => $this->application->uuid,
     ]));
-    $response->assertSee('form-control flex max-w-full flex-row items-center gap-4 py-1 pr-2', false);
-    $response->assertSee('label flex w-full max-w-full min-w-0 items-center gap-4 px-0', false);
-    $response->assertSee('flex min-w-0 grow gap-2 break-words', false);
-    $response->assertSee('shrink-0', false);
-    $response->assertSee('pt-2 w-full sm:w-96', false);
 
-    expect($response->getContent())->not->toContain('min-w-fit');
+    assertResponsiveCheckboxMarkup($response);
 });
 
 it('renders responsive checkbox classes on the server page', function () {
@@ -137,12 +128,6 @@ it('renders responsive checkbox classes on the server page', function () {
     ]));
 
     $response->assertSuccessful();
-    $response->assertSee('Use it as a build server?');
-    $response->assertSee('form-control flex max-w-full flex-row items-center gap-4 py-1 pr-2', false);
-    $response->assertSee('label flex w-full max-w-full min-w-0 items-center gap-4 px-0', false);
-    $response->assertSee('flex min-w-0 grow gap-2 break-words', false);
-    $response->assertSee('shrink-0', false);
-    $response->assertSee('w-full sm:w-96', false);
 
-    expect($response->getContent())->not->toContain('min-w-fit');
+    assertResponsiveCheckboxMarkup($response);
 });

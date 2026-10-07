@@ -6,15 +6,16 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
-use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
+use App\Support\ResourceStartActivity;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Spatie\Activitylog\Models\Activity;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $database;
 
@@ -28,14 +29,14 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'activityFinished',
             'refresh' => '$refresh',
             'compose_loaded' => '$refresh',
             'update_links' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => 'activityFinished',
+            ]),
         ];
     }
 
@@ -79,15 +80,9 @@ class Heading extends Component
     public function checkDeployments()
     {
         try {
-            $activity = Activity::where('properties->type_uuid', $this->database->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
-                $this->isDeploymentProgress = true;
-                $this->runningActivityId = $activity->id;
-            } else {
-                $this->isDeploymentProgress = false;
-                $this->runningActivityId = null;
-            }
+            $activity = ResourceStartActivity::latestRunning($this->database->uuid);
+            $this->isDeploymentProgress = $activity !== null;
+            $this->runningActivityId = $activity?->id;
         } catch (\Throwable) {
             $this->isDeploymentProgress = false;
             $this->runningActivityId = null;
@@ -157,7 +152,13 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = RestartDatabase::run($this->database);
+            if (is_string($activity)) {
+                $this->dispatch('error', $activity);
+
+                return;
+            }
             $this->auditDatabaseAction('ui.database.restarted');
+            $this->dispatch('info', 'Restarting database.');
             $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
@@ -172,6 +173,11 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = StartDatabase::run($this->database);
+            if (is_string($activity)) {
+                $this->dispatch('error', $activity);
+
+                return;
+            }
             $this->auditDatabaseAction('ui.database.started');
             $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");

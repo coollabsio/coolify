@@ -60,7 +60,7 @@ it('shows link cloud provider dropdown with available unlinked providers', funct
     ]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link Cloud Provider')
+        ->assertSee('Link provider')
         ->assertSee('Hetzner')
         ->assertSee('DigitalOcean')
         ->assertSee('Vultr')
@@ -70,13 +70,13 @@ it('shows link cloud provider dropdown with available unlinked providers', funct
         ->assertSee('Server ID')
         ->assertSee('Droplet ID')
         ->assertSee('Instance ID')
-        ->assertSee('Search by IP')
+        ->assertSee('Search by server IP')
         ->assertSee('Search');
 });
 
 it('hides link cloud provider dropdown when no providers can be linked', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertDontSee('Link Cloud Provider');
+        ->assertDontSee('Link provider');
 });
 
 it('does not list providers already linked to the server', function () {
@@ -97,7 +97,7 @@ it('does not list providers already linked to the server', function () {
     $this->server->update(['hetzner_server_id' => 123]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link Cloud Provider')
+        ->assertSee('Link provider')
         ->assertSee('Vultr Token')
         ->assertDontSee('Hetzner Token');
 });
@@ -189,4 +189,21 @@ it('shows Vultr search errors in the modal', function () {
         ->assertSet('vultrSearchError', fn (string $error) => str_contains($error, 'Failed to search Vultr instances:') && str_contains($error, 'invalid token'))
         ->assertSee('Failed to search Vultr instances:')
         ->assertSee('invalid token');
+});
+
+it('reloads only cloud provider tokens of the server team after the session team changes', function () {
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    $sameTeamToken = CloudProviderToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'hetzner']);
+    CloudProviderToken::factory()->create(['team_id' => $otherTeam->id, 'provider' => 'hetzner']);
+    CloudProviderToken::factory()->create(['team_id' => $otherTeam->id, 'provider' => 'vultr']);
+    CloudProviderToken::factory()->create(['team_id' => $otherTeam->id, 'provider' => 'digitalocean']);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid]);
+    session(['currentTeam' => $otherTeam]);
+    $component->call('handleServerValidated');
+
+    expect($component->get('availableHetznerTokens')->pluck('id')->all())->toBe([$sameTeamToken->id])
+        ->and($component->get('availableVultrTokens'))->toBeEmpty()
+        ->and($component->get('availableDigitalOceanTokens'))->toBeEmpty();
 });

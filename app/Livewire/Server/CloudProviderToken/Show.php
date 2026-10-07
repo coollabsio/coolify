@@ -44,7 +44,7 @@ class Show extends Component
         $this->provider = $this->server->vultr_instance_id ? 'vultr' : 'hetzner';
         $this->providerName = $this->provider === 'vultr' ? 'Vultr' : 'Hetzner';
 
-        $this->cloudProviderTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->cloudProviderTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', $this->provider)
             ->get();
     }
@@ -56,7 +56,7 @@ class Show extends Component
 
     public function setCloudProviderToken($tokenId)
     {
-        $ownedToken = CloudProviderToken::ownedByCurrentTeam()->find($tokenId);
+        $ownedToken = CloudProviderToken::where('team_id', $this->server->team_id)->find($tokenId);
         if (is_null($ownedToken)) {
             $this->dispatch('error', 'You are not allowed to use this token.');
 
@@ -77,7 +77,7 @@ class Show extends Component
             $this->server->save();
 
             auditLog('ui.server.cloud_token_assigned', [
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->server->team_id,
                 'server_uuid' => $this->server->uuid,
                 'server_name' => $this->server->name,
                 'cloud_token_uuid' => $ownedToken->uuid,
@@ -171,7 +171,7 @@ class Show extends Component
             }
 
             auditLog('ui.server.cloud_token_validated', [
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->server->team_id,
                 'server_uuid' => $this->server->uuid,
                 'server_name' => $this->server->name,
                 'cloud_token_uuid' => $token->uuid,

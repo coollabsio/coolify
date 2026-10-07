@@ -2,6 +2,8 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Jobs\DatabaseBackupJob;
+use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -14,6 +16,10 @@ use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -28,9 +34,11 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\Model;
@@ -969,21 +977,66 @@ function isDev(): bool
     return config('app.env') === 'local';
 }
 
+/**
+ * Path that the Docker daemon of $server must use as a bind mount source for $path, a path that Coolify
+ * writes through SSH (below base_configuration_dir()).
+ *
+ * Only the development `testing-host` server needs a different path (Server::sharesDevHostDocker()):
+ * it writes to Docker named volumes, but it starts containers on the host Docker daemon. The returned
+ * paths match its mounts in docker-compose.dev*.yml:
+ * - /data/coolify/backups/... -> /var/lib/docker/volumes/<DEV_COOLIFY_BACKUPS_VOLUME>/_data/...
+ * - /data/coolify/...         -> /var/lib/docker/volumes/<DEV_COOLIFY_DATA_VOLUME>/_data/...
+ *
+ * For all other servers (production, dev KVM VMs, remote servers) the function returns $path unchanged.
+ */
+function devHostDockerPath(?Server $server, string $path): string
+{
+    if (! $server?->sharesDevHostDocker()) {
+        return $path;
+    }
+
+    $mounts = [
+        backup_dir() => devDockerVolumeDataPath('constants.coolify.dev_backups_volume', 'coolify_dev_backups_data'),
+        base_configuration_dir() => devDockerVolumeDataPath('constants.coolify.dev_data_volume', 'coolify_dev_coolify_data'),
+    ];
+    foreach ($mounts as $containerPath => $hostPath) {
+        if ($path === $containerPath || str_starts_with($path, $containerPath.'/')) {
+            return $hostPath.substr($path, strlen($containerPath));
+        }
+    }
+
+    return $path;
+}
+
+/**
+ * Host path of a development Docker volume. An invalid volume name falls back to the legacy name.
+ */
+function devDockerVolumeDataPath(string $configKey, string $fallbackVolume): string
+{
+    $volume = (string) config($configKey);
+    if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*$/', $volume) !== 1) {
+        $volume = $fallbackVolume;
+    }
+
+    return "/var/lib/docker/volumes/{$volume}/_data";
+}
+
 function isCloud(): bool
 {
     return ! config('constants.coolify.self_hosted');
 }
 
 /**
- * Resolve the queue used for application deployments, database starts and service starts.
+ * Resolve the queue used for application deployments and for database, service and proxy
+ * starts and restarts.
  *
  * On cloud these jobs run on a dedicated `deployments` queue so they can be drained by an
  * isolated Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing
  * is decided by `isCloud()` (config-based) rather than `HORIZON_QUEUES`, so the dispatching
  * process needs no special env — only the worker must be configured to drain `deployments`.
  *
- * IMPORTANT: on cloud a worker MUST include `deployments` in its `HORIZON_QUEUES`, otherwise
- * these jobs are never processed.
+ * On cloud, config/horizon.php provisions a dedicated `deployments` pool in production
+ * (see docs/cloud-horizon-workers.md).
  */
 function deployment_queue(): string
 {
@@ -999,12 +1052,46 @@ function deployment_queue(): string
  * by `isCloud()` (config-based), so the dispatching process needs no special env — only the
  * worker must be configured to drain `crons`.
  *
- * IMPORTANT: on cloud a worker MUST include `crons` in its `HORIZON_QUEUES`, otherwise these
- * jobs are never processed.
+ * On cloud, config/horizon.php provisions a dedicated `crons` pool in production
+ * (see docs/cloud-horizon-workers.md).
  */
 function crons_queue(): string
 {
     return isCloud() ? 'crons' : 'high';
+}
+
+/**
+ * Resolve the queue used for slow server maintenance — scheduled, manual and stop-triggered
+ * Docker cleanups, and weekly server patch checks.
+ *
+ * On cloud these jobs run on a dedicated `maintenance` queue so a small, bounded Horizon pool
+ * drains them and slow remote prunes cannot occupy the `high` workers; self-hosted keeps them
+ * on the shared `high` queue, so a custom `HORIZON_QUEUES` does not need a new queue name. Routing is decided by `isCloud()` (config-based), so the dispatching
+ * process needs no special env — only the worker must be configured to drain `maintenance`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `maintenance` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function maintenance_queue(): string
+{
+    return isCloud() ? 'maintenance' : 'high';
+}
+
+/**
+ * Resolve the queue used for incoming webhook processing — GitHub pull request webhooks,
+ * Stripe events, and the server limit checks that follow subscription changes.
+ *
+ * On cloud these jobs run on a dedicated `webhooks` queue so a busy `high` queue cannot delay
+ * them; self-hosted keeps them on the shared `high` queue, so a custom `HORIZON_QUEUES` does
+ * not need a new queue name. Routing is decided by `isCloud()` (config-based), so the
+ * dispatching process needs no special env — only the worker must be configured to drain `webhooks`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `webhooks` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function webhooks_queue(): string
+{
+    return isCloud() ? 'webhooks' : 'high';
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -1439,6 +1526,12 @@ function service_templates_path(): string
  */
 function store_service_templates_bundle(string $json, ?string $fetchedAt = null): bool
 {
+    // A 200 response can still be an empty body or an error page; keep the current templates then.
+    $templates = json_decode($json, true);
+    if (! is_array($templates) || $templates === [] || array_is_list($templates)) {
+        return false;
+    }
+
     $fetchedAt ??= now()->toIso8601String();
     $path = service_templates_path();
 
@@ -1485,7 +1578,9 @@ function get_service_templates(bool $force = false): Collection
             if ($response->failed()) {
                 return collect([]);
             }
-            store_service_templates_bundle($response->body());
+            if (! store_service_templates_bundle($response->body())) {
+                return get_service_templates();
+            }
 
             return collect(json_decode($response->body()))->sortKeys();
         } catch (Throwable) {
@@ -1512,6 +1607,24 @@ function get_service_templates(bool $force = false): Collection
     return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
         return collect(json_decode(File::get($path)))->sortKeys();
     });
+}
+
+/**
+ * The template key for a service type. A renamed template keeps its old key as an alias, so API callers
+ * and services stored with the old key still find the template. A key that the templates contain is
+ * returned as is.
+ */
+function resolve_service_template_key(?string $type, ?Collection $templates = null): ?string
+{
+    $aliases = [
+        'denoKV' => 'deno-kv',
+    ];
+    if (blank($type) || ! isset($aliases[$type])) {
+        return $type;
+    }
+    $templates ??= get_service_templates();
+
+    return $templates->has($type) ? $type : $aliases[$type];
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -1622,7 +1735,7 @@ function getTopLevelNetworks(Service|Application $resource): Collection
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
             } catch (Exception $e) {
                 // If the docker-compose.yml file is not valid, we will return the network name as the key
                 $topLevelNetworks = collect([
@@ -1688,7 +1801,7 @@ function getTopLevelNetworks(Service|Application $resource): Collection
         }
     } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
         } catch (Exception $e) {
             // If the docker-compose.yml file is not valid, we will return the network name as the key
             $topLevelNetworks = collect([
@@ -1797,12 +1910,14 @@ function composeNamedVolumeSource(Stringable $source): Stringable
 }
 
 /**
- * Anchor relative paths to the resource configuration directory.
+ * The host path of a local Compose bind source, relative to the resource directory $replacedWith.
  *
- * For a leading `${VAR:-default}` (or `-`, `:+`, `+`), only the default value is changed, so
- * `${DATA:-./data}` keeps the old default location and a set `DATA` still overrides it.
+ * Sources with a `..` segment are resolved like Docker Compose resolves them, without touching the
+ * filesystem. Other sources keep the result of legacyReplaceLocalSource().
+ *
+ * @throws Exception If the source resolves above `/` or the resolved path is not shell-safe
  */
-function replaceLocalSource(Stringable $source, Stringable $replacedWith)
+function replaceLocalSource(Stringable $source, Stringable $replacedWith): Stringable
 {
     if ($source->startsWith('${')) {
         $value = $source->value();
@@ -1818,9 +1933,48 @@ function replaceLocalSource(Stringable $source, Stringable $replacedWith)
             }
         }
         if ($end !== null && preg_match('/^([A-Za-z_][A-Za-z0-9_]*)(:-|-|:\+|\+)(.+)$/s', substr($value, 2, $end - 2), $matches) === 1) {
-            $source = str('${'.$matches[1].$matches[2].replaceLocalSource(str($matches[3]), $replacedWith)->value().'}'.substr($value, $end + 1));
+            return str('${'.$matches[1].$matches[2].replaceLocalSource(str($matches[3]), $replacedWith)->value().'}'.substr($value, $end + 1));
         }
     }
+    $path = $source->value();
+    if (! in_array('..', explode('/', $path), true)) {
+        return legacyReplaceLocalSource($source, $replacedWith);
+    }
+
+    if (str_starts_with($path, '~')) {
+        $path = $replacedWith->value().substr($path, 1);
+    } elseif (! str_starts_with($path, '/')) {
+        $path = $replacedWith->value().'/'.$path;
+    }
+
+    $segments = [];
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            if ($segments === []) {
+                throw new Exception("Volume source {$source} resolves to a path above /. Remove some ../ segments.");
+            }
+            array_pop($segments);
+
+            continue;
+        }
+        $segments[] = $segment;
+    }
+
+    $resolved = '/'.implode('/', $segments);
+    validateShellSafePath($resolved, 'volume source');
+
+    return str($resolved);
+}
+
+/**
+ * The host path that Coolify used for a local Compose bind source before it resolved `..` segments.
+ * A leading `../` became `{directory}./`. Resources that still store that path keep it.
+ */
+function legacyReplaceLocalSource(Stringable $source, Stringable $replacedWith): Stringable
+{
     if ($source->startsWith('.')) {
         $source = $source->replaceFirst('.', $replacedWith->value());
     }
@@ -1835,6 +1989,22 @@ function replaceLocalSource(Stringable $source, Stringable $replacedWith)
     }
 
     return $source;
+}
+
+/**
+ * The host path of a local Compose bind source. A mount whose storage row already has the legacy path
+ * (also with a preview suffix) keeps it, because its data is there.
+ *
+ * @throws Exception If a new source resolves above `/` or is not shell-safe
+ */
+function resolveComposeBindSource(Stringable $source, Stringable $directory, ?string $existingFsPath = null): Stringable
+{
+    $legacySource = legacyReplaceLocalSource($source, $directory);
+    if ($existingFsPath !== null && preg_match('/^'.preg_quote($legacySource->value(), '/').'(-pr-\d+)?$/', $existingFsPath) === 1) {
+        return $legacySource;
+    }
+
+    return replaceLocalSource($source, $directory);
 }
 
 function convertToArray($collection)
@@ -2249,7 +2419,7 @@ function validateDNSEntry(string $fqdn, Server $server)
                             $found_matching_ip = true;
                             break 2;
                         }
-                        if ($ip && $result->getData() === $ip) {
+                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
                             $found_matching_ip = true;
                             break 2;
                         }
@@ -2508,17 +2678,11 @@ function isAnyDeploymentInprogress(bool $showAll = false)
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
 
-    if ($runningJobs->isEmpty()) {
-        echo "No deployments in progress.\n";
-        exit(0);
-    }
-
     $horizonJobIds = [];
     $deploymentDetails = [];
 
     foreach ($runningJobs as $runningJob) {
-        $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
-        if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
+        if ($runningJob->isHorizonJobActive()) {
             $horizonJobIds[] = $runningJob->horizon_job_id;
 
             if ($showAll) {
@@ -2549,20 +2713,43 @@ function isAnyDeploymentInprogress(bool $showAll = false)
         }
     }
 
-    if (count($horizonJobIds) === 0) {
-        echo "No active deployments in progress (all jobs completed or failed).\n";
+    $scheduledJobCount = runningScheduledJobCount();
+
+    if (count($horizonJobIds) === 0 && $scheduledJobCount === 0) {
+        echo "No active deployments or scheduled jobs in progress.\n";
         exit(0);
     }
 
-    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll);
+    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll, $scheduledJobCount);
 
     exit(1);
 }
 
-function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false): string
+/**
+ * Counts scheduled task, database backup, and volume backup runs that are still running.
+ * A run that started longer ago than its job timeout is stale: the worker has stopped it.
+ */
+function runningScheduledJobCount(): int
+{
+    $startedWithin = fn (Model $execution, int $timeoutSeconds): bool => $execution->created_at?->gt(now()->subSeconds($timeoutSeconds)) ?? false;
+
+    $tasks = ScheduledTaskExecution::with('scheduledTask')->where('status', 'running')->get()
+        ->filter(fn (ScheduledTaskExecution $execution) => $startedWithin($execution, ($execution->scheduledTask?->timeout ?? 300) + ScheduledTaskJob::WORKER_TIMEOUT_MARGIN_SECONDS));
+
+    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->where('status', 'running')->get()
+        ->filter(fn (ScheduledDatabaseBackupExecution $execution) => $startedWithin($execution, ($execution->scheduledDatabaseBackup?->timeout ?? 3600) + DatabaseBackupJob::WORKER_TIMEOUT_MARGIN_SECONDS));
+
+    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->where('status', 'running')->get()
+        ->filter(fn (ScheduledVolumeBackupExecution $execution) => $startedWithin($execution, $execution->scheduledVolumeBackup?->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT));
+
+    return $tasks->count() + $databaseBackups->count() + $volumeBackups->count();
+}
+
+function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false, int $scheduledJobCount = 0): string
 {
     $output = "\n=== Running Deployments ===\n";
     $output .= 'Total active deployments: '.$activeDeploymentCount."\n";
+    $output .= 'Total running scheduled jobs: '.$scheduledJobCount."\n";
 
     if (! $showAll) {
         return $output;
@@ -2605,13 +2792,14 @@ function customApiValidator(Collection|array $item, array $rules, array $message
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
+    $resource->resetComposeVolumeWarnings();
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             // Extract inline comments from raw YAML before Symfony parser discards them
             $envComments = extractYamlEnvironmentComments($resource->docker_compose_raw);
 
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
             } catch (Exception $e) {
                 throw new RuntimeException($e->getMessage());
             }
@@ -2826,7 +3014,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $savedService, $topLevelVolumes) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -2851,6 +3039,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             validateShellSafePath($target->value(), 'volume target');
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                            validateComposeContentVolumeSource($volume);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
@@ -2888,12 +3077,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } elseif ($type->value() === 'volume') {
+                            $legacyName = "{$savedService->service->uuid}_".Str::slug($source, '-');
+                            if (useComposeExternalVolumeAsWritten($resource, $savedService, $topLevelVolumes, $source->value(), $legacyName)) {
+                                // The external volume gets no row, so Coolify never removes it.
+                                return $volume;
+                            }
                             if ($topLevelVolumes->has($source->value())) {
                                 $v = $topLevelVolumes->get($source->value());
                                 if (data_get($v, 'driver_opts.type') === 'cifs') {
                                     return $volume;
                                 }
                             }
+                            $declaration = $topLevelVolumes->get($source->value());
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
@@ -2902,10 +3097,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             } elseif (is_array($volume)) {
                                 data_set($volume, 'source', $name);
                             }
-                            $topLevelVolumes->put($name, [
-                                'name' => $name,
-                            ]);
-                            LocalPersistentVolume::updateOrCreate(
+                            $persistentVolume = LocalPersistentVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
@@ -2918,6 +3110,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     'resource_type' => get_class($savedService),
                                 ]
                             );
+                            $topLevelVolumes->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume));
                         }
                         dispatch(new ServerFilesFromServerJob($savedService));
 
@@ -3198,13 +3391,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     ? $savedService->noindexDomains()
                     : collect([]);
                 $defaultLabels = defaultLabels(
-                    id: $resource->id,
+                    uuid: $resource->uuid,
                     name: $containerName,
                     projectName: $resource->project()->name,
                     resourceName: $resource->name,
                     type: 'service',
                     subType: $isDatabase ? 'database' : 'application',
-                    subId: $savedService->id,
+                    subUuid: $savedService->uuid,
                     subName: $savedService->name,
                     environment: $resource->environment->name,
                 );
@@ -3255,6 +3448,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection,
                                         domainPortOverrides: $domainPortOverrides,
+                                        is_traffic_analytics_enabled: $resource->server?->isTrafficAnalyticsEnabled() ?? false,
+                                        supports_log_append: $resource->server?->caddySupportsLogAppend() ?? false,
                                     ));
                                     break;
                             }
@@ -3288,6 +3483,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection,
                                 domainPortOverrides: $domainPortOverrides,
+                                is_traffic_analytics_enabled: $resource->server?->isTrafficAnalyticsEnabled() ?? false,
+                                supports_log_append: $resource->server?->caddySupportsLogAppend() ?? false,
                             ));
                         }
                     }
@@ -3395,12 +3592,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
     } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
         } catch (Exception) {
             return;
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
+        // Legacy Compose applications (parser versions 1 and 2) never stored their volumes, so Coolify
+        // cannot tell which external volume already holds data. They keep the old volume names, and
+        // warnLegacyApplicationComposeExternalVolume() tells the user about it.
+        $declaredTopLevelVolumes = collect($topLevelVolumes->all());
         if ($pull_request_id !== 0) {
             $topLevelVolumes = collect([]);
         }
@@ -3433,7 +3634,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $declaredTopLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3472,7 +3673,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $containerName = "$serviceName-$baseName";
             if ($resource->compose_parsing_version === '1') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $declaredTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3498,6 +3699,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, $name->value(), $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
@@ -3512,9 +3714,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name, [
-                                                'name' => $name,
-                                            ]);
+                                            $topLevelVolumes->put($name, legacyApplicationRenamedVolumeDeclaration($name));
                                         }
                                     } else {
                                         if ($topLevelVolumes->has($name->value())) {
@@ -3527,9 +3727,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name->value(), [
-                                                'name' => $name->value(),
-                                            ]);
+                                            $topLevelVolumes->put($name->value(), legacyApplicationRenamedVolumeDeclaration($name->value()));
                                         }
                                     }
                                 }
@@ -3575,6 +3773,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, (string) $source, $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
@@ -3595,9 +3794,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($source, [
-                                                'name' => $source,
-                                            ]);
+                                            $topLevelVolumes->put($source, legacyApplicationRenamedVolumeDeclaration($source));
                                         }
                                     }
                                 }
@@ -3613,7 +3810,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $declaredTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3639,6 +3836,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, $name->value(), $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
                                         $name = $uuid.'-'.addPreviewDeploymentSuffix($name, $pull_request_id);
@@ -3654,9 +3852,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name, [
-                                                'name' => $name,
-                                            ]);
+                                            $topLevelVolumes->put($name, legacyApplicationRenamedVolumeDeclaration($name));
                                         }
                                     } else {
                                         $uuid = $resource->uuid;
@@ -3672,9 +3868,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name->value(), [
-                                                'name' => $name->value(),
-                                            ]);
+                                            $topLevelVolumes->put($name->value(), legacyApplicationRenamedVolumeDeclaration($name->value()));
                                         }
                                     }
                                 }
@@ -3718,6 +3912,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, (string) $source, $pull_request_id);
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
                                     } else {
@@ -3740,9 +3935,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($source, [
-                                                'name' => $source,
-                                            ]);
+                                            $topLevelVolumes->put($source, legacyApplicationRenamedVolumeDeclaration($source));
                                         }
                                     }
                                 }
@@ -4093,6 +4286,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             domains: $fqdns,
                                             serviceLabels: $serviceLabels,
                                             image: data_get($service, 'image'),
+                                            service_name: $serviceName,
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
@@ -4100,6 +4294,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
+                                            is_traffic_analytics_enabled: $server?->isTrafficAnalyticsEnabled() ?? false,
+                                            supports_log_append: $server?->caddySupportsLogAppend() ?? false,
                                         )
                                     );
                                     break;
@@ -4128,6 +4324,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     domains: $fqdns,
                                     serviceLabels: $serviceLabels,
                                     image: data_get($service, 'image'),
+                                    service_name: $serviceName,
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
@@ -4135,6 +4332,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,
+                                    is_traffic_analytics_enabled: $server?->isTrafficAnalyticsEnabled() ?? false,
+                                    supports_log_append: $server?->caddySupportsLogAppend() ?? false,
                                 )
                             );
                         }
@@ -4143,7 +4342,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
 
             $defaultLabels = defaultLabels(
-                id: $resource->id,
+                uuid: $resource->uuid,
                 name: $containerName,
                 projectName: $resource->project()->name,
                 resourceName: $resource->name,
@@ -4241,7 +4440,7 @@ function isAssociativeArray($array)
  *
  *  Theses variables are added in place to the $where_to_add array.
  */
-function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
+function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
     // Currently disabled
     return;
@@ -4299,8 +4498,9 @@ function convertToKeyValueCollection($environment)
                         $key = $parts[0];
                         $realValue = $parts[1] ?? '';
                         $changedEnvironment->put($key, $realValue);
-                    } else {
-                        $changedEnvironment->put($key, $value);
+                    } elseif (is_string($value) && $value !== '') {
+                        // A bare name (for example a list-style build arg) is the same as `NAME:` without a value.
+                        $changedEnvironment->put($value, $changedEnvironment->get($value));
                     }
                 } else {
                     $changedEnvironment->put($key, $value);
@@ -4341,6 +4541,49 @@ function wireNavigate(): string
     } catch (Exception $e) {
         return 'wire:navigate';
     }
+}
+
+/**
+ * Flattens a grouped settings sidebar into the items that the command palette
+ * shows for the current page: every page, its child pages, and its in-page sections.
+ *
+ * @param  iterable<string, iterable<array{label: string, route: string, navigate?: bool, visible?: bool, children?: array<int, array{label: string, route: string, navigate?: bool, visible?: bool}>}>>  $groupedItems
+ * @param  array<string, string>  $routeParameters
+ * @param  array<string, array<int, array{id: string, label: string}>>  $pageSections  In-page sections keyed by page route
+ * @return array<int, array{label: string, breadcrumb: string, search_text: string, href: string, navigate: bool}>
+ */
+function settingsSearchItems(iterable $groupedItems, array $routeParameters, array $pageSections = []): array
+{
+    $spaNavigation = wireNavigate() !== '';
+    $items = [];
+    $add = function (string $label, string $breadcrumb, string $href, bool $navigate) use (&$items, $spaNavigation): void {
+        $items[] = [
+            'label' => $label,
+            'breadcrumb' => $breadcrumb,
+            'search_text' => $label.' '.$breadcrumb,
+            'href' => $href,
+            'navigate' => $navigate && $spaNavigation,
+        ];
+    };
+
+    foreach ($groupedItems as $groupLabel => $groupItems) {
+        foreach ($groupItems as $item) {
+            $href = route($item['route'], $routeParameters);
+            $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
+
+            foreach ($item['children'] ?? [] as $child) {
+                if ($child['visible'] ?? true) {
+                    $add($child['label'], $groupLabel.' · '.$item['label'], route($child['route'], $routeParameters), $child['navigate'] ?? true);
+                }
+            }
+
+            foreach ($pageSections[$item['route']] ?? [] as $section) {
+                $add($section['label'], $groupLabel.' · '.$item['label'], $href.'#'.$section['id'], true);
+            }
+        }
+    }
+
+    return $items;
 }
 
 /**
@@ -4867,12 +5110,16 @@ function formatContainerStatus(string $status): string
 }
 
 /**
- * Check if password confirmation should be skipped.
+ * Check if the password step of a destructive action should be skipped.
  * Returns true if:
  * - Two-step confirmation is globally disabled
- * - User has no usable local password confirmation (including SSO users)
+ * - User has a linked OAuth identity (they only use the dialog's typed confirmation)
+ * - User has no password (no way to confirm)
+ * - User confirmed their password recently (`auth.password_confirmed_at`
+ *   within `auth.password_timeout`)
  *
- * Used by modal-confirmation.blade.php to determine if password step should be shown.
+ * Used by modal-confirmation.blade.php to determine if password step should be shown,
+ * and by verifyPasswordConfirmation() to enforce the same rule on the server.
  *
  * @return bool True if password confirmation should be skipped
  */
@@ -4883,20 +5130,29 @@ function shouldSkipPasswordConfirmation(): bool
         return true;
     }
 
-    // OAuth users may have an unusable generated password, so the linked
-    // identity is the source of truth for whether confirmation is possible.
     if (! Auth::user()?->requiresPasswordConfirmation()) {
         return true;
     }
 
-    return false;
+    return hasRecentPasswordConfirmation();
+}
+
+/**
+ * Whether the session holds a password confirmation within `auth.password_timeout`.
+ */
+function hasRecentPasswordConfirmation(): bool
+{
+    $confirmedAt = session('auth.password_confirmed_at');
+    if (! is_numeric($confirmedAt)) {
+        return false;
+    }
+
+    return (time() - (int) $confirmedAt) < (int) config('auth.password_timeout', 10800);
 }
 
 /**
  * Verify password for two-step confirmation.
- * Skips verification if:
- * - Two-step confirmation is globally disabled
- * - User has no usable local password confirmation (including SSO users)
+ * Skips verification in the cases listed in shouldSkipPasswordConfirmation().
  *
  * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
  * @param  Component|null  $component  Optional Livewire component to add errors to
@@ -4910,10 +5166,8 @@ function verifyPasswordConfirmation(mixed $password, ?Component $component = nul
     }
 
     // Verify the password
-    if (! Hash::check($password, Auth::user()->password)) {
-        if ($component) {
-            $component->addError('password', 'The provided password is incorrect.');
-        }
+    if (! is_string($password) || ! Hash::check($password, Auth::user()->password)) {
+        $component?->addError('password', 'The provided password is incorrect.');
 
         return false;
     }
@@ -4934,7 +5188,7 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
     }
 
     try {
-        $yaml = Yaml::parse($dockerComposeRaw);
+        $yaml = parseDockerComposeYaml($dockerComposeRaw);
     } catch (Exception $e) {
         // Malformed YAML - return empty collection
         return collect([]);

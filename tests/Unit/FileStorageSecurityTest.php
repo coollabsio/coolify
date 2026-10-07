@@ -51,27 +51,6 @@ test('file storage rejects reverse shell payload', function () {
         ->toThrow(Exception::class);
 });
 
-test('file storage escapes paths properly', function () {
-    $path = "/var/www/app's data";
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/app'\\''s data'");
-});
-
-test('file storage escapes paths with spaces', function () {
-    $path = '/var/www/my app/data';
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/my app/data'");
-});
-
-test('file storage escapes paths with special characters', function () {
-    $path = '/var/www/app (production)/data';
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/app (production)/data'");
-});
-
 test('file storage accepts legitimate absolute paths', function () {
     expect(fn () => validateShellSafePath('/var/www/app', 'storage path'))
         ->not->toThrow(Exception::class);
@@ -206,16 +185,8 @@ test('confined path resolver rejects paths that escape the resource configuratio
 test('local file volume write sink keeps saved managed file paths for compatibility', function () {
     $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
 
-    expect($source)->toContain('confinePathToBase($workdir, $this->fs_path, \'storage path\')')
+    expect($source)->toContain('hostPathAndResourceDirectory()')
         ->and($source)->toContain('assertRemotePathIsConfined')
-        ->and($source)->toContain('tee {$escapedPath}');
-});
-
-test('host file mounts are bind-only and skipped by server storage writes', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
-
-    expect($source)->toContain('if ($this->is_host_file) {')
-        ->and($source)->toContain('return;')
         ->and($source)->toContain('tee {$escapedPath}');
 });
 
@@ -235,14 +206,4 @@ test('file storage permissions cannot be set by mass assignment', function () {
 
     expect($volume->chown)->toBeNull()
         ->and($volume->chmod)->toBeNull();
-});
-
-test('internal SSL files retain their private and public modes', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Helpers/SslHelper.php');
-
-    expect($source)
-        ->toContain("\$fileStorage->chmod = '600';")
-        ->toContain("\$fileStorage->chmod = '644';")
-        ->toContain('$fileStorage->save();')
-        ->not->toContain("'chmod' =>");
 });

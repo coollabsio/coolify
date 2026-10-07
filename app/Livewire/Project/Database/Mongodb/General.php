@@ -123,9 +123,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->mongoInitdbRootPassword = '';
-        }
     }
 
     private function syncData(bool $toModel = false): void
@@ -151,7 +148,8 @@ class General extends Component
             $this->description = $this->database->description;
             $this->mongoConf = $this->database->mongo_conf;
             $this->mongoInitdbRootUsername = $this->database->mongo_initdb_root_username;
-            $this->mongoInitdbRootPassword = $this->database->mongo_initdb_root_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->mongoInitdbRootPassword = $canSeeCredentials ? $this->database->mongo_initdb_root_password : '';
             $this->mongoInitdbDatabase = $this->database->mongo_initdb_database;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;

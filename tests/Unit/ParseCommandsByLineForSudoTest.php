@@ -271,7 +271,7 @@ test('adds ownership changes for Coolify data paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo chown -R ubuntu:ubuntu /data/coolify/logs && sudo chmod -R o-rwx /data/coolify/logs');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo find /data/coolify/logs -user root -exec chown -h ubuntu:ubuntu {} + && sudo chmod o-rwx /data/coolify/logs');
 });
 
 test('adds ownership changes for Coolify tmp paths', function () {
@@ -281,7 +281,7 @@ test('adds ownership changes for Coolify tmp paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo chown -R ubuntu:ubuntu /tmp/coolify/cache && sudo chmod -R o-rwx /tmp/coolify/cache');
+    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo find /tmp/coolify/cache -user root -exec chown -h ubuntu:ubuntu {} + && sudo chmod o-rwx /tmp/coolify/cache');
 });
 
 test('ownership changes work where root may not use sudo', function (string $parser) {
@@ -305,10 +305,86 @@ test('ownership changes work where root may not use sudo', function (string $par
         ->and($process->getErrorOutput())->toBe('')
         ->and($process->isSuccessful())->toBeTrue()
         ->and(is_dir($path))->toBeTrue()
-        ->and(file_get_contents("{$directory}/log"))->toBe("chown -R ubuntu:ubuntu {$path}\nchmod -R o-rwx {$path}\n");
+        ->and(file_get_contents("{$directory}/log"))->toContain("chmod o-rwx {$path}\n");
 
     (new Process(['rm', '-rf', $directory, $path]))->run();
 })->with(['command list', 'deployment line']);
+
+test('ownership changes keep container-owned files and file modes', function (string $parser) {
+    if (posix_geteuid() !== 0 || posix_getpwnam('daemon') === false) {
+        $this->markTestSkipped('Needs root and a daemon user to change file owners.');
+    }
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("{$directory}/sudo", 0755);
+    $path = '/tmp/coolify/ownership-test-'.bin2hex(random_bytes(4));
+    // A file mount that Coolify wrote with sudo, and a database folder that belongs to the container user.
+    mkdir("{$path}/pgdata", 0700, true);
+    file_put_contents("{$path}/index.html", 'mounted');
+    chmod("{$path}/index.html", 0644);
+    file_put_contents("{$path}/pgdata/PG_VERSION", '17');
+    chmod("{$path}/pgdata/PG_VERSION", 0600);
+    chown("{$path}/pgdata", 999);
+    chown("{$path}/pgdata/PG_VERSION", 999);
+
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('daemon');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect(["mkdir -p {$path}"]), $server)[0]
+        : parseLineForSudo("mkdir -p {$path}", $server);
+    $process = new Process(['/bin/sh', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH')]);
+    $process->run();
+    clearstatcache();
+
+    expect($process->getErrorOutput())->toBe('')
+        ->and(fileowner($path))->toBe(1)
+        ->and(fileperms($path) & 0007)->toBe(0)
+        ->and(fileowner("{$path}/index.html"))->toBe(1)
+        ->and(fileperms("{$path}/index.html") & 0777)->toBe(0644)
+        ->and(fileowner("{$path}/pgdata"))->toBe(999)
+        ->and(fileowner("{$path}/pgdata/PG_VERSION"))->toBe(999)
+        ->and(fileperms("{$path}/pgdata/PG_VERSION") & 0777)->toBe(0600);
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line']);
+
+test('ownership changes apply only to the mkdir path when more commands follow', function (string $parser, string $separator) {
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    foreach (['chown', 'chmod'] as $tool) {
+        file_put_contents("{$directory}/{$tool}", "#!/bin/sh\necho \"{$tool} \$*\" >> \"\$LOG\"\n");
+    }
+    array_map(fn (string $tool) => chmod("{$directory}/{$tool}", 0755), ['sudo', 'chown', 'chmod']);
+    $path = '/tmp/coolify/sudo-test-'.bin2hex(random_bytes(4));
+    $line = "mkdir -p {$path}/dynamic{$separator} ls -1 {$path}/dynamic | head -n 1000";
+
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect([$line]), $this->server)[0]
+        : parseLineForSudo($line, $this->server);
+    $process = new Process(['bash', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH'), 'LOG' => "{$directory}/log"]);
+    $process->run();
+
+    expect($command)->toContain("find {$path}/dynamic -user root -exec chown -h ubuntu:ubuntu {} + && ")
+        ->and($command)->toContain("chmod o-rwx {$path}/dynamic{$separator} ")
+        ->and($command)->toEndWith('head -n 1000'.($parser === 'command list' ? "'" : ''))
+        ->and($process->getErrorOutput())->toBe('')
+        ->and($process->isSuccessful())->toBeTrue()
+        ->and(is_dir("{$path}/dynamic"))->toBeTrue()
+        ->and(file_get_contents("{$directory}/log"))->toEndWith("chmod o-rwx {$path}/dynamic\n");
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line'])->with(['and' => ' &&', 'semicolon' => ';']);
+
+test('does not add ownership changes when mkdir is followed by other operators', function () {
+    $result = parseCommandsByLineForSudo(collect([
+        'mkdir -p /data/coolify/proxy > /dev/null 2>&1 || true',
+    ]), $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/proxy > /dev/null 2>&1 || sudo true');
+});
 
 test('does not add ownership changes for system paths', function () {
     $commands = collect([
@@ -731,4 +807,54 @@ test('do keyword with word boundary is not given sudo', function () {
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
     expect($result[0])->toBe('do');
+});
+
+test('keeps a single sudo sh -c script unchanged in both parsers', function () {
+    // A redirect inside the script is opened by root. Inner sudo fails where root is not in sudoers (Alpine).
+    $line = 'sh -c '.escapeshellarg("docker exec 'db' pg_dump 'app' > '/data/coolify/backups/app.dmp' && echo it's done | cat");
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toBe("sudo {$line}")
+        ->and(parseLineForSudo($line, $this->server))->toBe("sudo {$line}");
+});
+
+test('still wraps a sh -c call that is not the whole line', function () {
+    $line = "docker exec db pg_dumpall | docker run --rm -i helper sh -c 'gzip' > /data/coolify/backups/all.gz";
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toStartWith("sudo bash -c '");
+});
+
+test('parseLineForSudo adds sudo to each pipe stage without doubling it', function () {
+    expect(parseLineForSudo("echo 'ZW52' | base64 -d | tee /data/coolify/applications/app/.env > /dev/null", $this->server))
+        ->toBe("sudo echo 'ZW52' | sudo base64 -d | sudo tee /data/coolify/applications/app/.env > /dev/null")
+        ->and(parseLineForSudo('docker ps | sudo grep app', $this->server))
+        ->toBe('sudo docker ps | sudo grep app');
+});
+
+test('parseLineForSudo keeps pipes inside quoted strings unchanged', function (string $line, string $expected) {
+    expect(parseLineForSudo($line, $this->server))->toBe($expected);
+})->with([
+    'single-quoted go template' => [
+        "docker inspect --format '{{a | b}}' coolify-proxy | grep x",
+        "sudo docker inspect --format '{{a | b}}' coolify-proxy | sudo grep x",
+    ],
+    'double-quoted sh -c script' => [
+        'sh -c "x | y"',
+        'sudo sh -c "x | y"',
+    ],
+    'escaped double quote inside double quotes' => [
+        'echo "a \" | b" | tee /tmp/coolify/file',
+        'sudo echo "a \" | b" | sudo tee /tmp/coolify/file',
+    ],
+    'single quote inside double quotes' => [
+        "echo \"it's | here\" | tee /tmp/coolify/file",
+        "sudo echo \"it's | here\" | sudo tee /tmp/coolify/file",
+    ],
+]);
+
+test('parseCommandsByLineForSudo keeps pipes inside quoted strings unchanged', function () {
+    $result = parseCommandsByLineForSudo(collect([
+        "docker ps --format '{{.Names}} | {{.Image}}' | grep app",
+    ]), $this->server);
+
+    expect($result[0])->toBe("sudo docker ps --format '{{.Names}} | {{.Image}}' | sudo grep app");
 });

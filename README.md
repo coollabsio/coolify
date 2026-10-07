@@ -116,11 +116,11 @@ Thank you so much!
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
-* [PetroSky Cloud](https://petrosky.io) - Open source cloud deployment solutions
 * [QuickSrv](https://quicksrv.io/) - Fast and reliable server hosting
 
 ### Small Sponsors
 
+<a href="https://serverside.com/?utm_source=coolify.io"><img width="60px" alt="Serverside" src="https://cdn.coollabs.io/sponsors/serverside.svg"/></a>
 <a href="https://darkvps.pro"><img width="60px" alt="DarkVPS" src="https://cdn.coollabs.io/sponsors/darkvps.png"/></a>
 <a href="https://www.opensourcealternatives.to"><img width="60px" alt="Open Source Alternatives" src="https://cdn.coollabs.io/sponsors/opensourcealternatives.png"/></a>
 <a href="https://onserva.com/"><img width="60px" alt="Onserva" src="https://onserva.com/icon.svg"/></a>

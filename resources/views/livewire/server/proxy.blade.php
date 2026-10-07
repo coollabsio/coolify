@@ -36,8 +36,10 @@
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
-                        <x-callout type="warning" title="Configuration out of sync">
-                            Restart the proxy to apply the saved configuration.
+                        <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
+                    @elseif ($server->hasPendingProxyConfiguration())
+                        <x-callout type="warning" title="Restart required">
+                            Restart the proxy to apply TLS certificate changes.
                         </x-callout>
                     @else
                         <div class="flex items-start gap-3">
@@ -132,6 +134,8 @@
                                     changes before upgrading.
                                 </x-callout>
                             @endif
+                        @elseif ($this->outdatedCaddyImage)
+                            <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
                         <div wire:loading.flex wire:target="loadProxyConfiguration"

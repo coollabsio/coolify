@@ -373,12 +373,19 @@ class ServiceApplicationsController extends Controller
 
         $serviceApplication->refresh();
 
+        auditLog('api.service_application.updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_application_uuid' => $serviceApplication->uuid,
+            'changed_fields' => array_keys($payload),
+        ]);
+
         return response()->json($this->removeSensitiveData($serviceApplication));
     }
 
     #[OA\Get(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'get-service-application-logs-by-service-and-app-uuid',
         security: [
@@ -447,7 +454,7 @@ class ServiceApplicationsController extends Controller
     )]
     #[OA\Post(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'post-service-application-logs-by-service-and-app-uuid',
         security: [['bearerAuth' => []]],

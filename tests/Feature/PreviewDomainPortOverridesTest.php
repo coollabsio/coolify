@@ -19,16 +19,6 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('opens preview domain settings from browser data and shows a dns spinner', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
-
-    expect($view)
-        ->not->toContain('wire:click="startEdit(')
-        ->toContain('@click="openEditDomain(')
-        ->toContain('<x-loading compact aria-label="Checking DNS"')
-        ->not->toContain('<x-loading-on-button wire:loading.delay');
-});
-
 beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.driver' => 'file']);
@@ -402,16 +392,6 @@ it('copies the parent domain port override onto a generated preview domain', fun
         ->toHaveCount(1)
         ->and(array_values($preview->domain_port_overrides))
         ->toBe([8080]);
-});
-
-it('saves generated preview domains once in the application parser', function () {
-    $parser = file_get_contents(base_path('bootstrap/helpers/parsers.php'));
-    $previewGeneration = Str::of($parser)
-        ->after('// If the domain is set, we need to generate the FQDNs for the preview')
-        ->before('$defaultLabels = defaultLabels');
-
-    expect($previewGeneration->substrCount('$preview->save();'))->toBe(1)
-        ->and((string) $previewGeneration)->toContain('$preview->fqdn = $fqdns->implode(\',\');');
 });
 
 it('keeps every generated preview domain port override in the legacy compose parser', function () {

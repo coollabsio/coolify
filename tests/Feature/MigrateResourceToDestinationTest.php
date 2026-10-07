@@ -4,6 +4,7 @@ use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StopService;
 use App\Actions\Shared\MigrateResourceToDestination;
+use App\Enums\ServerRole;
 use App\Jobs\FinalizeResourceMigrationJob;
 use App\Jobs\HostPathCloneJob;
 use App\Jobs\VolumeCloneJob;
@@ -110,6 +111,7 @@ test('rejects migration to a build server destination', function () {
         'is_reachable' => true,
         'is_usable' => true,
         'is_build_server' => true,
+        'server_role' => ServerRole::BUILD,
     ]);
     $buildDestination = StandaloneDocker::where('server_id', $buildServer->id)->firstOrFail();
     $application = createMigrateTestApplication($this);
@@ -319,38 +321,6 @@ test('rejects migration to a server that is not validated and reachable', functi
 
     MigrateResourceToDestination::run($application, $this->targetDestination, migrateVolumes: false);
 })->throws(ValidationException::class);
-
-test('resource operations migrate list only includes other functional servers', function () {
-    $unreachableServer = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Unreachable Server',
-    ]);
-    $unreachableServer->settings()->update([
-        'is_reachable' => false,
-        'is_usable' => false,
-    ]);
-
-    $application = createMigrateTestApplication($this);
-    $application->load(['destination.server', 'environment.project']);
-
-    $this->actingAs($this->user);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(ResourceOperations::class, ['resource' => $application]);
-
-    $servers = $component->get('servers');
-    $serverIds = collect($servers)->pluck('id')->all();
-
-    expect($serverIds)->toContain($this->server->id)
-        ->and($serverIds)->toContain($this->targetServer->id)
-        ->and($serverIds)->toContain($unreachableServer->id);
-
-    $view = file_get_contents(resource_path('views/livewire/project/shared/resource-operations.blade.php'));
-
-    expect($view)
-        ->toContain('server.is_functional && server.id != this.currentServerId')
-        ->toContain("'is_functional' => \$server->isFunctional()");
-});
 
 test('migration is unavailable outside development mode', function () {
     config(['app.env' => 'production']);

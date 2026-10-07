@@ -112,7 +112,7 @@ trait CalculatesExcludedStatus
         }
 
         try {
-            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+            $dockerCompose = parseDockerComposeYaml($dockerComposeRaw);
 
             // Validate structure
             if (! is_array($dockerCompose)) {
