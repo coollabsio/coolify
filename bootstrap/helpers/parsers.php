@@ -731,7 +731,7 @@ function parseDockerVolumeString(string $volumeString): array
                     $possibleMode = substr($remaining, $lastColon + 1);
                     $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-                    if (in_array($possibleMode, $validModes)) {
+                    if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                         $mode = $possibleMode;
                         $target = substr($remaining, 0, $lastColon);
                     } else {
@@ -761,7 +761,7 @@ function parseDockerVolumeString(string $volumeString): array
             // Check if the last part is a valid Docker volume mode
             $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-            if (in_array($possibleMode, $validModes)) {
+            if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                 // It's a mode
                 // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
                 $mode = $possibleMode;
@@ -828,7 +828,7 @@ function parseDockerVolumeString(string $volumeString): array
                 $possibleMode = substr($remaining, $lastColon + 1);
                 $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-                if (in_array($possibleMode, $validModes)) {
+                if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                     $mode = $possibleMode;
                     $target = substr($remaining, 0, $lastColon);
                 } else {
@@ -1378,7 +1378,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, $pull_request_id);
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -1414,7 +1414,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, $pull_request_id);
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
@@ -1451,12 +1451,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                         LocalFileVolume::updateOrCreate(
                             [
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'resource_id' => $originalResource->id,
                                 'resource_type' => get_class($originalResource),
                             ],
                             [
-                                'fs_path' => $source,
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'content' => $content,
                                 'is_directory' => $isDirectory,
@@ -2750,7 +2751,7 @@ function serviceParser(Service $resource): Collection
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target);
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -2786,7 +2787,7 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target);
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
@@ -2817,12 +2818,13 @@ function serviceParser(Service $resource): Collection
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
                         LocalFileVolume::updateOrCreate(
                             [
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'resource_id' => $originalResource->id,
                                 'resource_type' => get_class($originalResource),
                             ],
                             [
-                                'fs_path' => $source,
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'content' => $content,
                                 'is_directory' => $isDirectory,
