@@ -126,6 +126,22 @@ test('members get no copy button and no value', function () {
         ->assertReturned(null);
 });
 
+test('members get no value after switching to a team they own', function (string $variableType) {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $ownedTeam = Team::factory()->create();
+    $ownedTeam->members()->attach($member, ['role' => 'owner']);
+    $this->actingAs($member);
+    $env = $variableType === 'shared'
+        ? SharedEnvironmentVariable::create(['key' => 'TEAM_WIDE', 'value' => 'team-wide-secret', 'type' => 'team', 'team_id' => $this->team->id])
+        : createEnvironmentVariable();
+
+    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application']);
+    session(['currentTeam' => $ownedTeam]);
+
+    $component->call('copyValue')->assertReturned(null);
+})->with(['application variable' => 'application', 'shared variable' => 'shared']);
+
 test('locked variables get no copy button and no value', function () {
     Livewire::test(Show::class, ['env' => createEnvironmentVariable(['is_shown_once' => true]), 'type' => 'application'])
         ->assertDontSeeHtml('Copy value')

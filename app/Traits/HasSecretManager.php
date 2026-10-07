@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Exceptions\RemoteSecretException;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\SecretManagerLink;
@@ -10,8 +11,10 @@ use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Support\RemoteSecretReferences;
+use App\Support\RemoteSecretValueFormatter;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
-use RuntimeException;
+use Throwable;
 
 trait HasSecretManager
 {
@@ -31,6 +34,28 @@ trait HasSecretManager
         return $this->morphOne(SecretManagerLink::class, 'resourceable');
     }
 
+    /**
+     * Give a cloned resource the same secret manager source. The token is team-scoped, so a clone in another team gets no link.
+     */
+    public function cloneSecretManagerLinkTo(Model $target): void
+    {
+        $link = $this->secretManagerLink()->with('integrationToken')->first();
+        // fresh(): a replicated model keeps the relations of its source, such as the old environment.
+        $targetTeamId = $target->fresh()?->team()?->id;
+
+        if (! $link || $targetTeamId === null || (int) $link->integrationToken?->team_id !== (int) $targetTeamId) {
+            return;
+        }
+
+        $target->secretManagerLink()->create([
+            'integration_token_id' => $link->integration_token_id,
+            'settings' => $link->settings,
+        ]);
+    }
+
+    /**
+     * The value for an `environment:` entry of a generated compose file (standalone databases).
+     */
     public function resolveSecretManagerEnvironmentVariable(EnvironmentVariable $environmentVariable): ?string
     {
         $value = $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
@@ -39,10 +64,70 @@ trait HasSecretManager
     }
 
     /**
-     * Format a value for a KEY=value item in a Docker Compose `environment:` list.
-     * Compose keeps quotes and backslashes there, so only `$` needs escaping.
+     * The value for a line of a dotenv file that Docker Compose reads (the service .env file).
+     */
+    public function resolveSecretManagerDotenvValue(EnvironmentVariable $environmentVariable): ?string
+    {
+        $value = $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+        if ($value !== null && $this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return RemoteSecretValueFormatter::dotenv($value);
+        }
+
+        return $value === null ? null : ($this->useExactEscaping($environmentVariable)
+            ? escapeComposeEnvFileValue($value, $this->environmentVariableAllowsInterpolation($environmentVariable, $value))
+            : $this->legacyFormatEnvironmentVariableValue($environmentVariable, $value));
+    }
+
+    /**
+     * Formats a resolved value for an `environment:` entry of a generated compose file. Remote secret
+     * values are used exactly as they are; other values keep their existing format.
      */
     public function formatEnvironmentVariableValue(EnvironmentVariable $environmentVariable, ?string $value): ?string
+    {
+        if ($value !== null && $this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return RemoteSecretValueFormatter::composeFile($value);
+        }
+
+        return $this->formatLocalEnvironmentVariableValue($environmentVariable, $value);
+    }
+
+    /**
+     * Formats a resolved value that is placed directly in a generated compose file, such as a
+     * password in a command or healthcheck. Remote secret values are escaped for compose
+     * interpolation; other values stay unchanged, as before.
+     */
+    public function formatComposeFileValue(EnvironmentVariable $environmentVariable, string $value): string
+    {
+        if ($this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return RemoteSecretValueFormatter::composeFile($value);
+        }
+
+        if ($environmentVariable->key === 'REDIS_PASSWORD' && $this->useExactEscaping($environmentVariable)
+            && ($this instanceof StandaloneRedis || $this instanceof StandaloneKeydb || $this instanceof StandaloneDragonfly)) {
+            return escapeDollarSign($value);
+        }
+
+        return $this->composeCommandValue($environmentVariable, $value);
+    }
+
+    /**
+     * Resolves every remote secret reference of the given variables now, so that an unreachable
+     * secret manager or a missing key stops an operation before it stops the running resource.
+     * The fetched secrets stay cached on this model for the start that follows.
+     *
+     * @param  iterable<EnvironmentVariable>  $environmentVariables
+     *
+     * @throws RemoteSecretException
+     */
+    public function ensureRemoteSecretsResolvable(iterable $environmentVariables): void
+    {
+        foreach ($environmentVariables as $environmentVariable) {
+            $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+        }
+    }
+
+    private function formatLocalEnvironmentVariableValue(EnvironmentVariable $environmentVariable, ?string $value): ?string
     {
         if ($value === null) {
             return null;
@@ -154,12 +239,12 @@ trait HasSecretManager
             return null;
         }
 
-        if (RemoteSecretReferences::containsReference($value)) {
+        if ($this->resolvesRemoteSecretReferences($environmentVariable, $value)) {
             $secrets = $this->secretManagerValues();
             $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
             if ($missing !== []) {
-                throw new RuntimeException('Missing secret keys: '.implode(', ', $missing)." (referenced by {$environmentVariable->key}).");
+                throw new RemoteSecretException('Missing secret keys: '.implode(', ', $missing)." (referenced by {$environmentVariable->key}).");
             }
 
             $value = RemoteSecretReferences::substitute($value, $secrets);
@@ -170,9 +255,24 @@ trait HasSecretManager
 
     public function environmentVariableUsesSecretManager(EnvironmentVariable $environmentVariable): bool
     {
-        return RemoteSecretReferences::containsReference(
+        return $this->resolvesRemoteSecretReferences(
+            $environmentVariable,
             $this->resolvedEnvironmentVariableValue($environmentVariable),
         );
+    }
+
+    /**
+     * Without a source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
+     */
+    private function resolvesRemoteSecretReferences(EnvironmentVariable $environmentVariable, ?string $value): bool
+    {
+        if (! RemoteSecretReferences::containsReference($value)) {
+            return false;
+        }
+
+        return ! $environmentVariable->is_literal
+            || $this->resolvedSecretManagerValues !== null
+            || $this->secretManagerLink()->exists();
     }
 
     private function resolvedEnvironmentVariableValue(EnvironmentVariable $environmentVariable): ?string
@@ -194,10 +294,16 @@ trait HasSecretManager
         $link = $this->secretManagerLink()->with('integrationToken')->first();
 
         if (! $link) {
-            throw new RuntimeException('Environment variables reference remote secrets, but no secret manager source is configured.');
+            throw new RemoteSecretException('Environment variables reference remote secrets, but no secret manager source is configured.');
         }
 
-        return $this->resolvedSecretManagerValues = $link->fetchSecrets();
+        try {
+            return $this->resolvedSecretManagerValues = $link->fetchSecrets();
+        } catch (RemoteSecretException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            throw new RemoteSecretException('Could not fetch remote secrets: '.$e->getMessage(), previous: $e);
+        }
     }
 
     /** @return array<string, string> */

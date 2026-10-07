@@ -213,3 +213,38 @@ it('applies OAuth git config to GitLab merge-request fetch and submodule checkou
         ->toContain("http.version=HTTP/1.1 fetch origin 'merge-requests/2/head:pr-2-coolify'")
         ->toContain('http.version=HTTP/1.1 submodule update --init --recursive');
 });
+
+it('uses a GitLab source private key only when it belongs to the source team', function (int $keyTeamId, bool $expectKey) {
+    $privateKey = new PrivateKey;
+    $privateKey->forceFill(['team_id' => $keyTeamId, 'private_key' => 'fake-private-key']);
+
+    $gitlabSource = new GitlabApp(['html_url' => 'https://gitlab.com', 'custom_port' => 22]);
+    $gitlabSource->forceFill(['team_id' => 1]);
+    $gitlabSource->setRelation('privateKey', $privateKey);
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('source');
+    $application->shouldReceive('customRepository')->andReturn([
+        'repository' => 'git@gitlab.com:user/repo.git',
+        'port' => 22,
+    ]);
+    $application->shouldReceive('getAttribute')->with('source')->andReturn($gitlabSource);
+    $application->shouldReceive('getAttribute')->with('settings')->andReturn((object) [
+        'is_git_shallow_clone_enabled' => false,
+        'is_git_submodules_enabled' => false,
+    ]);
+    $application->source = $gitlabSource;
+
+    $lsRemote = $application->generateGitLsRemoteCommands('test-deployment-uuid', false)['commands'];
+    $import = $application->generateGitImportCommands(deployment_uuid: 'test-deployment-uuid', exec_in_docker: false)['commands'];
+
+    foreach ([$lsRemote, $import] as $commands) {
+        $expectKey
+            ? expectGitlabCommandListToContain($commands, 'id_rsa_coolify_')
+            : expectGitlabCommandListNotToContain($commands, 'id_rsa_coolify_');
+    }
+})->with([
+    'same team' => [1, true],
+    'other team' => [2, false],
+]);

@@ -95,7 +95,7 @@ test('dragonfly start command keeps dollars literal for exact password variables
 
 test('keydb and dragonfly healthchecks use the compose-escaped password', function () {
     expect(file_get_contents(__DIR__.'/../../app/Actions/Database/StartKeydb.php'))
-        ->toContain("'CMD', 'keydb-cli', '--pass', \$this->composeRedisPassword(), 'ping'");
+        ->toContain("'CMD', 'keydb-cli', '--pass', \$this->resolvedRedisPassword, 'ping'");
     expect(file_get_contents(__DIR__.'/../../app/Actions/Database/StartDragonfly.php'))
-        ->toContain("'CMD', 'redis-cli', '-a', \$this->composeRedisPassword(), 'ping'");
+        ->toContain("'CMD', 'redis-cli', '-a', \$this->resolvedRedisPassword, 'ping'");
 });

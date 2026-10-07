@@ -358,7 +358,7 @@ class ServiceDatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get service database logs',
-        description: 'Get Docker logs for a compose database container.',
+        description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/databases/{database_uuid}/logs',
         operationId: 'get-service-database-logs-by-service-and-database-uuid',
         security: [['bearerAuth' => []]],

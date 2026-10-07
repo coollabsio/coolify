@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
@@ -191,18 +192,20 @@ class EnvironmentVariable extends BaseModel
     public function realValue(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $resolvedValue = $this->resolvedValueForDisplay();
-                if ($resolvedValue === null || ! $this->uses_legacy_escaping) {
-                    return $resolvedValue;
-                }
-
-                return $this->legacyEscapedValue($resolvedValue);
-            }
+            get: fn () => $this->resolveRealValue(),
         );
     }
 
-    private function resolvedValueForDisplay(): ?string
+    /**
+     * Resolved value for display and copy. References to locked shared variables keep their
+     * reference text, so the UI never reveals a value that is only shown once.
+     */
+    public function displayRealValue(): ?string
+    {
+        return $this->resolveRealValue(revealLockedSharedVariables: false);
+    }
+
+    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true): ?string
     {
         if (! $this->relationLoaded('resourceable')) {
             $this->load('resourceable');
@@ -223,7 +226,9 @@ class EnvironmentVariable extends BaseModel
             $resource->load('destination.server');
         }
 
-        return $this->get_real_environment_variables($this->value, $resource);
+        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+
+        return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
     }
 
     /**
@@ -286,9 +291,9 @@ class EnvironmentVariable extends BaseModel
         return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
     }
 
-    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
+    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null, bool $revealLockedSharedVariables = true)
     {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server);
+        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server, $revealLockedSharedVariables);
     }
 
     public function getResolvedValueWithServer($server = null)
@@ -331,7 +336,7 @@ class EnvironmentVariable extends BaseModel
     /** @return array<int, string> */
     public function logRedactionValues(): array
     {
-        $resolvedValue = $this->resolvedValueForDisplay();
+        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false);
         if (! is_string($resolvedValue) || $resolvedValue === '') {
             return [];
         }
@@ -343,15 +348,48 @@ class EnvironmentVariable extends BaseModel
             $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
                 ? substr($value, 1, -1)
                 : $value;
-            $values[] = $unquoted;
-            $values[] = escapeBashEnvValue($unquoted);
-            $values[] = str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $unquoted);
-            if ($this->is_multiline) {
-                $values = array_merge($values, preg_split('/\r\n|\r|\n/', $unquoted) ?: []);
-            }
+            $values = array_merge($values, self::logRedactionVariants($unquoted, (bool) $this->is_multiline));
         }
 
         return array_values(array_unique(array_filter($values, static fn (string $item): bool => $item !== '')));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $secrets
+     * @return array<int, string>
+     */
+    public static function remoteSecretLogRedactionValues(array $secrets): array
+    {
+        return collect($secrets)
+            ->filter(static fn (mixed $secret): bool => is_string($secret) && $secret !== '')
+            ->flatMap(static fn (string $secret): array => [
+                ...self::logRedactionVariants($secret, preg_match('/\r|\n/', $secret) === 1),
+                RemoteSecretValueFormatter::composeFile($secret),
+            ])
+            ->filter(static fn (string $item): bool => $item !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Also covers the value inside a quoted argument such as 'KEY=value'.
+     *
+     * @return array<int, string>
+     */
+    private static function logRedactionVariants(string $value, bool $splitLines): array
+    {
+        $values = [
+            $value,
+            escapeBashEnvValue($value),
+            str_replace("'", "'\\''", $value),
+            str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $value),
+        ];
+        if ($splitLines) {
+            $values = array_merge($values, preg_split('/\r\n|\r|\n/', $value) ?: []);
+        }
+
+        return $values;
     }
 
     public function resolveReferencedValue(): ?string
@@ -372,12 +410,7 @@ class EnvironmentVariable extends BaseModel
             ->first()?->value ?? $value;
     }
 
-    private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
-    {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource);
-    }
-
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null)
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
@@ -417,7 +450,7 @@ class EnvironmentVariable extends BaseModel
                 ->where('team_id', $resource->team()->id)
                 ->where("{$type}_id", $id)
                 ->first();
-            if ($found) {
+            if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }
         }

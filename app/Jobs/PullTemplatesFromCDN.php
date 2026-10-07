@@ -34,7 +34,11 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
                 ->get(config('constants.services.official'));
             if ($response->successful()) {
                 // Shared cache so Cloud HTTP nodes see the same bundle Horizon pulled.
-                store_service_templates_bundle($response->body());
+                if (! store_service_templates_bundle($response->body())) {
+                    Log::error('PullTemplatesFromCDN received an invalid bundle', [
+                        'body' => str($response->body())->limit(500)->toString(),
+                    ]);
+                }
             } else {
                 Log::error('PullTemplatesFromCDN failed', [
                     'status' => $response->status(),

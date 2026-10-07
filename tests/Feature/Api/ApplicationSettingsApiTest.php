@@ -351,6 +351,7 @@ test('PATCH /api/v1/applications/{uuid} accepts Docker-compatible custom interna
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
             'custom_internal_name' => $name,
+            'is_consistent_container_name_enabled' => true,
         ])
         ->assertOk();
 
@@ -544,6 +545,35 @@ test('PATCH /api/v1/applications/{uuid} rejects a container name prefix that is 
 
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'shared-prefix'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});
+
+test('application creation rejects a non-string container name prefix with 422', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/prefix-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'custom_container_name_prefix' => ['nested' => 'value'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect(Application::query()->where('git_repository', 'like', '%prefix-test%')->exists())->toBeFalse();
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a non-string container name prefix with 422', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => ['a', 'b']])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('custom_container_name_prefix');
 

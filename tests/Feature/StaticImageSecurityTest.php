@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Application\General;
 use App\Models\Application;
@@ -128,7 +129,7 @@ test('deployment rejects invalid legacy static images before they reach shell or
     $property->setValue($job, $application);
 
     expect(fn () => (new ReflectionMethod(ApplicationDeploymentJob::class, 'staticImage'))->invoke($job))
-        ->toThrow(ValueError::class);
+        ->toThrow(DeploymentException::class, 'is not supported');
 })->with(['shell' => 'nginx:alpine;id>/tmp/pwn', 'dockerfile newline' => "nginx:alpine\nRUN id"]);
 
 test('deployment accepts the allowed static image', function () {

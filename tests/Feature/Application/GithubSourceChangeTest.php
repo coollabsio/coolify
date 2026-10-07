@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -234,6 +235,79 @@ describe('GitHub Source Change Component', function () {
         expect($appSlug)->toBe('actual-github-slug')
             ->and($githubApp->refresh()->name)->toBe('actual-github-slug')
             ->and($privateKey->refresh()->name)->toBe('github-app-actual-github-slug');
+    });
+
+    test('saving settings keeps key selection within the source team', function (string $action) {
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        $ownKey = PrivateKey::create([
+            'name' => 'own-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $ownKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $foreignKey->id)
+            ->call($action);
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $ownKey->id)
+            ->call($action)
+            ->assertHasNoErrors();
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+    })->with(['submit', 'instantSave']);
+
+    test('github app tokens only use a key from the source team', function () {
+        Http::fake();
+
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        GithubApp::query()->whereKey($githubApp->id)->update(['private_key_id' => $foreignKey->id]);
+        $githubApp->refresh();
+
+        expect(fn () => generateGithubJwt($githubApp))->toThrow(RuntimeException::class)
+            ->and(syncGithubAppName($githubApp))->toBeNull()
+            ->and($foreignKey->refresh()->name)->toBe('other-team-key');
+
+        Http::assertNothingSent();
     });
 
     test('ghe.com installation path encodes the organization segment', function () {
@@ -809,5 +883,52 @@ describe('GitHub Source Change Component', function () {
             ->assertSee('Connected')
             ->assertSee('Incomplete GitHub App')
             ->assertSee('Setup incomplete');
+    });
+});
+
+describe('GitHub App name sync after the user switches the session team', function () {
+    beforeEach(function () {
+        Storage::fake('ssh-keys');
+        $this->otherTeam = Team::factory()->create();
+        $this->otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        $this->appKey = PrivateKey::create(['name' => 'App Key', 'private_key' => validPrivateKey(), 'team_id' => $this->team->id]);
+        $this->otherTeamKey = PrivateKey::create(['name' => 'Other Team Key', 'private_key' => validPrivateKey(), 'team_id' => $this->otherTeam->id]);
+        $this->githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $this->appKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, ['date' => now()->toRfc7231String()]),
+            'https://api.github.com/app' => Http::response(['slug' => 'synced-app']),
+        ]);
+
+        $this->component = Livewire::withQueryParams(['github_app_uuid' => $this->githubApp->uuid])->test(Change::class);
+        session(['currentTeam' => $this->otherTeam]);
+    });
+
+    test('rejects a private key of the session team', function () {
+        $this->component->set('privateKeyId', $this->otherTeamKey->id)
+            ->call('updateGithubAppName')
+            ->assertDispatched('error', 'No private key found for this GitHub App.');
+
+        expect($this->githubApp->fresh()->private_key_id)->toBe($this->appKey->id);
+        Http::assertNothingSent();
+    });
+
+    test('syncs the name with a private key of the GitHub App team', function () {
+        $this->component->call('updateGithubAppName')
+            ->assertDispatched('success');
+
+        expect($this->githubApp->fresh()->name)->toBe('synced-app');
     });
 });

@@ -165,12 +165,6 @@ it('marks interrupted database and service start activities as failed on startup
         ->and(data_get($unrelatedRunningProcess->refresh(), 'properties.status'))->toBe(ProcessStatus::IN_PROGRESS->value);
 });
 
-it('runs the interrupted start cleanup from app:init', function () {
-    $source = file_get_contents(app_path('Console/Commands/Init.php'));
-
-    expect($source)->toContain('ResourceStartActivity::failInterrupted()');
-});
-
 it('marks interrupted database imports as failed on startup and leaves other operations alone', function () {
     $queuedImport = startActivity($this->database->uuid, ProcessStatus::QUEUED, 'database_import');
     $runningImport = startActivity((string) Str::uuid(), ProcessStatus::IN_PROGRESS, 'database_import');

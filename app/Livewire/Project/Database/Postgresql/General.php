@@ -144,9 +144,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->postgresPassword = '';
-        }
     }
 
     private function syncData(bool $toModel = false): void
@@ -174,7 +171,8 @@ class General extends Component
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->postgresUser = $this->database->postgres_user;
-            $this->postgresPassword = $this->database->postgres_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->postgresPassword = $canSeeCredentials ? $this->database->postgres_password : '';
             $this->postgresDb = $this->database->postgres_db;
             $this->postgresInitdbArgs = $this->database->postgres_initdb_args;
             $this->postgresHostAuthMethod = $this->database->postgres_host_auth_method;

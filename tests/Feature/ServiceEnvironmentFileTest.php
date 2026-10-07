@@ -113,7 +113,7 @@ test('remote secret service values are written literally', function () {
         'value' => '{{vault.API_KEY}}',
     ]);
 
-    expect($line)->toBe('API_KEY="p4\\$\\$w\'ord\\""');
+    expect($line)->toBe('API_KEY="p4$$$$w\'ord\\""');
 });
 
 test('empty service values stay empty', function () {

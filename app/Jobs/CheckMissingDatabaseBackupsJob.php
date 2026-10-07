@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\Database\BackupMissing;
 use Illuminate\Bus\Queueable;
@@ -16,6 +17,14 @@ use Illuminate\Support\Facades\Log;
 class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 1800;
+
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), so the next hourly run is not
+     * blocked until the queue retry_after.
+     */
+    public int $uniqueFor = 1800;
 
     public function handle(): void
     {
@@ -39,10 +48,6 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
             return;
         }
 
-        if ($backup->missing_backup_notification_sent_at?->greaterThanOrEqualTo($lastActivityAt)) {
-            return;
-        }
-
         if (! $backup->team) {
             Log::warning("Cannot send missing backup notification for backup {$backup->id}: team not found");
 
@@ -53,7 +58,12 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
             return;
         }
 
-        $backup->team->notify(new BackupMissing($backup, $lastExecutionAt));
-        $backup->forceFill(['missing_backup_notification_sent_at' => now()])->save();
+        // Send once for each period without backup activity.
+        NotificationThrottle::sendOnce(
+            $backup,
+            BackupMissing::class,
+            $lastActivityAt,
+            fn () => $backup->team->notify(new BackupMissing($backup, $lastExecutionAt)),
+        );
     }
 }

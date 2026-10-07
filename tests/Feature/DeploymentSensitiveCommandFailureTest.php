@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
@@ -64,8 +66,11 @@ function makeSensitiveCommandFailureJob(array $environmentVariables = []): array
 
     $project = Project::create(['name' => 'Sensitive Failure Project', 'team_id' => $team->id]);
     $environment = Environment::where('project_id', $project->id)->firstOrFail();
+    $destination = $server->standaloneDockers()->firstOrFail();
     $application = Application::factory()->create([
         'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
         'build_pack' => 'dockerfile',
     ]);
     $application->settings()->update([
@@ -406,7 +411,7 @@ it('hides the Nixpacks plan write command that contains build-time values', func
     'not static' => [false],
 ]);
 
-it('hides the compose file write command because compose files can contain secrets', function () {
+it('streams the compose file over stdin so its content stays out of commands, errors, and logs', function () {
     [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob();
     $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
     setSensitiveFailureJobProperties($job, $reflection, [
@@ -414,12 +419,10 @@ it('hides the compose file write command because compose files can contain secre
         'production_image_name' => 'example/app:latest',
     ]);
 
-    $payloads = [];
-    Process::fake(function (PendingProcess $process) use (&$payloads) {
-        preg_match_all('~[A-Za-z0-9+/]{16,}={0,2}~', $process->command, $matches);
-        $composePayloads = array_filter($matches[0], fn (string $candidate): bool => str_contains((string) base64_decode($candidate, true), 'services:'));
-        if ($composePayloads !== []) {
-            $payloads = array_merge($payloads, $composePayloads);
+    $composeWrite = null;
+    Process::fake(function (PendingProcess $process) use (&$composeWrite) {
+        if (str_contains((string) $process->input, 'services:')) {
+            $composeWrite = $process;
 
             return Process::result(errorOutput: 'tee: docker-compose.yaml: No space left on device', exitCode: 1);
         }
@@ -429,15 +432,14 @@ it('hides the compose file write command because compose files can contain secre
 
     $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'generate_compose_file'));
 
-    expect($payloads)->not->toBeEmpty();
-    expect($exception->getMessage())
-        ->toContain('[command hidden because it contains sensitive data]')
-        ->toContain('No space left on device');
-    $storedLogs = (string) $queue->fresh()->logs;
-    foreach ($payloads as $payload) {
-        expect($exception->getMessage())->not->toContain($payload);
-        expect($storedLogs)->not->toContain($payload);
-    }
+    $compose = (string) readSensitiveFailureJobProperty($job, $reflection, 'docker_compose');
+    expect($composeWrite)->not->toBeNull()
+        ->and($composeWrite->input)->toBe($compose)
+        ->and($composeWrite->command)->toEndWith(escapeshellarg('docker exec -i sensitive-failure-deployment tee /artifacts/sensitive-failure/docker-compose.yaml > /dev/null'))
+        ->and($composeWrite->command)->not->toContain('services:')
+        ->and($exception->getMessage())->toContain('No space left on device')
+        ->and($exception->getMessage())->not->toContain('services:')
+        ->and((string) $queue->fresh()->logs)->not->toContain('services:');
 });
 
 function readSensitiveFailureJobProperty(object $job, ReflectionClass $reflection, string $property): mixed
@@ -447,3 +449,87 @@ function readSensitiveFailureJobProperty(object $job, ReflectionClass $reflectio
 
     return $reflectionProperty->getValue($job);
 }
+
+it('redacts shell-escaped remote secrets in command logs and later deployment log entries', function () {
+    [$job, $reflection, $queue] = makeSensitiveCommandFailureJob();
+    $remoteSecrets = $reflection->getProperty('remote_secrets_cache');
+    $remoteSecrets->setValue($job, ['DB_PASS' => "s3cr'et-value"]);
+    $escapedSecret = "'s3cr'\\''et-value'";
+
+    Process::fake(fn () => Process::result(output: "DB_PASS={$escapedSecret}"));
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'execute_remote_command', ["echo DB_PASS={$escapedSecret}"]);
+    $queue->addLogEntry("Build argument DB_PASS={$escapedSecret}");
+
+    $storedLogs = collect(json_decode((string) $queue->fresh()->logs, true));
+    expect($storedLogs)->toHaveCount(2)
+        ->and($storedLogs->toJson())->not->toContain('s3cr')
+        ->and($storedLogs->pluck('output')->all())->each->toContain('DB_PASS='.REDACTED);
+});
+
+function linkSensitiveFailureSecretManager(Application $application): void
+{
+    $token = IntegrationToken::query()->create([
+        'team_id' => $application->team()->id,
+        'provider' => 'doppler',
+        'name' => 'Doppler',
+        'token' => 'the-secret-token',
+        'capabilities' => ['secrets'],
+    ]);
+    $application->secretManagerLink()->create([
+        'integration_token_id' => $token->id,
+        'settings' => ['project' => 'app', 'config' => 'prd'],
+    ]);
+}
+
+it('redacts fetched remote secrets in log entries the deployment adds before its next remote command', function () {
+    [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob();
+    linkSensitiveFailureSecretManager($application);
+    Http::fake(['https://api.doppler.com/*' => Http::response(['DB_PASS' => 'fetched-remote-secret-5521'])]);
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'remote_secrets');
+    $queue->addLogEntry('Resolved DB_PASS=fetched-remote-secret-5521');
+
+    $storedLogs = (string) $queue->fresh()->logs;
+    expect($storedLogs)->not->toContain('fetched-remote-secret-5521')
+        ->toContain('DB_PASS='.REDACTED);
+});
+
+it('keeps a literal vault reference as text when the application has no secret manager source', function () {
+    [$job, $reflection, $queue] = makeSensitiveCommandFailureJob([
+        ['key' => 'LITERAL_REF', 'value' => '{{vault.FOO}}', 'is_literal' => true],
+    ]);
+    Http::fake();
+
+    $runtime = invokeSensitiveFailureJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    $buildtime = invokeSensitiveFailureJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    invokeSensitiveFailureJobMethod($job, $reflection, 'generate_env_variables');
+
+    expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe("LITERAL_REF='{{vault.FOO}}'")
+        ->and($buildtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe("LITERAL_REF='{{vault.FOO}}'")
+        ->and(readSensitiveFailureJobProperty($job, $reflection, 'env_args')->get('LITERAL_REF'))->toBe("'{{vault.FOO}}'")
+        ->and(invokeSensitiveFailureJobMethod($job, $reflection, 'has_remote_buildtime_secret_references'))->toBeFalse();
+    Http::assertNothingSent();
+});
+
+it('still fails a deployment when a non-literal vault reference has no secret manager source', function () {
+    [$job, $reflection] = makeSensitiveCommandFailureJob([
+        ['key' => 'REMOTE_REF', 'value' => '{{vault.FOO}}', 'is_literal' => false],
+    ]);
+
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'generate_runtime_environment_variables'));
+
+    expect($exception->getMessage())->toContain('no secret manager source is configured');
+});
+
+it('resolves a literal vault reference when the application has a secret manager source', function () {
+    [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob([
+        ['key' => 'LITERAL_REF', 'value' => '{{vault.FOO}}', 'is_literal' => true],
+    ]);
+    linkSensitiveFailureSecretManager($application);
+    Http::fake(['https://api.doppler.com/*' => Http::response(['FOO' => 'resolved-remote-value'])]);
+
+    $runtime = invokeSensitiveFailureJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe("LITERAL_REF='resolved-remote-value'");
+});

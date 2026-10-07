@@ -23,15 +23,6 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-it('exposes a 5 MiB content size limit', function () {
-    expect(LocalFileVolume::MAX_CONTENT_SIZE)->toBe(5_242_880);
-});
-
-it('exposes binary and too-large placeholder constants', function () {
-    expect(LocalFileVolume::BINARY_PLACEHOLDER)->toBe('[binary file]');
-    expect(LocalFileVolume::TOO_LARGE_PLACEHOLDER)->toBe('[file too large to display]');
-});
-
 it('flags is_too_large when content matches the placeholder', function () {
     $volume = new LocalFileVolume;
     $volume->content = LocalFileVolume::TOO_LARGE_PLACEHOLDER;

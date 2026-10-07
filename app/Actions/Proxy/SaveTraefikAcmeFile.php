@@ -26,15 +26,18 @@ class SaveTraefikAcmeFile
             @unlink($localPath);
         }
 
-        $script = sprintf(
-            'set -e; trap "rm -f -- %s" EXIT; umask 077; cat -- %s > %s; chmod 600 %s; mv -- %s %s',
-            escapeshellarg($uploadPath),
-            escapeshellarg($uploadPath),
-            escapeshellarg($temporaryPath),
-            escapeshellarg($temporaryPath),
-            escapeshellarg($temporaryPath),
-            escapeshellarg($path),
-        );
+        // Keep a copy of the current file, so a change can be rolled back from the proxy page.
+        $backup = ListTraefikAcmeBackups::backupCommands($server);
+        $script = implode('; ', [
+            'set -e',
+            'trap '.escapeshellarg('rm -f -- '.escapeshellarg($uploadPath).' '.escapeshellarg($temporaryPath).' '.escapeshellarg($backup['temporary_path'])).' EXIT',
+            'umask 077',
+            'cat -- '.escapeshellarg($uploadPath).' > '.escapeshellarg($temporaryPath),
+            'chmod 600 '.escapeshellarg($temporaryPath),
+            $backup['script'],
+            'mv -- '.escapeshellarg($temporaryPath).' '.escapeshellarg($path),
+            ListTraefikAcmeBackups::pruneCommands($server),
+        ]);
 
         instant_remote_process(['sh -c '.escapeshellarg($script)], $server);
     }

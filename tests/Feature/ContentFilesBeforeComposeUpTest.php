@@ -4,6 +4,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\StartService;
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\CoolifyTask;
 use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -16,6 +17,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
@@ -199,8 +201,8 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
     foreach ([
         'application' => $test->application->fresh(),
         'application_deployment_queue' => $queue,
-        'server' => $test->server,
-        'mainServer' => $test->server,
+        'server' => $test->server->fresh(),
+        'mainServer' => $test->server->fresh(),
         'deployment_uuid' => 'deployment-uuid',
         'workdir' => '/artifacts/deployment-uuid',
         'configuration_dir' => $test->application->workdir(),
@@ -342,18 +344,70 @@ test('a preserve-repository deployment writes content files before docker compos
         ->and($write)->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'));
 });
 
-test('a deployment to another server does not check the content files of the main server', function () {
+test('a deployment to an additional server writes missing content files on that server', function () {
     $volume = contentFilesVolume($this->application, 'config/app.conf');
     $otherServer = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->server->private_key_id,
-    ]);
+    ])->fresh();
     fakeContentFilesServer([$volume->fs_path => 'missing']);
 
     runComposeStart($this, ['server' => $otherServer, 'mainServer' => $otherServer]);
 
-    expect(contentFilesStateChecks())->toBe([]);
-    contentFilesAssertNoWrite();
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($volume->fs_path));
+    expect(contentFilesStateChecks())->toHaveCount(1)
+        ->and(contentFilesStateChecks()[0])->toContain("@'{$otherServer->ip}'")
+        ->and($write)->not->toBeNull()
+        ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
+        ->and(ContentFilesUpRecorder::ssh()[$write])->not->toContain("@'{$this->server->ip}'");
+});
+
+test('a Dockerfile deployment to an additional server writes missing content files before the container starts', function () {
+    $this->application->update(['build_pack' => 'dockerfile', 'docker_compose_location' => null]);
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    $otherServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+    ])->fresh();
+    fakeContentFilesServer([$volume->fs_path => 'missing']);
+
+    $job = new ContentFilesUpDeploymentJob;
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout') {
+        $this->logEntries[] = [$message, $type];
+    });
+    foreach ([
+        'application' => $this->application->fresh(),
+        'application_deployment_queue' => $queue,
+        'server' => $otherServer,
+        'mainServer' => $otherServer,
+        'destination' => $this->destination,
+        'deployment_uuid' => 'deployment-uuid',
+        'workdir' => '/artifacts/deployment-uuid',
+        'configuration_dir' => $this->application->workdir(),
+        'docker_compose_location' => '/docker-compose.yaml',
+        'coolify_variables' => '',
+        'pull_request_id' => 0,
+        'preserveRepository' => false,
+        'use_build_server' => false,
+        'saved_outputs' => collect(),
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    (new ReflectionMethod(ApplicationDeploymentJob::class, 'start_by_compose_file'))->invoke($job);
+
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($volume->fs_path));
+    $up = ContentFilesUpRecorder::indexOf('deployment', ' up --build -d');
+    expect($write)->not->toBeNull()
+        ->and($up)->not->toBeNull()
+        ->and($write)->toBeLessThan($up)
+        ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
+        ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
+
+    $connect = ContentFilesUpRecorder::indexOf('deployment', "docker network connect '{$this->destination->network}' coolify-proxy");
+    expect($connect)->not->toBeNull()
+        ->and($connect)->toBeLessThan($up);
 });
 
 test('the content file check and write are safe for non-root servers', function () {
@@ -386,7 +440,7 @@ test('starting a service writes missing content files before docker compose up',
 
     $activity = StartService::run($service->fresh());
 
-    $command = $activity->getExtraProperty('command');
+    $command = RemoteProcessCommand::read($activity);
     expect(contentFilesStateChecks())->toHaveCount(1)
         ->and($command)->toContain("echo 'Writing 1 missing configuration file.'")
         ->and($command)->toContain("echo 'Warning: A directory that is not empty is at {$workerConf->fs_path} on the server.")
@@ -414,7 +468,7 @@ test('deploying one service application writes only its missing content files', 
 
     $activity = DeployServiceApplication::run($service->applications()->where('name', 'app')->firstOrFail());
 
-    $command = $activity->getExtraProperty('command');
+    $command = RemoteProcessCommand::read($activity);
     expect(contentFilesStateChecks())->toHaveCount(1)
         ->and(contentFilesStateChecks()[0])->not->toContain(escapeshellarg($workerConf->fs_path))
         ->and(strpos($command, 'Writing 1 missing configuration file.'))->toBeLessThan(strpos($command, ' up -d'));
@@ -436,7 +490,7 @@ test('starting a service without content files does not run the file check', fun
 
     expect(contentFilesStateChecks())->toBe([])
         ->and($activity)->toBeInstanceOf(Activity::class)
-        ->and($activity->getExtraProperty('command'))->not->toContain('missing configuration file');
+        ->and(RemoteProcessCommand::read($activity))->not->toContain('missing configuration file');
 });
 
 test('the content file step continues when the server does not report a state', function () {
@@ -498,21 +552,6 @@ test('the storage save job does not delete a directory that is not empty', funct
     expect($volume->fresh()->is_directory)->toBeFalse();
 });
 
-test('the Compose deployment writes content files after it removes the old containers', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $methodStart = strpos($source, 'private function deploy_docker_compose_buildpack()');
-    $methodEnd = strpos($source, 'private function pull_docker_compose_images()', $methodStart);
-    $deploymentMethod = substr($source, $methodStart, $methodEnd - $methodStart);
-
-    $stopPosition = strpos($deploymentMethod, '$this->stop_running_container(force: true);');
-    $startPosition = strpos($deploymentMethod, '$this->start_docker_compose_services();');
-
-    expect($stopPosition)->not->toBeFalse()
-        ->and($startPosition)->not->toBeFalse()
-        ->and($stopPosition)->toBeLessThan($startPosition)
-        ->and(substr_count($deploymentMethod, ' up -d'))->toBe(0);
-});
-
 test('the server file sync keeps the content of a file storage when a directory is at its path', function () {
     $volume = contentFilesVolume($this->application, 'conf/app.conf');
     fakeContentFilesServer([$volume->fs_path => 'directory']);
@@ -546,3 +585,22 @@ test('the server file sync still marks a storage without content as a directory'
 
     expect($volume->fresh()->is_directory)->toBeTruthy();
 });
+
+test('starting a service runs its commands on the deployment queue', function (bool $selfHosted, string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx:alpine\n",
+    ]);
+    fakeContentFilesServer([]);
+
+    StartService::run($service);
+
+    Bus::assertDispatched(CoolifyTask::class, fn (CoolifyTask $job) => $job->queue === $queue);
+})->with([
+    'cloud' => [false, 'deployments'],
+    'self-hosted' => [true, 'high'],
+]);

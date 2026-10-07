@@ -184,7 +184,7 @@ describe('GET /api/v1/applications/{uuid}/storages', function () {
 });
 
 describe('POST /api/v1/applications/{uuid}/storages', function () {
-    test('rejects an application directory mount outside its managed root without side effects', function () {
+    test('creates an application directory mount outside its resource directory for an owner', function () {
         $app = createTestApplication($this);
 
         $this->withHeaders([
@@ -194,10 +194,9 @@ describe('POST /api/v1/applications/{uuid}/storages', function () {
             'is_directory' => true,
             'fs_path' => '/root/.ssh/authorized_keys',
             'mount_path' => '/data',
-        ])->assertUnprocessable();
+        ])->assertCreated();
 
-        expect($app->fileStorages()->exists())->toBeFalse();
-        Bus::assertNotDispatched(ServerStorageSaveJob::class);
+        expect($app->fileStorages()->sole()->fs_path)->toBe('/root/.ssh/authorized_keys');
     });
 
     test('creates a persistent storage', function () {
@@ -650,6 +649,26 @@ describe('DELETE /api/v1/databases/{uuid}/storages/{storage_uuid}', function () 
         $response->assertStatus(200);
         expect(LocalPersistentVolume::find($vol->id))->toBeNull();
     });
+
+    test('deletes a file storage', function () {
+        $db = createTestDatabase($this);
+
+        $vol = LocalFileVolume::create([
+            'fs_path' => database_configuration_dir().'/'.$db->uuid.'/postgres/postgresql.conf',
+            'mount_path' => '/postgres/postgresql.conf',
+            'content' => 'listen_addresses = "*"',
+            'is_directory' => false,
+            'resource_id' => $db->id,
+            'resource_type' => $db->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->deleteJson("/api/v1/databases/{$db->uuid}/storages/{$vol->uuid}");
+
+        $response->assertStatus(200);
+        expect(LocalFileVolume::find($vol->id))->toBeNull();
+    });
 });
 
 test('rejects host paths when creating persistent storage through the API', function (string $resourceType) {
@@ -685,7 +704,7 @@ test('rejects host paths when creating persistent storage through the API', func
     expect($resource->persistentStorages()->count())->toBe($storageCountBefore);
 })->with(['application', 'database', 'service']);
 
-test('rejects directory mounts outside each resource configuration root', function (string $resourceType) {
+test('creates directory mounts outside each resource configuration root for an owner', function (string $resourceType) {
     if ($resourceType === 'database') {
         $resource = createTestDatabase($this);
         $url = "/api/v1/databases/{$resource->uuid}/storages";
@@ -703,10 +722,9 @@ test('rejects directory mounts outside each resource configuration root', functi
         'is_directory' => true,
         'fs_path' => '/etc/shadow',
         'mount_path' => '/data',
-    ]])->assertUnprocessable();
+    ]])->assertCreated();
 
-    expect($resource->fileStorages()->exists())->toBeFalse();
-    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    expect($resource->fileStorages()->sole()->fs_path)->toBe('/etc/shadow');
 })->with(['database', 'service']);
 
 test('rejects a directory mount through a remote symlink before creating storage', function (string $resourceType) {

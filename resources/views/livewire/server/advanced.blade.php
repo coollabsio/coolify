@@ -14,7 +14,7 @@
 
             <x-application.settings-section id="server-disk-usage-section" title="Disk usage"
                 helper="Control when Coolify checks this server and when your team is notified.">
-                <div class="grid gap-4 lg:grid-cols-2">
+                <div class="grid gap-4 lg:grid-cols-3">
                     <x-forms.input canGate="update" :canResource="$server" placeholder="0 23 * * *"
                         id="serverDiskUsageCheckFrequency" label="Check frequency" required
                         helper="Cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
@@ -22,6 +22,10 @@
                         id="serverDiskUsageNotificationThreshold" type="number" min="1" max="99"
                         label="Notification threshold" required
                         helper="Notify the team when root filesystem usage exceeds this percentage." />
+                    <x-forms.input canGate="update" :canResource="$server"
+                        id="serverDiskUsageNotificationIntervalHours" type="number" min="1" max="720"
+                        label="Notification interval (hours)" required
+                        helper="Minimum time between high disk usage notifications for this server." />
                 </div>
             </x-application.settings-section>
 

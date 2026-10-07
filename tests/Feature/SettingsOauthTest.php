@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Livewire\SettingsOauth;
+use App\Livewire\Team\AuditLog;
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\Team;
@@ -234,4 +236,30 @@ it('toggles provider enabled state from the action button', function () {
         ->assertHasNoErrors();
 
     expect(OauthSetting::where('provider', 'authentik')->first()->enabled)->toBeTrue();
+});
+
+it('stores instance authentication audit events without the admin current team', function () {
+    $this->withoutDefer();
+    $otherTeam = Team::factory()->create();
+    $instanceAdmin = actingAsInstanceAdmin();
+    $instanceAdmin->teams()->attach($otherTeam, ['role' => 'owner']);
+    $instanceAdmin->unsetRelation('teams');
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(SettingsOauth::class)
+        ->set('disable_registration_when_oauth_enabled', true)
+        ->call('saveRegistrationPolicy')
+        ->assertHasNoErrors();
+
+    $event = AuditEvent::query()->where('event', 'ui.instance.authentication.updated')->sole();
+    expect($event->team_id)->toBeNull();
+
+    $otherTeamAdmin = User::factory()->create();
+    $otherTeam->members()->attach($otherTeamAdmin, ['role' => 'admin']);
+    $this->actingAs($otherTeamAdmin);
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(AuditLog::class)
+        ->assertDontSee($instanceAdmin->email)
+        ->assertDontSee($event->description);
 });

@@ -127,7 +127,7 @@ test('legacy redis password variables keep the old start command', function () {
     (new ReflectionMethod($action, 'generate_environment_variables'))->invoke($action);
 
     expect((new ReflectionMethod($action, 'buildStartCommand'))->invoke($action))
-        ->toBe('redis-server --requirepass p4$$word --appendonly yes');
+        ->toBe("redis-server --requirepass 'p4\$\$word' --appendonly yes");
 });
 
 test('keydb column passwords keep the old start command', function () {

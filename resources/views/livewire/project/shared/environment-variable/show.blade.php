@@ -90,7 +90,7 @@
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen"
-                @environment-variable-updated.window="if ($event.detail.envId === @js($env->id)) modalOpen = false">
+                @environment-variable-updated.window="if ($event.detail.envId === {{ (int) $env->id }}) modalOpen = false">
                 <x-slot:content>
                     <button type="button" wire:click="loadValues" data-env-settings-trigger class="icon-button shrink-0"
                         title="Edit environment variable" aria-label="Edit environment variable">

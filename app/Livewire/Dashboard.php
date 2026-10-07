@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\TeamInvitation;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -40,6 +41,34 @@ class Dashboard extends Component
 
     public function render()
     {
-        return view('livewire.dashboard');
+        return view('livewire.dashboard', [
+            'pendingInvitations' => $this->pendingInvitations(),
+        ]);
+    }
+
+    /**
+     * Unexpired invitations for the user's email to teams the user has not joined yet.
+     *
+     * Uses hasExpired() instead of isValid() so rendering never deletes invitations or users.
+     *
+     * @return Collection<int, TeamInvitation>
+     */
+    private function pendingInvitations(): Collection
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return collect();
+        }
+
+        return TeamInvitation::query()
+            ->where('email', strtolower($user->email))
+            ->whereHas('team')
+            ->whereNotIn('team_id', $user->teams()->select('teams.id'))
+            ->with('team:id,name')
+            ->oldest()
+            ->get()
+            ->reject(fn (TeamInvitation $invitation) => $invitation->hasExpired())
+            ->values();
     }
 }

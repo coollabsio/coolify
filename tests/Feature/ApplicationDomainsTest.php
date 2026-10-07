@@ -17,6 +17,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\DnsRecordHints;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
@@ -835,6 +836,83 @@ it('shows cloudflare domain connect only on cloud with a key', function () {
         ->assertSet('showCloudflareAutoconfigureModal', false);
 });
 
+function enableCloudflareDomainConnectForTest(): void
+{
+    $key = openssl_pkey_new([
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+    ]);
+    openssl_pkey_export($key, $privateKey);
+
+    config([
+        'constants.coolify.self_hosted' => false,
+        'services.domain_connect.provider_id' => 'coolify.io',
+        'services.domain_connect.service_id' => 'hosting',
+        'services.domain_connect.key_id' => '_dcpubkeyv1',
+        'services.domain_connect.private_key' => $privateKey,
+    ]);
+}
+
+it('opens cloudflare domain connect with the public server ip', function () {
+    enableCloudflareDomainConnectForTest();
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('openCloudflareAutoconfigureModal')
+        ->assertSet('showCloudflareAutoconfigureModal', true)
+        ->call('applyCloudflareAutoconfigure')
+        ->assertNotDispatched('error');
+
+    expect(collect($component->effects['xjs'] ?? [])->pluck('expression')->implode("\n"))
+        ->toContain('dash.cloudflare.com')
+        ->toContain('203.0.113.10');
+});
+
+it('does not start cloudflare domain connect for a server without a public ip', function () {
+    enableCloudflareDomainConnectForTest();
+    $this->server->update(['ip' => '10.221.1.11']);
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('serverIp', '10.221.1.11')
+        ->call('openCloudflareAutoconfigureModal')
+        ->assertDispatched('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE)
+        ->assertSet('showCloudflareAutoconfigureModal', false)
+        ->call('applyCloudflareAutoconfigure')
+        ->assertDispatched('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE)
+        ->assertSet('showCloudflareAutoconfigureModal', false);
+
+    expect($component->effects['xjs'] ?? [])->toBeEmpty();
+});
+
+it('uses only a public address for cloudflare domain connect on localhost', function () {
+    enableCloudflareDomainConnectForTest();
+    InstanceSettings::get()->update(['public_ipv4' => '198.51.100.20']);
+    $localhost = Server::factory()->create([
+        'id' => 0,
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+        'ip' => 'localhost',
+    ]);
+    $destination = StandaloneDocker::withoutEvents(fn () => StandaloneDocker::forceCreate([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'localhost-docker',
+        'network' => 'coolify-localhost',
+        'server_id' => $localhost->id,
+    ]));
+    $this->application->update([
+        'destination_id' => $destination->id,
+        'fqdn' => 'https://app.example.com',
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('applyCloudflareAutoconfigure')
+        ->assertNotDispatched('error');
+
+    expect(collect($component->effects['xjs'] ?? [])->pluck('expression')->implode("\n"))
+        ->toContain('198.51.100.20');
+});
+
 it('adds a domain to the application', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSee('Add domain')
@@ -1358,55 +1436,42 @@ it('hides dns check buttons from members', function () {
         ->assertDontSee('Check DNS');
 });
 
+function openDnsProviderModalWithZone(Team $team, Application $application): mixed
+{
+    $token = IntegrationToken::factory()->for($team)->create(['provider' => 'cloudflare', 'name' => 'Cloudflare', 'token' => 'secret']);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    $application->update(['fqdn' => 'https://app.example.com']);
+
+    return Livewire::test(Domains::class, ['application' => $application->fresh()])->call('openDnsProviderModal');
+}
+
 it('disables create dns record for members and hides replace confirmation', function () {
-    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
-    $this->actingAs($this->user->fresh());
+    Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response([
+        'success' => true,
+        'result' => [['id' => 'rec-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '198.51.100.10']],
+    ])]);
+    $setRole = function (string $role): void {
+        $this->team->members()->updateExistingPivot($this->user->id, ['role' => $role]);
+        $this->actingAs($this->user->fresh());
+    };
 
-    $proposal = [
-        'hostname' => 'app.example.com',
-        'zone_id' => 1,
-        'zone' => 'example.com',
-        'credential' => 'Cloudflare',
-        'target' => '203.0.113.10',
-        'managed' => false,
-    ];
-
-    $createHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('showDnsProviderModal', true)
-        ->set('dnsProviderProposals', [$proposal])
-        ->html();
-
-    expect($createHtml)->toContain('Create DNS record')
+    // The owner opens the DNS dialog, then becomes a member while the page is still open.
+    $createPage = openDnsProviderModalWithZone($this->team, $this->application);
+    $setRole('member');
+    expect($createPage->call('$refresh')->html())->toContain('Create DNS record')
         ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
 
-    $replaceHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('showDnsProviderModal', true)
-        ->set('dnsProviderProposals', [$proposal])
-        ->set('dnsProviderConflicts', [
-            'app.example.com|1' => [
-                'record_id' => 'rec-1',
-                'current' => '198.51.100.10',
-                'proposed' => '203.0.113.10',
-            ],
-        ])
-        ->html();
-
-    expect($replaceHtml)->toContain('Currently 198.51.100.10')
+    $setRole('owner');
+    $replacePage = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('openDnsProviderModal')
+        ->call('createManagedDnsRecord', 'app.example.com', DnsProviderZone::query()->value('id'));
+    $setRole('member');
+    expect($replacePage->call('$refresh')->html())->toContain('Currently 198.51.100.10')
         ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Replace record/s');
 });
 
 it('shows create dns record enabled for owners', function () {
-    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('showDnsProviderModal', true)
-        ->set('dnsProviderProposals', [[
-            'hostname' => 'app.example.com',
-            'zone_id' => 1,
-            'zone' => 'example.com',
-            'credential' => 'Cloudflare',
-            'target' => '203.0.113.10',
-            'managed' => false,
-        ]])
-        ->html();
+    $html = openDnsProviderModalWithZone($this->team, $this->application)->html();
 
     expect($html)->toContain('Create DNS record')
         ->not->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
@@ -2251,7 +2316,7 @@ it('regenerates an application domain as a draft while preserving its url settin
         ->assertSet('editingDomainParts.path', '/api');
 
     expect($component->get('editingDomainParts')['host'])
-        ->toEndWith('.sslip.io')
+        ->toEndWith('.wildcard.example.net')
         ->not->toBe('old.example.com')
         ->and($this->application->fresh()->fqdn)->toBe('http://old.example.com/api')
         ->and($this->application->fresh()->domain_port_overrides)->toMatchArray([
@@ -3566,4 +3631,28 @@ it('restarts a preview dns check when the domain already has a completed result'
     expect($preview->fresh()->domain_dns_statuses[$statusKey]['status'])->toBe('checking');
 
     Queue::assertPushed(CheckDomainDnsJob::class);
+});
+
+it('shows a manual dns note instead of create buttons when the server has no public ip', function (string $address) {
+    $this->server->update(['ip' => $address]);
+    Http::fake();
+
+    $component = openDnsProviderModalWithZone($this->team, $this->application)
+        ->assertSet('showDnsProviderModal', true)
+        ->call('openManualDnsRecords');
+
+    expect($component->html())
+        ->toContain('The server has no public IP address; add the DNS record manually.')
+        ->not->toContain('Create DNS record')
+        ->not->toContain('Add with Cloudflare');
+    Http::assertNothingSent();
+})->with(['10.0.0.5', '100.100.1.1', 'fd00::5']);
+
+it('offers dns provider record creation for a public server ip', function () {
+    $component = openDnsProviderModalWithZone($this->team, $this->application)->call('openManualDnsRecords');
+
+    expect($component->html())
+        ->toContain('Create DNS record')
+        ->toContain('Add with Cloudflare')
+        ->not->toContain('The server has no public IP address; add the DNS record manually.');
 });

@@ -18,6 +18,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
+use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -27,6 +28,9 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\VolumeBackup\BackupFailed;
+use App\Notifications\VolumeBackup\BackupSuccess;
+use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +41,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -55,23 +60,14 @@ it('types service backup S3 storage state as a nullable Eloquent collection', fu
         ->and($property->getDefaultValue())->toBeNull();
 });
 
-it('provides the volume backup domain classes and relationship', function () {
-    expect(class_exists(ScheduledVolumeBackup::class))->toBeTrue()
-        ->and(class_exists(ScheduledVolumeBackupExecution::class))->toBeTrue()
-        ->and(class_exists(VolumeBackupJob::class))->toBeTrue()
-        ->and(class_exists(VolumeBackups::class))->toBeTrue()
-        ->and(method_exists(LocalPersistentVolume::class, 'scheduledBackups'))->toBeTrue()
-        ->and(method_exists(LocalFileVolume::class, 'scheduledBackups'))->toBeTrue();
-});
-
 it('allows large volume backups to run for ten hours by default', function () {
     $backup = new ScheduledVolumeBackup;
     $job = new VolumeBackupJob($backup);
 
     expect($job->timeout)->toBe(36000)
         ->and((new VolumeBackups)->timeout)->toBe(36000)
-        ->and(config('horizon.defaults.s6.timeout'))->toBeGreaterThan($job->timeout)
-        ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.defaults.s6.timeout'));
+        ->and(config('horizon.worker_timeout'))->toBeGreaterThan($job->timeout)
+        ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.worker_timeout'));
 });
 
 it('changes the default volume backup timeout without changing existing timeouts', function () {
@@ -217,6 +213,61 @@ it('shows readable service storage backup target labels', function () {
         ->assertSet('targets.1.type', 'Directus')
         ->assertSee('Directus: directus-templates');
 });
+
+it('assigns a new volume backup schedule to the team of its resource, not the current team', function (string $resourceType) {
+    $team = Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume, $server] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    if ($resourceType === 'service') {
+        $service = Service::factory()->create([
+            'server_id' => $server->id,
+            'environment_id' => $application->environment_id,
+            'destination_id' => $application->destination_id,
+            'destination_type' => $application->destination_type,
+        ]);
+        $serviceApplication = ServiceApplication::create(['uuid' => new_public_id(), 'name' => 'app', 'service_id' => $service->id]);
+        $volume = LocalPersistentVolume::create([
+            'name' => $service->uuid.'_app-data',
+            'mount_path' => '/data',
+            'resource_id' => $serviceApplication->id,
+            'resource_type' => $serviceApplication->getMorphClass(),
+        ]);
+        $component = Livewire::test(CreateServiceVolumeBackup::class, ['service' => $service, 'selectedTargetKey' => 'volume:'.$volume->id]);
+    } else {
+        $component = Livewire::test(CreateScheduledVolumeBackup::class, ['application' => $application, 'selectedTargetKey' => 'volume:'.$volume->id]);
+    }
+
+    $component->set('frequency', 'daily')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(ScheduledVolumeBackup::query()->sole()->team_id)->toBe($team->id);
+})->with(['application', 'service']);
+
+it('assigns a volume backup schedule saved from its settings page to the team of its resource, not the current team', function (bool $rootTeam) {
+    $team = $rootTeam ? Team::factory()->create(['id' => 0]) : Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('frequency', 'daily')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(ScheduledVolumeBackup::query()->sole()->team_id)->toBe($team->id);
+})->with([
+    'team' => [false],
+    'root team' => [true],
+]);
 
 it('handles scheduled backup persistence failures', function () {
     $team = Team::factory()->create();
@@ -672,16 +723,6 @@ it('records the S3 storage used by each volume backup execution', function () {
         ->and((new ScheduledVolumeBackupExecution)->s3())->not->toBeNull();
 });
 
-it('exposes actions to manage and run volume backups', function () {
-    expect(method_exists(VolumeBackups::class, 'save'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'backupNow'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'toggleEnabled'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'delete'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'cleanupFailed'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'cleanupDeleted'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'deleteBackup'))->toBeTrue();
-});
-
 it('declares the volume backup action return types', function () {
     $backupNowReturnType = (new ReflectionMethod(VolumeBackups::class, 'backupNow'))->getReturnType();
     $deleteReturnType = (new ReflectionMethod(VolumeBackups::class, 'delete'))->getReturnType();
@@ -1103,6 +1144,19 @@ it('does not change S3 storage when another volume backup setting is invalid', f
         ->and($backup->frequency)->toBe('daily');
 });
 
+it('rejects a missing volume backup alert period above one year', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('missingBackupNotificationDays', 366)
+        ->call('save')
+        ->assertHasErrors(['missingBackupNotificationDays' => 'max']);
+
+    expect(ScheduledVolumeBackup::query()->exists())->toBeFalse();
+});
+
 function createVolumeBackupApplication(Team $team): array
 {
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
@@ -1169,12 +1223,14 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->set('retentionDaysLocally', 14)
         ->set('retentionMaxStorageLocally', 1.5)
         ->set('stopDuringBackup', true)
+        ->set('missingBackupNotificationDays', 3)
         ->call('save')
         ->assertDispatched('success');
 
     $backup = ScheduledVolumeBackup::query()->sole();
 
     expect($backup->backupable->is($volume))->toBeTrue()
+        ->and($backup->missing_backup_notification_days)->toBe(3)
         ->and($backup->team_id)->toBe($team->id)
         ->and($backup->frequency)->toBe('daily')
         ->and($backup->retention_amount_locally)->toBe(5)
@@ -1183,6 +1239,43 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->and($backup->stop_during_backup)->toBeTrue()
         ->and($backup->save_s3)->toBeFalse();
 });
+
+it('lists and accepts only S3 storages of the resource team when the session team differs', function (bool $rootTeam) {
+    $team = $rootTeam ? Team::factory()->create(['id' => 0]) : Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    $s3Attributes = ['region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret', 'bucket' => 'bucket', 'endpoint' => 'https://s3.example.com', 'is_usable' => true];
+    $resourceTeamStorage = S3Storage::create([...$s3Attributes, 'name' => 'Resource team S3', 'team_id' => $team->id]);
+    $otherTeamStorage = S3Storage::create([...$s3Attributes, 'name' => 'Other team S3', 'team_id' => $otherTeam->id]);
+    session(['currentTeam' => $otherTeam]);
+
+    $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application]);
+
+    expect($component->get('availableS3Storages')->pluck('id')->all())->toBe([$resourceTeamStorage->id])
+        ->and($component->get('s3StorageId'))->toBe($resourceTeamStorage->id);
+
+    $component->set('frequency', 'daily')
+        ->set('saveToS3', true)
+        ->set('s3StorageId', $otherTeamStorage->id)
+        ->assertHasErrors('s3StorageId')
+        ->call('save')
+        ->assertHasErrors('s3StorageId');
+
+    expect(ScheduledVolumeBackup::query()->count())->toBe(0);
+
+    $component->set('s3StorageId', $resourceTeamStorage->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(ScheduledVolumeBackup::query()->sole())
+        ->s3_storage_id->toBe($resourceTeamStorage->id)
+        ->save_s3->toBeTrue();
+})->with([
+    'team' => [false],
+    'root team' => [true],
+]);
 
 it('only accepts a usable S3 storage owned by the current team', function () {
     $team = Team::factory()->create();
@@ -2632,4 +2725,179 @@ it('dispatches pending recovery without starting another volume backup', functio
         fn (VolumeBackupRecoveryJob $job) => $job->execution->is($execution),
     );
     Queue::assertNotPushed(VolumeBackupJob::class);
+});
+
+it('dispatches pending recovery for an execution at most once every five minutes', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow('2026-07-15 12:00:00');
+    Queue::fake();
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $application->destination->server->settings()->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'enabled' => true,
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'failed',
+        'stop_recovery_pending' => true,
+    ]);
+
+    (new ScheduledJobManager)->handle();
+    Carbon::setTestNow('2026-07-15 12:04:00');
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(VolumeBackupRecoveryJob::class, 1);
+
+    Carbon::setTestNow('2026-07-15 12:05:01');
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(VolumeBackupRecoveryJob::class, 2);
+});
+
+it('stops container recovery when the server no longer exists', function () {
+    Process::fake();
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'failed',
+        'message' => 'Worker timed out',
+        'stop_recovery_pending' => true,
+    ]);
+    $application->update([
+        'destination_id' => null,
+        'destination_type' => null,
+    ]);
+
+    (new VolumeBackupRecoveryJob($execution))->handle();
+
+    expect($execution->fresh()->stop_recovery_pending)->toBeFalse()
+        ->and($execution->fresh()->message)->toStartWith('Worker timed out')
+        ->and($execution->fresh()->message)->toContain('Container recovery was skipped');
+    Process::assertNothingRan();
+});
+
+it('stops S3 upload cleanup when the S3 storage no longer exists', function () {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => null,
+        'status' => 'failed',
+        'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
+        's3_cleanup_pending' => true,
+    ]);
+    Storage::shouldReceive('build')->never();
+
+    (new VolumeBackupRecoveryJob($execution))->handle();
+
+    expect($execution->fresh()->s3_cleanup_pending)->toBeFalse()
+        ->and($execution->fresh()->s3_storage_deleted)->toBeFalsy()
+        ->and($execution->fresh()->message)->toContain('S3 upload cleanup was skipped');
+});
+
+it('notifies the team when a volume backup succeeds', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    Process::fake([
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    Notification::assertSentToTimes($team, BackupSuccess::class, 1);
+    Notification::assertSentTo($team, BackupSuccess::class, fn (BackupSuccess $notification) => $notification->warning === null
+        && $notification->resourceName === $application->name
+        && $notification->target === 'Volume '.$volume->name
+        && str_contains((string) $notification->toMail()->render(), 'was successful'));
+    Notification::assertNotSentTo($team, BackupFailed::class);
+});
+
+it('notifies the team once when a volume backup fails', function () {
+    Process::fake();
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    (new VolumeBackupJob($backup))->failed(new RuntimeException('Archive command failed'));
+
+    Notification::assertSentToTimes($team, BackupFailed::class, 1);
+    Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Archive command failed'
+        && str_contains((string) $notification->toMail()->render(), 'Archive command failed'));
+    Notification::assertNotSentTo($team, BackupSuccess::class);
+});
+
+it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $notifiable = Mockery::mock();
+    $notifiable->shouldReceive('getEnabledChannels')->once()->with($event)->andReturn([]);
+
+    (new BackupSuccess($backup, $warning))->via($notifiable);
+})->with([
+    'without warning' => [null, 'backup_success'],
+    'with warning' => ['S3 upload failed: denied', 'backup_failure'],
+]);
+
+it('records a missed volume backup that is too old to run late as a failed execution and notifies the team once', function () {
+    config(['broadcasting.default' => 'null']);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-volume-backup:{$backup->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 16, 0, 0, 0, 'UTC'),
+        'job_type' => 'volume-backup',
+        'resource_id' => $backup->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1),
+    ]);
+
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($execution->status)->toBe('failed')
+        ->and($execution->message)->toBe('Skipped: the queued job did not start within 60 minutes.')
+        ->and($execution->finished_at)->not->toBeNull()
+        ->and($occurrence->fresh()->status)->toBe('failed');
+    Queue::assertNotPushed(VolumeBackupJob::class);
+    Notification::assertSentToTimes($team, BackupFailed::class, 1);
+    Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
 });

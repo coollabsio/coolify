@@ -98,3 +98,20 @@ it('refreshes the breadcrumb application status after it changes', function () {
     expect($component->instance()->getListeners())
         ->toHaveKey("echo-private:team.{$this->team->id},ServiceChecked", 'refreshStatus');
 });
+
+it('links the application healthcheck status to the healthcheck page', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $healthcheckUrl = route('project.application.healthcheck', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]);
+
+    Livewire::test(ApplicationStatus::class, ['application' => $this->application])
+        ->assertSeeHtml('href="'.$healthcheckUrl.'"');
+
+    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
+        ->assertSeeHtml('href="'.$healthcheckUrl.'"');
+});

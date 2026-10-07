@@ -7,6 +7,7 @@ use App\Actions\Server\InstallDocker;
 use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
@@ -14,10 +15,10 @@ use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
-use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\VultrService;
@@ -29,12 +30,15 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
@@ -233,13 +237,41 @@ class Server extends BaseModel
             $server->destinations()->each(function ($destination) {
                 $destination->delete();
             });
+            // Leftover active runner rows would block deleting the GitHub App.
+            GithubRunnerExecution::deleteAndDeregister(GithubRunnerExecution::query()->where('server_id', $server->id));
+            $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
             $server->sslCertificates()->delete();
+            $server->notificationThrottles()->delete();
+        });
+
+        static::deleted(function (Server $server) {
+            $server->failQueuedDeployments();
         });
 
         static::updated(function () {
             static::flushIdentityMap();
         });
+    }
+
+    /**
+     * Fail the queued deployments of a deleted server, because they can never start.
+     */
+    public function failQueuedDeployments(): void
+    {
+        ApplicationDeploymentQueue::query()
+            ->where('server_id', $this->id)
+            ->where('status', ApplicationDeploymentStatus::QUEUED->value)
+            ->eachById(function (ApplicationDeploymentQueue $deployment) {
+                $updated = ApplicationDeploymentQueue::query()
+                    ->whereKey($deployment->id)
+                    ->where('status', ApplicationDeploymentStatus::QUEUED->value)
+                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+
+                if ($updated > 0) {
+                    $deployment->addLogEntry('The server was deleted.', 'stderr');
+                }
+            });
     }
 
     /**
@@ -280,7 +312,6 @@ class Server extends BaseModel
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
-        'unreachable_notification_sent' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
     ];
@@ -986,7 +1017,8 @@ $siteAddress {
 
     /**
      * Usable dedicated (build-only) servers of a team. Servers with the combined role
-     * host deployments, so they are never picked as build servers.
+     * host deployments, so they are never picked as build servers. Servers dedicated to
+     * GitHub Actions runners are also left out.
      */
     public static function buildServers($teamId): Builder
     {
@@ -994,7 +1026,8 @@ $siteAddress {
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereRelation('settings', 'force_disabled', false);
+            ->whereRelation('settings', 'force_disabled', false)
+            ->whereDoesntHave('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true)->where('is_dedicated', true));
 
         return self::whereServerRole($query, ServerRole::BUILD);
     }
@@ -1011,6 +1044,15 @@ $siteAddress {
     public function isTransferredAway(): bool
     {
         return data_get($this->server_metadata, 'transfer.status') === 'transferred';
+    }
+
+    /**
+     * Management was disabled manually on this instance; the server is ready to be transferred.
+     */
+    public function isManagementDisabled(): bool
+    {
+        return $this->isTransferredAway()
+            && (bool) data_get($this->server_metadata, 'transfer.management_disabled', false);
     }
 
     /**
@@ -1037,7 +1079,6 @@ $siteAddress {
         $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
-        $this->disableSshMux();
     }
 
     public function sentinelHeartbeat(bool $isReset = false)
@@ -1064,6 +1105,30 @@ $siteAddress {
     public function firstSentinelReportTimeoutSeconds(): int
     {
         return max(30, $this->settings->sentinel_push_interval_seconds + 30);
+    }
+
+    public static function sentinelReportedVersionCacheKey(int $serverId): string
+    {
+        return "sentinel:reported-version:{$serverId}";
+    }
+
+    /**
+     * The last known reason why Sentinel pushes do not arrive. It is shown while Sentinel is out of sync.
+     */
+    public function sentinelPushProblem(): ?string
+    {
+        return Cache::get("sentinel:push-problem:{$this->id}");
+    }
+
+    public function rememberSentinelPushProblem(?string $problem): void
+    {
+        if (blank($problem)) {
+            Cache::forget("sentinel:push-problem:{$this->id}");
+
+            return;
+        }
+
+        Cache::put("sentinel:push-problem:{$this->id}", Str::limit($problem, 500), now()->addDay());
     }
 
     public function isSentinelLive()
@@ -1497,6 +1562,21 @@ $siteAddress {
         return $standalone_docker->concat($swarm_docker);
     }
 
+    public function githubRunnerConfig()
+    {
+        return $this->hasOne(GithubRunnerConfig::class);
+    }
+
+    public function githubRunnerExecutions()
+    {
+        return $this->hasMany(GithubRunnerExecution::class);
+    }
+
+    public function hasEnabledGithubRunners(): bool
+    {
+        return $this->githubRunnerConfig()->where('is_enabled', true)->exists();
+    }
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);
@@ -1515,6 +1595,19 @@ $siteAddress {
     public function cloudProviderToken()
     {
         return $this->belongsTo(CloudProviderToken::class);
+    }
+
+    public function notificationThrottles(): MorphMany
+    {
+        return $this->morphMany(NotificationThrottle::class, 'notifiable');
+    }
+
+    /**
+     * True while an Unreachable notification was sent and no Reachable notification followed.
+     */
+    protected function unreachableNotificationSent(): Attribute
+    {
+        return Attribute::get(fn (): bool => NotificationThrottle::wasSent($this, Unreachable::class));
     }
 
     public function sslCertificates()
@@ -1587,6 +1680,25 @@ $siteAddress {
         }
 
         return $isFunctional;
+    }
+
+    /**
+     * Like isFunctional(), but runs a live SSH and Docker check when the server is marked
+     * unreachable. The flag can be stale after one failed scheduled check.
+     */
+    public function isFunctionalAfterRecheck(): bool
+    {
+        if ($this->isFunctional()) {
+            return true;
+        }
+        if ($this->settings->is_reachable || $this->settings->force_disabled || $this->hasPlaceholderIp()) {
+            return false;
+        }
+
+        (new ServerConnectionCheckJob($this, disableMux: false))->handle();
+        $this->settings->refresh();
+
+        return $this->isFunctional();
     }
 
     public function isLogDrainEnabled()
@@ -1720,31 +1832,39 @@ $siteAddress {
     {
         ['uptime' => $uptime] = $this->validateConnection();
         if ($uptime === false) {
-            foreach ($this->applications() as $application) {
-                $application->status = 'exited';
-                $application->save();
-            }
-            foreach ($this->databases() as $database) {
-                $database->status = 'exited';
-                $database->save();
-            }
-            foreach ($this->services() as $service) {
-                $apps = $service->applications()->get();
-                $dbs = $service->databases()->get();
-                foreach ($apps as $app) {
-                    $app->status = 'exited';
-                    $app->save();
-                }
-                foreach ($dbs as $db) {
-                    $db->status = 'exited';
-                    $db->save();
-                }
-            }
+            $this->markResourcesAsExited();
 
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Mark all resources on this server as exited, because their containers cannot be checked.
+     */
+    public function markResourcesAsExited(): void
+    {
+        foreach ($this->applications() as $application) {
+            $application->status = 'exited';
+            $application->save();
+        }
+        foreach ($this->databases() as $database) {
+            $database->status = 'exited';
+            $database->save();
+        }
+        foreach ($this->services() as $service) {
+            $apps = $service->applications()->get();
+            $dbs = $service->databases()->get();
+            foreach ($apps as $app) {
+                $app->status = 'exited';
+                $app->save();
+            }
+            foreach ($dbs as $db) {
+                $db->status = 'exited';
+                $db->save();
+            }
+        }
     }
 
     public function isReachableChanged()
@@ -1761,36 +1881,30 @@ $siteAddress {
             return;
         }
 
-        if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
+        if ($this->unreachable_count >= ServerConnectionCheckJob::UNREACHABLE_THRESHOLD && ! $unreachableNotificationSent) {
             $this->sendUnreachableNotification();
         }
     }
 
     public function sendReachableNotification()
     {
-        $this->unreachable_notification_sent = false;
-        $this->save();
-        $this->refresh();
-        $this->team->notify(new Reachable($this));
+        if (NotificationThrottle::release($this, Unreachable::class)) {
+            $this->team->notify(new Reachable($this));
+        }
     }
 
     public function sendUnreachableNotification()
     {
-        $this->unreachable_notification_sent = true;
-        $this->save();
-        $this->refresh();
-        $this->team->notify(new Unreachable($this));
+        NotificationThrottle::sendOnce($this, Unreachable::class, null, fn () => $this->team->notify(new Unreachable($this)));
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        $this->disableSshMux();
-
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            instant_remote_process(['ls /'], $this);
+            instant_remote_process(['ls /'], $this, disableMultiplexing: true);
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
@@ -2083,12 +2197,6 @@ $siteAddress {
             $this->services()->count() == 0;
     }
 
-    private function disableSshMux(): void
-    {
-        $configRepository = app(ConfigurationRepository::class);
-        $configRepository->disableSshMux();
-    }
-
     /**
      * Return the server's CA certificate, generating it first when it does not exist yet.
      */
@@ -2116,18 +2224,7 @@ $siteAddress {
             $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;
-                $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-                $base64Cert = base64_encode($certificateContent);
-
-                $commands = collect([
-                    "mkdir -p $caCertPath",
-                    "chown -R 9999:root $caCertPath",
-                    "chmod -R 700 $caCertPath",
-                    "rm -rf $caCertPath/coolify-ca.crt",
-                    "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
-                    "chmod 644 $caCertPath/coolify-ca.crt",
-                ]);
+                $commands = SslHelper::caCertificateFileCommands($certificateContent);
 
                 instant_remote_process($commands, $this, false);
 

@@ -20,10 +20,13 @@ class StopApplication
         if ($application?->additional_servers?->count() > 0) {
             $servers = $servers->merge($application->additional_servers);
         }
+        $errors = [];
         foreach ($servers as $server) {
             try {
                 if (! $server->isFunctional()) {
-                    return 'Server is not functional';
+                    $errors[] = "Server {$server->name} is not functional.";
+
+                    continue;
                 }
 
                 if ($server->isSwarm()) {
@@ -34,8 +37,8 @@ class StopApplication
                 }
 
                 $containers = $previewDeployments
-                    ? getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true)
-                    : getCurrentApplicationContainerStatus($server, $application->id, 0);
+                    ? getCurrentApplicationContainerStatus($server, $application, includePullrequests: true)
+                    : getCurrentApplicationContainerStatus($server, $application, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
                 $timeout = $application->settings->stopGracePeriodSeconds();
@@ -55,11 +58,14 @@ class StopApplication
                 }
 
                 if ($dockerCleanup) {
-                    CleanupDocker::dispatch($server, false, false);
+                    CleanupDocker::dispatchAfterStop($server);
                 }
             } catch (\Exception $e) {
-                return $e->getMessage();
+                $errors[] = $e->getMessage();
             }
+        }
+        if ($errors !== []) {
+            return implode(' ', $errors);
         }
 
         $status = [

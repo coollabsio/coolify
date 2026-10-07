@@ -7,6 +7,8 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Notifications\VolumeBackup\BackupFailed;
+use App\Notifications\VolumeBackup\BackupSuccess;
 use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
 use App\Support\BackupCompression;
@@ -17,7 +19,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +43,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping('volume-backup-'.$this->backup->id))
+            ScheduledJobDeliveryService::withoutOverlapping('volume-backup-'.$this->backup->id, $this->occurrenceUuid)
                 ->shared()
                 ->expireAfter($this->timeout + 60)
                 ->dontRelease(),
@@ -239,6 +240,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->execution->update(['finished_at' => now()]);
             BackupCreated::dispatch($team->id);
         }
+
+        $team->notify(new BackupSuccess($this->backup, $warning));
     }
 
     public function failed(?Throwable $exception): void
@@ -278,6 +281,11 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 'local_storage_deleted' => $localStorageDeleted,
             ]);
         }
+
+        $this->backup->team?->notify(new BackupFailed(
+            $this->backup,
+            $exception?->getMessage() ?? 'Volume backup timed out or was terminated.',
+        ));
     }
 
     /**
@@ -489,6 +497,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->backup->executions()
             ->where('local_storage_deleted', true)
+            ->where('stop_recovery_pending', false)
+            ->where('s3_cleanup_pending', false)
             ->where(function (Builder $query): void {
                 $query->where('s3_storage_deleted', true)->orWhereNull('s3_uploaded');
             })

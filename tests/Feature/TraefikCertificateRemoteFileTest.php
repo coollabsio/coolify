@@ -4,7 +4,7 @@ use App\Actions\Development\SeedDevelopmentTraefikCertificates;
 use App\Actions\Proxy\DeleteTraefikCertificate;
 use App\Actions\Proxy\GetTraefikCertificates;
 use App\Enums\ProxyTypes;
-use App\Livewire\Server\Proxy;
+use App\Livewire\Server\Proxy\Certificates;
 use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -56,7 +56,7 @@ it('reads the ACME file with sudo on non-root servers', function () {
     $certificates = GetTraefikCertificates::run($this->server);
 
     expect($certificates)->toHaveCount(40);
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo bash -c 'sh -c '\\''if [ ! -f")
+    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'if [ ! -f")
         && str_contains($process->command, 'head -c'));
 });
 
@@ -70,7 +70,7 @@ it('uploads a large ACME file instead of passing it as a shell argument', functi
         ->and($remaining)->toHaveCount(39)
         ->and(collect($remaining)->pluck('domain.main'))->not->toContain('app1.example.com');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo bash -c 'sh -c '\\''set -e;")
+    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'set -e;")
         && str_contains($process->command, 'umask 077')
         && str_contains($process->command, 'chmod 600')
         && str_contains($process->command, 'mv --'));
@@ -99,11 +99,11 @@ it('shows the restart warning after deleting a certificate from the proxy page',
     session(['currentTeam' => $this->server->team]);
     $certificateId = GetTraefikCertificates::run($this->server)[0]['id'];
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
-        ->assertDontSee('Restart the proxy to stop serving deleted TLS certificates.')
+    Livewire::test(Certificates::class, ['server' => $this->server])
+        ->assertDontSee('Restart the proxy to apply TLS certificate changes.')
         ->call('deleteTraefikCertificate', $certificateId)
         ->assertDispatched('refreshServerShow')
-        ->assertSee('Restart the proxy to stop serving deleted TLS certificates.');
+        ->assertSee('Restart the proxy to apply TLS certificate changes.');
 });
 
 function actingAsTraefikCertificateUser(Team $team, string $role): User
@@ -122,7 +122,7 @@ it('lets an admin delete a certificate and records an audit event', function () 
     actingAsTraefikCertificateUser($this->server->team, 'admin');
     $certificate = GetTraefikCertificates::run($this->server)[0];
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('deleteTraefikCertificate', $certificate['id'])
         ->assertDispatched('success');
 
@@ -140,10 +140,10 @@ it('lets a member list certificates but not delete them', function () {
     actingAsTraefikCertificateUser($this->server->team, 'member');
     $certificateId = GetTraefikCertificates::run($this->server)[0]['id'];
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('loadTraefikCertificates')
         ->assertSet('traefikCertificates', fn (array $certificates): bool => count($certificates) === 40)
-        ->assertDontSeeHtml('submitAction="deleteTraefikCertificate')
+        ->assertDontSeeHtml('deleteTraefikCertificate(')
         ->call('deleteTraefikCertificate', $certificateId)
         ->assertDispatched('error')
         ->assertNotDispatched('success');
@@ -157,7 +157,7 @@ it('does not show or delete certificates of another team', function () {
     actingAsTraefikCertificateUser(Team::factory()->create(), 'owner');
     $certificateId = app(TraefikAcmeService::class)->certificates($this->acmeContents)[0]['id'];
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('loadTraefikCertificates')
         ->assertSet('traefikCertificates', [])
         ->assertDontSee('app1.example.com')
@@ -185,4 +185,39 @@ it('refuses to add example certificates outside development', function () {
     $this->artisan('dev:traefik-certificates', ['server' => $this->server->id])->assertFailed();
 
     expect($this->uploadedContents)->toBeNull();
+});
+
+it('serves the certificate page for team users', function (string $role) {
+    $this->server->team->update(['show_boarding' => false]);
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    actingAsTraefikCertificateUser($this->server->team, $role);
+
+    $this->get(route('server.proxy.certificates', ['server_uuid' => $this->server->uuid]))
+        ->assertOk()
+        ->assertSeeLivewire(Certificates::class);
+})->with(['admin', 'member']);
+
+it('does not serve the certificate page of another team', function () {
+    actingAsTraefikCertificateUser(Team::factory()->create(['show_boarding' => false]), 'owner');
+
+    $this->get(route('server.proxy.certificates', ['server_uuid' => $this->server->uuid]))
+        ->assertNotFound();
+});
+
+it('requires login to open the certificate page', function () {
+    $this->get(route('server.proxy.certificates', ['server_uuid' => $this->server->uuid]))
+        ->assertRedirect(route('login'));
+});
+
+it('does not load certificate controls for a Caddy server', function () {
+    actingAsTraefikCertificateUser($this->server->team, 'admin');
+    $this->server->team->update(['show_boarding' => false]);
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $this->server->proxy = ['type' => ProxyTypes::CADDY->value, 'status' => 'running'];
+    $this->server->save();
+
+    $this->get(route('server.proxy.certificates', ['server_uuid' => $this->server->uuid]))
+        ->assertOk()
+        ->assertDontSeeLivewire(Certificates::class)
+        ->assertSee('Traefik required');
 });

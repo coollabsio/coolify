@@ -89,10 +89,16 @@
                                                     <span class="font-mono text-[12px] text-black dark:text-fg">{{ $key }}</span>
                                                     <span class="font-mono text-[11px] text-neutral-400 dark:text-fg-dim">{{ '{{vault.'.$key.'}'.'}' }}</span>
                                                 </div>
-                                                <x-forms.button wire:click="addReference({{ \Illuminate\Support\Js::from($key) }})"
-                                                    wire:target="addReference({{ \Illuminate\Support\Js::from($key) }})">
-                                                    Add as variable
-                                                </x-forms.button>
+                                                @if (isset($invalidKeys[$key]))
+                                                    <span class="shrink-0 text-[11px] text-neutral-500 dark:text-fg-dim">
+                                                        Not a valid variable name
+                                                    </span>
+                                                @else
+                                                    <x-forms.button wire:click="addReference({{ \Illuminate\Support\Js::from($key) }})"
+                                                        wire:target="addReference({{ \Illuminate\Support\Js::from($key) }})">
+                                                        Add as variable
+                                                    </x-forms.button>
+                                                @endif
                                             </div>
                                         @empty
                                             <div class="px-3 py-2 text-[12px] text-neutral-500 dark:text-fg-dim">

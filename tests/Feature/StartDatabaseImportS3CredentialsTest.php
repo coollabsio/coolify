@@ -13,6 +13,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,7 +86,7 @@ test('s3 import activity command does not contain storage key or secret', functi
         $this->team->id,
     );
 
-    $command = (string) $activity->getExtraProperty('command');
+    $command = (string) RemoteProcessCommand::read($activity);
 
     expect($command)
         ->not->toContain($accessKey)

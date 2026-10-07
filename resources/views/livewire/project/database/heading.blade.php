@@ -65,7 +65,8 @@
                     {{ $database->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$database->status" title="Database status" />
+                    <x-status-summary :status="$database->status" title="Database status"
+                        :healthcheck-url="route('project.database.healthcheck', $parameters)" />
                     @if ($isDeploymentProgress)
                         <x-deploying-indicator label="Working" />
                     @endif
@@ -182,7 +183,7 @@
                     window.dispatchEvent(new CustomEvent('database-action-finished'));
                     return;
                 }
-                window.dispatchEvent(new CustomEvent('startdatabase'));
+                // start() opens the log dialog only when the start was queued.
                 try {
                     await $wire.$call('start');
                 } finally {
@@ -196,8 +197,7 @@
                     return;
                 }
                 window.dispatchEvent(new CustomEvent('database-busy'));
-                $wire.$dispatch('info', 'Restarting database.');
-                window.dispatchEvent(new CustomEvent('startdatabase'));
+                // restart() opens the log dialog only when the restart was queued.
                 try {
                     await $wire.$call('restart');
                 } finally {

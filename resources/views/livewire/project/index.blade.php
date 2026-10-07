@@ -66,7 +66,7 @@
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                         <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
                                             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />

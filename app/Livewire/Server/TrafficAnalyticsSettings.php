@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
 use App\Enums\ProxyTypes;
+use App\Enums\TrafficIpMode;
 use App\Livewire\Analytics;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -19,16 +20,16 @@ class TrafficAnalyticsSettings extends Component
 
     public bool $isTrafficAnalyticsEnabled;
 
-    #[Validate(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1', 'max:1000'])]
     public int|string $trafficTopn;
 
     #[Validate(['required', 'integer', 'min:0'])]
     public int|string $trafficSampleThreshold;
 
-    #[Validate(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1', 'max:365'])]
     public int|string $trafficRetention1hDays;
 
-    #[Validate(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1', 'max:3650'])]
     public int|string $trafficRetention1dDays;
 
     public bool $isGeoipEnabled;
@@ -38,6 +39,9 @@ class TrafficAnalyticsSettings extends Component
 
     #[Validate(['nullable', 'string', 'max:255'])]
     public ?string $geoipMaxmindLicenseKey = null;
+
+    #[Validate(['required', 'string', 'in:full,anonymized,off'])]
+    public string $trafficIpMode = 'full';
 
     public function mount(): void
     {
@@ -56,6 +60,7 @@ class TrafficAnalyticsSettings extends Component
             $this->server->settings->is_geoip_enabled = $this->isGeoipEnabled;
             $this->server->settings->geoip_refresh_days = $this->geoipRefreshDays;
             $this->server->settings->geoip_maxmind_license_key = $this->geoipMaxmindLicenseKey;
+            $this->server->settings->traffic_ip_mode = TrafficIpMode::from($this->trafficIpMode);
             $this->server->settings->save();
 
             return;
@@ -69,6 +74,7 @@ class TrafficAnalyticsSettings extends Component
         $this->isGeoipEnabled = (bool) $this->server->settings->is_geoip_enabled;
         $this->geoipRefreshDays = $this->server->settings->geoip_refresh_days;
         $this->geoipMaxmindLicenseKey = $this->server->settings->geoip_maxmind_license_key;
+        $this->trafficIpMode = TrafficIpMode::forServer($this->server)->value;
     }
 
     public function toggleTrafficAnalytics(): void
@@ -99,7 +105,7 @@ class TrafficAnalyticsSettings extends Component
             $this->authorize('update', $this->server);
             $this->syncData(true);
             auditLog('ui.server.traffic_analytics.updated', $this->auditContext([
-                'changed_fields' => ['traffic_topn', 'traffic_sample_threshold', 'traffic_retention_1h_days', 'traffic_retention_1d_days', 'is_geoip_enabled', 'geoip_refresh_days', 'geoip_maxmind_license_key'],
+                'changed_fields' => ['traffic_topn', 'traffic_sample_threshold', 'traffic_retention_1h_days', 'traffic_retention_1d_days', 'is_geoip_enabled', 'geoip_refresh_days', 'geoip_maxmind_license_key', 'traffic_ip_mode'],
             ]));
             $this->dispatch('success', 'Traffic analytics settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {

@@ -434,11 +434,29 @@ it('defaults to the first available storage when multiple storages are available
     expect($backup->s3_storage_id)->toBe($firstS3->id);
 });
 
-it('accepts the S3 storage scope passed to the component', function () {
+it('accepts a root team S3 storage for the instance database backup', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    $this->user->teams()->syncWithoutDetaching([$rootTeam->id => ['role' => 'owner']]);
+    session(['currentTeam' => $this->team]);
     $s3 = createS3StorageForBackupEditValidationTest(0);
-    $backup = createBackupForEditValidationTest($this->team, [
+    $server = Server::factory()->create(['id' => 0, 'team_id' => 0, 'ip' => '127.0.0.1']);
+    $database = new StandalonePostgresql;
+    $database->forceFill([
+        'id' => 0,
+        'name' => 'coolify-db',
+        'postgres_user' => 'coolify',
+        'postgres_password' => 'password',
+        'postgres_db' => 'coolify',
+        'destination_type' => StandaloneDocker::class,
+        'destination_id' => StandaloneDocker::where('server_id', $server->id)->firstOrFail()->id,
+        'environment_id' => null,
+    ])->save();
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
         'save_s3' => false,
-        's3_storage_id' => null,
+        'database_type' => StandalonePostgresql::class,
+        'database_id' => 0,
+        'team_id' => 0,
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => collect([$s3])])

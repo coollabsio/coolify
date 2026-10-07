@@ -84,13 +84,23 @@ class StartClickhouse
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
         }
+
+        $docker_compose['services'][$container_name]['volumes'] ??= [];
+
         if (count($persistent_storages) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $persistent_storages
+            );
         }
+
         if (count($persistent_file_volumes) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
-                return "$item->fs_path:$item->mount_path";
-            })->toArray();
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $persistent_file_volumes->map(function ($item) {
+                    return "$item->fs_path:$item->mount_path";
+                })->toArray()
+            );
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
@@ -107,7 +117,7 @@ class StartClickhouse
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
@@ -158,11 +168,13 @@ class StartClickhouse
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'CLICKHOUSE_USER') {
-                $this->resolvedClickhouseUser = $this->database->composeCommandValue($env, $rawValue);
+                $this->resolvedClickhouseUser = $composeFileValue;
             } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
-                $this->resolvedClickhousePassword = $this->database->composeCommandValue($env, $rawValue);
+                $this->resolvedClickhousePassword = $composeFileValue;
             }
         }
 

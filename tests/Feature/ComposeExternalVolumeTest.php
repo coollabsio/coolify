@@ -4,6 +4,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\StartService;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\DeleteResourceJob;
+use App\Livewire\Project\Service\StackForm;
 use App\Livewire\Project\Service\Storage as StoragePage;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
@@ -21,6 +22,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -302,18 +304,34 @@ describe('applicationParser', function () {
             ->and(persistentVolumeNames())->toBe([]);
     });
 
-    it('shares the external volume with a preview deployment', function () {
+    it('gives a preview deployment its own volume instead of the external volume', function () {
         $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
         $uuid = $application->uuid;
         $preview = externalVolumePreview($application);
 
         $compose = applicationParser($application, 42, $preview->id)->toArray();
 
-        expect($compose['services']['web-pr-42']['volumes'])->toContain('shared-data:/data:ro')
+        expect($compose['services']['web-pr-42']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
             ->toContain("{$uuid}_app-data-pr-42:/app")
-            ->and($compose['volumes']['shared-data'])->toBe(['external' => true])
-            ->and($compose['volumes'])->not->toHaveKey("{$uuid}_shared-data-pr-42")
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data-pr-42"]);
+            ->not->toContain('shared-data:/data:ro')
+            ->and($compose['volumes']["{$uuid}_shared-data-pr-42"])->toBe(['name' => "{$uuid}_shared-data-pr-42"])
+            ->and($compose['volumes'])->not->toHaveKey('shared-data')
+            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data-pr-42", "{$uuid}_shared-data-pr-42"])
+            ->and($application->composeVolumeWarnings())->toBe([]);
+    });
+
+    it('gives a preview deployment its own volume instead of a named external volume in long syntax', function () {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_LONG_COMPOSE);
+        $uuid = $application->uuid;
+        $preview = externalVolumePreview($application);
+
+        $compose = applicationParser($application, 42, $preview->id);
+        $sources = collect($compose->toArray()['services']['web-pr-42']['volumes'])->pluck('source')->all();
+
+        expect($sources)->toBe(["{$uuid}_shared-data-pr-42", "{$uuid}_app-data-pr-42"])
+            ->and($compose->toArray()['volumes']["{$uuid}_shared-data-pr-42"])->toBe(['name' => "{$uuid}_shared-data-pr-42"])
+            ->and(Yaml::dump(convertToArray($compose), 10, 2))->not->toContain('existing-shared-volume')
+            ->and($application->composeVolumeWarnings())->toBe([]);
     });
 
     it('does not show a warning when the resource has no old storage entry', function () {
@@ -352,21 +370,22 @@ describe('applicationParser', function () {
             ->and($application->composeVolumeWarnings())->toBe([legacyExternalVolumeWarning("{$uuid}_shared-data", 'existing-shared-volume')]);
     });
 
-    it('keeps the old prefixed preview volume when the resource has its old storage entry', function () {
+    it('reuses the preview volume of an older Coolify version without a warning', function () {
         $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
         $uuid = $application->uuid;
         $preview = externalVolumePreview($application);
-        legacyExternalVolumeRow($application, "{$uuid}_shared-data-pr-42");
+        $oldVolume = legacyExternalVolumeRow($application, "{$uuid}_shared-data-pr-42");
 
         $compose = applicationParser($application, 42, $preview->id)->toArray();
 
         expect($compose['services']['web-pr-42']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
             ->and($compose['volumes']["{$uuid}_shared-data-pr-42"])->toBe(['name' => "{$uuid}_shared-data-pr-42"])
+            ->and(LocalPersistentVolume::find($oldVolume->id)?->name)->toBe("{$uuid}_shared-data-pr-42")
             ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data-pr-42", "{$uuid}_shared-data-pr-42"])
-            ->and($application->composeVolumeWarnings())->toBe([legacyExternalVolumeWarning("{$uuid}_shared-data-pr-42")]);
+            ->and($application->composeVolumeWarnings())->toBe([]);
     });
 
-    it('uses the external volume in a preview when only the production volume has an old storage entry', function () {
+    it('gives a preview its own volume when only the production volume has an old storage entry', function () {
         $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
         $uuid = $application->uuid;
         $preview = externalVolumePreview($application);
@@ -374,7 +393,9 @@ describe('applicationParser', function () {
 
         $compose = applicationParser($application, 42, $preview->id)->toArray();
 
-        expect($compose['services']['web-pr-42']['volumes'])->toContain('shared-data:/data:ro')
+        expect($compose['services']['web-pr-42']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
+            ->not->toContain('shared-data:/data:ro')
+            ->not->toContain("{$uuid}_shared-data:/data:ro")
             ->and($application->composeVolumeWarnings())->toBe([]);
     });
 
@@ -530,7 +551,7 @@ describe('legacy parsers', function () {
             ->and($service->composeVolumeWarnings())->toBe([]);
     });
 
-    it('keeps the old volume names of a legacy application and shows a warning when the name is not the external name', function (string $parsingVersion, int $pullRequestId, string $compose, string $expectedVolume, ?string $dockerVolume) {
+    it('keeps the old volume names of a legacy application and shows a warning when production does not use the external name', function (string $parsingVersion, int $pullRequestId, string $compose, string $expectedVolume, ?string $dockerVolume) {
         // Legacy Compose applications (parser versions 1 and 2) never stored their volumes, so Coolify
         // cannot tell which external volume already holds data: they always keep the old names.
         $application = externalVolumeApplication($compose, $parsingVersion);
@@ -546,7 +567,8 @@ describe('legacy parsers', function () {
             ->and(array_keys($parsed['volumes'] ?? []))->toContain($expectedName)
             ->and($application->composeVolumeWarnings())->toBe(
                 // Parser version 1 keeps the name of a production volume, so it uses the external volume.
-                $expectedName === 'shared-data' ? [] : [legacyParserExternalVolumeWarning($expectedName, $dockerVolume)]
+                // A preview always uses its own volume, so it gets no warning.
+                $pullRequestId !== 0 || $expectedName === 'shared-data' ? [] : [legacyParserExternalVolumeWarning($expectedName, $dockerVolume)]
             );
     })->with([
         'v1 short' => ['1', 0, EXTERNAL_VOLUME_SHORT_COMPOSE, 'shared-data:/data:ro', null],
@@ -570,8 +592,20 @@ describe('legacy parsers', function () {
             ->and($logEntries)->toBe([['Warning: '.legacyParserExternalVolumeWarning($keptName), 'stderr']]);
     })->with([
         'v2 production' => ['2', 0, '{uuid}-shared-data'],
-        'v2 preview' => ['2', 42, '{uuid}-shared-data-pr-42'],
-        'v1 preview' => ['1', 42, 'shared-data-pr-42'],
+    ]);
+
+    it('writes no warning to the deployment log of a legacy application preview, which always uses its own volume', function (string $parsingVersion, string $keptName) {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE, $parsingVersion);
+        $keptName = str_replace('{uuid}', $application->uuid, $keptName);
+        $preview = externalVolumePreview($application);
+
+        [$composeFile, $logEntries] = parseExternalVolumeDeployment($application, 42, $preview);
+
+        expect(data_get($composeFile, 'services.web-pr-42.volumes'))->toContain("{$keptName}:/data:ro")
+            ->and($logEntries)->toBe([]);
+    })->with([
+        'v2 preview' => ['2', '{uuid}-shared-data-pr-42'],
+        'v1 preview' => ['1', 'shared-data-pr-42'],
     ]);
 
     it('writes no warning to the deployment log for a production deployment of a parser version 1 application', function () {
@@ -608,23 +642,111 @@ describe('legacy parsers', function () {
     });
 });
 
+function variableExternalVolumeCompose(string $name, bool $oldSyntax = false): string
+{
+    $declaration = $oldSyntax ? "    external:\n      name: '{$name}'\n" : "    external: true\n    name: '{$name}'\n";
+
+    return "services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n{$declaration}";
+}
+
+dataset('external volume names with a variable', [
+    'variable' => ['${SHARED_VOLUME}', false],
+    'variable with a default' => ['${SHARED_VOLUME:-shared}', false],
+    'variable with text around it' => ['stack-${STACK}_data', false],
+    'two variables' => ['${PROJECT}-${ENVIRONMENT}', false],
+    'old syntax' => ['$SHARED_VOLUME', true],
+]);
+
 describe('validation', function () {
-    it('rejects an external volume name with a variable', function (string $compose) {
-        expect(fn () => validateDockerComposeForInjection($compose))
-            ->toThrow(Exception::class, 'Coolify does not resolve variables in the name of an external volume');
+    it('accepts an external volume name with a variable and leaves it to Docker Compose', function (string $name, bool $oldSyntax) {
+        $compose = variableExternalVolumeCompose($name, $oldSyntax);
+        $declaration = $oldSyntax ? ['external' => ['name' => $name]] : ['external' => true, 'name' => $name];
+        validateDockerComposeForInjection($compose);
 
-        $application = externalVolumeApplication($compose);
-        expect(fn () => applicationParser($application))
-            ->toThrow(Exception::class, 'Coolify does not resolve variables in the name of an external volume');
+        $application = applicationParser(externalVolumeApplication($compose))->toArray();
+        $service = serviceParser(externalVolumeService($compose))->toArray();
 
+        expect($application['services']['web']['volumes'])->toBe(['shared-data:/data'])
+            ->and($application['volumes'])->toBe(['shared-data' => $declaration])
+            ->and($service['services']['web']['volumes'])->toBe(['shared-data:/data'])
+            ->and($service['volumes'])->toBe(['shared-data' => $declaration])
+            ->and(persistentVolumeNames())->toBe([]);
+    })->with('external volume names with a variable');
+
+    it('keeps the old volume of an existing application whose external volume name has a variable', function (string $name, bool $oldSyntax) {
+        $application = externalVolumeApplication(variableExternalVolumeCompose($name, $oldSyntax));
+        $uuid = $application->uuid;
+        legacyExternalVolumeRow($application, "{$uuid}_shared-data");
+
+        $parsed = applicationParser($application)->toArray();
+
+        expect($parsed['services']['web']['volumes'])->toBe(["{$uuid}_shared-data:/data"])
+            ->and($parsed['volumes']["{$uuid}_shared-data"])->toBe(['name' => "{$uuid}_shared-data"])
+            ->and($application->composeVolumeWarnings())->toBe([legacyExternalVolumeWarning("{$uuid}_shared-data", $name)]);
+    })->with('external volume names with a variable');
+
+    it('keeps the old volume of an existing service whose external volume name has a variable', function (string $name, bool $oldSyntax) {
+        $compose = variableExternalVolumeCompose($name, $oldSyntax);
         $service = externalVolumeService($compose);
-        expect(fn () => serviceParser($service))
-            ->toThrow(Exception::class, 'Coolify does not resolve variables in the name of an external volume');
+        $uuid = $service->uuid;
+        legacyExternalVolumeRow(legacyExternalVolumeServiceResource($service, 'web', $compose), "{$uuid}_shared-data");
+
+        $parsed = serviceParser($service)->toArray();
+
+        expect($parsed['services']['web']['volumes'])->toBe(["{$uuid}_shared-data:/data"])
+            ->and($parsed['volumes']["{$uuid}_shared-data"])->toBe(['name' => "{$uuid}_shared-data"])
+            ->and($service->composeVolumeWarnings())->toBe([legacyExternalVolumeWarning("{$uuid}_shared-data", $name)]);
+    })->with('external volume names with a variable');
+
+    it('saves a service Compose file whose external volume name has a variable', function () {
+        $compose = variableExternalVolumeCompose('${SHARED_VOLUME}');
+        $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        $owner = User::factory()->create();
+        $team = $service->environment->project->team;
+        $team->members()->attach($owner, ['role' => 'owner']);
+        $this->actingAs($owner);
+        session(['currentTeam' => $team]);
+
+        Livewire::test(StackForm::class, ['service' => $service])
+            ->set('dockerComposeRaw', $compose)
+            ->call('submit')
+            ->assertDispatched('success');
+
+        expect($service->fresh()->docker_compose_raw)->toBe($compose);
+    });
+
+    it('keeps the old behavior of a legacy Compose application whose external volume name has a variable', function (string $name, bool $oldSyntax) {
+        $application = externalVolumeApplication(variableExternalVolumeCompose($name, $oldSyntax), '2');
+
+        $parsed = parseDockerComposeFile($application)->toArray();
+
+        expect($parsed['services']['web']['volumes'])->toBe(["{$application->uuid}-shared-data:/data"]);
+    })->with('external volume names with a variable');
+
+    it('rejects an external volume name with an unsafe or unsupported variable', function (string $name) {
+        $compose = variableExternalVolumeCompose($name);
+        $application = externalVolumeApplication($compose);
+
+        expect(fn () => validateDockerComposeForInjection($compose))
+            ->toThrow(Exception::class, 'Invalid external Docker Compose volume shared-data')
+            ->and(fn () => applicationParser($application))
+            ->toThrow(Exception::class, 'Invalid external Docker Compose volume shared-data');
     })->with([
-        'name field' => ["services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external: true\n    name: \${SHARED_VOLUME}\n"],
-        'name field with default' => ["services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external: true\n    name: \${SHARED_VOLUME:-shared}\n"],
-        'old syntax' => ["services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external:\n      name: \$SHARED_VOLUME\n"],
+        'command after a variable' => ['${SHARED_VOLUME}; rm -rf /'],
+        'command substitution' => ['$(id)'],
+        'space' => ['shared ${VOLUME}'],
+        'dollar sign alone' => ['shared-$'],
+        'escaped dollar sign' => ['$$SHARED_VOLUME'],
+        'required variable syntax' => ['${SHARED_VOLUME:?required}'],
+        'default with a space' => ['${SHARED_VOLUME:-a b}'],
     ]);
+
+    it('rejects a variable in the key of an external volume', function () {
+        $compose = "services:\n  web:\n    image: nginx\nvolumes:\n  \${SHARED_VOLUME}:\n    external: true\n";
+
+        expect(fn () => validateDockerComposeForInjection($compose))
+            ->toThrow(Exception::class, 'Invalid external Docker Compose volume. Volume names must start with an alphanumeric character');
+    });
 
     it('rejects an external volume name that is not a valid Docker volume name', function () {
         $compose = "services:\n  web:\n    image: nginx\nvolumes:\n  shared-data:\n    external: true\n    name: 'shared data;rm -rf /'\n";
@@ -682,7 +804,9 @@ describe('delete', function () {
         (new DeleteResourceJob($application))->handle();
 
         $all = implode("\n", $commands);
-        expect($all)->toContain('docker compose down -v')
+        // --project-directory, not cd: a non-root SSH user cannot enter the directory on the Coolify host.
+        expect($all)->toContain("docker compose --project-directory {$application->dirOnServer()} down -v")
+            ->not->toContain("cd {$application->dirOnServer()}")
             ->not->toContain('docker volume rm')
             ->and($application->docker_compose)->toContain("shared-data:\n    external: true");
     });
@@ -750,8 +874,8 @@ describe('delete', function () {
         expect(LocalPersistentVolume::find($volume->id))->not->toBeNull();
     });
 
-    it('does not remove the external volume when a preview is deleted', function () {
-        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+    it('removes the own volume of the preview, but not the external volume, when a preview is deleted', function (string $compose, string $externalVolume) {
+        $application = externalVolumeApplication($compose);
         $uuid = $application->uuid;
         $preview = externalVolumePreview($application);
         $commands = [];
@@ -761,7 +885,23 @@ describe('delete', function () {
 
         $volumeCommands = collect($commands)->filter(fn (string $command): bool => str_contains($command, 'docker volume'))->implode("\n");
         expect($volumeCommands)->toContain("docker volume rm -f '{$uuid}_app-data-pr-42'")
-            ->not->toContain('shared-data');
+            ->toContain("docker volume rm -f '{$uuid}_shared-data-pr-42'")
+            ->not->toContain("'{$externalVolume}'");
+    })->with([
+        'short syntax' => [EXTERNAL_VOLUME_SHORT_COMPOSE, 'shared-data'],
+        'named external volume' => [EXTERNAL_VOLUME_LONG_COMPOSE, 'existing-shared-volume'],
+    ]);
+
+    it('does not mark the own volume of a preview as an entry that replaces the external volume', function () {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        $uuid = $application->uuid;
+        $preview = externalVolumePreview($application);
+        $productionEntry = legacyExternalVolumeRow($application, "{$uuid}_shared-data");
+        applicationParser($application, 42, $preview->id);
+        $previewEntry = LocalPersistentVolume::query()->where('name', "{$uuid}_shared-data-pr-42")->firstOrFail();
+
+        expect($previewEntry->replacedExternalComposeVolume())->toBeNull()
+            ->and($productionEntry->replacedExternalComposeVolume())->toBe('shared-data');
     });
 
     it('removes the old prefixed preview volume, but not the external volume, when a preview is deleted', function () {
@@ -794,8 +934,19 @@ describe('warnings', function () {
             ->and($logEntries)->toBe([['Warning: '.legacyExternalVolumeWarning(str_replace('{uuid}', $uuid, $oldName)), 'stderr']]);
     })->with([
         'production' => [0, '{uuid}_shared-data', '{uuid}_shared-data:/data:ro'],
-        'preview' => [42, '{uuid}_shared-data-pr-42', '{uuid}_shared-data-pr-42:/data:ro'],
     ]);
+
+    it('writes no warning to the deployment log of a preview, which always uses its own volume', function () {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        $uuid = $application->uuid;
+        $preview = externalVolumePreview($application);
+        legacyExternalVolumeRow($application, "{$uuid}_shared-data-pr-42");
+
+        [$composeFile, $logEntries] = parseExternalVolumeDeployment($application, 42, $preview);
+
+        expect(data_get($composeFile, 'services.web-pr-42.volumes'))->toContain("{$uuid}_shared-data-pr-42:/data:ro")
+            ->and($logEntries)->toBe([]);
+    });
 
     it('writes no warning to the deployment log when the external volume is used as written', function () {
         $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
@@ -811,7 +962,7 @@ describe('warnings', function () {
         $uuid = $service->uuid;
         legacyExternalVolumeRow(legacyExternalVolumeServiceResource($service, 'web'), "{$uuid}_shared-data");
 
-        $command = StartService::run($service->fresh())->getExtraProperty('command');
+        $command = RemoteProcessCommand::read(StartService::run($service->fresh()));
 
         $echo = 'echo '.escapeshellarg('Warning: '.legacyExternalVolumeWarning("{$uuid}_shared-data"));
         expect($command)->toContain($echo)
@@ -824,7 +975,7 @@ describe('warnings', function () {
         $serviceApplication = legacyExternalVolumeServiceResource($service, 'web');
         legacyExternalVolumeRow($serviceApplication, "{$uuid}_shared-data");
 
-        $command = DeployServiceApplication::run($serviceApplication->fresh())->getExtraProperty('command');
+        $command = RemoteProcessCommand::read(DeployServiceApplication::run($serviceApplication->fresh()));
 
         $echo = 'echo '.escapeshellarg('Warning: '.legacyExternalVolumeWarning("{$uuid}_shared-data"));
         expect($command)->toContain($echo)
@@ -847,7 +998,7 @@ describe('warnings', function () {
     it('shows no warning when a service starts with the external volume as written', function () {
         $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);
 
-        $command = StartService::run($service->fresh())->getExtraProperty('command');
+        $command = RemoteProcessCommand::read(StartService::run($service->fresh()));
 
         expect($command)->not->toContain('declared as external');
     });

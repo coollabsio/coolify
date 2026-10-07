@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\AuditsStorageChanges;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\ScheduledVolumeBackup;
@@ -23,6 +24,7 @@ use Livewire\Component;
 
 class FileStorage extends Component
 {
+    use AuditsStorageChanges;
     use AuthorizesRequests;
 
     public LocalFileVolume $fileStorage;
@@ -121,11 +123,14 @@ class FileStorage extends Component
             : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
     }
 
-    private function syncData(bool $toModel = false): void
+    /**
+     * @return array<int, string> Names of the file storage fields the save changed.
+     */
+    private function syncData(bool $toModel = false): array
     {
         if ($toModel) {
             if ($this->fileStorage->is_too_large) {
-                return;
+                return [];
             }
             $this->validate();
 
@@ -134,13 +139,18 @@ class FileStorage extends Component
             $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
             $this->fileStorage->is_preview_suffix_enabled = $this->isPreviewSuffixEnabled;
 
+            $changedFields = auditChangedFields($this->fileStorage);
             $this->fileStorage->save();
+
+            return $changedFields;
         } else {
             // Sync from model
-            $this->content = $this->fileStorage->content;
+            $this->content = auth()->user()?->can('update', $this->resource) ? $this->fileStorage->content : null;
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
             $this->isPreviewSuffixEnabled = $this->fileStorage->is_preview_suffix_enabled ?? true;
         }
+
+        return [];
     }
 
     public function convertToDirectory()
@@ -156,8 +166,10 @@ class FileStorage extends Component
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
             $this->fileStorage->is_based_on_git = false;
+            $changedFields = auditChangedFields($this->fileStorage);
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->auditFileStorageUpdate($changedFields, 'converted_to_directory');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
@@ -203,8 +215,10 @@ class FileStorage extends Component
             if (data_get($this->resource, 'settings.is_preserve_repository_enabled')) {
                 $this->fileStorage->is_based_on_git = true;
             }
+            $changedFields = auditChangedFields($this->fileStorage);
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->auditFileStorageUpdate($changedFields, 'converted_to_file');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
@@ -233,11 +247,15 @@ class FileStorage extends Component
             } elseif ($this->fileStorage->is_host_file) {
                 $message = 'Host file mount removed.';
             }
-            if ($this->permanently_delete && ! $this->fileStorage->is_host_file) {
-                $message = 'Directory deleted from the server.';
+            $deletedFromServer = $this->canDeleteFromServer() && in_array('permanently_delete', $selectedActions, true);
+            if ($deletedFromServer) {
+                $message = $this->fileStorage->is_directory ? 'Directory deleted from the server.' : 'File deleted from the server.';
                 $this->fileStorage->deleteStorageOnServer();
             }
             $this->fileStorage->delete();
+            $this->auditStorageChange($this->resource, 'deleted', $this->fileStorage, [
+                'deleted_from_server' => $deletedFromServer,
+            ]);
             $this->dispatch('configurationChanged');
             $this->dispatch('success', $message);
         } catch (\Throwable $e) {
@@ -275,8 +293,10 @@ class FileStorage extends Component
             $this->fileStorage->content = $this->content;
             $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
             $this->fileStorage->is_preview_suffix_enabled = $this->isPreviewSuffixEnabled;
+            $changedFields = auditChangedFields($this->fileStorage);
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->auditFileStorageUpdate($changedFields);
             $this->dispatch('success', 'File updated.');
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
@@ -301,22 +321,57 @@ class FileStorage extends Component
 
             return;
         }
-        $this->syncData(true);
+        $this->auditFileStorageUpdate($this->syncData(true));
         $this->dispatch('success', 'File updated.');
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditFileStorageUpdate(array $changedFields, ?string $operation = null): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        $this->auditStorageChange($this->resource, 'updated', $this->fileStorage, array_filter([
+            'changed_fields' => $changedFields,
+            'operation' => $operation,
+        ], fn ($value) => $value !== null));
+    }
+
+    /**
+     * Only mounts inside the resource directory are ever deleted on the server.
+     */
+    private function canDeleteFromServer(): bool
+    {
+        return ! $this->fileStorage->is_host_file && ! $this->fileStorage->isOutsideResourceDirectory();
     }
 
     public function render()
     {
+        $kind = $this->fileStorage->is_directory ? 'directory' : 'file';
+        $deletionActions = [
+            $this->fileStorage->is_host_file
+                ? 'The mount will be removed from the container.'
+                : "The selected {$kind} will be permanently deleted from the container.",
+        ];
+        $deletionCheckboxes = [];
+
+        if ($this->canDeleteFromServer()) {
+            $deletionCheckboxes[] = [
+                'id' => 'permanently_delete',
+                'label' => $this->fileStorage->is_directory
+                    ? 'The selected directory and all its contents will be permanently deleted from the server.'
+                    : 'The selected file will be permanently deleted from the server.',
+            ];
+        } else {
+            $deletionActions[] = "Only the mount configuration will be removed. The {$kind} at {$this->fileStorage->fs_path} is not deleted on the server.";
+        }
+
         return view('livewire.project.service.file-storage', [
-            'directoryDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permanently deleted from the server.'],
-            ],
-            'fileDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted from the server.'],
-            ],
-            'hostFileDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'Only the mount configuration will be removed. The host file will not be deleted.'],
-            ],
+            'deletionCheckboxes' => $deletionCheckboxes,
+            'deletionActions' => $deletionActions,
         ]);
     }
 }

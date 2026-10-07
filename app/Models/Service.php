@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\ContainerStatusAggregator;
+use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ResourceStartActivity;
 use App\Traits\Auditable;
@@ -15,9 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
-use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Service model',
@@ -643,7 +642,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $this->isGrafanaImage($image->toString()):
+                case $this->isGrafanaServerImage($application->image):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -1418,8 +1417,22 @@ class Service extends BaseModel
         return $fields;
     }
 
-    private function isGrafanaImage(string $image): bool
+    /**
+     * Determine whether the given image is an actual Grafana server image
+     * (grafana/grafana, grafana/grafana-oss, grafana/grafana-enterprise),
+     * optionally prefixed by a registry host. Other Grafana-published images
+     * such as grafana/loki, grafana/promtail and grafana/tempo are excluded.
+     */
+    private function isGrafanaServerImage(string $image): bool
     {
+        $parsedImage = (new DockerImageParser)->parse($image);
+        $image = $parsedImage->getImageName();
+
+        // The parser recognizes registry hosts with dots or ports, but not bare localhost.
+        if ($parsedImage->getRegistryUrl() === '' && str_starts_with($image, 'localhost/')) {
+            $image = substr($image, strlen('localhost/'));
+        }
+
         return in_array($image, [
             'grafana/grafana',
             'grafana/grafana-oss',
@@ -1464,7 +1477,7 @@ class Service extends BaseModel
     public function documentation()
     {
         $services = get_service_templates();
-        $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
+        $service = data_get($services, resolve_service_template_key(str($this->name)->beforeLast('-')->value, $services), []);
 
         return data_get($service, 'documentation', config('constants.urls.docs'));
     }
@@ -1479,7 +1492,7 @@ class Service extends BaseModel
             if (blank($this->service_type)) {
                 return null;
             }
-            $serviceName = $this->service_type;
+            $serviceName = resolve_service_template_key($this->service_type, $services);
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 
@@ -1573,27 +1586,18 @@ class Service extends BaseModel
         }
 
         $workdir = $this->workdir();
-
-        instant_remote_process([
-            "mkdir -p $workdir",
-            "cd $workdir",
-        ], $this->server);
-
-        $filename = new_public_id().'-docker-compose.yml';
-        Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
-        $path = Storage::path("tmp/{$filename}");
-        instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
-        Storage::disk('local')->delete("tmp/{$filename}");
-
-        $commands[] = "cd $workdir";
-        $environmentFilename = new_public_id().'.env.tmp';
+        // Absolute paths and tee, no cd or scp: a non-root SSH user cannot enter /data/coolify on the Coolify host.
+        // File content goes over SSH stdin: inline in the command, a compose over ~96 KB exceeds the argument limit.
+        instant_remote_process(["mkdir -p $workdir"], $this->server);
+        instant_remote_write_file($this->server, "$workdir/docker-compose.yml", $this->docker_compose);
+        $environmentFile = "$workdir/".new_public_id().'.env.tmp';
 
         $envs = collect([]);
 
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = Yaml::parse($this->docker_compose);
+                $dockerCompose = parseDockerComposeYaml($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
@@ -1616,14 +1620,8 @@ class Service extends BaseModel
         foreach ($sorted as $env) {
             $envs->push($this->composeEnvironmentFileLine($env));
         }
-        if ($envs->count() === 0) {
-            $commands[] = "touch {$environmentFilename} && mv {$environmentFilename} .env";
-        } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee {$environmentFilename} > /dev/null && mv {$environmentFilename} .env";
-        }
-
-        instant_remote_process($commands, $this->server);
+        instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
+        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
     }
 
     /**
@@ -1632,20 +1630,7 @@ class Service extends BaseModel
      */
     public function composeEnvironmentFileLine(EnvironmentVariable $environmentVariable): string
     {
-        $value = $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
-
-        if ($value === null) {
-            return "{$environmentVariable->key}=";
-        }
-
-        if (! $this->useExactEscaping($environmentVariable)) {
-            return $environmentVariable->key.'='.$this->legacyFormatEnvironmentVariableValue($environmentVariable, $value);
-        }
-
-        return $environmentVariable->key.'='.escapeComposeEnvFileValue(
-            $value,
-            $this->environmentVariableAllowsInterpolation($environmentVariable, $value),
-        );
+        return $environmentVariable->key.'='.$this->resolveSecretManagerDotenvValue($environmentVariable);
     }
 
     public function parse(bool $isNew = false): Collection

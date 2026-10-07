@@ -229,3 +229,44 @@ test('Compose injection payloads are rejected', function (string $compose, strin
     'mixed network name with an unsafe default' => ["services:\n  web:\n    image: nginx\nnetworks:\n  edge:\n    name: 'app-\${ENV:-x y}'\n", 'Invalid Docker Compose network name field'],
     'network name variable with an unsafe default' => ["services:\n  web:\n    image: nginx\nnetworks:\n  edge:\n    name: '\${NET:-x\$(touch /tmp/pwned)}'\n", 'Invalid Docker Compose network name field'],
 ]);
+
+test('service network list entries accept the same variables as network names', function (string $network) {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - '{$network}'\nnetworks:\n  proxy:\n    external: true\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
+})->with([
+    'variable with a default' => ['${NET:-proxy}'],
+    'variable with an unset-only default' => ['${NET-proxy}'],
+    'braced variable' => ['${NET}'],
+    'plain variable' => ['$NET'],
+    'variable mixed with text' => ['${COMPOSE_PROJECT_NAME}_default'],
+    'text with a variable default' => ['app-${ENV:-prod}'],
+]);
+
+test('unsafe service network list entries with variables are rejected', function (string $network) {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - '{$network}'\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->toThrow(Exception::class, 'Invalid Docker Compose service network');
+})->with([
+    'command substitution' => ['$(id)'],
+    'backticks' => ['`id`'],
+    'variable with command substitution' => ['${NET}$(id)'],
+    'default with command substitution' => ['${NET:-$(id)}'],
+    'default with a space' => ['${NET:-x y}'],
+    'default with backticks' => ['${NET:-`id`}'],
+]);
+
+test('a service network key with a variable is rejected because Compose does not interpolate keys', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      '\${NET:-proxy}': {}\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->toThrow(Exception::class, 'Invalid Docker Compose service network');
+});
+
+test('network errors name the service and the invalid value', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - 'net;id'\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))
+        ->toThrow(Exception::class, 'Invalid Docker Compose service network "net;id" in service web. Network names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores, and can use variables such as ${NETWORK:-default}.');
+    expect(fn () => validateDockerComposeForInjection("services:\n  web:\n    image: nginx\nnetworks:\n  'net;id': {}\n"))
+        ->toThrow(Exception::class, 'Invalid Docker Compose network name "net;id".');
+});

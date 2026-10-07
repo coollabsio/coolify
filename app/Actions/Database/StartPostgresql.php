@@ -67,6 +67,7 @@ class StartPostgresql
 
             $server = $this->database->destination->server;
             $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -209,7 +210,7 @@ class StartPostgresql
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
@@ -263,11 +264,13 @@ class StartPostgresql
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'POSTGRES_USER') {
-                $this->resolvedPostgresUser = $this->database->composeCommandValue($env, $rawValue);
+                $this->resolvedPostgresUser = $composeFileValue;
             } elseif ($env->key === 'POSTGRES_DB') {
-                $this->resolvedPostgresDatabase = $this->database->composeCommandValue($env, $rawValue);
+                $this->resolvedPostgresDatabase = $composeFileValue;
             }
         }
 
@@ -293,7 +296,8 @@ class StartPostgresql
 
     private function generate_init_scripts()
     {
-        $this->commands[] = "rm -rf $this->configuration_dir/docker-entrypoint-initdb.d/*";
+        // find instead of a shell glob: a non-root SSH user cannot read the directory to expand it.
+        $this->commands[] = "find $this->configuration_dir/docker-entrypoint-initdb.d -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true";
 
         if (blank($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
             return;

@@ -32,7 +32,8 @@
                     {{ $service->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                    <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
+                        :container-name="$selectedResource ? 'Container' : 'Containers'" />
                     <x-services.links :service="$service" compact />
                     @if ($isDeploymentProgress)
                         <x-deploying-indicator />

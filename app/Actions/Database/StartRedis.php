@@ -23,11 +23,11 @@ class StartRedis
 
     private ?SslCertificate $ssl_certificate = null;
 
-    private ?string $resolvedRedisPassword = null;
+    private string $resolvedRedisPassword = '';
+
+    private bool $redisPasswordFromSecretManager = false;
 
     private ?string $resolvedRedisUsername = null;
-
-    private bool $redisPasswordUsesLegacyEscaping = true;
 
     public function handle(StandaloneRedis $database, ?Activity $activity = null)
     {
@@ -65,6 +65,7 @@ class StartRedis
 
             $server = $this->database->destination->server;
             $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -193,7 +194,7 @@ class StartRedis
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
@@ -245,21 +246,25 @@ class StartRedis
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        // The stored REDIS_PASSWORD value, unresolved: the v4.3.23 server password of legacy databases.
+        $this->resolvedRedisPassword = (string) $this->database->redis_password;
+        $passwordVariable = $this->database->serverPasswordEnvironmentVariable();
 
         foreach ($this->database->runtime_environment_variables as $env) {
             $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
 
+            if ($passwordVariable?->is($env)) {
+                $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                if ($rawValue !== '') {
+                    // Credentials below are placed directly in the compose file (command).
+                    $this->resolvedRedisPassword = $this->database->formatComposeFileValue($env, $rawValue);
+                    $this->redisPasswordFromSecretManager = $usesSecretManager;
+                }
+            }
+
             if ($env->is_shared) {
                 $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
-
-                if ($env->key === 'REDIS_PASSWORD') {
-                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
-                    $this->redisPasswordUsesLegacyEscaping = ! $this->database->useExactEscaping($env);
-
-                    if (! $usesSecretManager) {
-                        $this->database->update(['redis_password' => $this->resolvedRedisPassword]);
-                    }
-                }
 
                 if ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
@@ -269,16 +274,11 @@ class StartRedis
                     }
                 }
             } else {
-                if ($env->key === 'REDIS_PASSWORD' && ! $usesSecretManager) {
-                    $env->update(['value' => $this->database->redis_password]);
-                } elseif ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
+                if ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
                     $env->update(['value' => $this->database->redis_username]);
                 }
 
-                if ($env->key === 'REDIS_PASSWORD') {
-                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
-                    $this->redisPasswordUsesLegacyEscaping = ! $this->database->useExactEscaping($env);
-                } elseif ($env->key === 'REDIS_USERNAME') {
+                if ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
                 }
 
@@ -293,10 +293,7 @@ class StartRedis
 
     private function buildStartCommand(): string
     {
-        $redisPassword = $this->resolvedRedisPassword ?? $this->database->redis_password;
-        if (! $this->redisPasswordUsesLegacyEscaping) {
-            $redisPassword = escapeDollarSign(escapeshellarg((string) $redisPassword));
-        }
+        $redisPassword = $this->requirePassArgument();
         $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
         $redisConfPath = '/usr/local/etc/redis/redis.conf';
 
@@ -328,6 +325,21 @@ class StartRedis
         }
 
         return $command;
+    }
+
+    /**
+     * The password argument of the start command. Docker Compose splits the command like a shell, so the
+     * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
+     * quoting would change it (quotes, backslashes, whitespace, ; & | < >): Compose splits or cuts the old
+     * command there, so quoting now would change the password or options and can lose data.
+     */
+    private function requirePassArgument(): string
+    {
+        $keepsUnquotedPassword = $this->database->legacy_password_quoting
+            && ! $this->redisPasswordFromSecretManager
+            && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
+
+        return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }
 
     private function add_custom_redis()

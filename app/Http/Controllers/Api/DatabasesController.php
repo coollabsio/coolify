@@ -20,11 +20,15 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +40,7 @@ class DatabasesController extends Controller
 {
     use Concerns\HandlesDatabaseImportsApi;
     use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployForOutsideHostPaths;
 
     #[OA\Post(
         path: '/databases/{uuid}/imports/uploads',
@@ -132,6 +137,19 @@ class DatabasesController extends Controller
         }
 
         return $storage;
+    }
+
+    /**
+     * Store numeric resource limits (e.g. 0 or 1.5) as the strings the string limit columns expect.
+     */
+    private function normalizeNumericLimits(Request $request): void
+    {
+        foreach (['limits_memory', 'limits_memory_swap', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset'] as $field) {
+            $value = $request->input($field);
+            if (is_int($value) || is_float($value)) {
+                $request->offsetSet($field, (string) $value);
+            }
+        }
     }
 
     private function removeSensitiveData($database, bool $loadNestedServerSecrets = false)
@@ -274,15 +292,24 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases($databaseRelations));
         }
 
+        if ($request->attributes->get('can_read_sensitive', false) === true) {
+            // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
+            $databases
+                ->filter(fn ($database) => $database instanceof StandaloneRedis || $database instanceof StandaloneKeydb || $database instanceof StandaloneDragonfly)
+                ->groupBy(fn ($database) => $database::class)
+                ->each(fn ($group) => (new EloquentCollection($group->all()))->load('runtime_environment_variables'));
+        }
+
         $databaseIds = $databases->pluck('id')->toArray();
 
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
             ->whereIn('database_id', $databaseIds)
             ->get()
-            ->groupBy('database_id');
+            ->groupBy(fn (ScheduledDatabaseBackup $backup) => $backup->database_type.':'.$backup->database_id);
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
-            $database->backup_configs = $backupConfigs->get($database->id, collect())->values();
+            $database->backup_configs = $backupConfigs->get($database->getMorphClass().':'.$database->id, collect())->values();
+            $database->makeHidden('runtime_environment_variables');
 
             return $this->removeSensitiveData($database);
         });
@@ -1017,8 +1044,6 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $backupData['databases_to_backup'] = $database->clickhouse_db;
-            } elseif ($database->type() === 'standalone-sqlite') {
-                $backupData['databases_to_backup'] = $database->sqlite_databases;
             }
         }
 
@@ -1961,7 +1986,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
         }
         $serverUuid = $request->server_uuid;
-        $instantDeploy = $request->instant_deploy ?? false;
+        $instantDeploy = $request->boolean('instant_deploy');
         if ($request->is_public && ! $request->public_port) {
             $request->offsetSet('is_public', false);
         }
@@ -2011,6 +2036,7 @@ class DatabasesController extends Controller
                 return response()->json(['message' => 'Public port already used by another database.'], 400);
             }
         }
+        $this->normalizeNumericLimits($request);
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
@@ -2034,7 +2060,7 @@ class DatabasesController extends Controller
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
         ]);
-        if ($validator->failed()) {
+        if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
@@ -2612,7 +2638,7 @@ class DatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get database logs.',
-        description: 'Get database logs by UUID.',
+        description: 'Get database logs by UUID. Requires the `read:sensitive` or `root` token ability.',
         path: '/databases/{uuid}/logs',
         operationId: 'get-database-logs-by-uuid',
         security: [
@@ -2693,7 +2719,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $containers = getCurrentDatabaseContainerStatus($database->destination->server, $database->id);
+        $containers = getCurrentDatabaseContainerStatus($database->destination->server, $database);
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -2740,7 +2766,7 @@ class DatabasesController extends Controller
             ),
             new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
-            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
         ],
         responses: [
@@ -3365,6 +3391,10 @@ class DatabasesController extends Controller
                 response: 409,
                 description: 'Another start, restart or import of this database is already in progress.',
             ),
+            new OA\Response(
+                response: 422,
+                description: 'The database cannot start yet, for example because a CA certificate is missing.',
+            ),
         ]
     )]
     public function action_deploy(Request $request)
@@ -3386,6 +3416,10 @@ class DatabasesController extends Controller
 
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
+        }
+        $prerequisiteError = StartDatabase::prerequisiteError($database);
+        if ($prerequisiteError !== null) {
+            return response()->json(['message' => $prerequisiteError], 422);
         }
         $reservation = StartDatabase::reserveOperation($database);
         if ($reservation === null) {
@@ -3430,7 +3464,7 @@ class DatabasesController extends Controller
             new OA\Parameter(
                 name: 'docker_cleanup',
                 in: 'query',
-                description: 'Perform docker cleanup (prune networks, volumes, etc.).',
+                description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.',
                 schema: new OA\Schema(
                     type: 'boolean',
                     default: true,
@@ -3559,6 +3593,10 @@ class DatabasesController extends Controller
                 response: 409,
                 description: 'Another start, restart or import of this database is already in progress.',
             ),
+            new OA\Response(
+                response: 422,
+                description: 'The database cannot start yet, for example because a CA certificate is missing.',
+            ),
         ]
     )]
     public function action_restart(Request $request)
@@ -3578,6 +3616,10 @@ class DatabasesController extends Controller
 
         $this->authorize('manage', $database);
 
+        $prerequisiteError = StartDatabase::prerequisiteError($database);
+        if ($prerequisiteError !== null) {
+            return response()->json(['message' => $prerequisiteError], 422);
+        }
         $reservation = StartDatabase::reserveOperation($database);
         if ($reservation === null) {
             return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);
@@ -4292,7 +4334,7 @@ class DatabasesController extends Controller
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
-                            'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -4308,6 +4350,7 @@ class DatabasesController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -4412,9 +4455,18 @@ class DatabasesController extends Controller
             }
 
             try {
-                $fsPath = confinePathToBase(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'storage source path');
+                $fsPath = LocalFileVolume::resolveHostPath(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'storage source path');
                 $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
-                LocalFileVolume::assertRemotePathIsConfined($database->workdir(), $fsPath, $database->destination->server);
+                $forbidden = $this->outsideHostPathForbiddenResponse($request, new LocalFileVolume([
+                    'fs_path' => $fsPath,
+                    'is_directory' => true,
+                    'resource_id' => $database->id,
+                    'resource_type' => get_class($database),
+                ]));
+                if ($forbidden) {
+                    return $forbidden;
+                }
+                LocalFileVolume::assertHostPathOnServer(database_configuration_dir().'/'.$database->uuid, $fsPath, $database->destination->server, isDirectory: true);
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -4466,11 +4518,32 @@ class DatabasesController extends Controller
         } else {
             try {
                 $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
-                $fsPath = confineFileMountPath(database_configuration_dir().'/'.$database->uuid, $mountPath, 'file storage path');
             } catch (\Throwable $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            try {
+                if ($request->filled('fs_path')) {
+                    $fsPath = LocalFileVolume::resolveHostPath(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'file storage source path');
+                    $forbidden = $this->outsideHostPathForbiddenResponse($request, new LocalFileVolume([
+                        'fs_path' => $fsPath,
+                        'resource_id' => $database->id,
+                        'resource_type' => get_class($database),
+                    ]));
+                    if ($forbidden) {
+                        return $forbidden;
+                    }
+                    LocalFileVolume::assertHostPathOnServer(database_configuration_dir().'/'.$database->uuid, $fsPath, $database->destination->server, isDirectory: false);
+                } else {
+                    $fsPath = confineFileMountPath(database_configuration_dir().'/'.$database->uuid, $mountPath, 'file storage path');
+                }
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
             }
 
@@ -4532,7 +4605,7 @@ class DatabasesController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -4556,6 +4629,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy permission to change the content of a file outside the resource directory.',
             ),
             new OA\Response(
                 response: 422,
@@ -4658,6 +4735,10 @@ class DatabasesController extends Controller
                         ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type '{$request->type}'."]),
                 ], 422);
             }
+        }
+
+        if (! $isReadOnly && ($forbidden = $this->outsideContentChangeForbiddenResponse($request, $storage))) {
+            return $forbidden;
         }
 
         // Always allowed
@@ -4764,7 +4845,7 @@ class DatabasesController extends Controller
             ], 422);
         }
 
-        if ($storage->isSharedWithAnotherResource()) {
+        if ($storage instanceof LocalPersistentVolume && $storage->isSharedWithAnotherResource()) {
             return response()->json([
                 'message' => 'This volume is mounted by an application. Unlink it on the SQLite database page first.',
             ], 422);
@@ -5119,7 +5200,6 @@ class DatabasesController extends Controller
                 'created_at',
                 'updated_at',
                 'last_execution_at',
-                'missing_backup_notification_sent_at',
             ])->fill([
                 'uuid' => new_public_id(),
                 'database_id' => $newDatabase->id,

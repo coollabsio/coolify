@@ -8,6 +8,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -18,6 +19,7 @@ use Livewire\WithPagination;
 class BackupExecutions extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
     use WithPagination;
 
     public Service $service;
@@ -30,11 +32,11 @@ class BackupExecutions extends Component
 
     public function getListeners(): array
     {
-        $teamId = currentTeam()->id;
-
         return [
             'modalClosed' => 'closeExecutionModal',
-            "echo-private:team.{$teamId},BackupCreated" => '$refresh',
+            ...$this->teamChannelListeners([
+                'BackupCreated' => '$refresh',
+            ]),
         ];
     }
 
@@ -120,12 +122,14 @@ class BackupExecutions extends Component
             ->whereIn('id', $rows->where('type', 'storage')->pluck('id'))
             ->get()->keyBy('id');
 
-        return $rows->map(function (object $row) use ($databaseExecutions, $volumeExecutions): array {
+        $serviceTeamId = $this->service->team()?->id;
+
+        return $rows->map(function (object $row) use ($databaseExecutions, $volumeExecutions, $serviceTeamId): array {
             $isDatabase = $row->type === 'database';
             $execution = $isDatabase ? $databaseExecutions->get($row->id) : $volumeExecutions->get($row->id);
             $schedule = $isDatabase ? $execution->scheduledDatabaseBackup : $execution->scheduledVolumeBackup;
             $storage = $isDatabase ? ($schedule->save_s3 ? $schedule->s3 : null) : $execution->s3;
-            if ($storage?->team_id !== currentTeam()->id) {
+            if ($storage?->team_id !== $serviceTeamId) {
                 $storage = null;
             }
             $storageLabel = $storage ? $storage->name.' (bucket: '.$storage->bucket.')' : 'Unavailable';

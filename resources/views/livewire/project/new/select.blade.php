@@ -35,7 +35,7 @@
                                         :aria-selected="resourceType === option.value"
                                         @click="resourceType = option.value; close()">
                                         <span x-text="option.label"></span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check-circle" class="size-3.5 text-black dark:text-fg"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
@@ -71,7 +71,7 @@
                                         :aria-selected="selectedCategory === ''"
                                         @click="selectedCategory = ''; categorySearch = ''; categoryOpen = false">
                                         <span>All categories</span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check-circle" class="size-3.5 text-black dark:text-fg"
                                             x-show="selectedCategory === ''" />
                                     </button>
                                     <template
@@ -81,7 +81,7 @@
                                             :aria-selected="selectedCategory === category"
                                             @click="selectedCategory = category; categorySearch = ''; categoryOpen = false">
                                             <span class="truncate" x-text="category"></span>
-                                            <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                            <x-reicon name="check-circle" class="size-3.5 text-black dark:text-fg"
                                                 x-show="selectedCategory === category" />
                                         </button>
                                     </template>

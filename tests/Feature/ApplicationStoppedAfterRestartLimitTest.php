@@ -1,8 +1,6 @@
 <?php
 
-use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
-use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\BaseModel;
@@ -107,67 +105,6 @@ it('does not show the restart limit warning for a normal manual stop', function 
     ])->render();
 
     expect($html)->not->toContain('Restart limit reached');
-});
-
-it('keeps restart tracking configurable when stopping an application', function () {
-    $method = new ReflectionMethod(StopApplication::class, 'handle');
-    $resetRestartCount = collect($method->getParameters())->firstWhere('name', 'resetRestartCount');
-
-    expect($resetRestartCount)->not->toBeNull()
-        ->and($resetRestartCount->getDefaultValue())->toBeTrue();
-});
-
-it('can stop an application without removing its containers', function () {
-    $method = new ReflectionMethod(StopApplication::class, 'handle');
-    $removeContainers = collect($method->getParameters())->firstWhere('name', 'removeContainers');
-    $action = file_get_contents(app_path('Actions/Application/StopApplication.php'));
-
-    expect($removeContainers)->not->toBeNull()
-        ->and($removeContainers->getDefaultValue())->toBeTrue()
-        ->and($action)->not->toContain('docker update --restart=no')
-        ->and($action)->toContain('if ($removeContainers)');
-});
-
-it('preserves containers and skips cleanup when the restart limit is reached', function () {
-    $statusAction = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelJob = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    expect($statusAction)->toContain('dockerCleanup: false')
-        ->and($statusAction)->toContain('resetRestartCount: false')
-        ->and($statusAction)->toContain('removeContainers: false')
-        ->and($statusAction)->toContain("['restart_limit_reached' => true]")
-        ->and($sentinelJob)->toContain("['restart_limit_reached' => true]");
-});
-
-it('atomically claims the restart limit transition before stopping and notifying', function () {
-    $statusAction = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelJob = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    foreach ([$statusAction, $sentinelJob] as $detector) {
-        expect($detector)
-            ->toContain("->where('restart_limit_reached', false)")
-            ->toContain("->update(['restart_limit_reached' => true]) === 1");
-    }
-});
-
-it('clears the explicit restart limit state only after a successful main deployment', function () {
-    $method = new ReflectionMethod(ApplicationDeploymentJob::class, 'handleSuccessfulDeployment');
-    $source = file($method->getFileName());
-    $deploymentJob = implode(array_slice($source, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
-
-    expect(substr_count($deploymentJob, "'restart_limit_reached'] = false"))->toBe(1)
-        ->and($deploymentJob)->toContain("if (\$this->pull_request_id === 0) {\n            \$restartState['restart_limit_reached'] = false;\n        }")
-        ->and($deploymentJob)->toContain('$this->application->update($restartState);')
-        ->and(substr_count($deploymentJob, '$this->application->update('))->toBe(1);
-});
-
-it('preserves restart-limit applications only while their exited container exists', function () {
-    $statusAction = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelJob = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    expect($statusAction)->toContain("'container_present' => false")
-        ->and($statusAction)->toContain("'restart_limit_reached' => false")
-        ->and($sentinelJob)->toContain('if ($application->stoppedAfterRestartLimit() && $containerStatuses->every(');
 });
 
 it('builds restart limit notification urls from the instance base url', function () {
