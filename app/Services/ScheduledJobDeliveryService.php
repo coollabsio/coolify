@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\BackupCreated;
 use App\Events\DockerCleanupDone;
 use App\Events\ScheduledTaskDone;
 use App\Jobs\DatabaseBackupJob;
@@ -11,15 +12,19 @@ use App\Jobs\VolumeBackupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Team;
+use App\Notifications\Database\BackupFailed;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\Server\DockerCleanupFailed;
+use App\Notifications\VolumeBackup\BackupFailed as VolumeBackupFailed;
 use Closure;
 use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Model;
@@ -353,7 +358,7 @@ class ScheduledJobDeliveryService
     }
 
     /**
-     * Show a missed task or Docker cleanup as a failed execution and send the failure notification.
+     * Show a missed task, Docker cleanup, or backup as a failed execution and send the failure notification.
      * The caller moved the occurrence out of `enqueued` atomically, so this runs once per occurrence,
      * and claim() rejects the late job if it starts afterwards.
      */
@@ -391,6 +396,38 @@ class ScheduledJobDeliveryService
                 ]);
                 event(new DockerCleanupDone($execution));
                 $this->notifyMissedOccurrence($server, fn () => $server->team?->notify(new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}")));
+            } elseif ($occurrence->job_type === 'database-backup') {
+                $backup = ScheduledDatabaseBackup::with(['team', 'database'])->find($occurrence->resource_id);
+                if (! $backup?->database) {
+                    return;
+                }
+
+                $databaseName = $backup->dump_all ? 'all' : $backup->databases_to_backup;
+                ScheduledDatabaseBackupExecution::create([
+                    'uuid' => new_public_id(),
+                    'database_name' => filled($databaseName) ? str($databaseName)->limit(250)->toString() : null,
+                    'scheduled_database_backup_id' => $backup->id,
+                    'status' => 'failed',
+                    'message' => $message,
+                    'local_storage_deleted' => false,
+                    'finished_at' => now(),
+                ]);
+                BackupCreated::dispatch($backup->team_id);
+                $this->notifyMissedOccurrence($backup, fn () => $backup->team?->notify(new BackupFailed($backup, $backup->database, $message, $databaseName ?? 'unknown')));
+            } elseif ($occurrence->job_type === 'volume-backup') {
+                $backup = ScheduledVolumeBackup::with(['team', 'backupable.resource'])->find($occurrence->resource_id);
+                if (! $backup) {
+                    return;
+                }
+
+                ScheduledVolumeBackupExecution::create([
+                    'scheduled_volume_backup_id' => $backup->id,
+                    'status' => 'failed',
+                    'message' => $message,
+                    'finished_at' => now(),
+                ]);
+                BackupCreated::dispatch($backup->team_id);
+                $this->notifyMissedOccurrence($backup, fn () => $backup->team?->notify(new VolumeBackupFailed($backup, $message)));
             }
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to report missed scheduled occurrence', [
