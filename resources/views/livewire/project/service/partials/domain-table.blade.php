@@ -45,7 +45,6 @@
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
             $publicUrl = getFqdnWithoutPort($row['url']);
-            $domainParts = $isSuggested ? null : parse_url($publicUrl);
             $isNoindexed = $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']);
             $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
             $directionLabel = match ($rowDirection) {
@@ -53,9 +52,7 @@
                 'non-www' => 'Redirect to non-www',
                 default => 'Both www and non-www',
             };
-            $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
-                ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
-                : null;
+            $faviconUrl = $isSuggested ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
             $editingParts = \App\Support\DomainUrlParts::split($row['url']);
             if ($row['has_port_override'] ?? false) {

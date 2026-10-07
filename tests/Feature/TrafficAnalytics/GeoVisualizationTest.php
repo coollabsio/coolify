@@ -114,3 +114,24 @@ it('shows a plain no-data state when no country data has been recorded', functio
         ->assertSee('Countries')
         ->assertSee('No country data for the selected range');
 });
+
+it('mounts the globe from the element itself when country data arrives after the first render', function () {
+    $server = bootGeoServer();
+
+    $fake = new FakeGeoTrafficClient($server);
+    $fake->responses = fakeGeoResponses([]);
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $component = loadLazy(Livewire::test(Analytics::class))
+        ->assertSee('No country data for the selected range');
+
+    $fake->responses = fakeGeoResponses([
+        ['value' => 'US', 'requests' => 600, 'bytes_out' => 15000],
+    ]);
+
+    // A @script block runs only once per component, so a globe inserted by a later
+    // render never mounted. The mount must live on the element (Alpine x-data).
+    $component->call('loadData')
+        ->assertSeeHtml('id="global-analytics-globe" x-ref="canvas"')
+        ->assertSeeHtml('window.mountTrafficGlobe(canvas');
+});
