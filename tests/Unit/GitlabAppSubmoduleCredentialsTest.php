@@ -46,7 +46,7 @@ test('connected gitlab oauth submodule credentials use per command git config', 
         exec_in_docker: false,
     );
 
-    $expectedConfig = "git -c 'url.https://oauth2:gl-token%2Fwith%2Bsym@gitlab.example.test/.insteadOf=https://gitlab.example.test/' -c http.version=HTTP/1.1";
+    $expectedConfig = "git -c 'url.https://oauth2:gl-token%2Fwith%2Bsym@gitlab.example.test/.insteadOf=https://gitlab.example.test/'";
 
     expect($result['commands'])
         ->not->toContain('git config --global')
