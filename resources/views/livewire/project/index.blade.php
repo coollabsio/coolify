@@ -116,12 +116,13 @@
                                         <x-reicon name="projects" class="size-4" />
                                     </template>
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h2
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                         x-text="project.name"></h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                        x-text="project.description || ''"></p>
+                                        x-show="project.description?.trim()"
+                                        x-text="project.description"></p>
                                 </div>
                             </div>
 
