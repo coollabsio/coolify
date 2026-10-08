@@ -4,7 +4,9 @@ namespace App\Actions\Server;
 
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
+use App\Enums\ProxyTypes;
 use App\Jobs\RestartProxyJob;
+use App\Models\Application;
 use App\Models\Server;
 use App\Services\ProxyPortParser;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -40,6 +42,10 @@ class ConfigureTrafficAnalytics
         $server->settings->is_traffic_analytics_enabled = $enable;
         $server->settings->save();
         $server->refresh();
+
+        if ($server->proxyType() === ProxyTypes::CADDY->value) {
+            $this->regenerateReadonlyApplicationLabels($server);
+        }
 
         // A proxy the user stopped stays stopped; its next start applies the saved configuration.
         $restartProxy = $hasProxy && ! $this->proxyIsStopped($server);
@@ -77,6 +83,23 @@ class ConfigureTrafficAnalytics
 
             throw $exception;
         }
+    }
+
+    /**
+     * Caddy logs a site only when its labels contain the log directives. Deployments use the stored labels,
+     * so read-only (Coolify-managed) labels must be regenerated, or a redeploy keeps the old logging state.
+     */
+    private function regenerateReadonlyApplicationLabels(Server $server): void
+    {
+        $server->applications()
+            ->filter(fn (Application $application): bool => (bool) $application->settings?->is_container_label_readonly_enabled
+                && $application->destination?->server_id === $server->id)
+            ->each(function (Application $application) use ($server): void {
+                // The cached server of the destination can still have the old analytics setting.
+                $application->destination->setRelation('server', $server);
+                $application->custom_labels = base64_encode(implode("\n", generateLabelsApplication($application)));
+                $application->save();
+            });
     }
 
     private function proxyIsStopped(Server $server): bool

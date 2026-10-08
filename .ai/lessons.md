@@ -101,3 +101,7 @@
 - In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`, `--project-directory <dir>`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs. scp also runs as the SSH user; stage files outside `/data/coolify`.
 - The parsers add sudo only to line starts (and after `&&`, `||`, `|`, `$(`). Put `if`/`else` branches on their own lines. When a redirect or `cd` must stay, make the whole line one `sh -c '...'` script; it runs as `sudo sh -c` without inner sudo or bash.
 - Tests that replace `DatabaseStartCommandExecutor` or use root servers miss non-root bugs. Test the parsed commands of a non-root server.
+
+## Cached and stored state
+- `StandaloneDocker`/`SwarmDocker` `server` uses `Server::findCached()`, a per-process identity map that is flushed only when the `servers` row updates. A `ServerSetting` save does not flush it, so pass the current `Server` instance (`setRelation('server', $server)`) when generated output depends on just-saved settings.
+- Application deployments use the stored `custom_labels` when they exist. When a server-level setting changes the generated labels, regenerate the stored labels of read-only (`is_container_label_readonly_enabled`) applications, or a redeploy keeps the old labels.
