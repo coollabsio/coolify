@@ -45,8 +45,7 @@
                 title="{{ $buildPackLabels[$suggestedBuildPack] }} {{ $build_pack === $suggestedBuildPack ? 'selected' : 'suggested' }}"
                 description="Found {{ $suggestedFile }} in the base directory." />
         @elseif ($nestedFiles !== '')
-            <x-checkpoint-item icon="brain" title="Found {{ $nestedFiles }} in subdirectories"
-                description="None is in the base directory. To use one, set the base directory to its folder and scan again." />
+            <x-checkpoint-item icon="brain" title="Found {{ $nestedFiles }} in subdirectories" />
         @else
             <x-checkpoint-item icon="brain" title="No Dockerfile or Compose file found"
                 description="Select the build pack that fits the repository." />
