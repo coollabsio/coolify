@@ -144,35 +144,9 @@
                     <div class="flex flex-col gap-5">
                         @if ($buildPack === 'dockercompose')
                             <div class="flex flex-col gap-2">
-                                <div x-data="{
-                                    baseDir: @entangle('baseDirectory'),
-                                    composeLocation: @entangle('dockerComposeLocation'),
-                                    normalizePath(path) {
-                                        if (!path || path.trim() === '') return '/';
-                                        path = path.trim();
-                                        path = path.replace(/\/+$/, '');
-                                        if (!path.startsWith('/')) {
-                                            path = '/' + path;
-                                        }
-                                        return path;
-                                    },
-                                    normalizeBaseDir() {
-                                        this.baseDir = this.normalizePath(this.baseDir);
-                                    },
-                                    normalizeComposeLocation() {
-                                        this.composeLocation = this.normalizePath(this.composeLocation);
-                                    }
-                                }" class="grid gap-4 lg:grid-cols-2">
-                                    <x-forms.input x-bind:disabled="shouldDisable()" placeholder="/"
-                                        label="Base directory"
-                                        helper="Directory to use as root. Useful for monorepos." x-model="baseDir"
-                                        @blur="normalizeBaseDir()" />
-                                    <x-forms.input x-bind:disabled="shouldDisable()"
-                                        placeholder="/docker-compose.yaml"
-                                        label="Docker compose location"
-                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($baseDirectory . $dockerComposeLocation, '/') }}</span>"
-                                        x-model="composeLocation" @blur="normalizeComposeLocation()" />
-                                </div>
+                                <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
+                                    file="dockerComposeLocation" fileLabel="Docker compose location"
+                                    defaultFile="/docker-compose.yaml" disabled="shouldDisable()" />
                                 <div class="w-full sm:w-96">
                                     <x-forms.checkbox instantSave id="isPreserveRepositoryEnabled"
                                         label="Preserve repository during deployment"
@@ -215,41 +189,9 @@
                                 @endif
                             </div>
                         @else
-                            <div x-data="{
-                                baseDir: @entangle('baseDirectory'),
-                                dockerfileLocation: @entangle('dockerfileLocation'),
-                                normalizePath(path) {
-                                    if (!path || path.trim() === '') return '/';
-                                    path = path.trim();
-                                    path = path.replace(/\/+$/, '');
-                                    if (!path.startsWith('/')) {
-                                        path = '/' + path;
-                                    }
-                                    return path;
-                                },
-                                normalizeBaseDir() {
-                                    this.baseDir = this.normalizePath(this.baseDir);
-                                },
-                                normalizeDockerfileLocation() {
-                                    this.dockerfileLocation = this.normalizePath(this.dockerfileLocation);
-                                }
-                            }" class="grid gap-4 lg:grid-cols-2">
-                                <x-forms.input placeholder="/"
-                                    label="Base directory" helper="Directory to use as root. Useful for monorepos."
-                                    x-bind:disabled="!canUpdate" x-model="baseDir" @blur="normalizeBaseDir()" />
-                                @if ($buildPack === 'dockerfile' && !$application->dockerfile)
-                                    <x-forms.input placeholder="/Dockerfile"
-                                        label="Dockerfile location"
-                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>"
-                                        x-bind:disabled="!canUpdate" x-model="dockerfileLocation"
-                                        @blur="normalizeDockerfileLocation()" />
-                                @endif
-
-                                @if ($buildPack === 'dockerfile')
-                                    <x-forms.input id="dockerfileTargetBuild" label="Docker build stage target"
-                                        helper="Useful if you have multi-staged dockerfile."
-                                        x-bind:disabled="!canUpdate" />
-                                @endif
+                            <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
+                                :file="$buildPack === 'dockerfile' && !$application->dockerfile ? 'dockerfileLocation' : null"
+                                fileLabel="Dockerfile location" defaultFile="/Dockerfile" disabled="!canUpdate">
                                 @if ($application->could_set_build_commands())
                                     @if ($application->settings->is_static)
                                         <x-forms.input placeholder="/dist" id="publishDirectory"
@@ -259,8 +201,7 @@
                                             label="Publish directory" x-bind:disabled="!canUpdate" />
                                     @endif
                                 @endif
-
-                            </div>
+                            </x-forms.repository-paths>
                             @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                 <div class="pb-4">
                                     <x-forms.textarea
@@ -293,6 +234,11 @@
                                         : 'If no usable build server is available, the deployment fails.';
                                 @endphp
                                 <div class="grid gap-4 pt-2 sm:grid-cols-2">
+                                    @if ($buildPack === 'dockerfile')
+                                        <x-forms.input id="dockerfileTargetBuild" label="Docker build stage target"
+                                            helper="Useful if you have multi-staged dockerfile."
+                                            x-bind:disabled="!canUpdate" />
+                                    @endif
                                     <x-forms.listbox id="isBuildServerEnabled" label="Builder selection"
                                         onChange="instantSave" :options="$buildServerOptions"
                                         helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. {{ $buildServerFallbackPolicy }} More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
