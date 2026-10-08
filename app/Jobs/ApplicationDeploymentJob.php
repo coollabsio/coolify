@@ -3053,12 +3053,36 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+        $this->reuse_commit_message();
         $this->set_coolify_variables();
 
         // Restart helper container with actual SOURCE_COMMIT value
         if ($this->application->settings->use_build_secrets && $this->commit !== 'HEAD') {
             $this->application_deployment_queue->addLogEntry('Restarting helper container with actual SOURCE_COMMIT value.');
             $this->restart_builder_container_with_actual_commit();
+        }
+    }
+
+    /**
+     * The commit message is read from the cloned repository. Deployments that skip the build or fail
+     * before the clone reuse the message stored by an earlier deployment of the same commit.
+     */
+    private function reuse_commit_message(): void
+    {
+        if (filled($this->application_deployment_queue->commit_message) || $this->shouldResolveBranchHeadCommit()) {
+            return;
+        }
+
+        $commitMessage = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('commit', $this->commit)
+            ->whereNotNull('commit_message')
+            ->where('commit_message', '!=', '')
+            ->latest('id')
+            ->value('commit_message');
+
+        if (filled($commitMessage)) {
+            $this->application_deployment_queue->update(['commit_message' => $commitMessage]);
         }
     }
 
