@@ -57,6 +57,8 @@ class Service extends BaseModel
         'docker_compose',
         'connect_to_docker_network',
         'service_type',
+        'template_reference_hash',
+        'template_dismissed_hash',
         'config_hash',
         'compose_parsing_version',
         'is_container_label_escape_enabled',
