@@ -2,6 +2,7 @@
 
 use App\Jobs\CheckDomainDnsJob;
 use App\Jobs\ConfigureDnsRecordJob;
+use App\Jobs\ServerFilesFromServerJob;
 use App\Livewire\Project\Application\Domains;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Livewire\Project\Application\Previews;
@@ -3655,4 +3656,26 @@ it('offers dns provider record creation for a public server ip', function () {
         ->toContain('Create DNS record')
         ->toContain('Add with Cloudflare')
         ->not->toContain('The server has no public IP address; add the DNS record manually.');
+});
+
+it('does not queue file sync jobs when polling dns checks for compose applications', function () {
+    Queue::fake();
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    volumes:\n      - web-data:/data\n  api:\n    image: nginx:alpine\n    volumes:\n      - api-data:/data\n      - api-conf:/etc/api\nvolumes:\n  web-data:\n  api-data:\n  api-conf:\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose-poll-test.invalid'],
+        ]),
+        'fqdn' => null,
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class)->count();
+
+    $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
+
+    expect($queuedOnMount)->toBe(1)
+        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+        ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
