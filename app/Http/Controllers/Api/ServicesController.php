@@ -3399,7 +3399,7 @@ class ServicesController extends Controller
             }
 
             foreach ($sourceDatabase->scheduledBackups()->get() as $backup) {
-                $backup->replicate([
+                $newBackup = $backup->replicate([
                     'id',
                     'created_at',
                     'updated_at',
@@ -3408,7 +3408,9 @@ class ServicesController extends Controller
                     'database_id' => $database->id,
                     'database_type' => $database->getMorphClass(),
                     'team_id' => $teamId,
-                ])->save();
+                ]);
+                $newBackup->save();
+                $backup->copyS3StoragesTo($newBackup);
             }
         }
 

@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Destinations;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
+    use HasS3Destinations;
+
     protected function casts(): array
     {
         return [
@@ -78,6 +82,11 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
     }
 
+    public function s3Storages(): BelongsToMany
+    {
+        return $this->belongsToMany(S3Storage::class, 'scheduled_database_backup_s3_storage')->withTimestamps();
+    }
+
     public function get_last_days_backup_status($days = 7)
     {
         return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
@@ -85,7 +94,7 @@ class ScheduledDatabaseBackup extends BaseModel
 
     public function executionsPaginated(int $skip = 0, int $take = 10)
     {
-        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->orderBy('created_at', 'desc');
+        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->with('s3Replicas.s3')->orderBy('created_at', 'desc');
         $count = $executions->count();
         $executions = $executions->skip($skip)->take($take)->get();
 

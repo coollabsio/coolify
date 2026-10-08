@@ -62,9 +62,9 @@ paths:
               properties:
                 pull_request_id:
                   type: integer
+                  example: 42
                   maximum: 2147483647
                   minimum: 1
-                  example: 42
                 pull_request_html_url:
                   type: [string, 'null']
                   example: 'https://github.com/org/repo/pull/42'
@@ -4401,7 +4401,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Get all backups for a database'
+          description: 'Get all backups for a database. Each backup includes s3_storage_uuid (primary S3 destination) and s3_storage_uuids (every S3 destination, primary first).'
           content:
             application/json:
               schema:
@@ -4452,7 +4452,11 @@ paths:
                   default: false
                 s3_storage_uuid:
                   type: string
-                  description: 'S3 storage UUID (required if save_s3 is true)'
+                  description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true.'
+                s3_storage_uuids:
+                  type: array
+                  items: { type: string }
+                  description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 databases_to_backup:
                   type: string
                   description: 'Comma separated list of databases to backup'
@@ -4875,7 +4879,11 @@ paths:
                   description: 'Whether data is saved in s3 or not'
                 s3_storage_uuid:
                   type: string
-                  description: 'S3 storage UUID'
+                  description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay.'
+                s3_storage_uuids:
+                  type: array
+                  items: { type: string }
+                  description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 backup_now:
                   type: boolean
                   description: 'Whether to take a backup now or not'
@@ -7099,8 +7107,8 @@ paths:
                   maxLength: 255
                 network:
                   type: string
-                  maxLength: 255
                   pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+                  maxLength: 255
                 type:
                   type: string
                   enum: [standalone, swarm]
@@ -14947,8 +14955,8 @@ components:
       properties:
         frequency:
           type: string
-          maxLength: 255
           example: '0 2 * * *'
+          maxLength: 255
         enabled:
           type: boolean
           default: true
@@ -14962,9 +14970,15 @@ components:
           type: boolean
           default: false
         s3_storage_uuid:
+          description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.'
           type:
             - string
             - 'null'
+        s3_storage_uuids:
+          description: 'UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.'
+          type: array
+          items:
+            type: string
         retention_amount_locally:
           type: integer
           default: 7
@@ -15052,9 +15066,15 @@ components:
         stop_during_backup:
           type: boolean
         s3_storage_uuid:
+          description: 'Primary S3 destination.'
           type:
             - string
             - 'null'
+        s3_storage_uuids:
+          description: 'Every S3 destination, primary first.'
+          type: array
+          items:
+            type: string
         retention_amount_locally:
           type: integer
         retention_days_locally:

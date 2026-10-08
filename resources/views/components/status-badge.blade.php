@@ -4,6 +4,7 @@
     'type' => 'neutral',
     'as' => 'span',
     'dynamic' => false,
+    'pulse' => false, // ping the dot for a state that is still in progress
 ])
 
 @php
@@ -22,7 +23,12 @@
         @if ($dynamic)
             {{ $slot }}
         @else
-            <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            <span class="relative flex size-1.5 shrink-0">
+                @if ($pulse)
+                    <span class="absolute inline-flex size-full rounded-full opacity-75 motion-safe:animate-ping {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+                @endif
+                <span class="relative inline-flex size-1.5 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            </span>
             <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
         @endif
     </button>
@@ -31,7 +37,12 @@
         @if ($dynamic)
             {{ $slot }}
         @else
-            <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            <span class="relative flex size-1.5 shrink-0">
+                @if ($pulse)
+                    <span class="absolute inline-flex size-full rounded-full opacity-75 motion-safe:animate-ping {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+                @endif
+                <span class="relative inline-flex size-1.5 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            </span>
             <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
         @endif
     </a>
@@ -40,7 +51,12 @@
         @if ($dynamic)
             {{ $slot }}
         @else
-            <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            <span class="relative flex size-1.5 shrink-0">
+                @if ($pulse)
+                    <span class="absolute inline-flex size-full rounded-full opacity-75 motion-safe:animate-ping {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+                @endif
+                <span class="relative inline-flex size-1.5 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            </span>
             <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
         @endif
     </span>
