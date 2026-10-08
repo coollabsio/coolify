@@ -235,8 +235,8 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 ## Git Workflow
 
 - Production branch: `main`
-- Development branch: `next`
-- Fix PRs should target the current production branch; feature PRs should target `next`
+- Development branch: `release/v4.x`, where `x` is the next minor release (for example, `release/v4.5` while production is `4.4.x`). Do not use `next`.
+- Fix PRs should target the current production branch; feature PRs should target the current `release/v4.x` branch
 
 <laravel-boost-guidelines>
 === foundation rules ===
