@@ -104,6 +104,8 @@
                         <x-forms.button type="submit" wire:target="submit" isHighlighted>Continue</x-forms.button>
                     </div>
                     <div class="application-settings-section-body space-y-5">
+                        @include('livewire.project.new.partials.smart-scan-summary')
+
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.listbox searchable id="selected_branch_name" label="Branch" required
                                 searchPlaceholder="Search branches…"
@@ -133,6 +135,23 @@
                                     helper="Directory containing the generated static assets." />
                             @endif
                         </div>
+
+                        {{-- Dockerfile: pick a detected file or type a path --}}
+                        @if ($build_pack === 'dockerfile')
+                            <x-forms.listbox id="selectedDockerfile" label="Dockerfile" live searchable allowCustom placeholder="/Dockerfile"
+                                emptyText="No Dockerfiles detected. Type a path in the search field."
+                                searchPlaceholder="Search or type a path…"
+                                helper="Select a detected Dockerfile, or type a path relative to the base directory."
+                                :options="collect($detectedDockerfiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
+                        @endif
+
+                        {{-- Docker Compose file selector: pick a detected file or type a path --}}
+                        @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 0)
+                            <x-forms.listbox id="selectedDockerComposeFile" label="Docker Compose File" live searchable allowCustom
+                                searchPlaceholder="Search or type a path…"
+                                helper="Select a detected Docker Compose file, or type a path relative to the base directory."
+                                :options="collect($detectedDockerComposeFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
+                        @endif
 
                         @if ($build_pack === 'dockercompose')
                             <div x-data="{
