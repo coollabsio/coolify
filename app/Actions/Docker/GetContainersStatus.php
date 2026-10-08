@@ -16,18 +16,32 @@ use App\Models\ServiceDatabase;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Services\ContainerStatusAggregator;
 use App\Services\RestartCountTracker;
-use App\Traits\CalculatesExcludedStatus;
+use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\UniqueJobDecorator;
 
-class GetContainersStatus
+/**
+ * Queued runs are coalesced per server: while one run waits in the queue, further dispatches are
+ * dropped because the waiting run reads the same container snapshot. The lock is released when a
+ * worker starts the run, so a request made during a run still queues one follow-up.
+ * Synchronous run() calls are not affected.
+ */
+class GetContainersStatus implements ShouldBeUnique
 {
     use AsAction;
-    use CalculatesExcludedStatus;
 
     public string $jobQueue = 'high';
+
+    public int $jobTimeout = 120;
+
+    /**
+     * Bounds how long a lost queued run (for example a killed worker) blocks new refreshes.
+     */
+    public int $jobUniqueFor = 60;
 
     public $applications;
 
@@ -46,6 +60,16 @@ class GetContainersStatus
     protected ?Collection $serviceContainerStatuses;
 
     protected ?Collection $serviceContainerRestartCounts;
+
+    public static function makeUniqueJob(mixed ...$arguments): UniqueJobDecorator
+    {
+        return new UniqueUntilProcessingJobDecorator(static::class, ...$arguments);
+    }
+
+    public function getJobUniqueId(Server $server): string
+    {
+        return $server->uuid;
+    }
 
     public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
     {
@@ -106,6 +130,14 @@ class GetContainersStatus
         $foundDatabases = [];
         $foundServices = [];
 
+        // Owners of preview containers outside this server's applications, in one query.
+        $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
+            $this->applications,
+            $this->containers
+                ->map(fn ($container) => format_docker_labels_to_json(data_get($container, $this->server->isSwarm() ? 'Spec.Labels' : 'Config.Labels') ?? []))
+                ->filter(fn (Collection $labels) => (bool) $labels->get('coolify.pullRequestId') && isContainerOfType($labels, 'application'))
+        );
+
         foreach ($this->containers as $container) {
             if ($this->server->isSwarm()) {
                 $labels = data_get($container, 'Spec.Labels');
@@ -113,29 +145,23 @@ class GetContainersStatus
             } else {
                 $labels = data_get($container, 'Config.Labels');
             }
-            $containerStatus = data_get($container, 'State.Status');
-            $containerHealth = data_get($container, 'State.Health.Status');
-            if ($containerStatus === 'restarting') {
-                $healthSuffix = $containerHealth ?? 'unknown';
-                $containerStatus = "restarting:$healthSuffix";
-            } elseif ($containerStatus === 'exited') {
-                // Keep as-is, no health suffix for exited containers
-            } else {
-                $healthSuffix = $containerHealth ?? 'unknown';
-                $containerStatus = "$containerStatus:$healthSuffix";
-            }
-            $labels = Arr::undot(format_docker_labels_to_json($labels));
+            $containerStatus = ContainerStatusAggregator::containerStatus($container);
+            $flatLabels = format_docker_labels_to_json($labels);
+            $labels = Arr::undot($flatLabels);
             if (filter_var(data_get($labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)) {
                 continue;
             }
-            $applicationId = data_get($labels, 'coolify.applicationId');
-            if ($applicationId) {
+            // Containers are matched by owner UUID; numeric ids differ between instances.
+            $isApplicationContainer = isContainerOfType($flatLabels, 'application');
+            $isServiceContainer = isContainerOfType($flatLabels, 'service');
+            [$parentService, $serviceSubType, $serviceSubResource] = resolveServiceContainerOwner($services, $flatLabels);
+            if ($isApplicationContainer) {
                 $pullRequestId = data_get($labels, 'coolify.pullRequestId');
                 if ($pullRequestId) {
-                    if (str($applicationId)->contains('-')) {
-                        $applicationId = str($applicationId)->before('-');
-                    }
-                    $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
+                    $applicationId = resolveContainerApplicationId($this->applications, $flatLabels, $foreignApplicationIdsByUuid);
+                    $preview = $applicationId
+                        ? ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first()
+                        : null;
                     if ($preview) {
                         $foundApplicationPreviews[] = $preview->id;
                         $statusFromDb = $preview->status;
@@ -154,7 +180,8 @@ class GetContainersStatus
                         // Notify user that this container should not be there.
                     }
                 } else {
-                    $application = $this->applications->where('id', $applicationId)->first();
+                    $application = resolveContainerOwner($this->applications, $flatLabels, 'application');
+                    $applicationId = $application?->id;
                     if ($application) {
                         $foundApplications[] = $application->id;
                         if ($application->container_present !== true) {
@@ -199,9 +226,8 @@ class GetContainersStatus
 
                 if ($uuid) {
                     if ($type === 'service') {
-                        $database_id = data_get($labels, 'coolify.service.subId');
-                        if ($database_id) {
-                            $service_db = ServiceDatabase::where('id', $database_id)->first();
+                        if ($serviceSubResource instanceof ServiceDatabase) {
+                            $service_db = $serviceSubResource;
                             if ($service_db) {
                                 $proxyUuid = $service_db->uuid;
                                 $isPublic = data_get($service_db, 'is_public');
@@ -289,14 +315,13 @@ class GetContainersStatus
                     $foundDatabases[] = 0;
                 }
             }
-            $serviceLabelId = data_get($labels, 'coolify.serviceId');
-            if ($serviceLabelId) {
-                $subType = data_get($labels, 'coolify.service.subType');
-                $subId = data_get($labels, 'coolify.service.subId');
-                $parentService = $services->where('id', $serviceLabelId)->first();
+            if ($isServiceContainer) {
                 if (! $parentService) {
                     continue;
                 }
+                $serviceLabelId = $parentService->id;
+                $subType = $serviceSubType;
+                $subId = $serviceSubResource?->id;
 
                 // Store container status for aggregation
                 if (! isset($this->serviceContainerStatuses)) {
@@ -319,11 +344,7 @@ class GetContainersStatus
                 }
 
                 // Mark service as found
-                if ($subType === 'application') {
-                    $service = $parentService->applications()->where('id', $subId)->first();
-                } else {
-                    $service = $parentService->databases()->where('id', $subId)->first();
-                }
+                $service = $serviceSubResource;
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
                 }
@@ -531,25 +552,7 @@ class GetContainersStatus
 
     private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0): ?string
     {
-        // Parse docker compose to check for excluded containers
-        $dockerComposeRaw = data_get($application, 'docker_compose_raw');
-        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
-
-        // Filter out excluded containers
-        $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
-            return ! $excludedContainers->contains($containerName);
-        });
-
-        // If all containers are excluded, calculate status from excluded containers
-        if ($relevantStatuses->isEmpty()) {
-            return $this->calculateExcludedStatusFromStrings($containerStatuses);
-        }
-
-        // Use ContainerStatusAggregator service for state machine logic
-        // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
-        $aggregator = new ContainerStatusAggregator;
-
-        return $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
+        return (new ContainerStatusAggregator)->aggregateForCompose($containerStatuses, data_get($application, 'docker_compose_raw'), $maxRestartCount);
     }
 
     private function aggregateServiceContainerStatuses($services)
@@ -589,34 +592,7 @@ class GetContainersStatus
                 continue;
             }
 
-            // Parse docker compose from service to check for excluded containers
-            $dockerComposeRaw = data_get($service, 'docker_compose_raw');
-            $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
-
-            // Filter out excluded containers
-            $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
-                return ! $excludedContainers->contains($containerName);
-            });
-
-            // If all containers are excluded, calculate status from excluded containers
-            if ($relevantStatuses->isEmpty()) {
-                $aggregatedStatus = $this->calculateExcludedStatusFromStrings($containerStatuses);
-                if ($aggregatedStatus) {
-                    $statusFromDb = $subResource->status;
-                    if ($statusFromDb !== $aggregatedStatus) {
-                        $subResource->update(['status' => $aggregatedStatus]);
-                    } else {
-                        $subResource->update(['last_online_at' => now()]);
-                    }
-                }
-
-                continue;
-            }
-
-            // Use ContainerStatusAggregator service for state machine logic
-            // Use preserveRestarting: true so individual sub-resources show "Restarting" instead of "Degraded"
-            $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, preserveRestarting: true);
+            $aggregatedStatus = (new ContainerStatusAggregator)->aggregateForCompose($containerStatuses, data_get($service, 'docker_compose_raw'));
 
             // Update service sub-resource status with aggregated result
             if ($aggregatedStatus) {

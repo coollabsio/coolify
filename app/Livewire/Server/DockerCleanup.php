@@ -107,7 +107,9 @@ class DockerCleanup extends Component
             $this->server->settings->delete_unused_volumes = $this->deleteUnusedVolumes;
             $this->server->settings->delete_unused_networks = $this->deleteUnusedNetworks;
             $this->server->settings->disable_application_image_retention = $this->disableApplicationImageRetention;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->forceDockerCleanup = $this->server->settings->force_docker_cleanup;
             $this->dockerCleanupFrequency = $this->server->settings->docker_cleanup_frequency;
@@ -134,6 +136,13 @@ class DockerCleanup extends Component
         try {
             $this->authorize('update', $this->server);
             DockerCleanupJob::dispatch($this->server, true, $this->deleteUnusedVolumes, $this->deleteUnusedNetworks);
+            auditLog('ui.server.docker_cleanup_started', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'delete_unused_volumes' => $this->deleteUnusedVolumes,
+                'delete_unused_networks' => $this->deleteUnusedNetworks,
+            ]);
             $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -158,5 +167,22 @@ class DockerCleanup extends Component
     public function render()
     {
         return view('livewire.server.docker-cleanup');
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.docker_cleanup.updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

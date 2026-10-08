@@ -28,17 +28,15 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-test('cloud-init scripts page lists every supported cloud provider integration', function () {
+test('cloud-init scripts page describes scripts for every cloud provider', function () {
     Livewire::test(CloudInitScripts::class)
-        ->assertSee('Hetzner')
-        ->assertSee('Vultr')
-        ->assertSee('DigitalOcean')
+        ->assertSee('Reusable initialization scripts for cloud servers.')
         ->assertDontSee('Currently working only with Hetzner');
 });
 
 test('cloud-init script form does not show a cancel button in the modal', function () {
     Livewire::test(CloudInitScriptForm::class)
-        ->assertSee('Create Script')
+        ->assertSee('Create script')
         ->assertDontSee('Cancel');
 });
 

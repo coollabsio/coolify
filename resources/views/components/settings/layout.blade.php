@@ -9,7 +9,6 @@
             ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
             ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
-            ['label' => 'Scheduled Jobs', 'route' => 'settings.scheduled-jobs', 'icon' => 'calendar'],
         ],
     ];
 @endphp
@@ -20,7 +19,8 @@
         <p class="settings-mobile-description">Configure global settings for this Coolify instance.</p>
     </header>
     <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        <aside class="application-settings-navigation min-w-0 xl:self-start">
+        <aside class="application-settings-navigation min-w-0 xl:self-start"
+            data-settings-search-items="{{ json_encode(settingsSearchItems($settingsMenuSections, [])) }}">
             <nav aria-label="Instance settings"
                 class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                 @foreach ($settingsMenuSections as $section => $menuItems)

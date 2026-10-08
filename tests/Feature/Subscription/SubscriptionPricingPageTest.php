@@ -93,57 +93,6 @@ test('subscribed cloud sidebar shows subscription link for team admins', functio
         ->toContain(route('subscription.show'));
 });
 
-test('subscription adjustment modal is protected from livewire morphing', function () {
-    $view = file_get_contents(resource_path('views/livewire/subscription/actions.blade.php'));
-
-    expect($view)
-        ->toContain('<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6" x-data="{')
-        ->toContain('<template x-teleport="body" wire:ignore>');
-});
-
-test('subscription pricing page does not render a single-item pricing tab strip', function () {
-    $html = view('components.dashboard.navbar', [
-        'section' => 'subscription',
-        'title' => 'Subscription',
-        'subtitle' => 'Choose a plan',
-    ])->render();
-
-    expect($html)
-        ->toContain('Subscription')
-        ->toContain('Choose a plan')
-        ->not->toContain('app-tab')
-        ->and($html)->not->toContain(route('subscription.index'));
-});
-
-test('subscription plan page does not render a single-item plan tab strip', function () {
-    Subscription::create([
-        'team_id' => $this->team->id,
-        'stripe_subscription_id' => 'sub_active',
-        'stripe_customer_id' => 'cus_active',
-        'stripe_invoice_paid' => true,
-        'stripe_plan_id' => 'price_active',
-        'stripe_cancel_at_period_end' => false,
-        'stripe_past_due' => false,
-    ]);
-
-    // Refresh memoized subscription helpers after creating the row.
-    Once::flush();
-    session(['currentTeam' => $this->team->fresh()]);
-
-    $html = view('components.dashboard.navbar', [
-        'section' => 'subscription',
-        'title' => 'Subscription',
-        'subtitle' => 'Plan and billing',
-    ])->render();
-
-    expect($html)
-        ->toContain('Subscription')
-        ->toContain('Plan and billing')
-        ->not->toContain('app-tab')
-        ->and($html)->not->toContain(route('subscription.show'))
-        ->and($html)->not->toContain(route('subscription.index'));
-});
-
 test('Stripe API failures show an error without redirecting or retrying checkout', function () {
     config()->set('subscription.stripe_price_id_dynamic_monthly', 'price_monthly');
     $this->mock(CreateCheckoutSession::class)

@@ -1,0 +1,81 @@
+name: Sync main to release branches
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-main-to-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge main into release branches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into every release/v* branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main '+refs/heads/release/v*:refs/remotes/origin/release/v*'
+
+          branches=$(git for-each-ref --format='%(refname:lstrip=3)' 'refs/remotes/origin/release/v*')
+          if [ -z "$branches" ]; then
+            echo 'No release/v* branch exists, so there is nothing to sync.'
+            exit 0
+          fi
+
+          failed=0
+          for branch in $branches; do
+            echo "::group::Sync main into $branch"
+            git checkout --quiet -B "$branch" "origin/$branch"
+
+            if git merge --no-edit origin/main; then
+              git push origin "HEAD:refs/heads/$branch"
+              echo '::endgroup::'
+              continue
+            fi
+
+            conflicts=$(git diff --name-only --diff-filter=U)
+            git merge --abort
+            echo '::endgroup::'
+
+            if [ -z "$conflicts" ]; then
+              echo "::error title=main to $branch sync failed::The merge failed without conflicts, so no pull request was created."
+              failed=1
+              continue
+            fi
+
+            sync_branch="automation/sync-main-to-${branch//\//-}"
+            existing_pr=$(gh pr list --base "$branch" --head "$sync_branch" --state open --json url --jq '.[0].url')
+            if [ -n "$existing_pr" ]; then
+              # The conflict was already reported when this pull request was opened.
+              # Stay green until it is merged instead of failing every scheduled run.
+              echo "::notice title=main to $branch sync blocked::main still conflicts with $branch; resolve the open pull request: $existing_pr"
+              continue
+            fi
+
+            git push --force origin origin/main:"refs/heads/$sync_branch"
+            gh pr create \
+              --base "$branch" \
+              --head "$sync_branch" \
+              --title "chore: merge main into $branch" \
+              --body "This pull request was created automatically because main could not be merged into $branch without conflicts. Resolve conflicts on this temporary branch; never update main with $branch."
+
+            echo "::error title=main to $branch sync blocked::main could not be merged into $branch without conflicts; a pull request was opened to resolve them."
+            failed=1
+          done
+
+          exit "$failed"

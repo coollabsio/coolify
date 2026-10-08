@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -52,7 +53,7 @@ class ByIp extends Component
     protected function rules(): array
     {
         return [
-            'private_key_id' => 'nullable|integer',
+            'private_key_id' => ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', currentTeam()->id)],
             'new_private_key_name' => 'nullable|string',
             'new_private_key_description' => 'nullable|string',
             'new_private_key_value' => 'nullable|string',
@@ -70,6 +71,7 @@ class ByIp extends Component
         return array_merge(ValidationPatterns::combinedMessages(), [
             'private_key_id.integer' => 'The Private Key field must be an integer.',
             'private_key_id.nullable' => 'The Private Key field is optional.',
+            'private_key_id.exists' => 'The selected Private Key is invalid.',
             'new_private_key_name.string' => 'The Private Key Name must be a string.',
             'new_private_key_description.string' => 'The Private Key Description must be a string.',
             'new_private_key_value.string' => 'The Private Key Value must be a string.',
@@ -143,11 +145,7 @@ class ByIp extends Component
             $this->authorize('create', Server::class);
             $foundServer = Server::whereIp($this->ip)->first();
             if ($foundServer) {
-                if ($foundServer->team_id === currentTeam()->id) {
-                    return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
-                }
-
-                return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
+                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
             }
 
             if (is_null($this->private_key_id)) {
@@ -168,7 +166,7 @@ class ByIp extends Component
             if ($this->server_role === ServerRole::BUILD->value) {
                 data_forget($payload, 'proxy');
             }
-            $server = Server::create($payload);
+            $server = Team::createServerWithinLimit(currentTeam()->id, $payload);
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();

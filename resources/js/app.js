@@ -1,8 +1,18 @@
+import { initializeCopyButtonComponent } from './copy-button.js';
+import { initializeRuntimeLogsComponent } from './runtime-logs.js';
+import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
+import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
+import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
+import { parseSubmitAction } from './modal-confirmation.js';
+
+// Used by the modal-confirmation Blade component to call its submitAction.
+window.parseModalSubmitAction = parseSubmitAction;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
+    registerLivewireUpdateDedupe(window.Livewire);
 });
 
 // Livewire 3.5.19+ re-applies `x-cloak` to morphed elements during wire:navigate
@@ -17,16 +27,19 @@ document.addEventListener('livewire:navigated', () => {
 // Keeping this registration independent from the current route also makes it
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
+document.addEventListener('alpine:init', initializeCopyButtonComponent);
+document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
+document.addEventListener('alpine:init', initializeSettingsSidebarAccordionComponent);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms
  * after the scroll has settled. Starting the flash immediately makes long
  * jumps (top → bottom) finish scrolling after the animation has already ended.
  *
- * @param {string} id
+ * @param {string|HTMLElement} target Section id or element
  */
-window.scrollToSettingsSection = function scrollToSettingsSection(id) {
-    const el = document.getElementById(id);
+window.scrollToSettingsSection = function scrollToSettingsSection(target) {
+    const el = typeof target === 'string' ? document.getElementById(target) : target;
     if (!el) {
         return;
     }
@@ -123,6 +136,47 @@ window.scrollToSettingsSection = function scrollToSettingsSection(id) {
     };
 
     rafId = window.requestAnimationFrame(tick);
+};
+
+/**
+ * Items for the "This page" scope of the command palette: the pages of the
+ * settings sidebar (rendered by the server), then the visible sections of the
+ * current page. Sections that the sidebar already lists are skipped.
+ *
+ * @returns {Array<{label: string, breadcrumb: string, search_text: string, href: string, navigate?: boolean, element?: HTMLElement}>}
+ */
+window.currentPageSearchItems = function currentPageSearchItems() {
+    let items = [];
+    try {
+        items = JSON.parse(document.querySelector('[data-settings-search-items]')?.dataset.settingsSearchItems || '[]');
+    } catch (e) {
+        items = [];
+    }
+
+    const toPath = (href) => {
+        const url = new URL(href, window.location.href);
+        return url.pathname + url.hash;
+    };
+    const sidebarPaths = new Set(items.map((item) => toPath(item.href)));
+    const headingSelector = ':scope > header :is(h1, h2, h3), :scope > .application-settings-section-header :is(h1, h2, h3)';
+
+    document.querySelectorAll('.application-settings-section').forEach((section, index) => {
+        if (section.closest('[role=dialog], .command-palette') || section.getClientRects().length === 0) {
+            return;
+        }
+        if (section.id && sidebarPaths.has(window.location.pathname + '#' + section.id)) {
+            return;
+        }
+        const label = (section.dataset.settingsSectionTitle ?? section.querySelector(headingSelector)?.textContent ?? '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (!label) {
+            return;
+        }
+        items.push({ label, breadcrumb: 'Section', search_text: label + ' section', href: 'section-' + index, element: section });
+    });
+
+    return items;
 };
 
 // When a settings sub-section link navigates across pages (href="route#section-id"),

@@ -45,7 +45,6 @@
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
             $publicUrl = getFqdnWithoutPort($row['url']);
-            $domainParts = $isSuggested ? null : parse_url($publicUrl);
             $isNoindexed = $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']);
             $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
             $directionLabel = match ($rowDirection) {
@@ -53,9 +52,7 @@
                 'non-www' => 'Redirect to non-www',
                 default => 'Both www and non-www',
             };
-            $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
-                ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
-                : null;
+            $faviconUrl = $isSuggested ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
             $editingParts = \App\Support\DomainUrlParts::split($row['url']);
             if ($row['has_port_override'] ?? false) {
@@ -194,10 +191,12 @@
                             </button>
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
                                 buttonTitle="Remove" isErrorButton
+                                canGate="update" :canResource="$service"
                                 submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                     'This domain will be removed from the service application.',
                                     'Redeploy or restart may be required for proxy changes.',
-                                ]" :confirmWithPassword="false" :confirmWithText="false"
+                                ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"
+                                :confirmWithPassword="false" :confirmWithText="false"
                                 step2ButtonText="Remove domain">
                                 <x-slot:trigger>
                                     <button type="button"

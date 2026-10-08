@@ -24,15 +24,6 @@ class Sentinel extends Component
 
     public ?int $sentinelRestartRequestedAt = null;
 
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $sentinelMetricsRefreshRateSeconds;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $sentinelMetricsHistoryDays;
-
-    #[Validate(['required', 'integer', 'min:10'])]
-    public int|string $sentinelPushIntervalSeconds;
-
     #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl = null;
 
@@ -52,32 +43,35 @@ class Sentinel extends Component
 
     public function mount()
     {
+        $this->authorize('viewSentinel', $this->server);
         $this->syncData();
     }
 
-    private function syncData(bool $toModel = false): void
+    /**
+     * @return array<int, string> Names of the settings that changed when saving to the model.
+     */
+    private function syncData(bool $toModel = false): array
     {
         if ($toModel) {
             $this->validate();
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
-            $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
-            $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
-            $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+
+            return $changedFields;
         } else {
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = $this->server->settings->sentinel_token;
-            $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
-            $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
-            $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->sentinelStatus = $this->server->sentinelStatus();
         }
+
+        return [];
     }
 
     public function handleSentinelRestarted($event)
@@ -135,6 +129,7 @@ class Sentinel extends Component
             $this->setSentinelRestarting();
             $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
             $this->server->restartSentinel($customImage);
+            auditLog('ui.server.sentinel.restarted', $this->auditContext());
             $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -147,6 +142,7 @@ class Sentinel extends Component
             $this->authorize('manageSentinel', $this->server);
             $this->setSentinelRestarting();
             $this->server->settings->generateSentinelToken();
+            auditLog('ui.server.sentinel.token_regenerated', $this->auditContext());
             $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -165,6 +161,7 @@ class Sentinel extends Component
             $this->dispatch('sentinel-defaults-restored');
             $this->setSentinelRestarting();
             $this->server->restartSentinel();
+            auditLog('ui.server.sentinel.defaults_restored', $this->auditContext());
             $this->dispatch('success', 'Default Sentinel configuration restored. Restarting Sentinel.');
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -177,6 +174,9 @@ class Sentinel extends Component
             $this->authorize('update', $this->server);
             $this->setSentinelRestarting();
             $this->syncData(true);
+            auditLog('ui.server.sentinel.updated', $this->auditContext([
+                'changed_fields' => ['is_metrics_enabled', 'sentinel_token', 'sentinel_custom_url', 'is_sentinel_debug_enabled'],
+            ]));
             $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -187,8 +187,16 @@ class Sentinel extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            $this->syncData(true);
-            $this->restartSentinel();
+            $changedFields = $this->syncData(true);
+            if ($changedFields === []) {
+                return;
+            }
+            auditLog('ui.server.sentinel.updated', $this->auditContext([
+                'changed_fields' => $changedFields,
+            ]));
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
+            $this->setSentinelRestarting();
+            $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -197,5 +205,14 @@ class Sentinel extends Component
     public function render()
     {
         return view('livewire.server.sentinel');
+    }
+
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 }

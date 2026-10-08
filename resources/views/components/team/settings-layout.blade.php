@@ -12,19 +12,25 @@
             'active' => request()->routeIs('team.member.index'),
             'icon' => 'teams',
         ],
+        auth()->user()->isAdminOfTeam(currentTeam()->id) ? [
+            'label' => 'Audit log',
+            'route' => 'team.audit-log',
+            'active' => request()->routeIs('team.audit-log'),
+            'icon' => 'time-back',
+        ] : null,
         isInstanceAdmin() ? [
             'label' => 'Admin View',
             'route' => 'team.admin-view',
             'active' => request()->routeIs('team.admin-view'),
             'icon' => 'admin',
         ] : null,
-        [
+        auth()->user()->can('delete', currentTeam()) ? [
             'label' => 'Danger Zone',
             'route' => 'team.danger-zone',
             'active' => request()->routeIs('team.danger-zone'),
             'icon' => 'shield-alert',
             'sectionStart' => true,
-        ],
+        ] : null,
     ])->filter();
 @endphp
 
@@ -34,7 +40,8 @@
         <p class="settings-mobile-description">Manage your team, members, and access settings.</p>
     </header>
     <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        <aside class="application-settings-navigation min-w-0 xl:self-start">
+        <aside class="application-settings-navigation min-w-0 xl:self-start"
+            data-settings-search-items="{{ json_encode(settingsSearchItems(['Team' => $teamMenuItems], [])) }}">
             <nav aria-label="Team settings"
                 class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                 <div class="nav-section hidden xl:block">Team</div>

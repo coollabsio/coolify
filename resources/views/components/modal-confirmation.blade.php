@@ -34,7 +34,7 @@
     use Illuminate\View\ComponentSlot;
     // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
-    // Skip ONLY password confirmation for OAuth users (they have no password)
+    // Skip ONLY the password step (disabled globally, OAuth users, users without a password, or recently confirmed)
     $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
@@ -72,14 +72,18 @@
     dispatchEventMessage: @js($dispatchEventMessage),
     disableTwoStepConfirmation: @js($disableTwoStepConfirmation),
     skipPasswordConfirmation: @js($skipPasswordConfirmation),
-    resetModal() {
+    // A successful submit already re-rendered the component. Refreshing again
+    // after it can hit an ended session, for example after an account deletion.
+    resetModal(refresh = true) {
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
         this.submitting = false;
         this.userConfirmationText = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
-        $wire.$refresh();
+        if (refresh) {
+            $wire.$refresh();
+        }
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($effectiveStep2ButtonText),
@@ -102,9 +106,7 @@
             return Promise.resolve(true);
         }
 
-        const methodName = this.submitAction.split('(')[0];
-        const paramsMatch = this.submitAction.match(/\((.*?)\)/);
-        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+        const { method: methodName, params } = window.parseModalSubmitAction(this.submitAction);
 
         // Always pass password parameter (empty string if password confirmation is skipped)
         // This ensures consistent method signature for backend Livewire methods
@@ -263,21 +265,21 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                    <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                    <span class="shrink-0" aria-hidden="true">-</span>
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                        <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                        <span class="shrink-0" aria-hidden="true">-</span>
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                            <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                            <span class="shrink-0" aria-hidden="true">-</span>
                                             <span>{{ $checkbox['default_warning'] }}</span>
                                         </li>
                                     </template>
@@ -292,17 +294,8 @@
                                     <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
                                         <div class="relative">
                                             <input type="text" x-model="decodedText" readonly class="input">
-                                            <button x-show="window.isSecureContext"
-                                                @click.prevent="navigator.clipboard.writeText(decodedText); $el.innerHTML = '<svg class=\'w-5 h-5 text-green-500\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\' /></svg>'; setTimeout(() => $el.innerHTML = '<svg class=\'w-5 h-5\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\' /></svg>', 1000)"
-                                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-300 transition-colors"
-                                                title="Copy to clipboard">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                </svg>
-                                            </button>
+                                            <x-copy-button resolve="decodedText"
+                                                class="absolute top-1/2 right-2 -translate-y-1/2" />
                                         </div>
                                     </div>
 
@@ -343,7 +336,7 @@
                                         $nextTick(() => {
                                             submitForm().then((result) => {
                                                 submitting = false;
-                                                resetModal();
+                                                resetModal(result !== true);
                                             }).catch(() => {
                                                 submitting = false;
                                                 modalOpen = true;
@@ -401,7 +394,7 @@
                                         submitForm().then((result) => {
                                             submitting = false;
                                             if (result === true) {
-                                                resetModal();
+                                                resetModal(false);
                                             } else {
                                                 modalOpen = true;
                                                 passwordError = result;

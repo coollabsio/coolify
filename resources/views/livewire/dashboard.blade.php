@@ -11,10 +11,32 @@
         $dashboardItemLimit = 8;
         $dashboardProjects = $projects->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
         $dashboardServers = $servers->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
+        $hasTrafficAnalytics = $servers->contains(fn ($server) => $server->isTrafficAnalyticsEnabled());
     @endphp
 
     <div class="flex min-w-0 flex-col gap-8">
+        @if ($pendingInvitations->isNotEmpty())
+            <div class="flex min-w-0 flex-col gap-2">
+                @foreach ($pendingInvitations as $invitation)
+                    <x-callout type="info" title="Pending team invitation"
+                        wire:key="dashboard-invitation-{{ $invitation->uuid }}">
+                        <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                            <span class="min-w-0">Team <span class="font-semibold">{{ $invitation->team->name }}</span>
+                                invited you as {{ ucfirst($invitation->role) }}.</span>
+                            <a href="{{ route('team.invitation.show', $invitation->uuid) }}" class="button shrink-0">
+                                Review invitation
+                            </a>
+                        </div>
+                    </x-callout>
+                @endforeach
+            </div>
+        @endif
+
         <livewire:dashboard.active-deployments />
+
+        @if ($hasTrafficAnalytics)
+            <livewire:dashboard.traffic-analytics />
+        @endif
 
         <section class="mb-0! min-w-0">
             <x-section-heading title="Projects" subtitle="Your deployment workspaces"
@@ -22,7 +44,7 @@
 
             @if ($dashboardProjects->isEmpty())
                 <x-empty title="No projects yet"
-                    description="Use New to create your first deployment workspace."
+                    description="Create your first deployment workspace from Projects."
                     icon-name="projects" size="sm" />
             @else
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -40,6 +62,7 @@
                                 $project->mongodbs_count,
                                 $project->mysqls_count,
                                 $project->mariadbs_count,
+                                $project->sqlites_count,
                             ])->sum();
                         @endphp
 
@@ -60,24 +83,32 @@
                                         <x-reicon name="projects" class="size-4" />
                                     @endif
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h3
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                         {{ $project->name }}
                                     </h3>
-                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $project->description }}
-                                    </p>
+                                    @if (filled($project->description))
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $project->description }}
+                                        </p>
+                                    @endif
                                 </div>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    {{ $project->environments->count() }}
-                                    {{ str('env')->plural($project->environments->count()) }}
-                                    <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                                    {{ $resourceCount }} {{ str('resource')->plural($resourceCount) }}
-                                </p>
+                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
+                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                        aria-label="Environments">
+                                        <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        {{ $project->environments->count() }}
+                                    </span>
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
+                                        aria-label="Resources">
+                                        <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        {{ $resourceCount }}
+                                    </span>
+                                </div>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     @if ($firstEnvironment)
@@ -150,7 +181,7 @@
                     @foreach ($dashboardServers as $server)
                         @php
                             $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-                            $sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive();
+                            $sentinelNeedsAttention = $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
                             [$serverStatus, $serverStatusType] = match (true) {
                                 $server->settings->force_disabled => ['Disabled', 'error'],
@@ -175,14 +206,16 @@
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h3
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                         {{ $server->name }}
                                     </h3>
-                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $server->description }}
-                                    </p>
+                                    @if (filled($server->description))
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $server->description }}
+                                        </p>
+                                    @endif
                                 </div>
                                 @if ($serverStatusType !== 'success')
                                     <span data-tooltip="{{ $serverStatus }}"

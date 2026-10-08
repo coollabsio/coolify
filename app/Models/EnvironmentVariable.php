@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use OpenApi\Attributes as OA;
@@ -22,7 +24,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -34,6 +36,8 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
+    use Auditable;
+
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
     protected $attributes = [
@@ -181,42 +185,54 @@ class EnvironmentVariable extends BaseModel
     public function realValue(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                if (! $this->relationLoaded('resourceable')) {
-                    $this->load('resourceable');
-                }
-                $resource = $this->resourceable;
-                if (! $resource) {
-                    return null;
-                }
-
-                // Load relationships needed for shared variable resolution
-                if (! $resource->relationLoaded('environment')) {
-                    $resource->load('environment');
-                }
-                if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
-                    $resource->load('server');
-                }
-                if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
-                    $resource->load('destination.server');
-                }
-
-                $real_value = $this->get_real_environment_variables($this->value, $resource);
-
-                // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
-                if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
-                    return $real_value;
-                }
-
-                if ($this->is_literal || $this->is_multiline) {
-                    $real_value = '\''.$real_value.'\'';
-                } else {
-                    $real_value = escapeEnvVariables($real_value);
-                }
-
-                return $real_value;
-            }
+            get: fn () => $this->resolveRealValue(),
         );
+    }
+
+    /**
+     * Resolved value for display and copy. References to locked shared variables keep their
+     * reference text, so the UI never reveals a value that is only shown once.
+     */
+    public function displayRealValue(): ?string
+    {
+        return $this->resolveRealValue(revealLockedSharedVariables: false);
+    }
+
+    private function resolveRealValue(bool $revealLockedSharedVariables = true): ?string
+    {
+        if (! $this->relationLoaded('resourceable')) {
+            $this->load('resourceable');
+        }
+        $resource = $this->resourceable;
+        if (! $resource) {
+            return null;
+        }
+
+        // Load relationships needed for shared variable resolution
+        if (! $resource->relationLoaded('environment')) {
+            $resource->load('environment');
+        }
+        if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
+            $resource->load('server');
+        }
+        if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
+            $resource->load('destination.server');
+        }
+
+        $real_value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+
+        // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
+        if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
+            return $real_value;
+        }
+
+        if ($this->is_literal || $this->is_multiline) {
+            $real_value = '\''.$real_value.'\'';
+        } else {
+            $real_value = escapeEnvVariables($real_value);
+        }
+
+        return $real_value;
     }
 
     protected function isReallyRequired(): Attribute
@@ -249,20 +265,24 @@ class EnvironmentVariable extends BaseModel
     protected function isShared(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $type = str($this->value)->after('{{')->before('.')->value;
-                if (str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}')) {
-                    return true;
-                }
-
-                return false;
-            }
+            get: fn () => $this->isSharedReference(),
         );
     }
 
-    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
+    private function isSharedReference(): bool
     {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server);
+        if (blank($this->value)) {
+            return false;
+        }
+
+        $types = implode('|', SHARED_VARIABLE_TYPES);
+
+        return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
+    }
+
+    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null, bool $revealLockedSharedVariables = true)
+    {
+        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server, $revealLockedSharedVariables);
     }
 
     public function getResolvedValueWithServer($server = null)
@@ -302,12 +322,82 @@ class EnvironmentVariable extends BaseModel
         return $real_value;
     }
 
-    private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
+    /** @return array<int, string> */
+    public function logRedactionValues(): array
     {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource);
+        $value = $this->real_value;
+        if (! is_string($value) || $value === '') {
+            return [];
+        }
+
+        $values = [$value];
+        if ($this->is_multiline || $this->is_literal) {
+            $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
+                ? substr($value, 1, -1)
+                : $value;
+            $values = array_merge($values, self::logRedactionVariants($unquoted, (bool) $this->is_multiline));
+        }
+
+        return array_values(array_unique(array_filter($values, static fn (string $item): bool => $item !== '')));
     }
 
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null)
+    /**
+     * @param  array<array-key, mixed>  $secrets
+     * @return array<int, string>
+     */
+    public static function remoteSecretLogRedactionValues(array $secrets): array
+    {
+        return collect($secrets)
+            ->filter(static fn (mixed $secret): bool => is_string($secret) && $secret !== '')
+            ->flatMap(static fn (string $secret): array => [
+                ...self::logRedactionVariants($secret, preg_match('/\r|\n/', $secret) === 1),
+                RemoteSecretValueFormatter::composeFile($secret),
+            ])
+            ->filter(static fn (string $item): bool => $item !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Also covers the value inside a quoted argument such as 'KEY=value'.
+     *
+     * @return array<int, string>
+     */
+    private static function logRedactionVariants(string $value, bool $splitLines): array
+    {
+        $values = [
+            $value,
+            escapeBashEnvValue($value),
+            str_replace("'", "'\\''", $value),
+            str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $value),
+        ];
+        if ($splitLines) {
+            $values = array_merge($values, preg_split('/\r\n|\r|\n/', $value) ?: []);
+        }
+
+        return $values;
+    }
+
+    public function resolveReferencedValue(): ?string
+    {
+        $value = $this->value;
+
+        if ($this->is_literal || blank($value) || ! str($value)->startsWith('$')) {
+            return $value;
+        }
+
+        $referencedKey = str($value)->after('$')->trim('{}')->value();
+
+        return static::where('resourceable_type', $this->resourceable_type)
+            ->where('resourceable_id', $this->resourceable_id)
+            ->where('is_preview', (bool) $this->is_preview)
+            ->where('is_shown_once', false)
+            ->where('key', $referencedKey)
+            ->first()?->value ?? $value;
+    }
+
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
@@ -347,7 +437,7 @@ class EnvironmentVariable extends BaseModel
                 ->where('team_id', $resource->team()->id)
                 ->where("{$type}_id", $id)
                 ->first();
-            if ($found) {
+            if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }
         }
@@ -389,8 +479,6 @@ class EnvironmentVariable extends BaseModel
 
     protected function updateIsShared(): void
     {
-        $type = str($this->value)->after('{{')->before('.')->value;
-        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
-        $this->is_shared = $isShared;
+        $this->is_shared = $this->isSharedReference();
     }
 }

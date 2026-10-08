@@ -18,7 +18,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
 
@@ -102,6 +102,11 @@ test('admin sees unlocked env value in Show component', function () {
         'env' => $this->unlockedEnv,
         'type' => 'application',
     ]);
+
+    // Values hydrate lazily; the edit modal triggers loadValues() on open.
+    expect($component->get('value'))->toBeNull();
+
+    $component->call('loadValues');
 
     expect($component->get('value'))->toBe('secret-unlocked-value');
 });
@@ -246,6 +251,17 @@ test('API hides env values for member even with read:sensitive token', function 
         'Authorization' => 'Bearer '.$token->plainTextToken,
     ])->getJson("/api/v1/applications/{$this->application->uuid}/envs");
 
+    $response->assertForbidden();
+});
+
+test('API hides env values for member with read token', function () {
+    session(['currentTeam' => $this->team]);
+    $token = $this->member->createToken('member-read', ['read']);
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$token->plainTextToken,
+    ])->getJson("/api/v1/applications/{$this->application->uuid}/envs");
+
     $response->assertOk();
 
     $envs = collect($response->json());
@@ -271,4 +287,60 @@ test('API shows env values for admin with read:sensitive token', function () {
 
     expect($unlocked)->not->toBeNull();
     expect($unlocked)->toHaveKey('value');
+});
+
+// --- Session team differs from the resource team ---
+
+test('member dev view hides values after switching to a team they own', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+    $this->actingAs($this->member);
+    session(['currentTeam' => $ownTeam]);
+
+    $component = Livewire::test(EnvironmentVariableAll::class, [
+        'resource' => $this->application,
+    ])->call('switch');
+
+    expect($component->get('variables'))->not->toContain('secret-unlocked-value')
+        ->and($component->get('variables'))->toContain('UNLOCKED_VAR=(Hidden');
+    $component->assertDontSee('secret-unlocked-value');
+});
+
+test('admin dev view shows values while the session is on a team where they are a member', function () {
+    $otherTeam = Team::factory()->create();
+    $this->admin->teams()->attach($otherTeam, ['role' => 'member']);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $otherTeam]);
+
+    $component = Livewire::test(EnvironmentVariableAll::class, [
+        'resource' => $this->application,
+    ])->call('switch');
+
+    expect($component->get('variables'))->toContain('UNLOCKED_VAR=secret-unlocked-value');
+});
+
+test('user outside the resource team cannot open the dev view', function () {
+    $outsider = User::factory()->create();
+    $outsiderTeam = Team::factory()->create();
+    $outsider->teams()->attach($outsiderTeam, ['role' => 'owner']);
+    $this->actingAs($outsider);
+    session(['currentTeam' => $outsiderTeam]);
+
+    Livewire::test(EnvironmentVariableAll::class, [
+        'resource' => $this->application,
+    ])->call('switch')->assertForbidden();
+});
+
+test('member keeps isValueHidden after switching to a team they own', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+    $this->actingAs($this->member);
+    session(['currentTeam' => $ownTeam]);
+
+    $component = Livewire::test(EnvironmentVariableShow::class, [
+        'env' => $this->unlockedEnv,
+        'type' => 'application',
+    ]);
+
+    expect($component->get('isValueHidden'))->toBeTrue();
 });

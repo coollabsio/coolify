@@ -13,6 +13,13 @@
                                 :type="$server->isFunctional() ? 'success' : 'warning'" />
                         </x-slot:actions>
 
+                        @if ($this->limaStartCommand)
+                            <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
+                                <code
+                                    class="mt-2 block overflow-x-auto rounded-lg bg-neutral-950 px-3 py-2 font-mono text-[11px] text-neutral-200">{{ $this->limaStartCommand }}</code>
+                            </x-callout>
+                        @endif
+
                         <div class="flex items-start gap-3">
                             <div
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
@@ -85,13 +92,13 @@
                                 id="connectionTimeout" label="Connection timeout"
                                 helper="Seconds to wait before an SSH connection fails." min="1" max="300"
                                 required :disabled="$isValidating" />
-                            <x-forms.searchable-listbox id="serverTimezone" label="Server timezone"
+                            <x-forms.listbox searchable id="serverTimezone" label="Server timezone"
                                 helper="Used for backup schedules, cron jobs, and displayed timestamps."
-                                searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                                searchPlaceholder="Search timezones" searchEmptyText="No matching timezone"
                                 :options="collect($this->timezones)->map(fn ($timezone) => [
                                     'value' => $timezone,
                                     'label' => $timezone,
-                                ])->all()" :disabled="$isValidating || !auth()->user()->can('update', $server)" />
+                                ])->all()" :disabled="$isValidating" canGate="update" :canResource="$server" />
                             <x-forms.input canGate="update" :canResource="$server"
                                 placeholder="https://example.com" id="wildcardDomain" label="Wildcard domain"
                                 helper="New resources can receive generated subdomains from this domain."

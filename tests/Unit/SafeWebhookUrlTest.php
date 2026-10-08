@@ -327,6 +327,29 @@ it('redacts webhook URLs for logs', function () {
         ->toBe('https://hooks.slack.com');
 });
 
+it('rejects NAT64 local-use IPv6 literals and DNS answers', function (string $ipv6) {
+    $url = "http://[{$ipv6}]/webhook";
+    $rule = new SafeWebhookUrl(fn (string $host): array => [$ipv6]);
+
+    expect(Validator::make(['url' => $url], ['url' => $rule])->fails())->toBeTrue("Expected literal rejection: {$ipv6}");
+    expect(Validator::make(['url' => 'http://nat64.example.test/webhook'], ['url' => $rule])->fails())->toBeTrue("Expected DNS rejection: {$ipv6}");
+    expect(fn () => SafeWebhookUrl::httpClientOptions($url))->toThrow(RuntimeException::class, 'unsafe IP address');
+    expect(fn () => SafeWebhookUrl::httpClientOptions('http://nat64.example.test/webhook', resolver: fn (string $host): array => [$ipv6]))
+        ->toThrow(RuntimeException::class, 'unsafe IP address');
+})->with([
+    'loopback' => '64:ff9b:1::7f00:1',
+    'private 172.16' => '64:ff9b:1::ac10:1',
+    'private 192.168' => '64:ff9b:1::c0a8:1',
+    'link-local' => '64:ff9b:1::a9fe:a9fe',
+]);
+
+it('keeps public IPv6 allowed and NAT64 well-known prefix blocked', function () {
+    $rule = new SafeWebhookUrl;
+
+    expect(Validator::make(['url' => 'https://[2606:4700:4700::1111]/webhook'], ['url' => $rule])->passes())->toBeTrue();
+    expect(Validator::make(['url' => 'http://[64:ff9b::7f00:1]/webhook'], ['url' => $rule])->fails())->toBeTrue();
+});
+
 it('falls back to system DNS when custom DNS returns no answers', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
         'custom_dns_servers' => '1.1.1.1',

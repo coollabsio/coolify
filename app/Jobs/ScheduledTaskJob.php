@@ -29,6 +29,11 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     public const MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024;
 
     /**
+     * Lets a task that runs too long fail inside handle() before the worker times out.
+     */
+    public const WORKER_TIMEOUT_MARGIN_SECONDS = 120;
+
+    /**
      * The number of times the job may be attempted.
      */
     public $tries = 3;
@@ -41,7 +46,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * The number of seconds the job can run before timing out.
      */
-    public $timeout = 300;
+    public $timeout = 300 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?Team $team = null;
 
@@ -54,9 +59,9 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     public ?ScheduledTaskExecution $task_log = null;
 
     /**
-     * Store execution ID to survive job serialization for timeout handling.
+     * Queued with the payload, so failed() finds this run's execution after a worker timeout.
      */
-    protected ?int $executionId = null;
+    public ?string $executionUuid = null;
 
     public string $task_status = 'failed';
 
@@ -71,7 +76,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         $this->onQueue(crons_queue());
 
         $this->task = $task;
-        $this->timeout = $this->task->timeout ?? 300;
+        $this->timeout = ($this->task->timeout ?? 300) + self::WORKER_TIMEOUT_MARGIN_SECONDS;
+        $this->executionUuid = new_public_id();
     }
 
     private function initializeExecutionContext(): void
@@ -107,6 +113,15 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        // maxExceptions = 1 fails the job on its first error, so a second attempt only happens
+        // when Redis hands the job out again after its worker was killed (retry_after, about a
+        // day later). The command may have run already, so it is not run again late.
+        if ($this->attempts() > 1) {
+            $this->fail(new \RuntimeException('The worker stopped while this task was running. The task is not run again late.'));
+
+            return;
+        }
+
         if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
             return;
         }
@@ -117,17 +132,19 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $this->initializeExecutionContext();
 
-            $this->task_log = ScheduledTaskExecution::create([
+            // A retried job reuses the queued payload and its execution uuid.
+            if ($this->executionUuid === null || ScheduledTaskExecution::query()->where('uuid', $this->executionUuid)->exists()) {
+                $this->executionUuid = new_public_id();
+            }
+            $this->task_log = ScheduledTaskExecution::forceCreate([
+                'uuid' => $this->executionUuid,
                 'scheduled_task_id' => $this->task->id,
                 'started_at' => $startTime,
                 'retry_count' => $this->attempts() - 1,
             ]);
 
-            // Store execution ID for timeout handling
-            $this->executionId = $this->task_log->id;
-
             if ($this->resource->type() === 'application') {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource, 0);
                 if ($containers->count() > 0) {
                     $containers->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);
@@ -157,11 +174,11 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
-                    $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
+                    $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName)." {$cmd}";
                     $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->timeout, disableMultiplexing: true);
+                    $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->task->timeout ?? 300, disableMultiplexing: true);
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
@@ -256,28 +273,11 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             'trace' => $exception?->getTraceAsString(),
         ]);
 
-        // Reload execution log from database
-        // When a job times out, failed() is called in a fresh process with the original
-        // queue payload, so $executionId will be null. We need to query for the latest execution.
-        $execution = null;
-
-        // Try to find execution using stored ID first (works for non-timeout failures)
-        if ($this->executionId) {
-            $execution = ScheduledTaskExecution::find($this->executionId);
-        }
-
-        // If no stored ID or not found, query for the most recent execution log for this task
-        if (! $execution) {
-            $execution = ScheduledTaskExecution::query()
-                ->where('scheduled_task_id', $this->task->id)
-                ->orderBy('created_at', 'desc')
-                ->first();
-        }
-
-        // Last resort: check task_log property
-        if (! $execution && $this->task_log) {
-            $execution = $this->task_log;
-        }
+        // After a worker timeout only the queued uuid identifies this run's execution.
+        $execution = $this->executionUuid === null ? null : ScheduledTaskExecution::query()
+            ->where('uuid', $this->executionUuid)
+            ->whereNull('finished_at')
+            ->first();
 
         if ($execution) {
             $errorMessage = 'Job permanently failed after '.$this->attempts().' attempts';
@@ -293,7 +293,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         } else {
             Log::channel('scheduled-errors')->warning('Could not find execution log to update', [
-                'execution_id' => $this->executionId,
+                'execution_uuid' => $this->executionUuid,
                 'task_id' => $this->task->uuid,
             ]);
         }

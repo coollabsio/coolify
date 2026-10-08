@@ -105,7 +105,9 @@ class Webhook extends Component
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
@@ -134,7 +136,6 @@ class Webhook extends Component
     public function instantSaveWebhookEnabled()
     {
         try {
-            $original = $this->webhookEnabled;
             $this->validate([
                 'webhookUrl' => 'required',
             ], [
@@ -142,7 +143,31 @@ class Webhook extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->webhookEnabled = $original;
+            $this->webhookEnabled = (bool) $this->settings->refresh()->webhook_enabled;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function toggleWebhookEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->webhookEnabled) {
+                $this->webhookEnabled = false;
+            } else {
+                $this->validate([
+                    'webhookUrl' => 'required',
+                ], [
+                    'webhookUrl.required' => 'Webhook URL is required.',
+                ]);
+                $this->webhookEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
 
             return handleError($e, $this);
         }
@@ -195,5 +220,12 @@ class Webhook extends Component
     public function render()
     {
         return view('livewire.notifications.webhook');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.webhook.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

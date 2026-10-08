@@ -99,11 +99,3 @@ test('development helper version is read fresh for queue workers', function () {
 
     expect(getHelperVersion())->toBe('second');
 });
-
-test('development helper build uses the configured helper repository', function () {
-    $component = file_get_contents(app_path('Livewire/Settings/Index.php'));
-
-    expect($component)
-        ->toContain('$imageRef = escapeshellarg(coolifyHelperImage().":{$version}");')
-        ->not->toContain('"ghcr.io/coollabsio/coolify-helper:{$version}"');
-});

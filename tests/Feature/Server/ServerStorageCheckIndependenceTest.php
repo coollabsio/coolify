@@ -3,6 +3,7 @@
 use App\Jobs\ServerCheckJob;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\ServerStorageCheckJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use Carbon\Carbon;
@@ -13,6 +14,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Queue::fake();
+    InstanceSettings::forceCreate(['id' => 0]);
 });
 
 afterEach(function () {

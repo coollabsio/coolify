@@ -31,6 +31,13 @@ class ExecuteContainerCommand extends Component
 
     public bool $containersLoaded = false;
 
+    /**
+     * Container picker entries. Alpine reads them through entangle, because containers load after the first render.
+     *
+     * @var list<array{value: string, label: string}>
+     */
+    public array $containerOptions = [];
+
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
@@ -100,7 +107,7 @@ class ExecuteContainerCommand extends Component
                         ],
                     ]);
                 } else {
-                    $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
+                    $containers = getCurrentApplicationContainerStatus($server, $this->resource, includePullrequests: true);
                 }
                 foreach ($containers as $container) {
                     // if container state is running
@@ -149,10 +156,17 @@ class ExecuteContainerCommand extends Component
         $this->containers = $this->containers->sortBy(function ($container) {
             return data_get($container, 'container.Names');
         });
+        $this->containerOptions = $this->containers->map(fn (array $container) => [
+            'value' => $this->containerTarget($container),
+            'label' => data_get($container, 'container.Names').' · '.data_get($container, 'server.name'),
+        ])->values()->all();
 
         if ($this->containers->count() === 1) {
             $this->selected_container = $this->containerTarget($this->containers->first());
             $this->connectToContainer();
+        } elseif ($this->containers->count() > 1) {
+            // The terminal was rendered with auto-start before the containers were known.
+            $this->dispatch(Terminal::AUTO_START_CANCELLED_EVENT)->to(Terminal::class);
         }
 
         $this->containersLoaded = true;
@@ -190,7 +204,7 @@ class ExecuteContainerCommand extends Component
             // Dispatch a frontend event to ensure terminal gets focus after connection
             $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->failTerminalSession(Terminal::sessionFailureMessage($e));
         } finally {
             $this->isConnecting = false;
         }
@@ -200,7 +214,7 @@ class ExecuteContainerCommand extends Component
     public function connectToContainer()
     {
         if ($this->selected_container === 'default') {
-            $this->dispatch('error', 'Please select a container.');
+            $this->failTerminalSession('Please select a container.');
 
             return;
         }
@@ -251,10 +265,18 @@ class ExecuteContainerCommand extends Component
             // Dispatch a frontend event to ensure terminal gets focus after connection
             $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->failTerminalSession(Terminal::sessionFailureMessage($e));
         } finally {
             $this->isConnecting = false;
         }
+    }
+
+    /**
+     * Stop the terminal "connecting…" state and show why. The terminal also shows the toast.
+     */
+    private function failTerminalSession(string $message): void
+    {
+        $this->dispatch(Terminal::SESSION_FAILED_EVENT, message: $message)->to(Terminal::class);
     }
 
     public function render()

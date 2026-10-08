@@ -296,7 +296,9 @@ class ByDigitalOcean extends Component
             $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
         }
 
-        return "{$providerName} API error: {$details}";
+        $prefix = "{$providerName} API error: ";
+
+        return str_starts_with($details, $prefix) ? $details : $prefix.$details;
     }
 
     public function getAvailableSizesProperty(): array
@@ -464,10 +466,16 @@ class ByDigitalOcean extends Component
             if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
+                ]);
+
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
             }
 
@@ -478,7 +486,7 @@ class ByDigitalOcean extends Component
             // Persist the server immediately so the droplet is always tracked
             // in Coolify, even if waiting for the public IP fails below.
             $server = DB::transaction(function () use ($dropletId, $droplet): Server {
-                $server = Server::create([
+                $server = Team::createServerWithinLimit(currentTeam()->id, [
                     'name' => strtolower(trim($this->server_name)),
                     'ip' => Server::PLACEHOLDER_IP,
                     'user' => 'root',

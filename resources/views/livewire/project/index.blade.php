@@ -66,7 +66,7 @@
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                         <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
                                             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
@@ -116,23 +116,29 @@
                                         <x-reicon name="projects" class="size-4" />
                                     </template>
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h2
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                         x-text="project.name"></h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                        x-text="project.description || ''"></p>
+                                        x-show="project.description?.trim()"
+                                        x-text="project.description"></p>
                                 </div>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    <span
-                                        x-text="`${project.environmentCount} ${project.environmentCount === 1 ? 'env' : 'envs'}`"></span>
-                                    <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                                    <span
-                                        x-text="`${project.resourceCount} ${project.resourceCount === 1 ? 'resource' : 'resources'}`"></span>
-                                </p>
+                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
+                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                        aria-label="Environments">
+                                        <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        <span x-text="project.environmentCount"></span>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
+                                        aria-label="Resources">
+                                        <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        <span x-text="project.resourceCount"></span>
+                                    </span>
+                                </div>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     <a x-show="project.addResourceHref" :href="project.addResourceHref"
@@ -161,8 +167,8 @@
                 <div
                     class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Project</div>
-                    <div>Environments</div>
-                    <div>Resources</div>
+                    <div>Contents</div>
+                    <div>Created</div>
                     <div class="project-description">Description</div>
                     <div></div>
                 </div>
@@ -185,10 +191,19 @@
                                 x-text="project.name"></a>
                         </div>
 
-                        <div class="text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="project.environmentCount"></div>
-                        <div class="text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="project.resourceCount"></div>
+                        <div class="flex items-center gap-3 text-[12px] font-medium text-neutral-600 dark:text-fg-dim">
+                            <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                aria-label="Environments">
+                                <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                <span x-text="project.environmentCount"></span>
+                            </span>
+                            <span class="inline-flex items-center gap-1" data-tooltip="Resources" aria-label="Resources">
+                                <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                <span x-text="project.resourceCount"></span>
+                            </span>
+                        </div>
+                        <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim"
+                            x-text="project.createdAt"></div>
                         <p class="project-description truncate text-[12px] text-neutral-500 dark:text-fg-dim"
                             x-text="project.description || '-'"></p>
 

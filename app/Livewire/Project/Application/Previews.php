@@ -7,13 +7,14 @@ use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Previews extends Component
 {
-    use AuthorizesRequests;
+    use AuditsApplicationSettings, AuthorizesRequests;
 
     protected $listeners = ['previewDomainsChanged' => 'refreshPreviewDomains'];
 
@@ -62,7 +63,7 @@ class Previews extends Component
 
         $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
         $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
-        $this->application->settings->save();
+        $this->saveApplicationSettingsWithAudit($this->application);
 
         $this->dispatch('success', 'Settings saved.');
         $this->dispatch('configurationChanged');
@@ -94,6 +95,9 @@ class Previews extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            if (! $this->application->isGithubAppSource()) {
+                throw new \Exception('Loading pull requests is only supported for GitHub App sources.');
+            }
             ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
@@ -124,7 +128,11 @@ class Previews extends Component
 
             $this->validateOnly("previewDockerTags.{$previewKey}");
             $preview->docker_registry_image_tag = $this->previewDockerTags[$previewKey] ?? null;
+            $changedFields = $preview->isDirty('docker_registry_image_tag') ? ['docker_registry_image_tag'] : [];
             $preview->save();
+            if ($changedFields !== []) {
+                $this->auditPreviewEvent('ui.application.preview_updated', $preview->pull_request_id, $changedFields);
+            }
             $this->dispatch('success', 'Preview saved.<br><br>Do not forget to redeploy the preview to apply the changes.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -145,6 +153,7 @@ class Previews extends Component
                         'pull_request_html_url' => $pull_request_html_url,
                         'docker_compose_domains' => $this->application->docker_compose_domains,
                     ]);
+                    $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
                 }
                 $found->generate_preview_fqdn_compose();
                 $this->application->refresh();
@@ -159,10 +168,10 @@ class Previews extends Component
                         'pull_request_html_url' => $pull_request_html_url ?? '',
                         'docker_registry_image_tag' => $docker_registry_image_tag,
                     ]);
+                    $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
                 }
                 if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
-                    $found->docker_registry_image_tag = $docker_registry_image_tag;
-                    $found->save();
+                    $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
                 }
                 $found->generate_preview_fqdn(generateWithoutApplicationDomain: true);
                 $this->application->refresh();
@@ -218,10 +227,10 @@ class Previews extends Component
                     'pull_request_html_url' => $pull_request_html_url ?? '',
                     'docker_registry_image_tag' => $docker_registry_image_tag,
                 ]);
+                $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
             }
             if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
-                $found->docker_registry_image_tag = $docker_registry_image_tag;
-                $found->save();
+                $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
             }
             $result = queue_application_deployment(
                 application: $this->application,
@@ -251,6 +260,28 @@ class Previews extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function saveDockerTagWithAudit(ApplicationPreview $preview, string $dockerRegistryImageTag): void
+    {
+        $preview->docker_registry_image_tag = $dockerRegistryImageTag;
+        $changed = $preview->isDirty('docker_registry_image_tag');
+        $preview->save();
+        if ($changed) {
+            $this->auditPreviewEvent('ui.application.preview_updated', $preview->pull_request_id, ['docker_registry_image_tag']);
+        }
+    }
+
+    /** @param  array<int, string>  $changedFields */
+    private function auditPreviewEvent(string $event, int $pullRequestId, array $changedFields = []): void
+    {
+        auditLog($event, array_filter([
+            'team_id' => $this->application->team()?->id,
+            'application_uuid' => $this->application->uuid,
+            'application_name' => $this->application->name,
+            'pull_request_id' => $pullRequestId,
+            'changed_fields' => $changedFields,
+        ], fn ($value): bool => $value !== []));
     }
 
     protected function setDeploymentUuid()
@@ -307,13 +338,19 @@ class Previews extends Component
             if ($this->application->destination->server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
             } else {
-                $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
+                $containers = getCurrentApplicationContainerStatus($server, $this->application, $pull_request_id)->toArray();
                 $this->stopContainers($containers, $server);
             }
 
             ApplicationPreview::where('application_id', $this->application->id)
                 ->where('pull_request_id', $pull_request_id)
                 ->update(['status' => 'exited']);
+            auditLog('ui.application.preview_stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+                'pull_request_id' => $pull_request_id,
+            ]);
             ServiceStatusChanged::dispatch($this->application->environment->project->team->id);
 
             GetContainersStatus::run($server);
@@ -341,6 +378,7 @@ class Previews extends Component
 
             // Soft delete immediately for instant UI feedback
             $preview->delete();
+            $this->auditPreviewEvent('ui.application.preview_deleted', $pull_request_id);
 
             // Dispatch the job for async cleanup (container stopping + force delete)
             DeleteResourceJob::dispatch($preview);

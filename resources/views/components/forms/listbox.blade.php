@@ -4,7 +4,7 @@
     'label' => null,
     'helper' => null,
     'required' => false,
-    'options' => [], // list of ['value' => ..., 'label' => ..., 'disabled' => bool]
+    'options' => [], // list of ['value' => ..., 'label' => ..., 'description' => ?string, 'disabled' => bool]
     'placeholder' => 'Select…',
     'emptyText' => 'No options available.',
     'live' => false,
@@ -19,6 +19,10 @@
     'canGate' => null,
     'canResource' => null,
     'autoDisable' => true,
+    'multiple' => false, // true = the bound value is an array of option values
+    'searchable' => false, // true = a search field filters the options
+    'searchPlaceholder' => 'Search…',
+    'searchEmptyText' => 'No matching options',
 ])
 
 @php
@@ -28,6 +32,28 @@
 
     $triggerId = ($htmlId ?? $id).'-trigger';
     $panelId = ($htmlId ?? $id).'-panel';
+
+    // A multiple listbox also shows item errors, for example a rule on `ids.*`.
+    $errorMessage = $wire && $id && isset($errors)
+        ? ($errors->first($id) ?: ($multiple ? $errors->first($id.'.*') : null))
+        : null;
+
+    if ($multiple) {
+        // Server-rendered trigger text; Alpine keeps it current after init.
+        if (! $wire) {
+            $value = is_array($value) ? array_values($value) : [];
+        }
+        $selectedValues = $wire ? data_get($__livewire ?? null, $id) : $value;
+        $selectedValues = is_array($selectedValues) ? array_map('strval', $selectedValues) : [];
+        $selectedLabels = collect($options)
+            ->filter(fn ($option) => empty($option['header']) && in_array((string) $option['value'], $selectedValues, true))
+            ->pluck('label');
+        $multipleLabel = match (true) {
+            $selectedLabels->isEmpty() => $placeholder,
+            $selectedLabels->count() <= 2 => $selectedLabels->implode(', '),
+            default => $selectedLabels->count().' selected',
+        };
+    }
 @endphp
 
 <div class="w-full min-w-0">
@@ -55,21 +81,75 @@
         positioned: false,
         saving: false,
         options: @js(array_values($options)),
+        @if ($searchable)
+        query: '',
+        init() {
+            this.$watch('open', (open) => open ? this.$nextTick(() => this.$refs.search?.focus()) : this.query = '');
+        },
+        get visibleOptions() {
+            const query = this.query.toLowerCase().trim();
+            if (query === '') return this.options;
+            return this.options.filter((option) => !option.header && [option.label, option.value, option.description]
+                .some((text) => String(text ?? '').toLowerCase().includes(query)));
+        },
+        chooseOnlyMatch() {
+            const matches = this.visibleOptions.filter((option) => !option.disabled);
+            if (matches.length === 1) this.choose(matches[0]);
+        },
+        @else
+        get visibleOptions() {
+            return this.options;
+        },
+        @endif
         value: @if (!$wire) @js($value) @elseif ($live && ! $onChange) @entangle($id).live @else @entangle($id) @endif,
+        @if ($multiple)
+        get selected() {
+            return Array.isArray(this.value) ? this.value : [];
+        },
+        isSelected(option) {
+            return this.selected.some((value) => String(value) === String(option.value));
+        },
+        get selectedLabels() {
+            return this.options.filter((option) => !option.header && this.isSelected(option)).map((option) => option.label);
+        },
+        get current() {
+            const labels = this.selectedLabels;
+            if (labels.length === 0) return @js($placeholder);
+            return labels.length <= 2 ? labels.join(', ') : `${labels.length} selected`;
+        },
+        get title() {
+            return this.selectedLabels.join(', ') || @js($placeholder);
+        },
+        @else
+        isSelected(option) {
+            return String(option.value) === String(this.value);
+        },
         get current() {
             const found = this.options.find((option) => String(option.value) === String(this.value));
             return found ? found.label : @js($placeholder);
         },
+        get title() {
+            return this.current;
+        },
+        @endif
         async choose(option) {
-            if (this.saving || option.disabled) return;
-            this.open = false;
-            if (String(option.value) === String(this.value)) return;
-            this.value = option.value;
-            this.$dispatch('listbox-change', { value: option.value });
+            if (option.header || option.disabled || this.saving) return;
+            @if ($multiple)
+                {{-- Replace the whole array: an in-place splice makes Livewire send two updates for one click. --}}
+                const next = this.isSelected(option)
+                    ? this.selected.filter((value) => String(value) !== String(option.value))
+                    : [...this.selected, option.value];
+            @else
+                this.open = false;
+                if (String(option.value) === String(this.value)) return;
+                const next = option.value;
+            @endif
+            this.value = next;
+            this.$dispatch('listbox-change', { value: next });
             @if ($onChange && is_array($onChangeArgs))
                 this.saving = true;
                 try {
-                    await this.$wire.{{ $onChange }}(...@js($onChangeArgs), option.value);
+                    await this.$wire.{{ $onChange }}(...@js($onChangeArgs), next);
                 } finally {
                     this.saving = false;
                 }
@@ -123,12 +203,12 @@
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @if ($preserveValue) wire:ignore @endif
-        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()"
+        @click.outside="document.getElementById(@js($panelId))?.contains($event.target) || (open = false)" @keydown.escape="open = false" @resize.window="open && positionPanel()"
         @scroll.window.capture="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
-            :aria-expanded="open" @if ($tooltip) :title="current" @endif>
-            <span class="listbox-trigger-label" x-text="current"></span>
+            :aria-expanded="open" @if ($tooltip) :title="title" @endif>
+            <span class="listbox-trigger-label" x-text="current">{{ $multiple ? $multipleLabel : '' }}</span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
                 stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
@@ -136,7 +216,7 @@
         </button>
         @if ($portal)
             <template x-teleport="body">
-                <div id="{{ $panelId }}" class="listbox-panel"
+                <div id="{{ $panelId }}" class="listbox-panel{{ $searchable ? ' searchable-listbox-panel' : '' }}"
                     style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
                     x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
                     x-transition:enter="transition ease-out duration-100"
@@ -145,50 +225,119 @@
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                     x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
-                    x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox">
-                    <div x-show="options.length === 0"
+                    x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox"
+                    @if ($multiple) aria-multiselectable="true" @endif>
+                    @if ($searchable)
+                        <div class="searchable-listbox-search">
+                            <x-reicon name="search"
+                                class="pointer-events-none absolute top-1/2 left-3 size-3 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                            <input x-ref="search" type="search" x-model="query" autocomplete="off"
+                                placeholder="{{ $searchPlaceholder }}" class="searchable-listbox-search-input"
+                                @keydown.enter.prevent="chooseOnlyMatch()" @keydown.escape.stop="open = false" />
+                        </div>
+                        <div class="searchable-listbox-options">
+                    @endif
+                    <div x-show="visibleOptions.length === 0"
                         class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
-                        {{ $emptyText }}
+                        @if ($searchable)
+                            <span x-text="options.length === 0 ? @js($emptyText) : @js($searchEmptyText)"></span>
+                        @else
+                            {{ $emptyText }}
+                        @endif
                     </div>
-                    <template x-for="option in options" :key="String(option.value)">
-                        <button type="button" class="listbox-option" role="option"
-                            :class="{ 'listbox-option-disabled': option.disabled }"
-                            :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                            <span class="truncate" x-text="option.label"></span>
-                            <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
-                                fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
-                                class="size-3.5 shrink-0">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
-                        </button>
+                    <template x-for="option in visibleOptions" :key="String(option.value)">
+                        <div>
+                            {{-- Non-selectable group header (options with header: true). Each header is the
+                                 only child of its x-for wrapper, so `first:` can't target it — the divider
+                                 is an unconditional top border, which reads as a separator between groups. --}}
+                            <template x-if="option.header">
+                                <div class="mt-1 border-t border-neutral-100 px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:border-white/[0.06] dark:text-fg-faint"
+                                    x-text="option.label"></div>
+                            </template>
+                            <template x-if="!option.header">
+                                <button type="button" class="listbox-option" role="option"
+                                    :class="{ 'listbox-option-disabled': option.disabled }"
+                                    :aria-selected="isSelected(option)" @click="choose(option)">
+                                    <span class="flex min-w-0 flex-col">
+                                        <span class="truncate" x-text="option.label"></span>
+                                        <span x-show="option.description" x-text="option.description"
+                                            class="text-xs whitespace-normal text-neutral-500 dark:text-fg-dim"></span>
+                                    </span>
+                                    <svg x-show="isSelected(option)" xmlns="http://www.w3.org/2000/svg"
+                                        fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                                        class="size-3.5 shrink-0">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                    </svg>
+                                </button>
+                            </template>
+                        </div>
                     </template>
+                    @if ($searchable)
+                        </div>
+                    @endif
                 </div>
             </template>
         @else
-            <div x-ref="panel" class="listbox-panel" x-show="open" x-cloak
+            <div x-ref="panel" class="listbox-panel{{ $searchable ? ' searchable-listbox-panel' : '' }}" x-show="open" x-cloak
                 x-transition:enter="transition ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
                 x-transition:leave="transition ease-in duration-75"
                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]" role="listbox">
-                <div x-show="options.length === 0"
+                x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]" role="listbox"
+                @if ($multiple) aria-multiselectable="true" @endif>
+                @if ($searchable)
+                    <div class="searchable-listbox-search">
+                        <x-reicon name="search"
+                            class="pointer-events-none absolute top-1/2 left-3 size-3 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                        <input x-ref="search" type="search" x-model="query" autocomplete="off"
+                            placeholder="{{ $searchPlaceholder }}" class="searchable-listbox-search-input"
+                            @keydown.enter.prevent="chooseOnlyMatch()" @keydown.escape.stop="open = false" />
+                    </div>
+                    <div class="searchable-listbox-options">
+                @endif
+                <div x-show="visibleOptions.length === 0"
                     class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
-                    {{ $emptyText }}
+                    @if ($searchable)
+                        <span x-text="options.length === 0 ? @js($emptyText) : @js($searchEmptyText)"></span>
+                    @else
+                        {{ $emptyText }}
+                    @endif
                 </div>
-                <template x-for="option in options" :key="String(option.value)">
-                    <button type="button" class="listbox-option" role="option"
-                        :class="{ 'listbox-option-disabled': option.disabled }"
-                        :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                        <span class="truncate" x-text="option.label"></span>
-                        <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
-                            class="size-3.5 shrink-0">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                    </button>
+                <template x-for="option in visibleOptions" :key="String(option.value)">
+                    <div>
+                        {{-- Non-selectable group header (options with header: true). --}}
+                        <template x-if="option.header">
+                            <div class="mt-1 border-t border-neutral-100 px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:border-white/[0.06] dark:text-fg-faint"
+                                x-text="option.label"></div>
+                        </template>
+                        <template x-if="!option.header">
+                            <button type="button" class="listbox-option" role="option"
+                                :class="{ 'listbox-option-disabled': option.disabled }"
+                                :aria-selected="isSelected(option)" @click="choose(option)">
+                                <span class="flex min-w-0 flex-col">
+                                    <span class="truncate" x-text="option.label"></span>
+                                    <span x-show="option.description" x-text="option.description"
+                                        class="text-xs whitespace-normal text-neutral-500 dark:text-fg-dim"></span>
+                                </span>
+                                <svg x-show="isSelected(option)" xmlns="http://www.w3.org/2000/svg"
+                                    fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                                    class="size-3.5 shrink-0">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
                 </template>
+                @if ($searchable)
+                    </div>
+                @endif
             </div>
         @endif
     </div>
+    @if ($errorMessage)
+        <label class="label">
+            <span class="text-red-500 label-text-alt">{{ $errorMessage }}</span>
+        </label>
+    @endif
 </div>

@@ -20,6 +20,9 @@ class Advanced extends Component
     public bool $is_registration_enabled;
 
     #[Validate('boolean')]
+    public bool $disable_registration_when_oauth_enabled;
+
+    #[Validate('boolean')]
     public bool $do_not_track;
 
     #[Validate('boolean')]
@@ -61,6 +64,7 @@ class Advanced extends Component
     {
         return [
             'is_registration_enabled' => 'boolean',
+            'disable_registration_when_oauth_enabled' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
             'custom_dns_servers' => ['nullable', 'string', new ValidDnsServers],
@@ -87,6 +91,7 @@ class Advanced extends Component
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->disable_registration_when_oauth_enabled = $this->settings->disable_registration_when_oauth_enabled;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
@@ -203,6 +208,7 @@ class Advanced extends Component
         try {
             $this->authorize('update', $this->settings);
             $this->settings->is_registration_enabled = $this->is_registration_enabled;
+            $this->settings->disable_registration_when_oauth_enabled = $this->disable_registration_when_oauth_enabled;
             $this->settings->do_not_track = $this->do_not_track;
             $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
             $this->settings->custom_dns_servers = $this->custom_dns_servers;
@@ -216,7 +222,7 @@ class Advanced extends Component
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -254,12 +260,32 @@ class Advanced extends Component
             }
             $this->authorize('update', $this->settings);
             $this->settings->domain_connect_private_key = null;
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->domain_connect_private_key = null;
             $this->dispatch('success', 'Domain Connect private key removed.');
         } catch (\Exception $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * Save the instance settings and record the changed field names (never their values).
+     */
+    private function saveAndAudit(): void
+    {
+        $changedFields = auditChangedFields($this->settings);
+        $this->settings->save();
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.instance.settings.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'section' => 'advanced',
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     private function normalizeDomainConnectPrivateKey(string $key): string

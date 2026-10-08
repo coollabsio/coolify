@@ -11,6 +11,7 @@ use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupMissing;
 use App\Notifications\Database\BackupSuccess;
+use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
 use App\Notifications\Server\DockerCleanupFailed;
@@ -20,6 +21,10 @@ use App\Notifications\Server\Reachable;
 use App\Notifications\Server\ServerPatchCheck;
 use App\Notifications\Server\TraefikVersionOutdated;
 use App\Notifications\Server\Unreachable;
+use App\Notifications\VolumeBackup\BackupFailed as VolumeBackupFailed;
+use App\Notifications\VolumeBackup\BackupMissing as VolumeBackupMissing;
+use App\Notifications\VolumeBackup\BackupSuccess as VolumeBackupSuccess;
+use App\Notifications\VolumeBackup\RecoveryFailed as VolumeBackupRecoveryFailed;
 
 class TelegramChannel
 {
@@ -41,8 +46,15 @@ class TelegramChannel
             RestartLimitReached::class => $settings->telegram_notifications_restart_limit_reached_thread_id,
 
             BackupSuccess::class => $settings->telegram_notifications_backup_success_thread_id,
+            VolumeBackupSuccess::class => $notification->warning
+                ? $settings->telegram_notifications_backup_failure_thread_id
+                : $settings->telegram_notifications_backup_success_thread_id,
             BackupFailed::class,
-            BackupMissing::class => $settings->telegram_notifications_backup_failure_thread_id,
+            BackupMissing::class,
+            BackupSuccessWithS3Warning::class,
+            VolumeBackupFailed::class,
+            VolumeBackupMissing::class,
+            VolumeBackupRecoveryFailed::class => $settings->telegram_notifications_backup_failure_thread_id,
 
             TaskSuccess::class => $settings->telegram_notifications_scheduled_task_success_thread_id,
             TaskFailed::class => $settings->telegram_notifications_scheduled_task_failure_thread_id,

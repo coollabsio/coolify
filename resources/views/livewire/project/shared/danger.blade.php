@@ -8,6 +8,13 @@
             default => 'resource',
         };
     @endphp
+    @if ($resource && !data_get($resource, 'destination.server')?->isFunctional())
+        <x-callout type="warning" title="Server is not reachable" class="mb-4">
+            Coolify cannot stop or remove Docker resources on this server. Deleting removes this {{ $resourceLabel }}
+            from Coolify only. Its containers, volumes, networks, and configuration files remain on the server and can
+            start again when the server is back.
+        </x-callout>
+    @endif
     <x-application.settings-section id="danger-zone-section" title="Danger zone"
         helper="Destructive resource actions cannot be undone.">
         <x-danger-zone title="Delete {{ $resourceLabel }}">
@@ -30,6 +37,19 @@
                             confirmationText="{{ $resourceName }}"
                             confirmationLabel="Enter the resource name to confirm permanent deletion"
                             shortConfirmationLabel="Resource name" />
+                        @if ($resource instanceof \App\Models\Service)
+                            <x-modal-confirmation title="Remove service from Coolify only?"
+                                buttonTitle="Remove from Coolify only"
+                                isErrorButton submitAction="deleteFromCoolifyOnly"
+                                :actions="[
+                                    'Permanently remove this service from Coolify.',
+                                    'Leave all containers, volumes, networks, and configuration files on the server.',
+                                ]"
+                                warningMessage="Coolify will no longer track or manage the Docker resources for this service. Use this only when normal cleanup cannot complete."
+                                confirmationText="{{ $resourceName }}"
+                                confirmationLabel="Enter the resource name to confirm metadata-only deletion"
+                                shortConfirmationLabel="Resource name" />
+                        @endif
                     @else
                         <x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">
                             Delete {{ $resourceLabel }}

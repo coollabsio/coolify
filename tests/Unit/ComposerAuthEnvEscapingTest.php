@@ -12,13 +12,27 @@ use App\Models\EnvironmentVariable;
  */
 const COMPOSER_AUTH_JSON = '{"http-basic":{"backpackforlaravel.com":{"username":"ourusername","password":"ourpassword"}}}';
 
+/**
+ * A resource whose relations realValue() treats as already loaded, so no query runs.
+ */
+function composerAuthResourceStub(): object
+{
+    return new class
+    {
+        public function relationLoaded(string $relation): bool
+        {
+            return true;
+        }
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Test 1: realValue accessor returns raw JSON for non-literal env vars
 // ---------------------------------------------------------------------------
 it('realValue accessor returns raw JSON without escaping quotes', function () {
     $env = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $env->shouldReceive('relationLoaded')->with('resourceable')->andReturn(true);
-    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(new stdClass);
+    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(composerAuthResourceStub());
     $env->shouldReceive('getAttribute')->with('value')->andReturn(COMPOSER_AUTH_JSON);
     $env->shouldReceive('getAttribute')->with('is_literal')->andReturn(false);
     $env->shouldReceive('getAttribute')->with('is_multiline')->andReturn(false);
@@ -37,7 +51,7 @@ it('realValue accessor returns raw JSON without escaping quotes', function () {
 it('realValue accessor for literal JSON env returns raw value without wrapping', function () {
     $env = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $env->shouldReceive('relationLoaded')->with('resourceable')->andReturn(true);
-    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(new stdClass);
+    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(composerAuthResourceStub());
     $env->shouldReceive('getAttribute')->with('value')->andReturn(COMPOSER_AUTH_JSON);
     $env->shouldReceive('getAttribute')->with('is_literal')->andReturn(true);
     $env->shouldReceive('getAttribute')->with('is_multiline')->andReturn(false);
@@ -56,7 +70,7 @@ it('realValue accessor for literal JSON env returns raw value without wrapping',
 it('realValue accessor still escapes non-JSON values with quotes', function () {
     $env = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $env->shouldReceive('relationLoaded')->with('resourceable')->andReturn(true);
-    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(new stdClass);
+    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(composerAuthResourceStub());
     $env->shouldReceive('getAttribute')->with('value')->andReturn('hello "world"');
     $env->shouldReceive('getAttribute')->with('is_literal')->andReturn(false);
     $env->shouldReceive('getAttribute')->with('is_multiline')->andReturn(false);
@@ -76,7 +90,7 @@ it('realValue accessor returns raw JSON array without escaping', function () {
 
     $env = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $env->shouldReceive('relationLoaded')->with('resourceable')->andReturn(true);
-    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(new stdClass);
+    $env->shouldReceive('getAttribute')->with('resourceable')->andReturn(composerAuthResourceStub());
     $env->shouldReceive('getAttribute')->with('value')->andReturn($jsonArray);
     $env->shouldReceive('getAttribute')->with('is_literal')->andReturn(false);
     $env->shouldReceive('getAttribute')->with('is_multiline')->andReturn(false);

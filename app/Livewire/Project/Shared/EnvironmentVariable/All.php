@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,7 +15,7 @@ use Livewire\Component;
 
 class All extends Component
 {
-    use AuthorizesRequests, EnvironmentVariableProtection;
+    use AuditsApplicationSettings, AuthorizesRequests, EnvironmentVariableProtection;
 
     public $resource;
 
@@ -128,7 +129,11 @@ class All extends Component
             $this->page = 1;
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
             $this->resource->settings->use_build_secrets = $this->use_build_secrets;
-            $this->resource->settings->save();
+            if ($this->resource instanceof Application) {
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } else {
+                $this->resource->settings->save();
+            }
             $this->clearEnvironmentVariableCaches();
             if ($this->readyToLoad && $this->view === 'dev') {
                 $this->getDevView();
@@ -214,12 +219,17 @@ class All extends Component
         return $this->environmentVariableRowCount > 0;
     }
 
+    private function canViewEnvironmentValues(): bool
+    {
+        return auth()->user()?->can('manageEnvironment', $this->resource) ?? false;
+    }
+
     private function nullLockedValues($envs)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
-        $envs->each(function ($env) use ($isMember) {
-            if ($env->is_shown_once || $isMember) {
+        $envs->each(function ($env) use ($hideValues) {
+            if ($env->is_shown_once || $hideValues) {
                 $env->value = null;
                 $env->real_value = null;
             }
@@ -753,7 +763,14 @@ class All extends Component
         }
         // Otherwise keep order from docker-compose file
 
-        return $hardcodedVars;
+        // Compose content is visible only to users who can edit the resource.
+        $canViewValues = auth()->user()?->can('update', $this->resource) ?? false;
+
+        return $hardcodedVars->map(fn (array $variable): array => [
+            ...$variable,
+            'value' => $canViewValues ? $variable['value'] : null,
+            'is_value_hidden' => ! $canViewValues,
+        ]);
     }
 
     /** @return list<string> */
@@ -816,12 +833,12 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(function ($item) use ($isMember) {
-                if ($isMember) {
+            ->map(function ($item) use ($hideValues) {
+                if ($hideValues) {
                     return "$item->key=(Hidden, only admins can view)";
                 }
                 if ($item->is_shown_once) {
@@ -837,6 +854,7 @@ class All extends Component
 
     public function switch()
     {
+        $this->authorize('view', $this->resource);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         if ($this->view === 'dev') {
             $this->ensureEnvironmentVariablesLoaded();

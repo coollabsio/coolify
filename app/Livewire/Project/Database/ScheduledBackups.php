@@ -52,6 +52,12 @@ class ScheduledBackups extends Component
 
             $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
             $backup->delete();
+            auditLog('ui.database.backup_schedule_deleted', [
+                'team_id' => $this->database->team()?->id,
+                'database_uuid' => $this->database->uuid,
+                'database_name' => $this->database->name,
+                'backup_uuid' => $backup->uuid,
+            ]);
             $this->dispatch('success', 'Scheduled backup deleted.');
             $this->refreshScheduledBackups();
         } catch (\Throwable $e) {

@@ -116,6 +116,11 @@
                 'active' => $currentRoute === 'project.application.metrics',
             ],
             [
+                'label' => 'Analytics',
+                'route' => 'project.application.analytics',
+                'active' => $currentRoute === 'project.application.analytics',
+            ],
+            [
                 'label' => 'Tags',
                 'route' => 'project.application.tags',
                 'active' => $currentRoute === 'project.application.tags',
@@ -154,6 +159,7 @@
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
             'Metrics' => 'graph',
+            'Analytics' => 'analytics',
             'Tags' => 'tags',
             'Danger Zone' => 'shield-alert',
         ];
@@ -161,7 +167,7 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone'],
@@ -172,6 +178,9 @@
                 ->filter()
                 ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
+
+        // Group that holds the current page — always kept open, even if collapsed before.
+        $activeGroup = (string) $groupedMenuItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
         // In-page sections (cards) shown as sub-items under the active page
         $isComposeApp = $application->build_pack === 'dockercompose';
@@ -233,19 +242,33 @@
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
             ],
         ];
+
+        // Pages and in-page sections that the command palette (⌘K) can search on this page
+        $settingsSearchItems = settingsSearchItems($groupedMenuItems, $applicationRouteParameters, $pageSections);
     @endphp
 
 <aside @class([
     'application-settings-navigation min-w-0 xl:self-start',
     'is-flush' => $flush,
-])>
+]) data-settings-search-items="{{ json_encode($settingsSearchItems) }}">
                 <nav aria-label="Configuration sections"
+                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.application' })"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
-                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
+                                aria-hidden="true"></div>
                         @endunless
-                        <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
+                        <button type="button" class="nav-section-toggle hidden xl:flex"
+                            @click="toggle(@js($groupLabel))" :aria-expanded="isOpen(@js($groupLabel))">
+                            <span>{{ $groupLabel }}</span>
+                            <svg class="size-3 shrink-0 opacity-60 transition-transform"
+                                :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
                             <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}">
@@ -266,28 +289,23 @@
                                         </span>
                                     @endif
                                 </a>
-                                @if (filled($sections))
+                                {{-- Sub-sections belong to the current page only; collapse them for
+                                     every other item so the sidebar stays short. --}}
+                                @if ($menuItem['active'] && filled($sections))
                                     <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
                                         x-data="{ activeSection: '' }">
                                         @foreach ($sections as $section)
-                                            @if ($menuItem['active'])
-                                                <button type="button" class="menu-subitem"
-                                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                                    x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </button>
-                                            @else
-                                                <a class="menu-subitem"
-                                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
-                                                    {{ wireNavigate() }}>
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </a>
-                                            @endif
+                                            <button type="button" class="menu-subitem"
+                                                :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                                x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                                <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                            </button>
                                         @endforeach
                                     </div>
                                 @endif
                             </div>
                         @endforeach
+                        </div>
                     @endforeach
                 </nav>
             </aside>

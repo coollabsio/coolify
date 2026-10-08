@@ -1,9 +1,9 @@
 <?php
 
 use App\Http\Controllers\UploadController;
-use App\Livewire\Project\Database\ImportForm;
 use App\Models\StandalonePostgresql;
 use App\Support\DatabaseBackupFileValidator;
+use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Process;
 
@@ -67,18 +67,12 @@ function invokeHasAllowedExtension(string $name): bool
     return $method->invoke(null, $name);
 }
 
-function backupValidationImportFormWithResource(string $modelClass): ImportForm
+function postgresScanScript(string $path): ?string
 {
-    $component = new class extends ImportForm
-    {
-        public $resource;
-    };
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
 
-    $database = Mockery::mock($modelClass);
-    $database->shouldReceive('getMorphClass')->andReturn($modelClass);
-    $component->resource = $database;
-
-    return $component;
+    return (new DatabaseImportCommandBuilder)->buildPostgresRestoreScanScript($database, $path);
 }
 
 function makeTemporaryUpload(string $name, string $content): UploadedFile
@@ -108,6 +102,12 @@ test('hasAllowedExtension accepts supported extensions', function (string $name)
     'archive.gz' => ['data.archive.gz'],
     'bz2' => ['data.bz2'],
     'xz' => ['data.xz'],
+    'sqlite db' => ['app.db'],
+    'sqlite' => ['app.sqlite'],
+    'sqlite3' => ['app.sqlite3'],
+    'gzip sqlite db' => ['app.db.gz'],
+    'gzip sqlite' => ['app.sqlite.gz'],
+    'gzip sqlite3' => ['app.sqlite3.gz'],
 ]);
 
 test('hasAllowedExtension rejects unsupported or empty stems', function (string $name) {
@@ -142,6 +142,23 @@ test('backup validator rejects content that does not match the backup extension'
     expect(DatabaseBackupFileValidator::isUploadAllowed($file, 10 * 1024 * 1024))->toBeFalse();
 });
 
+test('backup validator accepts SQLite database files and their gzip form', function (string $name, string $content) {
+    expect(DatabaseBackupFileValidator::isUploadAllowed(makeTemporaryUpload($name, $content), 10 * 1024 * 1024))->toBeTrue();
+})->with([
+    'db' => ['app.db', "SQLite format 3\0".str_repeat("\0", 84)],
+    'sqlite' => ['app.sqlite', "SQLite format 3\0".str_repeat("\0", 84)],
+    'sqlite3' => ['app.sqlite3', "SQLite format 3\0".str_repeat("\0", 84)],
+    'gzip sqlite' => ['app.sqlite.gz', gzencode("SQLite format 3\0".str_repeat("\0", 84))],
+]);
+
+test('backup validator rejects SQLite extensions with content that is not a SQLite database', function (string $name, string $content) {
+    expect(DatabaseBackupFileValidator::isUploadAllowed(makeTemporaryUpload($name, $content), 10 * 1024 * 1024))->toBeFalse();
+})->with([
+    'sql text as db' => ['app.db', "CREATE TABLE users (id integer);\n"],
+    'script as sqlite' => ['app.sqlite', "#!/bin/sh\nid\n"],
+    'plain sqlite as sqlite.gz' => ['app.sqlite.gz', "SQLite format 3\0".str_repeat("\0", 84)],
+]);
+
 test('backup validator accepts valid plain sql and gzip backup content', function () {
     $plainSql = makeTemporaryUpload('backup.sql', "CREATE TABLE users (id integer);\n");
     $gzipSql = makeTemporaryUpload('backup.sql.gz', gzencode("CREATE TABLE users (id integer);\n"));
@@ -173,39 +190,21 @@ SQL;
 });
 
 test('postgresql restore commands include a safety check before execution', function () {
-    $component = new class extends ImportForm
-    {
-        public function __get($property)
-        {
-            if ($property === 'resource') {
-                return new class
-                {
-                    public function getMorphClass(): string
-                    {
-                        return StandalonePostgresql::class;
-                    }
-                };
-            }
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
 
-            return parent::__get($property);
-        }
-    };
-    $component->container = 'postgres-test';
-
-    $command = $component->buildRestoreSafetyCheckCommand('/tmp/restore_test');
+    $command = (new DatabaseImportCommandBuilder)->buildPostgresSafetyCommand(
+        $database,
+        'postgres-test',
+        '/tmp/restore_test',
+    );
 
     expect($command)
         ->toContain('docker exec postgres-test')
         ->toContain('COPY ... PROGRAM')
         ->toContain('/tmp/restore_test')
-        ->toContain('grep -Eiq');
-});
-
-test('non postgresql restore commands do not include a safety check', function () {
-    $component = backupValidationImportFormWithResource('App\Models\StandaloneMysql');
-    $component->container = 'mysql-test';
-
-    expect($component->buildRestoreSafetyCheckCommand('/tmp/restore_test'))->toBeNull();
+        ->toContain('grep -Eiq')
+        ->toContain('pg_restore -l');
 });
 
 test('file scanner detects program execution payloads inside gzipped backups', function () {
@@ -251,11 +250,8 @@ test('backup validator rejects plaintext .dump containing program execution', fu
 });
 
 test('remote postgresql scanner blocks bypass payloads', function (string $content, bool $gzip) {
-    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
-    $component->container = 'postgres-test';
-
     $payload = writeScanPayload($content, $gzip);
-    $script = $component->buildPostgresRestoreScanScript($payload);
+    $script = postgresScanScript($payload);
 
     expect(scannerBlocks($script))->toBeTrue();
 })->with([
@@ -272,11 +268,8 @@ test('remote postgresql scanner blocks bypass payloads', function (string $conte
 ]);
 
 test('remote postgresql scanner allows legitimate restores', function (string $content, bool $gzip) {
-    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
-    $component->container = 'postgres-test';
-
     $payload = writeScanPayload($content, $gzip);
-    $script = $component->buildPostgresRestoreScanScript($payload);
+    $script = postgresScanScript($payload);
 
     expect(scannerBlocks($script))->toBeFalse();
 })->with([
@@ -288,7 +281,6 @@ test('remote postgresql scanner allows legitimate restores', function (string $c
 ]);
 
 test('remote postgresql scanner inspects custom archives instead of skipping them', function () {
-    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
     $safeArchive = writeScanPayload("PGDMP\0binary archive");
     $maliciousSql = "COPY x FROM PROGRAM 'id';\n";
     $safeSql = "CREATE TABLE users (id integer);\nCOPY users FROM stdin;\n1\tTaylor\n\\.\n";
@@ -298,10 +290,10 @@ test('remote postgresql scanner inspects custom archives instead of skipping the
     $unreadablePath = fakePgRestorePath($safeSql, listExitCode: 1);
     $path = getenv('PATH') ?: '/usr/bin:/bin';
 
-    expect(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $maliciousPath.':'.$path]))->toBeTrue()
-        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $safePath.':'.$path]))->toBeFalse()
-        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $unreadablePath.':'.$path]))->toBeTrue()
-        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive)))->toBeTrue();
+    expect(scannerBlocks(postgresScanScript($safeArchive), ['PATH' => $maliciousPath.':'.$path]))->toBeTrue()
+        ->and(scannerBlocks(postgresScanScript($safeArchive), ['PATH' => $safePath.':'.$path]))->toBeFalse()
+        ->and(scannerBlocks(postgresScanScript($safeArchive), ['PATH' => $unreadablePath.':'.$path]))->toBeTrue()
+        ->and(scannerBlocks(postgresScanScript($safeArchive)))->toBeTrue();
 });
 
 test('MAX_BYTES constant is 10 GiB', function () {

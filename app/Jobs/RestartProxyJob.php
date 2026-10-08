@@ -4,10 +4,10 @@ namespace App\Jobs;
 
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
-use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use App\Services\ProxyPortParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,18 +31,27 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         return [(new WithoutOverlapping('restart-proxy-'.$this->server->uuid))->expireAfter(120)->dontRelease()];
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue(deployment_queue());
+    }
 
     public function handle()
     {
         try {
+            $configuration = GetProxyConfiguration::run($this->server);
+            if (! $configuration) {
+                throw new \Exception('Configuration is not synced');
+            }
+            ProxyPortParser::fromConfiguration($configuration);
+
             // Set status to restarting
             $this->server->proxy->status = 'restarting';
             $this->server->proxy->force_stop = false;
             $this->server->save();
 
             // Build combined stop + start commands for a single activity
-            $commands = $this->buildRestartCommands();
+            $commands = $this->buildRestartCommands($configuration);
 
             // Create activity and dispatch immediately - returns Activity right away
             // The remote_process runs asynchronously, so UI gets activity ID instantly
@@ -50,13 +59,16 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 $commands,
                 $this->server,
                 callEventOnFinish: 'ProxyStatusChanged',
-                callEventData: $this->server->id
+                callEventData: $this->server->id,
+                queue: deployment_queue(),
             );
 
             // Store activity ID and notify UI immediately with it
             $this->activity_id = $activity->id;
             ProxyStatusChangedUI::dispatch($this->server->team_id, $this->activity_id);
 
+        } catch (\InvalidArgumentException $e) {
+            return handleError($e);
         } catch (\Throwable $e) {
             // Set error status
             $this->server->proxy->status = 'error';
@@ -76,22 +88,16 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
      * Build combined stop + start commands for proxy restart.
      * This creates a single command sequence that shows all logs in one activity.
      */
-    private function buildRestartCommands(): array
+    private function buildRestartCommands(string $configuration): array
     {
-        $proxyType = $this->server->proxyType();
         $containerName = $this->server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
         $proxy_path = $this->server->proxyPath();
+        // Absolute paths: a non-root SSH user may not be able to enter the proxy directory (#4255).
+        $compose_file = rtrim($proxy_path, '/').'/docker-compose.yml';
         $stopTimeout = 30;
 
-        // Get proxy configuration
-        $configuration = GetProxyConfiguration::run($this->server);
-        if (! $configuration) {
-            throw new \Exception('Configuration is not synced');
-        }
         SaveProxyConfiguration::run($this->server, $configuration);
-        $docker_compose_yml_base64 = base64_encode($configuration);
-        $this->server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
-        $this->server->save();
+        $this->server->markProxyConfigurationApplied($configuration);
 
         $commands = collect([]);
 
@@ -125,31 +131,26 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             $commands = $commands->merge([
                 "echo 'Starting proxy (Swarm mode)...'",
                 "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Starting coolify-proxy.'",
-                'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
+                "docker stack deploy --detach=true -c $compose_file coolify-proxy",
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            if (isDev() && $proxyType === ProxyTypes::CADDY->value) {
-                $proxy_path = '/data/coolify/proxy/caddy';
-            }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
                 "echo 'Starting proxy...'",
                 "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
-                "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
+                "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                'docker compose pull',
+                "docker compose -f $compose_file pull",
             ]);
             // Ensure required networks exist BEFORE docker compose up
             $commands = $commands->merge(ensureProxyNetworksExist($this->server));
             $commands = $commands->merge([
                 "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --wait --remove-orphans',
+                "docker compose -f $compose_file up -d --wait --remove-orphans",
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($this->server));
