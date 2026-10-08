@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\ComposeBindPathResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -177,7 +176,7 @@ class ScheduledVolumeBackup extends BaseModel
         }
 
         if ($target->usesComposeBindSource()) {
-            return ComposeBindPathResolver::resolve($target);
+            return $target->composeBindHostPath();
         }
 
         $path = str($target->fs_path);

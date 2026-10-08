@@ -402,7 +402,7 @@ class LocalFileVolume extends BaseModel
     public function contentPathOnServer(?Server $server = null): string
     {
         if ($this->usesComposeBindSource()) {
-            return ComposeBindPathResolver::resolve($this, server: $server);
+            return $this->composeBindHostPath($server);
         }
 
         return $this->hostPathAndResourceDirectory()[0];
@@ -563,7 +563,8 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
-     * Compose resources get their bind source from `docker compose config`, not from `fs_path`.
+     * Compose resources use the administrator-selected bind source and write their file mounts
+     * before `docker compose up`, not in a queued job.
      */
     public function usesComposeBindSource(): bool
     {
@@ -571,6 +572,25 @@ class LocalFileVolume extends BaseModel
             ?? data_get($this->resource, 'service.docker_compose_raw');
 
         return is_string($compose) && $compose !== '';
+    }
+
+    /**
+     * The host path of a Compose bind source. Only a source with a variable needs
+     * `docker compose config`; the parser already resolved other sources in `fs_path`.
+     */
+    public function composeBindHostPath(?Server $server = null, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
+    {
+        validateComposeBindSource($this->fs_path);
+        if (str_contains($this->fs_path, '$')) {
+            return ComposeBindPathResolver::resolve($this, $composeFile, $envFile, $projectDirectory, $server);
+        }
+
+        $path = normalizeUnixPath($this->resolvedFsPath($this->ownerResource()->workdir())->value(), allowLiteralBindCharacters: true);
+        if ($path === '/' || ! str_starts_with($path, '/')) {
+            throw new \RuntimeException('Invalid storage path: the bind source must be an absolute path below the root directory.');
+        }
+
+        return $path;
     }
 
     /**
@@ -596,9 +616,7 @@ class LocalFileVolume extends BaseModel
     public function resolvedStoragePath(string $workdir, Server $server, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
     {
         if ($this->usesComposeBindSource()) {
-            validateComposeBindSource($this->fs_path);
-
-            return ComposeBindPathResolver::resolve($this, $composeFile, $envFile, $projectDirectory, $server);
+            return $this->composeBindHostPath($server, $composeFile, $projectDirectory, $envFile);
         }
 
         [$path, $resourceDirectory] = $this->hostPathAndResourceDirectory();

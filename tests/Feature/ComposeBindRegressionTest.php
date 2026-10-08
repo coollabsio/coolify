@@ -216,10 +216,27 @@ test('the resolver supports custom start commands and applications without a fin
     Process::assertRan(fn ($process) => str_contains($process->command, "--project-directory {$workdir}") && ! str_contains($process->command, '--no-env-resolution'));
 });
 
+test('a storage without a variable source keeps its stored host path without docker compose config', function () {
+    $application = regressionComposeApplication("services:\n  app:\n    image: alpine\n    volumes:\n      - ./data:/data\n");
+    $volume = LocalFileVolume::create([
+        'fs_path' => $application->workdir().'/data',
+        'mount_path' => '/data',
+        'is_directory' => true,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    Process::fake(fn () => Process::result(output: 'NOK'));
+
+    expect($volume->fresh()->initializeOnServer())->toBeNull();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'mkdir -p '.escapeshellarg($application->workdir().'/data')));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'config --format json'));
+});
+
 test('failed initialization returns the error and keeps the storage pending', function () {
     $application = regressionComposeApplication("services:\n  app:\n    image: alpine\n");
     $volume = LocalFileVolume::create([
-        'fs_path' => './data',
+        'fs_path' => '${DATA_DIR:-./data}',
         'mount_path' => '/data',
         'is_directory' => true,
         'resource_id' => $application->id,

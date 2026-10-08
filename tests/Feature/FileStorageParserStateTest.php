@@ -285,7 +285,7 @@ it('writes a new service mount before start after final Compose files exist', fu
 });
 
 it('keeps a service mount pending when Compose cannot resolve it', function () {
-    [$service] = makeComposeService(DATA_DIR_COMPOSE);
+    [$service] = makeComposeService("services:\n  app:\n    image: nginx:latest\n    volumes:\n      - \${DATA_DIR:-./data}:/app/data\n");
     serviceParser($service);
     $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
     $service->server->update(['private_key_id' => $privateKey->id]);
