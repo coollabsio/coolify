@@ -83,6 +83,23 @@ export function isFindShortcut(event) {
     return Boolean(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key?.toLowerCase() === 'f';
 }
 
+const DEFAULT_LOG_FILTERS = { error: true, warning: true, debug: true, info: true };
+
+/** Read saved level filters. Invalid saved values fall back to the defaults. */
+export function readLogFilters(saved) {
+    const filters = { ...DEFAULT_LOG_FILTERS };
+    let parsed;
+    try {
+        parsed = JSON.parse(saved);
+    } catch {
+        return filters;
+    }
+    for (const level of Object.keys(filters)) {
+        if (typeof parsed?.[level] === 'boolean') filters[level] = parsed[level];
+    }
+    return filters;
+}
+
 export function filterLogLines(lines, filters, query) {
     const needle = query.trim().toLowerCase();
     return lines.filter((line) => filters[line.level] !== false && (!needle || line.lower.includes(needle)));
@@ -170,7 +187,7 @@ export function initializeRuntimeLogsComponent() {
             scrollDebounce: null,
             destroyed: false,
             colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
-            logFilters: JSON.parse(localStorage.getItem('coolify-log-filters')) || { error: true, warning: true, debug: true, info: true },
+            logFilters: readLogFilters(localStorage.getItem('coolify-log-filters')),
             searchQuery: '',
             appliedQuery: '',
             matchCount: 0,
