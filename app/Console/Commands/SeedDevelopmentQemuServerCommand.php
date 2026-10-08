@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Actions\Development\SeedDevelopmentQemuServer;
+use App\Actions\Development\StartDevelopmentInstanceDatabase;
 use Illuminate\Console\Command;
+use Throwable;
 
 class SeedDevelopmentQemuServerCommand extends Command
 {
@@ -21,6 +23,15 @@ class SeedDevelopmentQemuServerCommand extends Command
 
         $server = SeedDevelopmentQemuServer::run($this->argument('profile'), ! $this->option('keep-others'), (bool) $this->option('as-localhost'), $this->option('ip') ?: null, (int) $this->option('port'));
         $this->info("Seeded {$server->name} at {$server->ip}.");
+
+        if ($this->option('as-localhost')) {
+            try {
+                StartDevelopmentInstanceDatabase::run($server);
+                $this->info('Started the coolify-db container for instance backups.');
+            } catch (Throwable $e) {
+                $this->warn("Could not start the coolify-db container for instance backups: {$e->getMessage()}");
+            }
+        }
 
         return self::SUCCESS;
     }
