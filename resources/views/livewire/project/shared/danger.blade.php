@@ -17,6 +17,23 @@
     @endif
     <x-application.settings-section id="danger-zone-section" title="Danger zone"
         helper="Destructive resource actions cannot be undone.">
+        @if (in_array($resource?->type(), ['standalone-redis', 'standalone-keydb', 'standalone-dragonfly']))
+            <x-danger-zone title="Flush all data" class="mb-4">
+                <p>
+                    Permanently remove every key from
+                    <strong class="font-semibold text-black dark:text-fg">{{ $resourceName }}</strong>.
+                    The database keeps running.
+                </p>
+                <x-slot:action>
+                    <x-modal-confirmation title="Flush all data?" buttonTitle="Flush all data" isErrorButton
+                        submitAction="flush" :actions="['Permanently remove every key from every logical database.']"
+                        confirmationText="{{ $resourceName }}"
+                        confirmationLabel="Enter the database name to confirm flushing all data"
+                        shortConfirmationLabel="Database name" :disabled="auth()->user()->cannot('manage', $resource)"
+                        disabledTooltip="You do not have permission to flush this database." />
+                </x-slot:action>
+            </x-danger-zone>
+        @endif
         <x-danger-zone title="Delete {{ $resourceLabel }}">
                     <p>
                         Permanently delete

@@ -639,6 +639,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
         }
 
+        // Domains can change with a deployment, so the maintenance routes follow them.
+        if ($this->pull_request_id === 0 && $this->application->is_maintenance_enabled) {
+            try {
+                $this->application->syncMaintenancePage();
+            } catch (Exception $e) {
+                \Log::warning('Maintenance page update failed for '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+        }
+
     }
 
     private function deploy_simple_dockerfile()
@@ -3357,11 +3366,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $variables;
     }
 
+    /**
+     * Without the `...` entry, the list replaces the packages that Railpack generates
+     * (for example libatomic1, which Node.js 25+ needs at runtime).
+     */
     private function merge_railpack_deploy_apt_packages(Collection $variables): Collection
     {
         $packages = collect(preg_split('/\s+/', trim((string) $variables->get('RAILPACK_DEPLOY_APT_PACKAGES', ''))) ?: [])
             ->filter()
             ->values();
+
+        if (! $packages->contains('...')) {
+            $packages->prepend('...');
+        }
 
         foreach (['curl', 'wget'] as $package) {
             if (! $packages->contains($package)) {
@@ -3446,7 +3463,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." {$this->workdir}";
 
         return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
+            ."\n".railpackBuilderLockedScript('('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
     }
 
     private function decode_railpack_config(string $config, string $source): array

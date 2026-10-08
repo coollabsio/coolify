@@ -179,3 +179,16 @@ test('cancelling after switching to another team still cleans up and starts the 
     assertCancelCleanupRanCorrectly($this->remoteCommands, $this->deployment);
     expect($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
 });
+
+test('cancelling a Railpack deployment stops the idle Railpack builder on the build server', function (string $buildPack, bool $stopsBuilder) {
+    $this->application->update(['build_pack' => $buildPack]);
+    $this->actingAs($this->user);
+
+    Livewire::test(DeploymentNavbar::class, ['application_deployment_queue' => $this->deployment])
+        ->call('cancel');
+
+    expect(cancelCleanupCommandsOn($this->remoteCommands, '203.0.113.20', 'docker buildx stop coolify-railpack') !== [])->toBe($stopsBuilder);
+})->with([
+    'railpack' => ['railpack', true],
+    'nixpacks' => ['nixpacks', false],
+]);

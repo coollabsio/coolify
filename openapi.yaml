@@ -646,6 +646,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1032,6 +1055,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1418,6 +1464,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1745,6 +1814,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2058,6 +2150,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2430,6 +2545,25 @@ paths:
                 use_build_secrets:
                   type: boolean
                   description: 'Use Docker Build Secrets for build-time environment variables.'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 is_git_submodules_enabled:
                   type: boolean
                   description: 'Clone Git submodules.'
@@ -3941,7 +4075,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr, hostinger] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3969,7 +4103,7 @@ paths:
               properties:
                 provider:
                   type: string
-                  enum: [hetzner, digitalocean, vultr]
+                  enum: [hetzner, digitalocean, vultr, hostinger]
                   example: hetzner
                   description: 'The cloud provider.'
                 token:
@@ -8110,6 +8244,124 @@ paths:
           $ref: '#/components/responses/422'
         '429':
           $ref: '#/components/responses/429'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/data-centers:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS data centers'
+      operationId: get-hostinger-data-centers
+      responses:
+        '200':
+          description: 'List of Hostinger VPS data centers.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/catalog:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS plans and prices'
+      operationId: get-hostinger-catalog
+      responses:
+        '200':
+          description: 'List of Hostinger VPS plans and prices.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/templates:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS operating system templates'
+      operationId: get-hostinger-templates
+      responses:
+        '200':
+          description: 'List of Hostinger VPS templates.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/ssh-keys:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger account SSH keys'
+      operationId: get-hostinger-ssh-keys
+      responses:
+        '200':
+          description: 'List of Hostinger account SSH keys.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/post-install-scripts:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger post-install scripts'
+      operationId: get-hostinger-post-install-scripts
+      responses:
+        '200':
+          description: 'List of Hostinger post-install scripts.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /servers/hostinger:
+    post:
+      tags:
+        - Hostinger
+      summary: 'Purchase a Hostinger VPS and create a linked server'
+      operationId: create-hostinger-server
+      responses:
+        '201':
+          description: 'Hostinger VPS purchased and linked to a Coolify server.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -15139,6 +15391,27 @@ components:
           type: string
           nullable: true
           description: 'Password for HTTP Basic Authentication'
+        http_basic_auth_hash_algorithm:
+          type: string
+          enum:
+            - bcrypt
+            - argon2id
+          description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+        http_basic_auth_bcrypt_cost:
+          type: integer
+          minimum: 4
+          maximum: 14
+          description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+        http_basic_auth_argon2id_memory_cost:
+          type: integer
+          minimum: 8192
+          maximum: 262144
+          description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+        http_basic_auth_argon2id_time_cost:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
         settings:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
@@ -15923,6 +16196,9 @@ tags:
   -
     name: Hetzner
     description: Hetzner
+  -
+    name: Hostinger
+    description: Hostinger
   -
     name: Settings
     description: Settings

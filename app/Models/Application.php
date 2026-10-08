@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
 use App\Services\ConfigurationGenerator;
@@ -16,6 +17,7 @@ use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasConfiguration;
+use App\Traits\HasMaintenancePage;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
@@ -125,6 +127,10 @@ use Symfony\Component\Yaml\Yaml;
         'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
         'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
         'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+        'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+        'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+        'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+        'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
         new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
@@ -132,7 +138,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -220,6 +226,10 @@ class Application extends BaseModel
         'is_http_basic_auth_enabled',
         'http_basic_auth_username',
         'http_basic_auth_password',
+        'http_basic_auth_hash_algorithm',
+        'http_basic_auth_bcrypt_cost',
+        'http_basic_auth_argon2id_memory_cost',
+        'http_basic_auth_argon2id_time_cost',
         'connect_to_docker_network',
         'force_domain_override',
         'is_container_label_escape_enabled',
@@ -268,6 +278,7 @@ class Application extends BaseModel
     {
         return [
             'http_basic_auth_password' => 'encrypted',
+            'http_basic_auth_hash_algorithm' => HttpBasicAuthHashAlgorithm::class,
             'manual_webhook_secret_github' => 'encrypted',
             'manual_webhook_secret_gitlab' => 'encrypted',
             'manual_webhook_secret_bitbucket' => 'encrypted',
@@ -280,6 +291,7 @@ class Application extends BaseModel
             'restart_limit_reached' => 'boolean',
             'container_present' => 'boolean',
             'last_restart_at' => 'datetime',
+            'is_maintenance_enabled' => 'boolean',
         ];
     }
 
@@ -575,6 +587,39 @@ class Application extends BaseModel
         instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 
+    /**
+     * Domains of the application, or of every service of a Docker Compose application.
+     *
+     * @return Collection<int, array{url: string, force_https: bool}>
+     */
+    public function maintenanceDomains(): Collection
+    {
+        if ($this->build_pack === 'dockercompose') {
+            $urls = collect(json_decode($this->docker_compose_domains ?: '[]', true) ?: [])
+                ->flatMap(fn ($service) => explode(',', (string) data_get($service, 'domain', '')));
+        } else {
+            $urls = collect($this->fqdns);
+        }
+        $forceHttps = (bool) $this->isForceHttpsEnabled();
+
+        return $urls->map(fn ($url) => trim((string) $url))
+            ->filter()
+            ->map(fn (string $url) => ['url' => $url, 'force_https' => $forceHttps])
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    public function maintenanceServers(): Collection
+    {
+        return collect([$this->destination?->server])
+            ->concat($this->additional_servers)
+            ->filter()
+            ->unique('id')
+            ->values();
+    }
+
     public function additional_servers()
     {
         return $this->belongsToMany(Server::class, 'additional_destinations')
@@ -655,6 +700,12 @@ class Application extends BaseModel
     public function isGithubAppSource(): bool
     {
         return $this->source instanceof GithubApp;
+    }
+
+    public function usesArgon2idBasicAuth(): bool
+    {
+        return $this->http_basic_auth_hash_algorithm === HttpBasicAuthHashAlgorithm::ARGON2ID
+            && $this->destination->server->caddySupportsArgon2idBasicAuth();
     }
 
     public function isForceHttpsEnabled()
