@@ -23,55 +23,52 @@ services:
       - db-data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  minio:
-    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
-    command: [server, /storage]
+  rustfs:
+    image: rustfs/rustfs:1.0.1
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
-      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+      - RUSTFS_VOLUMES=/data
+      - RUSTFS_ACCESS_KEY=${MINIO_ROOT_USER:-minio}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - RUSTFS_ADDRESS=:9000
+      - RUSTFS_CONSOLE_ENABLE=false
     volumes:
-      - minio-data:/storage
+      - rustfs-data:/data
     restart: unless-stopped
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >
-          /bin/mc alias set health http://127.0.0.1:9000
-          "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1
-          && /bin/mc ready health >/dev/null 2>&1
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9000/health/ready >/dev/null']
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
 
-  minio-init:
-    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+  rustfs-init:
+    image: rustfs/rc:v0.1.36
     exclude_from_hc: true
-    entrypoint: [/bin/sh, /scripts/init-minio.sh]
+    entrypoint: [/bin/sh, /scripts/init-rustfs.sh]
     environment:
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
-      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+      - RUSTFS_ENDPOINT=http://rustfs:9000
+      - RUSTFS_ACCESS_KEY=${MINIO_ROOT_USER:-minio}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
     volumes:
       - type: bind
         read_only: true
-        source: ./scripts/init-minio.sh
-        target: /scripts/init-minio.sh
+        source: ./scripts/init-rustfs.sh
+        target: /scripts/init-rustfs.sh
         content: |
           #!/bin/sh
 
           set -eu
 
-          until /bin/mc alias set airbyte "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; do
+          until rc alias set airbyte "$RUSTFS_ENDPOINT" "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY" >/dev/null 2>&1; do
             sleep 2
           done
 
           for bucket in airbyte-bucket state-storage airbyte-dev-logs; do
-            /bin/mc mb --ignore-existing "airbyte/$bucket"
+            rc bucket create --ignore-existing "airbyte/$bucket"
           done
     depends_on:
-      minio:
-        condition: service_started
+      rustfs:
+        condition: service_healthy
     restart: on-failure
 
   temporal:
@@ -287,7 +284,7 @@ services:
             namespace: default
           spec:
             type: ExternalName
-            externalName: minio
+            externalName: rustfs
             ports:
               - name: api
                 port: 9000
@@ -714,7 +711,7 @@ services:
       - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
       - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=http://rustfs:9000
       - TEMPORAL_HOST=temporal:7233
       - USE_CUSTOM_NODE_SELECTOR=false
       - WORKSPACE_ROOT=/workspace
@@ -738,7 +735,7 @@ services:
     depends_on:
       bootloader:
         condition: service_completed_successfully
-      minio-init:
+      rustfs-init:
         condition: service_completed_successfully
       temporal:
         condition: service_started
@@ -751,7 +748,7 @@ services:
     depends_on:
       bootloader:
         condition: service_completed_successfully
-      minio-init:
+      rustfs-init:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -781,7 +778,7 @@ services:
     depends_on:
       bootloader:
         condition: service_completed_successfully
-      minio-init:
+      rustfs-init:
         condition: service_completed_successfully
       temporal:
         condition: service_started
@@ -825,7 +822,7 @@ services:
       - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
       - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=http://rustfs:9000
       - TEMPORAL_HOST=temporal:7233
       - MAX_CHECK_WORKERS=30
       - MAX_NOTIFY_WORKERS=30
@@ -930,7 +927,7 @@ services:
       - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
       - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=http://rustfs:9000
       - S3_PATH_STYLE_ACCESS=true
       - USE_CUSTOM_NODE_SELECTOR=false
       - WORKSPACE_ROOT=/workspace
