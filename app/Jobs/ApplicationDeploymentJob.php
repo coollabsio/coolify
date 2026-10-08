@@ -2714,16 +2714,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->build_pack === 'dockerfile') {
             $this->add_build_env_variables_to_dockerfile();
         }
-        if ($this->application->build_pack === 'railpack') {
-            $this->build_railpack_image();
-        } else {
-            $this->build_image();
-        }
+        $this->build_pull_request_image();
 
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
         $this->push_to_docker_registry();
         $this->rolling_update();
+    }
+
+    private function build_pull_request_image(): void
+    {
+        match ($this->application->build_pack) {
+            'railpack' => $this->build_railpack_image(),
+            'static' => $this->build_static_image(),
+            default => $this->build_image(),
+        };
     }
 
     private function create_workdir()
