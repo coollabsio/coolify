@@ -19,6 +19,7 @@
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
 - Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.
 - When the request covers more than one interface or resource type, inventory and verify each supported path.
+- When a change alters how stored data reaches running containers, simulate the upgrade on the dev VM: start resources on the old code, then migrate and restart them on the new code, and compare the results.
 
 ## Preserve product scope
 - Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.

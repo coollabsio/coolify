@@ -3,8 +3,13 @@
 namespace App\Traits;
 
 use App\Exceptions\RemoteSecretException;
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\SecretManagerLink;
+use App\Models\Service;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneRedis;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use Illuminate\Database\Eloquent\Model;
@@ -69,7 +74,9 @@ trait HasSecretManager
             return RemoteSecretValueFormatter::dotenv($value);
         }
 
-        return $this->formatLocalEnvironmentVariableValue($environmentVariable, $value);
+        return $value === null ? null : ($this->useExactEscaping($environmentVariable)
+            ? escapeComposeEnvFileValue($value, $this->environmentVariableAllowsInterpolation($environmentVariable, $value))
+            : $this->legacyFormatEnvironmentVariableValue($environmentVariable, $value));
     }
 
     /**
@@ -92,9 +99,16 @@ trait HasSecretManager
      */
     public function formatComposeFileValue(EnvironmentVariable $environmentVariable, string $value): string
     {
-        return $this->environmentVariableUsesSecretManager($environmentVariable)
-            ? RemoteSecretValueFormatter::composeFile($value)
-            : $value;
+        if ($this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return RemoteSecretValueFormatter::composeFile($value);
+        }
+
+        if ($environmentVariable->key === 'REDIS_PASSWORD' && $this->useExactEscaping($environmentVariable)
+            && ($this instanceof StandaloneRedis || $this instanceof StandaloneKeydb || $this instanceof StandaloneDragonfly)) {
+            return escapeDollarSign($value);
+        }
+
+        return $this->composeCommandValue($environmentVariable, $value);
     }
 
     /**
@@ -119,6 +133,46 @@ trait HasSecretManager
             return null;
         }
 
+        if (! $this->useExactEscaping($environmentVariable)) {
+            return $this->legacyFormatEnvironmentVariableValue($environmentVariable, $value);
+        }
+
+        return $this->environmentVariableAllowsInterpolation($environmentVariable, $value)
+            ? $value
+            : escapeDollarSign($value);
+    }
+
+    /**
+     * Decides the escaping of a variable for all paths (service .env, database environment,
+     * Redis password). A variable saved before exact escaping keeps the old escaping, so its
+     * container gets the same value as before the upgrade. Saving the variable again switches
+     * it to exact escaping.
+     */
+    public function useExactEscaping(EnvironmentVariable $environmentVariable): bool
+    {
+        return ! $environmentVariable->uses_legacy_escaping;
+    }
+
+    /**
+     * A variable value for a Docker Compose command or healthcheck. Compose interpolates `$` there
+     * too, so the value gets the same `$` escaping as in the environment list, and the command uses
+     * the same value as the container.
+     */
+    public function composeCommandValue(EnvironmentVariable $environmentVariable, string $value): string
+    {
+        if (! $this->useExactEscaping($environmentVariable) || $this->environmentVariableAllowsInterpolation($environmentVariable, $value)) {
+            return $value;
+        }
+
+        return escapeDollarSign($value);
+    }
+
+    /**
+     * The escaping used before exact escaping. Variables saved before the upgrade keep it,
+     * so their containers get the same values as before.
+     */
+    public function legacyFormatEnvironmentVariableValue(EnvironmentVariable $environmentVariable, string $value): string
+    {
         if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
             return $value;
         }
@@ -126,6 +180,55 @@ trait HasSecretManager
         return $environmentVariable->is_literal || $environmentVariable->is_multiline
             ? "'{$value}'"
             : escapeEnvVariables($value);
+    }
+
+    /**
+     * Whether the container gets a different value than the saved value, because this variable
+     * uses the old escaping. Secret manager values are not fetched here, so they never show it.
+     */
+    public function legacyEscapingChangesValue(EnvironmentVariable $environmentVariable): bool
+    {
+        if ($this->useExactEscaping($environmentVariable)) {
+            return false;
+        }
+
+        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+
+        if (blank($value) || RemoteSecretReferences::containsReference($value)) {
+            return false;
+        }
+
+        $isRedisPassword = $environmentVariable->key === 'REDIS_PASSWORD'
+            && ($this instanceof StandaloneRedis || $this instanceof StandaloneKeydb || $this instanceof StandaloneDragonfly);
+
+        if ($isRedisPassword && str_contains($value, '$')) {
+            return true;
+        }
+
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return str_contains($value, '$') || (! $this instanceof Application && str_contains($value, "\n"));
+        }
+
+        if ($environmentVariable->is_literal || $environmentVariable->is_multiline) {
+            // Service and application .env files strip the old single quotes; database environment lists keep them.
+            return ($this instanceof Service || $this instanceof Application) ? str_contains($value, "'") : true;
+        }
+
+        return escapeEnvVariables($value) !== $value
+            || (($this instanceof Service || $this instanceof Application) && str_contains($value, ' #'));
+    }
+
+    /**
+     * Only plain values allow Compose $VAR interpolation.
+     */
+    public function environmentVariableAllowsInterpolation(EnvironmentVariable $environmentVariable, string $value): bool
+    {
+        $isJson = json_validate($value) && in_array(ltrim($value)[0] ?? '', ['{', '['], true);
+
+        return ! $isJson
+            && ! $environmentVariable->is_literal
+            && ! $environmentVariable->is_multiline
+            && ! $this->environmentVariableUsesSecretManager($environmentVariable);
     }
 
     public function resolveSecretManagerEnvironmentVariableValue(EnvironmentVariable $environmentVariable): ?string

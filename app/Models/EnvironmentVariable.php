@@ -77,6 +77,7 @@ class EnvironmentVariable extends BaseModel
         'is_preview' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
+        'uses_legacy_escaping' => 'boolean',
         'version' => 'string',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
@@ -92,6 +93,8 @@ class EnvironmentVariable extends BaseModel
     protected $hidden = [
         'value',
         'real_value',
+        // Internal: decides the escaping of variables saved before exact escaping.
+        'uses_legacy_escaping',
     ];
 
     protected static function booted()
@@ -182,6 +185,10 @@ class EnvironmentVariable extends BaseModel
         return $this->resourceable;
     }
 
+    /**
+     * The value that the container gets: the old escaped form for variables saved before exact
+     * escaping, otherwise the resolved value without escaping.
+     */
     public function realValue(): Attribute
     {
         return Attribute::make(
@@ -198,7 +205,7 @@ class EnvironmentVariable extends BaseModel
         return $this->resolveRealValue(revealLockedSharedVariables: false);
     }
 
-    private function resolveRealValue(bool $revealLockedSharedVariables = true): ?string
+    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true): ?string
     {
         if (! $this->relationLoaded('resourceable')) {
             $this->load('resourceable');
@@ -219,20 +226,24 @@ class EnvironmentVariable extends BaseModel
             $resource->load('destination.server');
         }
 
-        $real_value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
 
+        return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
+    }
+
+    /**
+     * The escaping used before exact escaping.
+     */
+    private function legacyEscapedValue(string $value): string
+    {
         // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
-        if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
-            return $real_value;
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return $value;
         }
 
-        if ($this->is_literal || $this->is_multiline) {
-            $real_value = '\''.$real_value.'\'';
-        } else {
-            $real_value = escapeEnvVariables($real_value);
-        }
-
-        return $real_value;
+        return $this->is_literal || $this->is_multiline
+            ? '\''.$value.'\''
+            : escapeEnvVariables($value);
     }
 
     protected function isReallyRequired(): Attribute
@@ -325,12 +336,14 @@ class EnvironmentVariable extends BaseModel
     /** @return array<int, string> */
     public function logRedactionValues(): array
     {
-        $value = $this->real_value;
-        if (! is_string($value) || $value === '') {
+        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false);
+        if (! is_string($resolvedValue) || $resolvedValue === '') {
             return [];
         }
 
-        $values = [$value];
+        // Build-time paths still write the old escaped form, so redact both forms.
+        $value = $this->legacyEscapedValue($resolvedValue);
+        $values = [$value, $resolvedValue];
         if ($this->is_multiline || $this->is_literal) {
             $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
                 ? substr($value, 1, -1)

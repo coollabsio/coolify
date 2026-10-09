@@ -92,6 +92,11 @@ class Show extends Component
 
     public array $problematicVariables = [];
 
+    /**
+     * The variable was saved before exact escaping, and the container gets a different value.
+     */
+    public bool $legacyEscapingChangesValue = false;
+
     protected $listeners = [
         'refresh',
         'compose_loaded' => '$refresh',
@@ -168,6 +173,10 @@ class Show extends Component
         }
 
         $this->hydrateValueFields();
+        $this->legacyEscapingChangesValue = $this->env instanceof ModelsEnvironmentVariable
+            && is_object($this->env->resourceable)
+            && method_exists($this->env->resourceable, 'legacyEscapingChangesValue')
+            && $this->env->resourceable->legacyEscapingChangesValue($this->env);
         $this->valuesLoaded = true;
     }
 
