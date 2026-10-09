@@ -137,8 +137,53 @@
                                 </div>
                             </template>
 
+                            {{-- Low Disk Space View --}}
+                            <template x-if="!showProgress && lowDiskSpace">
+                                <div class="flex flex-col gap-4">
+                                    <x-callout type="danger" title="Not enough free disk space">
+                                        <p>
+                                            The server has <span class="font-semibold" x-text="availableGb + ' GB'"></span> free.
+                                            The upgrade needs at least <span class="font-semibold" x-text="requiredGb + ' GB'"></span>.
+                                            If the disk becomes full during the upgrade, Coolify can stop working.
+                                        </p>
+                                    </x-callout>
+
+                                    <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)">
+                                        Run a Docker cleanup to remove unused images, containers, and build cache, then check again.
+                                    </p>
+
+                                    <template x-if="confirmOverride">
+                                        <x-callout type="warning" title="Upgrade anyway?">
+                                            <p>Only continue if you are sure that the upgrade has enough disk space.</p>
+                                        </x-callout>
+                                    </template>
+
+                                    <div
+                                        class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                        <template x-if="!confirmOverride">
+                                            <x-forms.button @click="confirmOverride = true" type="button">
+                                                Upgrade anyway
+                                            </x-forms.button>
+                                        </template>
+                                        <template x-if="confirmOverride">
+                                            <x-forms.button @click="confirmed(true)" type="button"
+                                                x-bind:disabled="checkingDiskSpace">
+                                                Yes, upgrade anyway
+                                            </x-forms.button>
+                                        </template>
+                                        <x-forms.button @click="$wire.runDockerCleanup()" type="button">
+                                            Run Docker cleanup
+                                        </x-forms.button>
+                                        <x-forms.button @click="checkDiskSpaceAgain()" isHighlighted type="button"
+                                            x-bind:disabled="checkingDiskSpace">
+                                            <span x-text="checkingDiskSpace ? 'Checking…' : 'Check again'"></span>
+                                        </x-forms.button>
+                                    </div>
+                                </div>
+                            </template>
+
                             {{-- Confirmation View --}}
-                            <template x-if="!showProgress">
+                            <template x-if="!showProgress && !lowDiskSpace">
                                 <div class="flex flex-col gap-4">
                                     <x-callout type="warning" title="Caution">
                                         <p>Any deployments running during the update process will fail.</p>
@@ -160,8 +205,9 @@
                                                 Simulate
                                             </x-forms.button>
                                         </template>
-                                        <x-forms.button @click="confirmed" isHighlighted type="button">
-                                            Upgrade now
+                                        <x-forms.button @click="confirmed()" isHighlighted type="button"
+                                            x-bind:disabled="checkingDiskSpace">
+                                            <span x-text="checkingDiskSpace ? 'Checking disk space…' : 'Upgrade now'"></span>
                                         </x-forms.button>
                                     </div>
                                 </div>
@@ -202,6 +248,11 @@
             instanceWentDown: false,
             devMode: config.devMode || false,
             simulationInterval: null,
+            lowDiskSpace: false,
+            availableGb: null,
+            requiredGb: null,
+            confirmOverride: false,
+            checkingDiskSpace: false,
 
             simulateUpgrade() {
                 if (!this.devMode) return;
@@ -234,13 +285,30 @@
                 }, 2000);
             },
 
-            confirmed() {
+            async confirmed(skipDiskSpaceCheck = false) {
+                if (this.checkingDiskSpace) return;
+                this.checkingDiskSpace = true;
+                let result;
+                try {
+                    // Trigger server-side upgrade script via Livewire. It does not start when the disk is almost full.
+                    result = await this.$wire.upgrade(skipDiskSpaceCheck);
+                } finally {
+                    this.checkingDiskSpace = false;
+                }
+                if (result?.status === 'low_disk_space') {
+                    this.lowDiskSpace = true;
+                    this.availableGb = result.available_gb;
+                    this.requiredGb = result.required_gb;
+                    return;
+                }
+                if (result?.status !== 'started') return;
+
+                this.lowDiskSpace = false;
+                this.confirmOverride = false;
                 this.showProgress = true;
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
-                // Trigger server-side upgrade script via Livewire
-                this.$wire.$call('upgrade');
                 // Start client-side status polling
                 this.upgrade();
                 // Prevent accidental navigation during upgrade
@@ -249,6 +317,22 @@
                     event.returnValue = '';
                 };
                 window.addEventListener('beforeunload', this.beforeUnloadHandler);
+            },
+
+            async checkDiskSpaceAgain() {
+                if (this.checkingDiskSpace) return;
+                this.checkingDiskSpace = true;
+                try {
+                    const result = await this.$wire.checkDiskSpace();
+                    this.availableGb = result.available_gb;
+                    this.requiredGb = result.required_gb;
+                    this.lowDiskSpace = result.status === 'low_disk_space';
+                    if (!this.lowDiskSpace) {
+                        this.confirmOverride = false;
+                    }
+                } finally {
+                    this.checkingDiskSpace = false;
+                }
             },
 
             startTimer() {
