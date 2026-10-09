@@ -7,7 +7,6 @@ return [
     'coolify' => [
         'version' => env('COOLIFY_VERSION') ?: '4.4.4',
         'helper_version' => '1.0.17',
-        'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),

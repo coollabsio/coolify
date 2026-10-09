@@ -3461,7 +3461,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $environmentPrefix = $this->railpack_build_environment_prefix($controlVariables);
         $secretFlags = $this->railpack_build_secret_flags($variables);
-        $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version');
+        // The helper image sets RAILPACK_VERSION, so the frontend always matches the Railpack CLI in the helper.
+        // Helper images without it fall back to the version of the Railpack CLI itself.
+        $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v${RAILPACK_VERSION:-$(railpack --version | cut -d " " -f 3)}';
 
         $buildxBuildCommand = "{$environmentPrefix}DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack"
             ." {$this->addHosts} --network host"
