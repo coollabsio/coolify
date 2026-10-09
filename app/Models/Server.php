@@ -1732,14 +1732,23 @@ $siteAddress {
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
+        $ID_LIKE = data_get($collectedData, 'ID_LIKE');
         // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
+        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID, $ID_LIKE) {
+            if (filled($ID) && str($supportedOs)->contains($ID)) {
                 return str($ID);
             }
+            // Derivatives (e.g. CachyOS reports ID=cachyos, ID_LIKE=arch) are
+            // supported through their parent distribution(s) in ID_LIKE.
+            if (filled($ID_LIKE)) {
+                return collect(explode(' ', $ID_LIKE))->filter()->contains(
+                    fn ($parent) => str($supportedOs)->contains($parent)
+                );
+            }
+
+            return false;
         });
-        if ($supported->count() === 1) {
+        if ($supported->count() >= 1) {
             return str($supported->first());
         } else {
             return false;
