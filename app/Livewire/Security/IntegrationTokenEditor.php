@@ -30,6 +30,8 @@ class IntegrationTokenEditor extends Component
 
     public bool $automaticDns = true;
 
+    public bool $proxiedDns = false;
+
     public function mount(string $integration_token_uuid): void
     {
         $this->integrationToken = IntegrationToken::ownedByCurrentTeam()
@@ -43,6 +45,7 @@ class IntegrationTokenEditor extends Component
         $this->metadata = $this->integrationToken->metadata ?? [];
         $this->loadZones();
         $this->automaticDns = $this->integrationToken->automaticDnsEnabled();
+        $this->proxiedDns = $this->integrationToken->proxiedDnsEnabled();
     }
 
     protected function rules(): array
@@ -55,6 +58,7 @@ class IntegrationTokenEditor extends Component
             'capabilities' => ['required', 'array', 'min:1'],
             'capabilities.*' => ['required', 'in:'.$allowedCapability],
             'automaticDns' => ['boolean'],
+            'proxiedDns' => ['boolean'],
         ];
 
         if ($this->integrationToken->provider === 'infisical') {
@@ -90,6 +94,11 @@ class IntegrationTokenEditor extends Component
                 unset($metadata['automatic_dns']);
             } else {
                 $metadata['automatic_dns'] = false;
+            }
+            if ($validated['proxiedDns']) {
+                $metadata['proxied_dns'] = true;
+            } else {
+                unset($metadata['proxied_dns']);
             }
         }
         $storedMetadata = $this->integrationToken->metadata ?? [];
