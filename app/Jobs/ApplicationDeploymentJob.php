@@ -1323,7 +1323,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Pushing image to docker registry ({$this->production_image_name}).");
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "docker push {$this->production_image_name}"),
+                    executeInDocker($this->deployment_uuid, 'docker push '.escapeshellarg($this->production_image_name)),
                     'hidden' => true,
                 ],
             );
@@ -1332,12 +1332,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry("Tagging and pushing image with {$this->application->docker_registry_image_tag} tag.");
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "docker tag {$this->production_image_name} {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"),
+                        executeInDocker($this->deployment_uuid, 'docker tag '.escapeshellarg($this->production_image_name).' '.escapeshellarg("{$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}")),
                         'ignore_errors' => true,
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, "docker push {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"),
+                        executeInDocker($this->deployment_uuid, 'docker push '.escapeshellarg("{$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}")),
                         'ignore_errors' => true,
                         'hidden' => true,
                     ],
@@ -1543,7 +1543,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         ]);
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
             $this->execute_remote_command([
-                "docker pull {$this->production_image_name} 2>/dev/null",
+                'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
                 'ignore_errors' => true,
                 'hidden' => true,
             ]);
@@ -3926,6 +3926,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         $labels = $this->useDestinationNetworkInCaddyLabels($labels);
+        $labels = traefikHostRulesWithoutIpv6Brackets($labels);
         if ($this->application->settings->is_container_label_escape_enabled) {
             $labels = $labels->map(function ($value, $key) {
                 return escapeDollarSign($value);
@@ -4227,7 +4228,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $method = $this->sanitizeHealthCheckValue($this->application->health_check_method, '/^[A-Z]+$/', 'GET');
         $scheme = $this->sanitizeHealthCheckValue($this->application->health_check_scheme, '/^https?$/', 'http');
-        $host = $this->sanitizeHealthCheckValue($this->application->health_check_host, '/^[a-zA-Z0-9.\-_]+$/', 'localhost');
+        $host = ValidationPatterns::isValidHealthCheckHost($this->application->health_check_host)
+            ? formatHostForUrl($this->application->health_check_host)
+            : 'localhost';
         $path = $this->application->health_check_path
             ? $this->sanitizeHealthCheckValue($this->application->health_check_path, '#^[a-zA-Z0-9/\-_.~%,;]+$#', '/')
             : null;

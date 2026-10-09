@@ -124,3 +124,20 @@ test('only returns domains for applications on the specified server', function (
     expect($allDomains)->toContain('app-on-server.example.com');
     expect($allDomains)->not->toContain('app-on-other-server.example.com');
 });
+
+test('returns IPv6 hosts with brackets and without the port', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    Application::query()->whereKey($application->id)->update([
+        'fqdn' => 'http://[2a01:4f8::1]:8080,https://app.example.com:8443/api,http://192.0.2.10:3000',
+    ]);
+
+    $response = $this->withHeaders(domainApiAuthHeaders())
+        ->getJson("/api/v1/servers/{$this->server->uuid}/domains");
+
+    $response->assertOk();
+    expect($response->json('0.domains'))->toBe(['[2a01:4f8::1]', 'app.example.com', '192.0.2.10']);
+});

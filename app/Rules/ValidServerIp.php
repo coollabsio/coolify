@@ -8,7 +8,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 class ValidServerIp implements ValidationRule
 {
     /**
-     * Accepts a valid IPv4 address, IPv6 address, or RFC 1123 hostname.
+     * Accepts a valid IPv4 address, IPv6 address (optionally in brackets), or RFC 1123 hostname.
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
@@ -23,6 +23,12 @@ class ValidServerIp implements ValidationRule
         }
 
         if (filter_var($trimmed, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return;
+        }
+
+        // A bracketed IPv6 address ([2a01:4f8::1]); it is stored without brackets.
+        if (str_starts_with($trimmed, '[') && str_ends_with($trimmed, ']')
+            && filter_var(substr($trimmed, 1, -1), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
             return;
         }
 

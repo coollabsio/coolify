@@ -4,6 +4,8 @@ use App\Models\InstanceSettings;
 use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
+use PurplePixie\PhpDns\DNSQuery;
+use PurplePixie\PhpDns\DNSTypes;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -448,4 +450,38 @@ it('still rejects private targets after system DNS fallback when host is not all
     );
 
     expect($validator->fails())->toBeTrue('Expected private IP rejection without allowlist after fallback');
+});
+
+it('passes bracketed IPv6 custom dns servers to the dns query', function () {
+    $queriedServers = new ArrayObject;
+    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queriedServers) {
+        $queriedServers->append($parameters['server']);
+
+        return new class('192.0.2.1') extends DNSQuery
+        {
+            public function query(string $question, string $typeName = DNSTypes::NAME_A): false
+            {
+                return false;
+            }
+
+            public function hasError(): bool
+            {
+                return true;
+            }
+        };
+    });
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'resolveHostWithCustomDnsServers');
+    $method->invoke(new SafeWebhookUrl, 'hooks.example.com', ['2606:4700:4700::1111', '[2001:db8::53]', '192.0.2.1']);
+
+    expect(array_values(array_unique($queriedServers->getArrayCopy())))
+        ->toBe(['[2606:4700:4700::1111]', '[2001:db8::53]', '192.0.2.1']);
+});
+
+it('accepts bracketed IPv6 custom dns servers from instance settings', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['custom_dns_servers' => '1.1.1.1, [2606:4700:4700::1111]']));
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'customDnsServers');
+
+    expect($method->invoke(new SafeWebhookUrl))->toBe(['1.1.1.1', '2606:4700:4700::1111']);
 });

@@ -77,7 +77,7 @@ class CheckDomainDns
 
             try {
                 $query = app()->make(DNSQuery::class, [
-                    'server' => $dnsServer,
+                    'server' => formatHostForUrl($dnsServer),
                     'port' => 53,
                     'timeout' => min(5, (int) floor($remainingNanoseconds / 1_000_000_000)),
                 ]);

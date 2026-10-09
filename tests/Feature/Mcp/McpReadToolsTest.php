@@ -671,6 +671,18 @@ test('get_server_domains and get_server_resources are team scoped', function () 
     expect(mcpReadCall('get_server_resources', ['uuid' => $otherServer->uuid])->json('result.isError'))->toBeTrue();
 });
 
+test('get_server_domains returns IPv6 hosts with brackets and without the port', function () {
+    Application::query()->whereKey($this->application->id)->update([
+        'fqdn' => 'http://[2a01:4f8::1]:8080,https://app.example.com:8443/api,http://192.0.2.10:3000',
+    ]);
+
+    $domains = mcpReadCall('get_server_domains', ['uuid' => $this->server->uuid]);
+    $domains->assertOk();
+
+    expect(mcpReadJson($domains)['data']['domains'][0]['domains'])
+        ->toBe(['[2a01:4f8::1]', 'app.example.com', '192.0.2.10']);
+});
+
 test('get_server_domains filters polymorphic destinations by type and id', function () {
     // Other server gets the next standalone_dockers id (typically 2).
     $otherServer = Server::factory()->create(['team_id' => $this->team->id]);

@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Log;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
-use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Throwable;
 
@@ -362,7 +361,7 @@ class SafeWebhookUrl implements ValidationRule
         foreach ($dnsServers as $dnsServer) {
             foreach ([DNSTypes::NAME_A, DNSTypes::NAME_AAAA] as $type) {
                 try {
-                    $query = new DNSQuery($dnsServer, 53, 5);
+                    $query = createDnsQuery($dnsServer);
                     $records = $query->query($host, $type);
 
                     if ($records === false || $query->hasError()) {
@@ -395,7 +394,7 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         return array_values(array_filter(array_map(
-            fn (string $server): string => trim($server),
+            fn (string $server): string => normalizeIpAddress($server),
             explode(',', $servers),
         ), fn (string $server): bool => filter_var($server, FILTER_VALIDATE_IP) !== false));
     }

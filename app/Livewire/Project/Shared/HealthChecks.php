@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Support\ValidationPatterns;
+use Closure;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -28,7 +30,6 @@ class HealthChecks extends Component
     #[Validate(['required', 'string', 'in:http,https'])]
     public string $healthCheckScheme;
 
-    #[Validate(['required', 'string', 'regex:/^[a-zA-Z0-9.\-_]+$/'])]
     public string $healthCheckHost;
 
     #[Validate(['nullable', 'integer', 'min:1', 'max:65535'])]
@@ -58,23 +59,30 @@ class HealthChecks extends Component
     #[Validate(['boolean'])]
     public bool $customHealthcheckFound = false;
 
-    protected $rules = [
-        'healthCheckEnabled' => 'boolean',
-        'healthCheckType' => 'string|in:http,cmd',
-        'healthCheckCommand' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
-        'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
-        'healthCheckPort' => 'nullable|integer|min:1|max:65535',
-        'healthCheckHost' => ['required', 'string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
-        'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',
-        'healthCheckReturnCode' => 'integer',
-        'healthCheckScheme' => 'required|string|in:http,https',
-        'healthCheckResponseText' => 'nullable|string',
-        'healthCheckInterval' => 'integer|min:1',
-        'healthCheckTimeout' => 'integer|min:1',
-        'healthCheckRetries' => 'integer|min:1',
-        'healthCheckStartPeriod' => 'integer',
-        'customHealthcheckFound' => 'boolean',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'healthCheckEnabled' => 'boolean',
+            'healthCheckType' => 'string|in:http,cmd',
+            'healthCheckCommand' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
+            'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
+            'healthCheckPort' => 'nullable|integer|min:1|max:65535',
+            'healthCheckHost' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail): void {
+                if (! ValidationPatterns::isValidHealthCheckHost($value)) {
+                    $fail('The health check host must be a hostname, an IPv4 address, or an IPv6 address.');
+                }
+            }],
+            'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',
+            'healthCheckReturnCode' => 'integer',
+            'healthCheckScheme' => 'required|string|in:http,https',
+            'healthCheckResponseText' => 'nullable|string',
+            'healthCheckInterval' => 'integer|min:1',
+            'healthCheckTimeout' => 'integer|min:1',
+            'healthCheckRetries' => 'integer|min:1',
+            'healthCheckStartPeriod' => 'integer',
+            'customHealthcheckFound' => 'boolean',
+        ];
+    }
 
     public function mount()
     {

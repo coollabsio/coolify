@@ -335,9 +335,10 @@ class StandaloneMysql extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->mysql_user);
                     $encodedPass = rawurlencode($this->mysql_password);
-                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mysql_database}";
+                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$this->mysql_database}";
                     if ($this->enable_ssl) {
                         $url .= "?ssl-mode={$this->ssl_mode}";
                         if (in_array($this->ssl_mode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {

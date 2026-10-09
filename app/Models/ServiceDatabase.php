@@ -151,7 +151,7 @@ class ServiceDatabase extends BaseModel
             $realIp = base_ip();
         }
 
-        return "{$realIp}:{$port}";
+        return formatHostForUrl((string) $realIp).":{$port}";
     }
 
     public function team()

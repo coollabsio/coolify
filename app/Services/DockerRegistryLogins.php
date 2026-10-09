@@ -15,7 +15,11 @@ class DockerRegistryLogins
 {
     public const DOCKER_HUB = 'docker.io';
 
-    public const REGISTRY_PATTERN = '/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$/';
+    /**
+     * A registry host with an optional port. An IPv6 host is bracketed ([2a01:4f8::1]:5000) and holds only
+     * hex digits, ':' and '.', so the value stays safe in shell commands.
+     */
+    public const REGISTRY_PATTERN = '/^(?:[a-z0-9]([a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(:[0-9]{1,5})?$/';
 
     /**
      * Read the registries a server is logged in to from the Docker config that deployments mount.

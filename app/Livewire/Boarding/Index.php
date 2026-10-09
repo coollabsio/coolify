@@ -302,7 +302,7 @@ class Index extends Component
 
         $this->validate();
 
-        $foundServer = Server::whereIp($this->remoteServerHost)->first();
+        $foundServer = Server::whereIp(Server::normalizeIp($this->remoteServerHost))->first();
         if ($foundServer) {
             return $this->dispatch('error', 'A server with this IP/Domain already exists.');
         }

@@ -911,6 +911,19 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
         ->unique()->values()->all();
 }
 
+/**
+ * Traefik matches an IPv6 host without brackets: Host(`[2a01:4f8::1]`) never matches a request,
+ * Host(`2a01:4f8::1`) does. Labels that were saved with brackets get them removed here.
+ */
+function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
+{
+    return $labels->map(fn ($label) => is_string($label) ? preg_replace_callback(
+        '/Host\(`\[([0-9A-Fa-f:.]+)\]`\)/',
+        fn (array $matches): string => filter_var($matches[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "Host(`{$matches[1]}`)" : $matches[0],
+        $label,
+    ) : $label);
+}
+
 function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
 {
     $labels = collect([]);
@@ -964,6 +977,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
             $url = Url::fromString($domain);
             $host = $url->getHost();
+            // Traefik matches an IPv6 Host header without brackets: Host(`[2a01:4f8::1]`) never matches.
+            $traefikHost = trim($host, '[]');
             $path = $url->getPath();
             $schema = $url->getScheme();
             $portlessDomain = ServiceApplication::withoutPort($domain);
@@ -1008,7 +1023,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             ];
             if ($schema === 'https') {
                 // Set labels for https
-                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
                 if ($port) {
                     $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
@@ -1080,7 +1095,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
 
                 // Set labels for http (redirect to https)
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
@@ -1100,7 +1115,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
             } else {
                 // Set labels for http
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
