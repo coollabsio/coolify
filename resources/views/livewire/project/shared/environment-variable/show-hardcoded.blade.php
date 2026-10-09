@@ -1,6 +1,9 @@
 <div class="env-table-item"
     x-show="typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $isPreview ? 'preview' : 'production' }}'">
-    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
+    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }} {{ $selectable ? 'env-table-grid-selectable' : '' }}">
+        @if ($selectable)
+            <span></span>
+        @endif
         <div class="flex min-w-0 items-center gap-2">
             <button type="button" data-env-name-trigger
                 class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
