@@ -25,6 +25,7 @@ services:
       - ./databases:/var/www/html/storage/app/databases
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
+      - ./images:/var/www/html/storage/app/images
     env_file:
       - .env
     environment:

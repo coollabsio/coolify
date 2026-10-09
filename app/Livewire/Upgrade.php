@@ -3,10 +3,8 @@
 namespace App\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
-use App\Jobs\DockerCleanupJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
-use App\Services\CoolifyUpgradeDiskSpace;
 use App\Services\CoolifyUpgradeStatus;
 use Livewire\Component;
 
@@ -64,30 +62,19 @@ class Upgrade extends Component
         $this->isUpgradeAvailable = $hasNewerVersion && $newVersionAvailable;
     }
 
-    /**
-     * Start the upgrade. Without $skipDiskSpaceCheck, the upgrade does not start when the disk is almost full.
-     *
-     * @return array{status: 'started'|'low_disk_space', available_gb?: float|null, required_gb?: int}|null
-     */
-    public function upgrade(bool $skipDiskSpaceCheck = false)
+    public function upgrade()
     {
         try {
             if (! isInstanceAdmin()) {
                 abort(403);
             }
             if ($this->updateInProgress) {
-                return null;
-            }
-            if (! $skipDiskSpaceCheck) {
-                $diskSpace = $this->checkDiskSpace();
-                if ($diskSpace['status'] === 'low_disk_space') {
-                    return $diskSpace;
-                }
+                return;
             }
             $this->updateInProgress = true;
-            dispatch(function () use ($skipDiskSpaceCheck) {
+            dispatch(function () {
                 try {
-                    UpdateCoolify::run(manual_update: true, skipDiskSpaceCheck: $skipDiskSpaceCheck);
+                    UpdateCoolify::run(manual_update: true);
                 } catch (\Throwable $e) {
                     report($e);
                 }
@@ -98,50 +85,7 @@ class Upgrade extends Component
                 'resource' => 'instance',
                 'from_version' => config('constants.coolify.version'),
                 'to_version' => get_latest_version_of_coolify(),
-                'skip_disk_space_check' => $skipDiskSpaceCheck,
             ]);
-
-            return ['status' => 'started'];
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    /**
-     * @return array{status: 'low_disk_space'|'ok', available_gb: float|null, required_gb: int}
-     */
-    public function checkDiskSpace(): array
-    {
-        if (! isInstanceAdmin()) {
-            abort(403);
-        }
-
-        $server = Server::find(0);
-        $availableGb = $server ? app(CoolifyUpgradeDiskSpace::class)->availableGb($server) : null;
-
-        return [
-            'status' => CoolifyUpgradeDiskSpace::isLow($availableGb) ? 'low_disk_space' : 'ok',
-            'available_gb' => $availableGb,
-            'required_gb' => CoolifyUpgradeDiskSpace::REQUIRED_GB,
-        ];
-    }
-
-    public function runDockerCleanup()
-    {
-        try {
-            if (! isInstanceAdmin()) {
-                abort(403);
-            }
-            $server = Server::findOrFail(0);
-            DockerCleanupJob::dispatch($server, true);
-            auditLog('ui.server.docker_cleanup_started', [
-                'team_id' => $server->team_id,
-                'server_uuid' => $server->uuid,
-                'server_name' => $server->name,
-                'delete_unused_volumes' => false,
-                'delete_unused_networks' => false,
-            ]);
-            $this->dispatch('success', 'Docker cleanup started. When it is done, click "Check again".');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
