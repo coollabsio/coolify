@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use App\Services\CoolifyUpgradeStatus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
@@ -116,6 +117,8 @@ class UpdateCoolify
 
     private function update()
     {
+        $this->ensureNoUpgradeIsRunning();
+
         $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
         $registryUrl = coolifyRegistryUrl();
@@ -127,5 +130,30 @@ class UpdateCoolify
                 escapeshellarg($latestHelperImageVersion).' '.
                 escapeshellarg($registryUrl),
         ], $this->server);
+    }
+
+    private function ensureNoUpgradeIsRunning(): void
+    {
+        $status = $this->readUpgradeStatus();
+
+        if (CoolifyUpgradeStatus::isRunning((string) $status)) {
+            Log::warning('Upgrade skipped because another upgrade is running', [
+                'target_version' => $this->latestVersion,
+                'status' => $status,
+            ]);
+            throw new \Exception(
+                'Another Coolify upgrade is already running. Wait for it to finish. '.
+                'If it has stopped, you can upgrade again '.CoolifyUpgradeStatus::RUNNING_LOCK_EXPIRES_AFTER_MINUTES.' minutes after its last status update.'
+            );
+        }
+    }
+
+    protected function readUpgradeStatus(): ?string
+    {
+        return instant_remote_process(
+            ['cat '.CoolifyUpgradeStatus::FILE.' 2>/dev/null || true'],
+            $this->server,
+            false
+        );
     }
 }
