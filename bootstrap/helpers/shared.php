@@ -72,6 +72,7 @@ use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
 use PurplePixie\PhpDns\DNSQuery;
+use PurplePixie\PhpDns\DNSResult;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -2342,10 +2343,8 @@ function validateDNSEntry(string $fqdn, Server $server)
     $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            $query = createDnsQuery($dns_server);
-            $results = $query->query($host, $type);
-            if ($results === false || $query->hasError()) {
-            } else {
+            $results = queryDnsServer($dns_server, $host, $type);
+            if ($results !== false) {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
                         if (isCloudflareIp($result->getData())) {
@@ -2366,13 +2365,38 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function createDnsQuery(string $dnsServer): DNSQuery
+function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DNSQuery
 {
     return app()->make(DNSQuery::class, [
         'server' => formatHostForUrl($dnsServer),
         'port' => 53,
-        'timeout' => 5,
+        'timeout' => $timeout,
+        'udp' => $udp,
     ]);
+}
+
+/**
+ * Query one DNS server for one record type. When the UDP answer is truncated (TC bit),
+ * retry over TCP: resolvers such as 1.1.1.1 can truncate even small answers, and the
+ * records would otherwise be silently dropped.
+ *
+ * @return iterable<int, DNSResult>|false
+ */
+function queryDnsServer(string $dnsServer, string $host, string $type, int $timeout = 5): iterable|false
+{
+    $query = createDnsQuery($dnsServer, $timeout);
+    $records = $query->query($host, $type);
+
+    if ($records === false && str_contains($query->getLasterror(), 'too big for UDP')) {
+        $query = createDnsQuery($dnsServer, $timeout, udp: false);
+        $records = $query->query($host, $type);
+    }
+
+    if ($records === false || $query->hasError()) {
+        return false;
+    }
+
+    return $records;
 }
 
 function isCloudflareIp(string $ip): bool

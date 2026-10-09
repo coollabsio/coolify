@@ -361,10 +361,9 @@ class SafeWebhookUrl implements ValidationRule
         foreach ($dnsServers as $dnsServer) {
             foreach ([DNSTypes::NAME_A, DNSTypes::NAME_AAAA] as $type) {
                 try {
-                    $query = createDnsQuery($dnsServer);
-                    $records = $query->query($host, $type);
+                    $records = queryDnsServer($dnsServer, $host, $type);
 
-                    if ($records === false || $query->hasError()) {
+                    if ($records === false) {
                         continue;
                     }
 

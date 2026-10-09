@@ -5,7 +5,6 @@ namespace App\Actions\Shared;
 use App\Models\Server;
 use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
-use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 
@@ -76,14 +75,9 @@ class CheckDomainDns
             }
 
             try {
-                $query = app()->make(DNSQuery::class, [
-                    'server' => formatHostForUrl($dnsServer),
-                    'port' => 53,
-                    'timeout' => min(5, (int) floor($remainingNanoseconds / 1_000_000_000)),
-                ]);
-                $records = $query->query($host, $type);
+                $records = queryDnsServer($dnsServer, $host, $type, min(5, (int) floor($remainingNanoseconds / 1_000_000_000)));
 
-                if ($records === false || $query->hasError()) {
+                if ($records === false) {
                     continue;
                 }
 
