@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -1622,6 +1623,16 @@ class Service extends BaseModel
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
         instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+
+        /** Write new file mounts now, so `docker compose up` does not create directories in their place. */
+        foreach ($this->applications()->get()->concat($this->databases()->get()) as $resource) {
+            foreach ($resource->fileStorages()->where('pending_initialization', true)->get() as $fileStorage) {
+                $error = $fileStorage->initializeOnServer();
+                if ($error !== null) {
+                    Log::warning("Could not prepare storage {$fileStorage->mount_path} for service {$this->uuid}: {$error}");
+                }
+            }
+        }
     }
 
     public function parse(bool $isNew = false): Collection

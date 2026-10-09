@@ -4,6 +4,7 @@ use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\LocalFileVolume;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -12,6 +13,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Process;
 use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
@@ -158,16 +160,7 @@ it('keeps safe array source expressions in both parsers', function (string $sour
 
     expect(fn () => applicationParser($application))->not->toThrow(Exception::class)
         ->and(fn () => serviceParser($service))->not->toThrow(Exception::class);
-})->with(['${DATA}', '${DATA}/config', '${DATA}//config', '${DATA:-/srv/app/data}', '/srv/$HOME/config.yml', '$HOME/$FILE', '${DATA:-/srv/$HOME/config.yml}']);
-
-it('keeps unsupported array source forms rejected in both parsers', function (string $source) {
-    $compose = "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n";
-    $application = makeComposeApplication($compose);
-    [$service] = makeComposeService($compose);
-
-    expect(fn () => applicationParser($application))->toThrow(Exception::class, 'Invalid Docker volume definition')
-        ->and(fn () => serviceParser($service))->toThrow(Exception::class, 'Invalid Docker volume definition');
-})->with(['${DATA:+/srv/app}', '${DATA:-${HOME}/config.yml}', '${DATA:-/srv/app}/file', '${DATA:?missing}', '${DATA?missing}', '${DATA-/srv/app}', '${DATA+/srv/app}']);
+})->with(['${DATA}', '${DATA}/config', '${DATA}//config', '${DATA:-/srv/app/data}', '/srv/$HOME/config.yml', '$HOME/$FILE', '${DATA:-/srv/$HOME/config.yml}', '${DATA:+/srv/app}', '${DATA:-${HOME}/config.yml}', '${DATA:-/srv/app}/file', '${DATA:?missing}', '${DATA?missing}', '${DATA-/srv/app}', '${DATA+/srv/app}']);
 
 it('preserves existing application file volume content when reparsing compose bind mounts', function () {
     $application = makeComposeApplication(TWO_FILE_COMPOSE);
@@ -251,26 +244,129 @@ it('defaults new service bind mounts to directories', function () {
         ->and($fileVolume->is_directory)->toBeTrue();
 });
 
-it('queues a new application mount once without loading its service relation', function () {
+it('defers a new application mount until final Compose files exist', function () {
     $application = makeComposeApplication(DATA_DIR_COMPOSE);
 
     applicationParser($application);
     applicationParser($application);
 
-    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
-    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
-        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
-    });
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    expect($application->fileStorages()->first()->pending_initialization)->toBeTrue();
 });
 
-it('queues a new service mount once without loading its service relation', function () {
+it('writes a new service mount before start after final Compose files exist', function () {
     [$service] = makeComposeService(DATA_DIR_COMPOSE);
 
     serviceParser($service);
     serviceParser($service);
 
-    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
-    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
-        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
+    $storage = $service->applications()->first()->fileStorages()->first();
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    expect($storage->pending_initialization)->toBeTrue();
+
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    $hostPath = '/data/coolify/services/'.$service->uuid.'/data';
+    Process::fake(function ($process) use ($hostPath) {
+        if (str_contains($process->command, 'config --format json')) {
+            return Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
+                ['type' => 'bind', 'source' => $hostPath, 'target' => '/app/data'],
+            ]]]]));
+        }
+
+        return Process::result(output: 'NOK');
     });
+
+    $service->saveComposeConfigs();
+
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$hostPath}'"));
+    expect($storage->fresh()->pending_initialization)->toBeFalse();
+});
+
+it('keeps a service mount pending when Compose cannot resolve it', function () {
+    [$service] = makeComposeService("services:\n  app:\n    image: nginx:latest\n    volumes:\n      - \${DATA_DIR:-./data}:/app/data\n");
+    serviceParser($service);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'config --format json') ? '{"services":{}}' : 'NOK'));
+
+    $service->saveComposeConfigs();
+
+    expect($service->applications()->first()->fileStorages()->first()->pending_initialization)->toBeTrue();
+});
+
+it('preserves long-form bind interpolation and configured file content', function () {
+    $compose = <<<'YAML'
+services:
+  app:
+    image: alpine
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-${FALLBACK_ROOT:-./config}}/settings.ini
+        target: /app/settings.ini
+        content: configured value
+        isDirectory: false
+YAML;
+    $application = makeComposeApplication($compose);
+
+    applicationParser($application);
+
+    $mount = Yaml::parse($application->fresh()->docker_compose)['services']['app']['volumes'][0];
+    $storage = $application->fileStorages()->firstOrFail();
+    expect($mount)->toBeArray()
+        ->and($mount['type'])->toBe('bind')
+        ->and($mount['source'])->toBe('${DATA_ROOT:-${FALLBACK_ROOT:-/data/coolify/applications/'.$application->uuid.'/config}}/settings.ini')
+        ->and($storage->content)->toBe('configured value')
+        ->and($storage->pending_initialization)->toBeTrue();
+});
+
+it('does not replace the main storage row while parsing a preview', function () {
+    $application = makeComposeApplication(DATA_DIR_COMPOSE);
+    applicationParser($application);
+    $storage = $application->fileStorages()->firstOrFail();
+    $mainPath = $storage->fs_path;
+
+    applicationParser($application, pull_request_id: 42);
+
+    expect($storage->fresh()->fs_path)->toBe($mainPath)
+        ->and($application->fileStorages()->count())->toBe(1);
+});
+
+it('keeps a nested default intact in the legacy application parser', function () {
+    $application = makeComposeApplication(<<<'YAML'
+services:
+  app:
+    image: alpine
+    volumes:
+      - ${DATA_ROOT:-${FALLBACK_ROOT:-./data}}/file:/app/file
+YAML);
+    $application->compose_parsing_version = '1';
+    $application->save();
+
+    $application->parse();
+
+    $volumes = Yaml::parse($application->fresh()->docker_compose)['services']['app']['volumes'];
+    expect($volumes[0])->toContain('${DATA_ROOT:-${FALLBACK_ROOT:-/data/coolify/applications/'.$application->uuid.'/data}}/file:/app/file');
+});
+
+it('creates a legacy service bind row without splitting its nested default', function () {
+    [$service, $serviceApplication] = makeComposeService(<<<'YAML'
+services:
+  app:
+    image: alpine
+    volumes:
+      - ${DATA_ROOT:-${FALLBACK_ROOT:-./data}}/file:/app/file
+YAML);
+    $service->compose_parsing_version = '1';
+    $service->save();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    Process::fake();
+
+    $service->parse();
+
+    $storage = $serviceApplication->fileStorages()->firstOrFail();
+    expect($storage->fs_path)->toBe('${DATA_ROOT:-${FALLBACK_ROOT:-./data}}/file')
+        ->and($storage->mount_path)->toBe('/app/file');
 });

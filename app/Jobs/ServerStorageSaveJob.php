@@ -22,5 +22,9 @@ class ServerStorageSaveJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         $this->localFileVolume->saveStorageOnServer();
+        if ($this->localFileVolume->pending_initialization) {
+            $this->localFileVolume->pending_initialization = false;
+            $this->localFileVolume->saveQuietly();
+        }
     }
 }

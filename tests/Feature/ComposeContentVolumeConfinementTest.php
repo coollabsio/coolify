@@ -131,11 +131,26 @@ function contentHostPathUseServerUser(string $user): void
  */
 function contentHostPathFakeServer(): void
 {
-    Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'readlink -f') => 'OK',
-        str_contains($process->command, 'test -') => 'NOK',
-        default => '',
-    }));
+    Process::fake(function ($process) {
+        if (str_contains($process->command, 'config --format json')) {
+            $services = [];
+            foreach (LocalFileVolume::query()->get() as $volume) {
+                $owner = $volume->resource;
+                $name = data_get($owner, 'service') ? $owner->name : 'app';
+                $workdir = data_get($owner, 'service') ? $owner->service->workdir() : $owner->workdir();
+                $path = str_starts_with($volume->fs_path, '/') ? $volume->fs_path : $workdir.'/'.ltrim($volume->fs_path, './');
+                $services[$name]['volumes'][] = ['type' => 'bind', 'source' => $path, 'target' => $volume->mount_path];
+            }
+
+            return Process::result(output: json_encode(['services' => $services]));
+        }
+
+        return Process::result(output: match (true) {
+            str_contains($process->command, 'readlink -f') => 'OK',
+            str_contains($process->command, 'test -') => 'NOK',
+            default => '',
+        });
+    });
 }
 
 /**
@@ -189,6 +204,7 @@ test('the service parser stores a content volume at its host path and Coolify wr
 
     [$fsPath, $writePath] = contentHostPathExpected($target, $service->workdir());
     $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    contentHostPathFakeServer();
     expect($fileVolume->fs_path)->toBe($fsPath)
         ->and($fileVolume->content)->toBe($content)
         ->and($fileVolume->is_directory)->toBeFalse()
@@ -207,6 +223,7 @@ test('the application parser stores a content volume at its host path and Coolif
 
     [$fsPath, $writePath] = contentHostPathExpected($target, $application->workdir());
     $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    contentHostPathFakeServer();
     expect($fileVolume->fs_path)->toBe($fsPath)
         ->and($fileVolume->content)->toBe($content)
         ->and($fileVolume->contentPathOnServer())->toBe($writePath);
@@ -225,12 +242,13 @@ test('loading files for a service writes content at its host path', function (st
     [, $writePath] = contentHostPathExpected($target, $service->workdir());
 
     contentHostPathFakeServer();
+    $fileVolume->forceFill(['pending_initialization' => false])->saveQuietly();
     getFilesystemVolumesFromServer($fileVolume->resource, true);
 
     $sudo = $user === 'root' ? '' : 'sudo ';
     $escapedPath = escapeshellarg($writePath);
     $base64 = base64_encode($content);
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p -- \"$({$sudo}dirname -- {$escapedPath})\""));
+    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p -- ".escapeshellarg(dirname($writePath))));
     Process::assertRan(fn ($process) => str_contains($process->command, "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
 })->with(contentHostPathTargets())->with(['root', 'coolify']);
 
@@ -245,6 +263,7 @@ test('a quote in a content path is shell-escaped in every write command', functi
 
     contentHostPathFakeServer();
     $fileVolume->saveStorageOnServer();
+    $fileVolume->forceFill(['pending_initialization' => false])->saveQuietly();
     getFilesystemVolumesFromServer($fileVolume->resource, true);
 
     $sudo = $user === 'root' ? '' : 'sudo ';
@@ -255,9 +274,9 @@ test('a quote in a content path is shell-escaped in every write command', functi
 
 test('the parsers reject shell injection in a content volume source', function () {
     expect(fn () => serviceParser(contentHostPathService(CONTENT_HOST_PATH_INJECTION_COMPOSE)))
-        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)')
+        ->toThrow(Exception::class, 'Invalid Docker volume definition')
         ->and(fn () => applicationParser(contentHostPathApplication(CONTENT_HOST_PATH_INJECTION_COMPOSE)))
-        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)');
+        ->toThrow(Exception::class, 'Invalid Docker volume definition');
 
     expect(LocalFileVolume::query()->count())->toBe(0);
 });

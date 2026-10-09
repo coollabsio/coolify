@@ -78,6 +78,11 @@
 - Pass record IDs to Livewire actions instead of display values, and resolve team-scoped records on the server. When JavaScript needs text, use `@js()` or `Js::from()`.
 - Mark Livewire properties that select records or feed server-side lookups as `#[Locked]`; clients can change every other public property.
 
+## Live-test deployments in the dev instance
+- Run `php artisan horizon:terminate` in the branch's `coolify-dev-<branch>` container after code changes; queue workers keep old code until they restart.
+- To deploy a custom Compose file without an external repository, serve a bare repo with `git update-server-info` and `python3 -m http.server` on the instance's libvirt bridge IP, add a public GitHub source with that `html_url`, and disable shallow clone (dumb HTTP does not support `--depth`).
+- Baseline a regression by reverting only `app/` and `bootstrap/` to HEAD with a saved patch; a copied checkout still loads the worktree through the shared `vendor` autoloader.
+
 ## Keep host test runs away from the dev app cache
 - The repository is bind-mounted into the dev `coolify` container. Tests that call `app:init` run `optimize` and write a testing config/route cache into `bootstrap/cache`, so the dev app returns 500. For broad host test runs, set `APP_CONFIG_CACHE`, `APP_ROUTES_CACHE`, `APP_EVENTS_CACHE`, `APP_SERVICES_CACHE`, and `APP_PACKAGES_CACHE` to a temporary directory.
 

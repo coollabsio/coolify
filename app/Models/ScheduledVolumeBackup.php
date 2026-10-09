@@ -175,6 +175,10 @@ class ScheduledVolumeBackup extends BaseModel
             throw new \RuntimeException('The backup target is not a directory or persistent volume.');
         }
 
+        if ($target->usesComposeBindSource()) {
+            return $target->composeBindHostPath();
+        }
+
         $path = str($target->fs_path);
         if ($path->startsWith('.')) {
             $resource = $this->targetResource();

@@ -202,6 +202,9 @@ class LocalPersistentVolume extends BaseModel
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
                     $source = data_get($parsedVolume, 'source');
+                    if (is_string($volume) && $source) {
+                        $source = composeNamedVolumeSource(str($source));
+                    }
                     $target = data_get($parsedVolume, 'target');
                     if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
                         // The parsers use an external volume as written. A storage entry with the generated

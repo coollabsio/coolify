@@ -100,6 +100,19 @@ function fakeContentFilesServer(array $states): void
         $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
         ContentFilesUpRecorder::$commands[] = ['ssh', $command];
 
+        if (str_contains($process->command, 'config --format json')) {
+            $services = [];
+            foreach (LocalFileVolume::query()->get() as $volume) {
+                $owner = $volume->resource;
+                $name = data_get($owner, 'service') ? $owner->name : 'app';
+                $workdir = data_get($owner, 'service') ? $owner->service->workdir() : $owner->workdir();
+                $path = str_starts_with($volume->fs_path, '/') ? $volume->fs_path : $workdir.'/'.ltrim($volume->fs_path, './');
+                $services[$name]['volumes'][] = ['type' => 'bind', 'source' => $path, 'target' => $volume->mount_path];
+            }
+
+            return Process::result(output: json_encode(['services' => $services]));
+        }
+
         if (str_contains($command, 'empty-directory')) {
             $positions = collect($states)
                 ->map(fn (string $state, string $path) => strpos($command, escapeshellarg($path)))
@@ -194,6 +207,7 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
 {
     $job = new ContentFilesUpDeploymentJob;
     $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->updated_at = now();
     $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout') use ($test) {
         $test->logEntries[] = [$message, $type];
     });
@@ -214,6 +228,10 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
         ...$properties,
     ] as $property => $value) {
         (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    if ($properties['preserveRepository'] ?? false) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, 'generated_docker_compose'))->setValue($job, "services:\n  app:\n    image: nginx:alpine\n");
     }
 
     (new ReflectionMethod(ApplicationDeploymentJob::class, 'start_docker_compose_services'))->invoke($job);
@@ -436,6 +454,7 @@ test('starting a service writes missing content files before docker compose up',
     $service->parse();
     $appConf = LocalFileVolume::query()->where('mount_path', '/etc/app.conf')->firstOrFail();
     $workerConf = LocalFileVolume::query()->where('mount_path', '/etc/worker.conf')->firstOrFail();
+    LocalFileVolume::query()->update(['pending_initialization' => false]);
     fakeContentFilesServer([$appConf->fs_path => 'missing', $workerConf->fs_path => 'directory']);
 
     $activity = StartService::run($service->fresh());
@@ -464,6 +483,7 @@ test('deploying one service application writes only its missing content files', 
     $service->parse();
     $appConf = LocalFileVolume::query()->where('mount_path', '/etc/app.conf')->firstOrFail();
     $workerConf = LocalFileVolume::query()->where('mount_path', '/etc/worker.conf')->firstOrFail();
+    LocalFileVolume::query()->update(['pending_initialization' => false]);
     fakeContentFilesServer([$appConf->fs_path => 'missing', $workerConf->fs_path => 'missing']);
 
     $activity = DeployServiceApplication::run($service->applications()->where('name', 'app')->firstOrFail());

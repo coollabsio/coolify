@@ -2117,8 +2117,8 @@ class Application extends BaseModel
                     $type = null;
                     $source = null;
                     if (is_string($volume)) {
-                        $source = str($volume)->before(':');
-                        if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
+                        $source = parseDockerVolumeString($volume)['source'];
+                        if (sourceIsLocal($source)) {
                             $type = str('bind');
                         }
                     } elseif (is_array($volume)) {
