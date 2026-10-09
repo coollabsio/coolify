@@ -241,6 +241,89 @@ it('allows IP addresses when explicitly allowed', function () {
     }
 });
 
+it('allows IP addresses by default', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://192.168.1.10/org/repo.git',
+        'http://10.0.0.5:3000/org/repo.git',
+        'https://203.0.113.7/org/repo',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("IP address URL should be allowed: {$url}");
+    }
+});
+
+it('rejects loopback and reserved IP addresses even when IP addresses are allowed', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://127.0.0.1/org/repo',
+        'https://127.0.0.2/org/repo',
+        'https://0.0.0.0/org/repo',
+        'https://169.254.169.254/org/repo',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("Reserved IP URL should be rejected: {$url}");
+        expect($validator->errors()->first('url'))->toBe('The url cannot point to internal hosts.');
+    }
+});
+
+it('allows IPv6 addresses in every URL format', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://[2a01:4f8::1]/org/repo.git',
+        'http://[fd00::5]:3000/org/repo.git',
+        'git://[2a01:4f8::1]/org/repo.git',
+        'git://[2a01:4f8::1]:9418/org/repo.git',
+        'git@[2a01:4f8::1]:org/repo.git',
+        'git@[fd00::5]:2222/org/repo.git',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("IPv6 URL should be allowed: {$url}");
+    }
+});
+
+it('rejects loopback and reserved IPv6 addresses', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://[::1]/org/repo',
+        'http://[fe80::1]/org/repo',
+        'https://[::ffff:127.0.0.1]/org/repo',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("Reserved IPv6 URL should be rejected: {$url}");
+        expect($validator->errors()->first('url'))->toBe('The url cannot point to internal hosts.');
+    }
+});
+
+it('rejects brackets that are not an IPv6 host', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://[not-an-ip]/org/repo',
+        'https://github.com/[2a01:4f8::1]/repo',
+        'git@[::1;id]:org/repo.git',
+        'https://[2a01:4f8::1]/org/[repo]',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("URL should be rejected: {$url}");
+        expect($validator->errors()->first('url'))->toContain('invalid characters');
+    }
+});
+
 it('rejects dangerous shell metacharacters', function () {
     $rule = new ValidGitRepositoryUrl;
 

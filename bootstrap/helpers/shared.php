@@ -4713,7 +4713,7 @@ function parseScpStyleGitUrl(?string $gitRepository): ?array
         return null;
     }
 
-    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>[^:]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
+    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>\[[0-9A-Fa-f:.]+\]|[^:\[\]]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
         return null;
     }
 
