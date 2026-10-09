@@ -2,6 +2,8 @@
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -9,6 +11,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
 
 uses(RefreshDatabase::class);
 
@@ -83,11 +86,35 @@ test('buildListenConfig adds an IPv6 listener only when the network has IPv6 ena
     'IPv6 enabled network' => [true, ['listen 28197;', 'listen [::]:28197;']],
 ]);
 
-test('buildUpstreamConfig resolves the database host at runtime', function () {
-    $action = new StartDatabaseProxy;
-    $method = new ReflectionMethod($action, 'buildUpstreamConfig');
+test('database proxy resolves the database container on every connection', function () {
+    Server::flushIdentityMap();
+    InstanceSettings::forceCreate(['id' => 0]);
+    config(['constants.ssh.mux_enabled' => false]);
 
-    $lines = array_map('trim', explode("\n", $method->invoke($action, 'db-uuid', 27017)));
+    $commands = [];
+    Process::fake(function ($process) use (&$commands) {
+        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
 
-    expect($lines)->toBe(['set $upstream db-uuid:27017;', 'proxy_pass $upstream;']);
+        return Process::result(output: '');
+    });
+
+    $team = Team::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = create_standalone_postgresql($environment->id, $destination);
+    $database->update(['is_public' => true, 'public_port' => 15432]);
+
+    StartDatabaseProxy::run($database->fresh());
+
+    preg_match("/echo '([A-Za-z0-9+\\/=]+)' \\| base64 -d \\| tee [^ ]+nginx\\.conf/", implode("\n", $commands), $matches);
+    $nginxConfig = base64_decode($matches[1]);
+
+    // A literal host in proxy_pass is resolved once at startup, so a restarted database with a new IP becomes unreachable.
+    expect($nginxConfig)->toContain('resolver 127.0.0.11 valid=10s;')
+        ->toContain("set \$upstream {$database->uuid}:5432;")
+        ->toContain('proxy_pass $upstream;')
+        ->not->toContain("proxy_pass {$database->uuid}:5432;");
 });
