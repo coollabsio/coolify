@@ -70,3 +70,15 @@ test('buildProxyTimeoutConfig normalizes invalid values to default', function (?
     [-10, 'proxy_timeout 3600s;'],
     [120, 'proxy_timeout 120s;'],
 ]);
+
+test('buildListenConfig adds an IPv6 listener only when the network has IPv6 enabled', function (bool $ipv6Enabled, array $expectedListeners) {
+    $action = new StartDatabaseProxy;
+    $method = new ReflectionMethod($action, 'buildListenConfig');
+
+    $listeners = array_map('trim', explode("\n", $method->invoke($action, 28197, $ipv6Enabled)));
+
+    expect($listeners)->toBe($expectedListeners);
+})->with([
+    'IPv4 only network' => [false, ['listen 28197;']],
+    'IPv6 enabled network' => [true, ['listen 28197;', 'listen [::]:28197;']],
+]);
