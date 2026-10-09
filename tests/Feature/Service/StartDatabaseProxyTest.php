@@ -82,3 +82,12 @@ test('buildListenConfig adds an IPv6 listener only when the network has IPv6 ena
     'IPv4 only network' => [false, ['listen 28197;']],
     'IPv6 enabled network' => [true, ['listen 28197;', 'listen [::]:28197;']],
 ]);
+
+test('buildUpstreamConfig resolves the database host at runtime', function () {
+    $action = new StartDatabaseProxy;
+    $method = new ReflectionMethod($action, 'buildUpstreamConfig');
+
+    $lines = array_map('trim', explode("\n", $method->invoke($action, 'db-uuid', 27017)));
+
+    expect($lines)->toBe(['set $upstream db-uuid:27017;', 'proxy_pass $upstream;']);
+});

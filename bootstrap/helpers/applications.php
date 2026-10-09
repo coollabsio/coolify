@@ -509,6 +509,15 @@ function clone_application(Application $source, $destination, array $overrides =
 
     // Clone production environment variables without triggering the created hook
     $environmentVariables = $source->environment_variables()->get();
+    $previewEnvironmentVariables = $source->environment_variables_preview()->get();
+
+    // Drop defaults auto-created for the new application (e.g. NIXPACKS_NODE_VERSION) so the source values win
+    EnvironmentVariable::query()
+        ->where('resourceable_type', $newApplication->getMorphClass())
+        ->where('resourceable_id', $newApplication->id)
+        ->whereIn('key', $environmentVariables->pluck('key')->merge($previewEnvironmentVariables->pluck('key'))->unique())
+        ->delete();
+
     foreach ($environmentVariables as $environmentVariable) {
         EnvironmentVariable::withoutEvents(function () use ($environmentVariable, $newApplication) {
             $newEnvironmentVariable = $environmentVariable->replicate([
@@ -527,7 +536,6 @@ function clone_application(Application $source, $destination, array $overrides =
     $source->cloneSecretManagerLinkTo($newApplication);
 
     // Clone preview environment variables
-    $previewEnvironmentVariables = $source->environment_variables_preview()->get();
     foreach ($previewEnvironmentVariables as $previewEnvironmentVariable) {
         EnvironmentVariable::withoutEvents(function () use ($previewEnvironmentVariable, $newApplication) {
             $newPreviewEnvironmentVariable = $previewEnvironmentVariable->replicate([

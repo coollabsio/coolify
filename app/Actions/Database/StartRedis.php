@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -86,6 +87,7 @@ class StartRedis
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_redis();
@@ -268,10 +270,6 @@ class StartRedis
 
                 if ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
-
-                    if (! $usesSecretManager) {
-                        $this->database->update(['redis_username' => $this->resolvedRedisUsername]);
-                    }
                 }
             } else {
                 if ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
