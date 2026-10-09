@@ -261,13 +261,13 @@
         @if ($deploymentsIndicator)
             <livewire:deployments-indicator variant="sidebar" />
         @endif
-        <div class="flex items-center gap-1" :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
+        <div class="flex items-center gap-1" :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
             <x-top-user-menu sidebar />
             <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
                 class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
                 <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
-                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                    <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
             </button>
         </div>

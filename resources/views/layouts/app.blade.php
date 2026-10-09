@@ -173,8 +173,8 @@
                         class="-mr-1 flex size-9 items-center justify-center rounded-md text-neutral-500 transition-transform duration-100 ease-out hover:bg-neutral-100 hover:text-black active:scale-90 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
                         <span class="sr-only">Open sidebar</span>
                         <svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
-                            <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                            <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
+                            <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                         </svg>
                     </button>
                 </div>
