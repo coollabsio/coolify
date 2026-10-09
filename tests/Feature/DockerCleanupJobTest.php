@@ -372,7 +372,7 @@ it('gives remote cleanup commands a local timeout and fails once the cleanup dea
     expect(fn () => CleanupDocker::run($server))
         ->toThrow(RuntimeException::class, 'Docker cleanup did not finish within '.CleanupDocker::REMOTE_COMMANDS_DEADLINE.' seconds');
 
-    $sshCommands = $commands->filter(fn (string $command) => str_contains($command, 'docker container prune') || str_contains($command, 'docker image prune'))->values();
+    $sshCommands = $commands->filter(fn (string $command) => str_contains($command, 'label=coolify.managed=true') || str_contains($command, 'docker image prune'))->values();
 
     expect(CleanupDocker::REMOTE_COMMANDS_DEADLINE)->toBeLessThan(CleanupDocker::JOB_TIMEOUT)
         ->and($sshCommands)->toHaveCount(2)
@@ -498,3 +498,38 @@ it('scans application images with a fixed number of remote commands and keeps th
         expect($removal)->not->toContain($kept);
     }
 });
+
+it('removes stopped Coolify containers but keeps the proxy, databases, applications and services', function (bool $nonRoot) {
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildContainerPruneCommand'))->invoke(new CleanupDocker);
+    preg_match("/--format '([^']+)'/", $command, $format);
+    $stoppedContainers = collect([
+        ['proxy', 'true', ''],
+        ['database', '', 'database'],
+        ['application', '', 'application'],
+        ['service', '', 'service'],
+        ['helper', '', ''],
+    ])->map(fn (array $container) => str_replace(['{{.ID}}', '{{.Label "coolify.proxy"}}', '{{.Label "coolify.type"}}'], $container, $format[1]));
+
+    // Fake docker on PATH: `docker ps` prints the stopped containers, `docker rm` prints what it is asked to remove
+    $bin = sys_get_temp_dir().'/docker-cleanup-'.bin2hex(random_bytes(4));
+    mkdir($bin);
+    file_put_contents("$bin/containers", $stoppedContainers->implode("\n")."\n");
+    file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = ps ]; then cat $bin/containers; else echo \"\$@\"; fi\n");
+    chmod("$bin/docker", 0755);
+
+    if ($nonRoot) {
+        $server = new Server;
+        $server->user = 'coolify';
+        $command = parseCommandsByLineForSudo(collect([$command]), $server)[0];
+        file_put_contents("$bin/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+        chmod("$bin/sudo", 0755);
+    }
+
+    $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
+
+    array_map('unlink', glob("$bin/*"));
+    rmdir($bin);
+
+    expect($command)->toContain('--filter label=coolify.managed=true')
+        ->and(trim((string) $output))->toBe('rm helper');
+})->with(['root' => false, 'non-root sudo parser' => true]);

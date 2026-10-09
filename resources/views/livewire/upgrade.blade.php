@@ -186,6 +186,9 @@
             checkUpgradeStatusInterval: null,
             elapsedInterval: null,
             healthCheckAttempts: 0,
+            healthProbePending: false,
+            healthTimeouts: 0,
+            statusRequestPending: false,
             livewireFailures: 0,
             startTime: null,
             elapsedTime: 0,
@@ -261,6 +264,19 @@
                 return `${minutes}:${seconds.toString().padStart(2, '0')}`;
             },
 
+            // Livewire never settles a $wire call when its request fails, and a request to a removed
+            // container can hang. Time out both so the progress view does not freeze.
+            withTimeout(promise, ms) {
+                return Promise.race([
+                    promise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms)),
+                ]);
+            },
+
+            fetchUpgradeStatus() {
+                return this.withTimeout(this.$wire.getUpgradeStatus(), 15000);
+            },
+
             mapStepToUI(apiStep) {
                 // Map backend steps (1-6) to UI steps (1-4)
                 // Backend: 1=config, 2=env, 3=pull, 4=stop, 5=start, 6=complete
@@ -281,11 +297,30 @@
             },
 
             async probeHealth() {
+                if (this.healthProbePending) {
+                    return;
+                }
+                this.healthProbePending = true;
+                try {
+                    await this.runHealthProbe();
+                } finally {
+                    this.healthProbePending = false;
+                }
+            },
+
+            async runHealthProbe() {
+                if (this.upgradeComplete || this.upgradeError) {
+                    return;
+                }
                 this.healthCheckAttempts++;
                 const elapsedMinutes = Math.floor((Date.now() - this.startTime) / 60000);
 
                 try {
-                    const response = await fetch('/api/health');
+                    const response = await fetch('/api/health', {
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(10000),
+                    });
+                    this.healthTimeouts = 0;
                     if (!response.ok) {
                         this.instanceWentDown = true;
                         this.currentStep = 4;
@@ -298,7 +333,7 @@
 
                     let data;
                     try {
-                        data = await this.$wire.getUpgradeStatus();
+                        data = await this.fetchUpgradeStatus();
                     } catch (error) {
                         if (this.instanceWentDown) {
                             this.showSuccess();
@@ -328,6 +363,10 @@
                         this.currentStatus = data.message ?? this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
                     }
                 } catch (error) {
+                    // A busy server can answer slowly, so one timeout does not prove that it is down.
+                    if (error?.name === 'TimeoutError' && ++this.healthTimeouts < 2) {
+                        return;
+                    }
                     console.error('Health check failed:', error);
                     this.instanceWentDown = true;
                     this.currentStep = 4;
@@ -356,6 +395,9 @@
             },
 
             showSuccess() {
+                if (this.upgradeComplete) {
+                    return;
+                }
                 if (this.checkHealthInterval) {
                     clearInterval(this.checkHealthInterval);
                     this.checkHealthInterval = null;
@@ -431,12 +473,17 @@
                 this.serviceDown = false;
                 this.instanceWentDown = false;
                 this.livewireFailures = 0;
+                this.healthTimeouts = 0;
                 this.startHealthWatch();
 
                 // Poll upgrade status via Livewire
                 this.checkUpgradeStatusInterval = setInterval(async () => {
+                    if (this.statusRequestPending) {
+                        return;
+                    }
+                    this.statusRequestPending = true;
                     try {
-                        const data = await this.$wire.getUpgradeStatus();
+                        const data = await this.fetchUpgradeStatus();
                         this.livewireFailures = 0;
                         if (data.status === 'in_progress') {
                             this.currentStep = this.mapStepToUI(data.step);
@@ -450,6 +497,9 @@
                             await this.probeHealth();
                         }
                     } catch (error) {
+                        if (this.upgradeComplete || this.upgradeError) {
+                            return;
+                        }
                         this.livewireFailures++;
                         if (this.livewireFailures < 3) {
                             this.currentStatus = 'Reconnecting. This is expected during an upgrade...';
@@ -468,6 +518,8 @@
                             }
                             this.revive();
                         }
+                    } finally {
+                        this.statusRequestPending = false;
                     }
                 }, 2000);
             }
