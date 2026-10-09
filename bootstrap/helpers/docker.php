@@ -89,10 +89,12 @@ function containerOwnerUuid(Collection|array|string $labels, string $type): ?str
 
 /**
  * Resource that owns a container, from the given candidates, by UUID label or compose project /
- * stack namespace (see containerOwnerUuid()). Applications deployed before mid-2024 used the
- * deployment directory as compose project; their compose service (the container name) starts
- * with the application UUID. The numeric id label is never used: another Coolify instance that
- * manages the same server can have a resource with the same id.
+ * stack namespace (see containerOwnerUuid()). Some older application containers have another
+ * compose project: the deployment directory (before mid-2024, or a custom Compose start command
+ * without --project-name). Their container name (`coolify.name`, for Dockerfile-style builds also
+ * the compose service) contains the application UUID as a dash-separated part, for example
+ * `{uuid}-104512123456` or `{service}-{uuid}-104512123456`. The numeric id label is never used:
+ * another Coolify instance that manages the same server can have a resource with the same id.
  *
  * @template TResource of \Illuminate\Database\Eloquent\Model
  *
@@ -110,9 +112,11 @@ function resolveContainerOwner(Collection $resources, Collection|array|string $l
         return $owner;
     }
 
-    $composeService = (string) $labels->get('com.docker.compose.service');
+    $names = [(string) $labels->get('com.docker.compose.service'), (string) $labels->get('coolify.name')];
 
-    return $resources->first(fn ($resource) => $composeService === $resource->uuid || str_starts_with($composeService, $resource->uuid.'-'));
+    return $resources->first(fn ($resource) => collect($names)->contains(
+        fn (string $name) => filled($resource->uuid) && preg_match('/(?:^|-)'.preg_quote($resource->uuid, '/').'(?:-|$)/', $name) === 1
+    ));
 }
 
 /**
@@ -238,8 +242,8 @@ function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters
         $base.' '.$filters(["label=coolify.{$type}Id", "label=com.docker.compose.project={$uuid}", ...$legacyFilters]).' '.$formatArgument,
     ];
     if ($type === 'application') {
-        // Deployed before mid-2024 (see resolveContainerOwner()): the container name starts with the UUID.
-        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name=^{$uuid}", ...$legacyFilters]).' '.$formatArgument;
+        // Compose project is the deployment directory (see resolveContainerOwner()): the container name contains the UUID.
+        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name={$uuid}", ...$legacyFilters]).' '.$formatArgument;
     }
 
     return $commands;
