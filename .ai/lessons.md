@@ -14,6 +14,7 @@
 - Browser `click('Text')` can match a hidden element first (for example inactive modal steps) and wait forever; use `button:visible:has-text("Text")`.
 - Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
+- Run Pest with host PHP, not `./scripts/dev exec`; inside the container `RefreshDatabase` uses the instance Postgres and wipes the dev data.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
