@@ -323,6 +323,21 @@ function getCurrentApplicationContainerStatus(Server $server, Application $appli
     return $containers;
 }
 
+/**
+ * Pick the container the proxy routes to when an application has several, as during a
+ * rolling update: running, ready (healthy or without a healthcheck) over starting or
+ * unhealthy, and the newest among equals, since the older one is about to be stopped.
+ */
+function selectServingContainer(Collection $containers): ?array
+{
+    $running = $containers->filter(fn ($container) => data_get($container, 'State') === 'running');
+    $ready = $running->reject(fn ($container) => str(data_get($container, 'Status'))->contains(['(health: starting)', '(unhealthy)']));
+
+    return ($ready->isEmpty() ? $running : $ready)
+        ->sortByDesc(fn ($container) => strtotime((string) data_get($container, 'CreatedAt')) ?: 0)
+        ->first();
+}
+
 function getCurrentServiceContainerStatus(Server $server, Service $service): Collection
 {
     $containers = collect([]);

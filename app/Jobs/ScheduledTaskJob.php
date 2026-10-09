@@ -145,11 +145,14 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
             if ($this->resource->type() === 'application') {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource, 0);
-                if ($containers->count() > 0) {
-                    $containers->each(function ($container) {
-                        $this->containers[] = str_replace('/', '', $container['Names']);
-                    });
+                if ($this->resource->build_pack !== 'dockercompose') {
+                    // Compose runs one container per service and the task names which one; any other build pack
+                    // serves from a single container, even while a rolling update or a stopped leftover adds another.
+                    $containers = collect([selectServingContainer($containers)])->filter();
                 }
+                $containers->each(function ($container) {
+                    $this->containers[] = str_replace('/', '', $container['Names']);
+                });
             } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
