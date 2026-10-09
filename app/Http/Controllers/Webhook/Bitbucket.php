@@ -84,7 +84,11 @@ class Bitbucket extends Controller
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_name, $branch);
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_bitbucket_token);
-            $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
+            $applications = Application::query();
+            if ($x_bitbucket_event !== 'pullrequest:rejected' && $x_bitbucket_event !== 'pullrequest:fulfilled') {
+                $applications->where('git_branch', $branch);
+            }
+            $applications = $this->manualWebhookApplications($applications, $full_name);
             if ($applications->isEmpty()) {
                 return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
             }
