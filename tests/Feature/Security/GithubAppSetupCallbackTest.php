@@ -400,3 +400,54 @@ it('allows reinstalling an already configured github app installation id', funct
     $this->githubApp->refresh();
     expect($this->githubApp->installation_id)->toBe(222222);
 });
+
+it('redirects to the github app with the reason when github does not confirm the installation', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    fakeGithubInstallationVerificationFailure();
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=999999')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionHas('error', fn (string $error) => str_contains($error, 'HTTP 404: Not Found'));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBeNull();
+});
+
+it('redirects to the github app with the reason when the server clock is out of sync with github', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
+            'Date' => now()->addMinutes(5)->toRfc7231String(),
+        ]),
+    ]);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionHas('error', fn (string $error) => str_contains($error, 'System time is out of sync with GitHub API time'));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBeNull();
+});
+
+it('completes the github app installation after the user switched to another of their teams', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    fakeGithubInstallationVerification($this->githubApp->app_id);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBe(123456)
+        ->and(data_get(session('currentTeam'), 'id'))->toBe($this->team->id);
+});

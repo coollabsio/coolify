@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Github extends Controller
@@ -747,11 +748,21 @@ class Github extends Controller
             action: 'install',
         );
 
-        abort_unless(
-            $this->githubInstallationBelongsToApp($github_app, $installation_id),
-            403,
-            'GitHub App installation could not be verified.'
-        );
+        $verification_error = $this->githubInstallationVerificationError($github_app, $installation_id);
+        if ($verification_error) {
+            Log::warning('GitHub App installation could not be verified.', [
+                'github_app_id' => $github_app->id,
+                'installation_id' => $installation_id,
+                'reason' => $verification_error,
+            ]);
+
+            $message = "GitHub App installation could not be verified: {$verification_error}";
+            abort_if($request->expectsJson(), 403, $message);
+
+            return redirect()
+                ->route('source.github.show', ['github_app_uuid' => $github_app->uuid])
+                ->with('error', $message);
+        }
 
         $github_app->installation_id = $installation_id;
         $github_app->save();
@@ -778,11 +789,13 @@ class Github extends Controller
      * The installation id arrives as an untrusted query parameter on an
      * unauthenticated-reachable GET callback, so it must be confirmed against
      * the GitHub API using the App's own credentials before it is persisted.
+     *
+     * @return string|null The reason the verification failed, or null when it passed.
      */
-    private function githubInstallationBelongsToApp(GithubApp $github_app, string $installation_id): bool
+    private function githubInstallationVerificationError(GithubApp $github_app, string $installation_id): ?string
     {
-        if (blank($github_app->app_id) || blank($github_app->privateKey?->private_key)) {
-            return false;
+        if (blank($github_app->app_id) || blank(githubAppPrivateKey($github_app)?->private_key)) {
+            return 'The GitHub App ID or private key is missing.';
         }
 
         try {
@@ -794,12 +807,19 @@ class Github extends Controller
                 ->timeout(10)
                 ->connectTimeout(5)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
-
-            return $response->successful()
-                && (string) data_get($response->json(), 'app_id') === (string) $github_app->app_id;
-        } catch (\Throwable) {
-            return false;
+        } catch (\Throwable $e) {
+            return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
         }
+
+        if (! $response->successful()) {
+            return "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found');
+        }
+
+        if ((string) data_get($response->json(), 'app_id') !== (string) $github_app->app_id) {
+            return 'The installation belongs to a different GitHub App.';
+        }
+
+        return null;
     }
 
     private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp
@@ -813,12 +833,20 @@ class Github extends Controller
             $this->rejectInvalidGithubAppSetupState($request);
         }
 
-        $team_id = $request->user()?->currentTeam()?->id;
-        abort_unless(! is_null($team_id) && (int) data_get($payload, 'team_id') === $team_id, 403);
+        // The state is bound to the team that started the setup. The user may have switched
+        // teams while on GitHub, so check membership of that team, not the session team.
+        $team_id = (int) data_get($payload, 'team_id');
+        abort_unless((bool) $request->user()?->teams->contains('id', $team_id), 403);
 
-        return GithubApp::whereKey(data_get($payload, 'github_app_id'))
-            ->where('team_id', data_get($payload, 'team_id'))
+        $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
+            ->where('team_id', $team_id)
             ->firstOrFail();
+
+        if ($request->user()->currentTeam()?->id !== $team_id) {
+            refreshSession($github_app->team);
+        }
+
+        return $github_app;
     }
 
     private function rejectInvalidGithubAppSetupState(Request $request): never
