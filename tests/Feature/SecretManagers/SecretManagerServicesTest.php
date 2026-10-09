@@ -99,7 +99,9 @@ describe('InfisicalService', function () {
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/api/v4/secrets')
             && $request->hasHeader('Authorization', 'Bearer short-lived-token')
-            && str_contains($request->url(), 'projectId=project-1'));
+            && str_contains($request->url(), 'projectId=project-1')
+            && $request['expandSecretReferences'] === 'true'
+            && $request['viewSecretValue'] === 'true');
     });
 
     test('falls back to the v3 raw endpoint on older self-hosted instances', function () {
@@ -119,7 +121,8 @@ describe('InfisicalService', function () {
 
         expect($service->fetchSecrets('project-1', 'prod'))->toBe(['LEGACY_KEY' => 'legacy-value']);
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'workspaceId=project-1'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'workspaceId=project-1')
+            && $request['expandSecretReferences'] === 'true');
     });
 
     test('throws when the login fails', function () {
