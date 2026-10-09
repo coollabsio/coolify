@@ -232,6 +232,7 @@ class ResourceOperations extends Component
                         'team_id' => $this->resourceTeamId(),
                     ]);
                     $newBackup->save();
+                    $backup->copyS3StoragesTo($newBackup);
                 }
 
                 $environmentVaribles = $this->resource->environment_variables()->get();

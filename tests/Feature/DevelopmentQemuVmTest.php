@@ -173,16 +173,41 @@ it('can change the localhost qemu profile without adding a server', function () 
 
 it('seeds localhost through the container command', function () {
     $this->seed(ServerSeeder::class);
+    Process::fake();
 
     expect(Artisan::call('dev:qemu:seed', [
         'profile' => 'ubuntu-root',
         '--as-localhost' => true,
     ]))->toBe(Command::SUCCESS)
         ->and(Server::query()->findOrFail(0)->ip)->toBe('192.168.122.10');
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker run -d --name coolify-db')
+        && str_contains($process->command, 'POSTGRES_DB='));
+});
+
+it('starts the instance database container with sudo on a non-root localhost vm', function () {
+    $this->seed(ServerSeeder::class);
+    Process::fake();
+
+    Artisan::call('dev:qemu:seed', ['profile' => 'ubuntu-non-root', '--as-localhost' => true]);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'if ! sudo docker inspect coolify-db')
+        && str_contains($process->command, 'sudo docker run -d --name coolify-db')
+        && str_contains($process->command, 'sudo docker start coolify-db'));
+});
+
+it('still seeds localhost when the instance database container cannot start', function () {
+    $this->seed(ServerSeeder::class);
+    Process::fake(fn () => Process::result(errorOutput: 'Cannot connect to the Docker daemon', exitCode: 1));
+
+    expect(Artisan::call('dev:qemu:seed', ['profile' => 'ubuntu-root', '--as-localhost' => true]))->toBe(Command::SUCCESS)
+        ->and(Artisan::output())->toContain('Could not start the coolify-db container')
+        ->and(Server::query()->findOrFail(0)->ip)->toBe('192.168.122.10');
 });
 
 it('seeds localhost with the forwarded ssh address of a lima vm', function () {
     $this->seed(ServerSeeder::class);
+    Process::fake();
 
     expect(Artisan::call('dev:qemu:seed', [
         'profile' => 'debian-non-root',

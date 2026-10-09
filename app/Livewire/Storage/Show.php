@@ -32,8 +32,10 @@ class Show extends Component
             return $this->redirectRoute('storage.index', navigate: true);
         }
         $this->currentRoute = request()->route()->getName();
-        $this->backupCount = ScheduledDatabaseBackup::where('s3_storage_id', $this->storage->id)->count()
-            + ScheduledVolumeBackup::where('s3_storage_id', $this->storage->id)->count();
+        $this->backupCount = collect([ScheduledDatabaseBackup::class, ScheduledVolumeBackup::class])
+            ->sum(fn (string $backupModel): int => $backupModel::query()
+                ->usingS3Storage($this->storage->id)
+                ->count());
     }
 
     public function delete()

@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\DatabaseBackupS3Replica;
 use App\Models\EnvironmentVariable;
 use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
@@ -314,110 +316,96 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
 
 function removeOldBackups($backup): void
 {
-    try {
-        if ($backup->executions) {
-            // Delete old local backups (only if local backup is NOT disabled)
-            // Note: When disable_local_backup is enabled, each execution already marks its own
-            // local_storage_deleted status at the time of backup, so we don't need to retroactively
-            // update old executions
-            if (! $backup->disable_local_backup) {
-                $localBackupsToDelete = deleteOldBackupsLocally($backup);
-                if ($localBackupsToDelete->isNotEmpty()) {
-                    $backup->executions()
-                        ->whereIn('id', $localBackupsToDelete->pluck('id'))
-                        ->update(['local_storage_deleted' => true]);
-                }
-            }
-        }
-
-        if ($backup->save_s3 && $backup->executions) {
-            $s3BackupsToDelete = deleteOldBackupsFromS3($backup);
-            if ($s3BackupsToDelete->isNotEmpty()) {
-                $backup->executions()
-                    ->whereIn('id', $s3BackupsToDelete->pluck('id'))
-                    ->update(['s3_storage_deleted' => true]);
-            }
-        }
-
-        // Delete execution records where all backup copies are gone
-        // Case 1: Both local and S3 backups are deleted
+    // When local backups are disabled, retain the local file until an S3 copy is available.
+    $localBackupsToDelete = deleteOldBackupsLocally($backup);
+    if ($localBackupsToDelete->isNotEmpty()) {
         $backup->executions()
-            ->where('local_storage_deleted', true)
-            ->where('s3_storage_deleted', true)
-            ->delete();
-
-        // Case 2: Local backup is deleted and S3 was never used (s3_uploaded is null)
-        $backup->executions()
-            ->where('local_storage_deleted', true)
-            ->whereNull('s3_uploaded')
-            ->delete();
-
-    } catch (Exception $e) {
-        throw $e;
+            ->whereIn('id', $localBackupsToDelete->pluck('id'))
+            ->update(['local_storage_deleted' => true]);
     }
+
+    if ($backup->save_s3) {
+        deleteOldBackupsFromS3($backup);
+    }
+
+    // Delete execution records when no local file and no S3 copy is left
+    $backup->executions()
+        ->where('local_storage_deleted', true)
+        ->withoutLiveS3Copies()
+        ->delete();
 }
 
-function deleteOldBackupsLocally($backup): Collection
+/**
+ * Successful executions that fall outside the retention settings, newest execution first.
+ *
+ * @param  Collection<int, ScheduledDatabaseBackupExecution>  $executions  Sorted newest first.
+ * @return Collection<int, ScheduledDatabaseBackupExecution>
+ */
+function backupExecutionsOutsideRetention(Collection $executions, ?int $retentionAmount, ?int $retentionDays, int|float|null $maxStorageGB): Collection
 {
-    if (! $backup || ! $backup->executions) {
-        return collect();
-    }
-
-    $successfulBackups = $backup->executions()
-        ->where('status', 'success')
-        ->where('local_storage_deleted', false)
-        ->orderBy('created_at', 'desc')
-        ->get();
-
-    if ($successfulBackups->isEmpty()) {
-        return collect();
-    }
-
-    $retentionAmount = $backup->database_backup_retention_amount_locally;
-    $retentionDays = $backup->database_backup_retention_days_locally;
-    $maxStorageGB = $backup->database_backup_retention_max_storage_locally;
-
-    if ($retentionAmount === 0 && $retentionDays === 0 && $maxStorageGB === 0) {
+    if ($executions->isEmpty()) {
         return collect();
     }
 
     $backupsToDelete = collect();
 
     if ($retentionAmount > 0) {
-        $byAmount = $successfulBackups->skip($retentionAmount);
-        $backupsToDelete = $backupsToDelete->merge($byAmount);
+        $backupsToDelete = $backupsToDelete->merge($executions->skip($retentionAmount));
     }
 
     if ($retentionDays > 0) {
-        $oldestAllowedDate = $successfulBackups->first()->created_at->clone()->utc()->subDays($retentionDays);
-        $oldBackups = $successfulBackups->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate);
-        $backupsToDelete = $backupsToDelete->merge($oldBackups);
+        $oldestAllowedDate = $executions->first()->created_at->clone()->utc()->subDays($retentionDays);
+        $backupsToDelete = $backupsToDelete->merge(
+            $executions->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate)
+        );
     }
 
     if ($maxStorageGB > 0) {
         $maxStorageBytes = $maxStorageGB * pow(1024, 3);
         $totalSize = 0;
-        $backupsOverLimit = collect();
 
-        $backupsToCheck = $successfulBackups->skip(1);
-
-        foreach ($backupsToCheck as $backupExecution) {
+        foreach ($executions->skip(1) as $backupExecution) {
             $totalSize += (int) $backupExecution->size;
             if ($totalSize > $maxStorageBytes) {
-                $backupsOverLimit = $successfulBackups->filter(
+                $backupsToDelete = $backupsToDelete->merge($executions->filter(
                     fn ($b) => $b->created_at->utc() <= $backupExecution->created_at->utc()
-                )->skip(1);
+                )->skip(1));
                 break;
             }
         }
-
-        $backupsToDelete = $backupsToDelete->merge($backupsOverLimit);
     }
 
-    $backupsToDelete = $backupsToDelete->unique('id');
-    $processedBackups = collect();
+    return $backupsToDelete->unique('id')->values();
+}
 
-    $server = null;
+function deleteOldBackupsLocally($backup): Collection
+{
+    if (! $backup) {
+        return collect();
+    }
+
+    $successfulBackups = $backup->executions()
+        ->where('status', 'success')
+        ->where('local_storage_deleted', false)
+        ->when($backup->disable_local_backup, fn ($query) => $query
+            ->whereHas('s3Replicas', fn ($query) => $query
+                ->where('s3_uploaded', true)
+                ->where('s3_storage_deleted', false)))
+        ->orderBy('created_at', 'desc')
+        ->orderBy('id', 'desc')
+        ->get();
+
+    $backupsToDelete = backupExecutionsOutsideRetention(
+        $successfulBackups,
+        $backup->database_backup_retention_amount_locally,
+        $backup->database_backup_retention_days_locally,
+        $backup->database_backup_retention_max_storage_locally,
+    );
+
+    if ($backupsToDelete->isEmpty()) {
+        return collect();
+    }
+
     if ($backup->database_type === ServiceDatabase::class) {
         $server = $backup->database->service->server;
     } else {
@@ -433,89 +421,81 @@ function deleteOldBackupsLocally($backup): Collection
         ->pluck('filename')
         ->all();
 
-    if (! empty($filesToDelete)) {
-        deleteBackupsLocally($filesToDelete, $server);
-        $processedBackups = $backupsToDelete;
+    if (empty($filesToDelete)) {
+        return collect();
     }
 
-    return $processedBackups;
+    deleteBackupsLocally($filesToDelete, $server);
+
+    return $backupsToDelete;
 }
 
+/**
+ * Applies the S3 retention settings to each destination separately. Copies in a storage that no longer exists are
+ * marked as deleted.
+ *
+ * @return Collection<int, ScheduledDatabaseBackupExecution> The executions that lost at least one S3 copy.
+ */
 function deleteOldBackupsFromS3($backup): Collection
 {
-    if (! $backup || ! $backup->executions || ! $backup->s3) {
+    if (! $backup) {
         return collect();
     }
 
-    $successfulBackups = $backup->executions()
-        ->where('status', 'success')
+    $liveReplicas = DatabaseBackupS3Replica::query()
+        ->with('s3')
+        ->whereHas('execution', fn ($query) => $query
+            ->where('scheduled_database_backup_id', $backup->id)
+            ->where('status', 'success'))
+        ->where('s3_uploaded', true)
         ->where('s3_storage_deleted', false)
-        ->orderBy('created_at', 'desc')
         ->get();
 
-    if ($successfulBackups->isEmpty()) {
-        return collect();
-    }
+    $deletedReplicas = $liveReplicas->filter(fn (DatabaseBackupS3Replica $replica) => ! $replica->s3);
 
-    $retentionAmount = $backup->database_backup_retention_amount_s3;
-    $retentionDays = $backup->database_backup_retention_days_s3;
-    $maxStorageGB = $backup->database_backup_retention_max_storage_s3;
+    foreach ($liveReplicas->filter(fn (DatabaseBackupS3Replica $replica) => $replica->s3)->groupBy('s3_storage_id') as $replicas) {
+        $successfulBackups = $backup->executions()
+            ->whereIn('id', $replicas->pluck('execution_id'))
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
 
-    if ($retentionAmount === 0 && $retentionDays === 0 && $maxStorageGB === 0) {
-        return collect();
-    }
+        $backupsToDelete = backupExecutionsOutsideRetention(
+            $successfulBackups,
+            $backup->database_backup_retention_amount_s3,
+            $backup->database_backup_retention_days_s3,
+            $backup->database_backup_retention_max_storage_s3,
+        );
 
-    $backupsToDelete = collect();
+        $filesToDelete = $backupsToDelete
+            ->filter(fn ($execution) => ! empty($execution->filename))
+            ->pluck('filename')
+            ->all();
 
-    if ($retentionAmount > 0) {
-        $byAmount = $successfulBackups->skip($retentionAmount);
-        $backupsToDelete = $backupsToDelete->merge($byAmount);
-    }
-
-    if ($retentionDays > 0) {
-        $oldestAllowedDate = $successfulBackups->first()->created_at->clone()->utc()->subDays($retentionDays);
-        $oldBackups = $successfulBackups->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate);
-        $backupsToDelete = $backupsToDelete->merge($oldBackups);
-    }
-
-    if ($maxStorageGB > 0) {
-        $maxStorageBytes = $maxStorageGB * pow(1024, 3);
-        $totalSize = 0;
-        $backupsOverLimit = collect();
-
-        $backupsToCheck = $successfulBackups->skip(1);
-
-        foreach ($backupsToCheck as $backupExecution) {
-            $totalSize += (int) $backupExecution->size;
-            if ($totalSize > $maxStorageBytes) {
-                $backupsOverLimit = $successfulBackups->filter(
-                    fn ($b) => $b->created_at->utc() <= $backupExecution->created_at->utc()
-                )->skip(1);
-                break;
-            }
+        if (empty($filesToDelete)) {
+            continue;
         }
 
-        $backupsToDelete = $backupsToDelete->merge($backupsOverLimit);
-    }
-
-    $backupsToDelete = $backupsToDelete->unique('id');
-    $processedBackups = collect();
-
-    $filesToDelete = $backupsToDelete
-        ->filter(fn ($execution) => ! empty($execution->filename))
-        ->pluck('filename')
-        ->all();
-
-    if (! empty($filesToDelete)) {
         try {
-            deleteBackupsS3($filesToDelete, $backup->s3);
-            $processedBackups = $backupsToDelete;
+            deleteBackupsS3($filesToDelete, $replicas->first()->s3);
+            $deletedReplicas = $deletedReplicas->merge($replicas->whereIn('execution_id', $backupsToDelete->pluck('id')));
         } catch (Throwable $e) {
             report($e);
         }
     }
 
-    return $processedBackups;
+    if ($deletedReplicas->isEmpty()) {
+        return collect();
+    }
+
+    DatabaseBackupS3Replica::query()
+        ->whereKey($deletedReplicas->pluck('id'))
+        ->update(['s3_storage_deleted' => true]);
+
+    $executions = $backup->executions()->whereIn('id', $deletedReplicas->pluck('execution_id')->unique())->get();
+    $executions->each(fn (ScheduledDatabaseBackupExecution $execution) => $execution->refreshS3Summary());
+
+    return $executions;
 }
 
 function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null): bool

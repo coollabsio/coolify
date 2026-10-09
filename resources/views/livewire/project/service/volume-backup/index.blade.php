@@ -268,8 +268,8 @@
                                 default => 'neutral',
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
-                            $databaseS3 = $databaseBackup->s3?->team_id === $serviceTeamId ? $databaseBackup->s3 : null;
-                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3 ? 'S3 storage: '.$databaseS3->name.' (bucket: '.$databaseS3->bucket.')' : 'S3 storage: Unavailable');
+                            $databaseS3s = ($databaseBackup->s3Storages->isNotEmpty() ? $databaseBackup->s3Storages : collect([$databaseBackup->s3])->filter())->where('team_id', $serviceTeamId);
+                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3s->isNotEmpty() ? 'S3 storage: '.$databaseS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
                         @endphp
                         <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
                             x-show="isVisible(@js($databaseBackupId))"
@@ -284,8 +284,8 @@
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
-                                <x-status-badge :status="$databaseBackup->save_s3 ? ($databaseS3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                    :type="$databaseBackup->save_s3 ? ($databaseS3 ? 'success' : 'error') : 'neutral'"
+                                <x-status-badge :status="$databaseBackup->save_s3 ? match ($databaseS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $databaseS3s->count().' storages' } : 'Not set'"
+                                    :type="$databaseBackup->save_s3 ? ($databaseS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
                                     :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
@@ -308,8 +308,8 @@
                     @foreach ($backups as $backup)
                         @php
                             $latestExecution = $backup->latestExecution;
-                            $volumeS3 = $backup->s3?->team_id === $serviceTeamId ? $backup->s3 : null;
-                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3 ? 'S3 storage: '.$volumeS3->name.' (bucket: '.$volumeS3->bucket.')' : 'S3 storage: Unavailable');
+                            $volumeS3s = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId);
+                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3s->isNotEmpty() ? 'S3 storage: '.$volumeS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {
                                 'running' => 'In progress',
@@ -338,8 +338,8 @@
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
-                                <x-status-badge :status="$backup->save_s3 ? ($volumeS3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                    :type="$backup->save_s3 ? ($volumeS3 ? 'success' : 'error') : 'neutral'"
+                                <x-status-badge :status="$backup->save_s3 ? match ($volumeS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $volumeS3s->count().' storages' } : 'Not set'"
+                                    :type="$backup->save_s3 ? ($volumeS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
                                     :data-tooltip="$volumeS3Tooltip" :aria-label="$volumeS3Tooltip" tabindex="0" />
                             </span>
                             <span>

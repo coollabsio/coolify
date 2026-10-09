@@ -93,7 +93,7 @@ function createRecoveryBoundsBackup(Team $team, array $backupAttributes = []): a
 
 function createRecoveryBoundsExecution(ScheduledVolumeBackup $backup, array $attributes = []): ScheduledVolumeBackupExecution
 {
-    return ScheduledVolumeBackupExecution::create([
+    $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         's3_storage_id' => $backup->s3_storage_id,
         'status' => 'failed',
@@ -101,6 +101,9 @@ function createRecoveryBoundsExecution(ScheduledVolumeBackup $backup, array $att
         's3_cleanup_pending' => true,
         ...$attributes,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $backup->s3_storage_id]);
+
+    return $execution;
 }
 
 function failRecoveryBoundsS3Delete(string $awsCode): void
@@ -164,7 +167,7 @@ it('records a categorized S3 cleanup failure without throwing or leaking the S3 
 
     $execution->refresh();
     expect($execution->s3_cleanup_pending)->toBeTrue()
-        ->and($execution->s3_storage_deleted)->toBeFalse()
+        ->and($execution->s3Replicas()->sole()->s3_storage_deleted)->toBeFalse()
         ->and($execution->recovery_error)->toBe('s3_auth')
         ->and($execution->recovery_last_attempt_at->equalTo(now()))->toBeTrue()
         ->and($execution->recovery_needs_attention)->toBeTrue()
@@ -261,7 +264,7 @@ it('cleans the S3 upload even when container recovery fails', function () {
     $execution->refresh();
     expect($execution->stop_recovery_pending)->toBeTrue()
         ->and($execution->s3_cleanup_pending)->toBeFalse()
-        ->and($execution->s3_storage_deleted)->toBeTrue()
+        ->and($execution->s3Replicas()->sole()->s3_storage_deleted)->toBeTrue()
         ->and($execution->recovery_error)->toBe('server_unreachable')
         ->and($execution->recovery_needs_attention)->toBeFalse();
     Notification::assertNothingSent();
@@ -281,7 +284,7 @@ it('resets the recovery state after a successful attempt', function () {
 
     $execution->refresh();
     expect($execution->s3_cleanup_pending)->toBeFalse()
-        ->and($execution->s3_storage_deleted)->toBeTrue()
+        ->and($execution->s3Replicas()->sole()->s3_storage_deleted)->toBeTrue()
         ->and($execution->recovery_error)->toBeNull()
         ->and($execution->recovery_last_attempt_at)->toBeNull()
         ->and($execution->recovery_needs_attention)->toBeFalse();

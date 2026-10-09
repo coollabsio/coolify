@@ -6,10 +6,12 @@ use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
 use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -67,19 +69,48 @@ class S3Storage extends BaseModel
         });
 
         static::deleting(function (S3Storage $storage) {
-            ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->update([
-                'save_s3' => false,
-                's3_storage_id' => null,
-            ]);
-            ScheduledVolumeBackupExecution::where('s3_storage_id', $storage->id)
-                ->update([
-                    's3_storage_deleted' => true,
-                    's3_cleanup_pending' => false,
-                ]);
-            ScheduledVolumeBackup::where('s3_storage_id', $storage->id)->update([
-                'save_s3' => false,
-                's3_storage_id' => null,
-            ]);
+            $storage->detachFromBackups();
+        });
+    }
+
+    /**
+     * Removes this storage from every backup schedule and marks the copies in it as deleted. A schedule moves its
+     * primary destination to a remaining storage, or stops S3 backups when none remains.
+     */
+    public function detachFromBackups(): void
+    {
+        DB::transaction(function (): void {
+            foreach ([ScheduledDatabaseBackup::class, ScheduledVolumeBackup::class] as $backupModel) {
+                $backupModel::query()
+                    ->usingS3Storage($this->id)
+                    ->lazyById()
+                    ->each(function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup): void {
+                        $backup->syncS3Storages($backup->s3Storages()->whereKeyNot($this->id)->pluck('s3_storages.id')->all());
+                        if ($backup->s3_storage_id === null && $backup->save_s3) {
+                            $backup->update(['save_s3' => false]);
+                        }
+                    });
+            }
+
+            foreach ([DatabaseBackupS3Replica::class, VolumeBackupS3Replica::class] as $replicaModel) {
+                $replicaModel::query()
+                    ->with('execution')
+                    ->where('s3_storage_id', $this->id)
+                    ->where('s3_storage_deleted', false)
+                    ->lazyById()
+                    ->each(function (DatabaseBackupS3Replica|VolumeBackupS3Replica $replica): void {
+                        $replica->update(['s3_storage_deleted' => true]);
+                        $replica->execution?->refreshS3Summary();
+                    });
+            }
+
+            ScheduledVolumeBackupExecution::query()
+                ->where('s3_cleanup_pending', true)
+                ->whereHas('s3Replicas', fn (Builder $query) => $query->where('s3_storage_id', $this->id))
+                ->whereDoesntHave('s3Replicas', fn (Builder $query) => $query
+                    ->where('s3_storage_deleted', false)
+                    ->where(fn (Builder $query) => $query->whereNull('s3_uploaded')->orWhere('s3_uploaded', false)))
+                ->update(['s3_cleanup_pending' => false]);
         });
     }
 

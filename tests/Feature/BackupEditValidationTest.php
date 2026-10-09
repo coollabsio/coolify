@@ -424,7 +424,7 @@ it('defaults to the first available storage when multiple storages are available
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
-        ->assertSet('s3StorageId', $firstS3->id)
+        ->assertSet('s3StorageIds', [$firstS3->id])
         ->set('saveS3', true)
         ->call('instantSave')
         ->assertDispatched('success');
@@ -461,7 +461,7 @@ it('accepts a root team S3 storage for the instance database backup', function (
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => collect([$s3])])
         ->set('saveS3', true)
-        ->set('s3StorageId', $s3->id)
+        ->set('s3StorageIds', [$s3->id])
         ->call('instantSave')
         ->assertDispatched('success');
 
@@ -548,7 +548,7 @@ it('saves selected S3 storage immediately when it changes', function () {
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
-        ->set('s3StorageId', $secondS3->id)
+        ->set('s3StorageIds', [$secondS3->id])
         ->assertDispatched('success');
 
     $backup->refresh();

@@ -148,6 +148,22 @@ it('detects deployment hook changes as redeploy-only changes', function (string 
     'post-deployment container' => ['post_deployment_command_container', 'Post-deployment command container', 'worker'],
 ]);
 
+it('detects HTTP basic auth hash setting changes as redeploy-only changes', function (string $field, string $label, string|int $newValue) {
+    $application = snapshotTestApplication();
+    markSnapshotTestApplicationDeployed($application);
+
+    $application->update([$field => $newValue]);
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->requiresBuild())->toBeFalse()
+        ->and(collect($diff->changes())->pluck('label'))->toContain($label);
+})->with([
+    'hash algorithm' => ['http_basic_auth_hash_algorithm', 'HTTP basic auth hash algorithm', 'argon2id'],
+    'bcrypt cost factor' => ['http_basic_auth_bcrypt_cost', 'HTTP basic auth bcrypt cost factor', 4],
+    'Argon2id memory' => ['http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', 8192],
+    'Argon2id iterations' => ['http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', 2],
+]);
+
 it('detects source integration changes as build changes', function (string $field, string $label, mixed $newValue) {
     $application = snapshotTestApplication([
         'source_id' => 1,

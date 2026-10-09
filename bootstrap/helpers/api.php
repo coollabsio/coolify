@@ -2,6 +2,7 @@
 
 use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
 use App\Models\Application;
@@ -276,6 +277,10 @@ function sharedDataApplications(?Application $application = null): array
         'docker_compose_custom_build_command' => ValidationPatterns::shellSafeCommandRules(),
         'is_container_label_escape_enabled' => 'boolean',
         'is_preserve_repository_enabled' => 'boolean',
+        'http_basic_auth_hash_algorithm' => Rule::enum(HttpBasicAuthHashAlgorithm::class),
+        'http_basic_auth_bcrypt_cost' => 'integer|min:4|max:14',
+        'http_basic_auth_argon2id_memory_cost' => 'integer|min:8192|max:262144',
+        'http_basic_auth_argon2id_time_cost' => 'integer|min:1|max:12',
     ];
 }
 

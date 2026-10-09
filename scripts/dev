@@ -382,9 +382,10 @@ start_backend() {
     local host="${DEV_BIND_ADDRESS:-127.0.0.1}"
     [[ "$host" == 0.0.0.0 ]] && host=127.0.0.1
     echo "Using KVM profile: $profile"
-    # The host command must reach this instance's database and encrypt with this instance's
-    # APP_KEY, not the ones in .env, and must not create root-owned files in storage/logs.
-    LOG_CHANNEL=stderr APP_KEY="$(env_value "$instance" APP_KEY)" \
+    # Use this instance database and encryption key, without a stale environment or config cache.
+    # Send logs to stderr to avoid root-owned files in storage/logs.
+    APP_ENV=local APP_CONFIG_CACHE="$ROOT/bootstrap/cache/dev-qemu-$$.php" \
+      LOG_CHANNEL=stderr APP_KEY="$(env_value "$instance" APP_KEY)" \
       DB_HOST="$host" DB_PORT="$(env_value "$instance" FORWARD_DB_PORT)" \
       REDIS_HOST="$host" REDIS_PORT="$(env_value "$instance" FORWARD_REDIS_PORT)" \
       DEVELOPMENT_QEMU_INSTANCE="$instance" \

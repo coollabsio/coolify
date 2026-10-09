@@ -197,6 +197,7 @@
                         :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
                 @elseif ($currentRoute === 'project.service.domains')
                     <livewire:project.service.domains :service="$service" />
+                    <livewire:project.shared.maintenance :resource="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$service" />
                     <livewire:project.shared.secret-manager-links :resource="$service" />

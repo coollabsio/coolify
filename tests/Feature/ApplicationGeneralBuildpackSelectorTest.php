@@ -122,6 +122,26 @@ test('switching from railpack to compose preserves the existing application doma
         ->toBe('https://example.com,https://www.example.com');
 });
 
+test('Dockerfile location defaults to the Dockerfile only for the Dockerfile build pack', function (string $buildPack, ?string $expected) {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => $buildPack,
+        'static_image' => 'nginx:alpine',
+        'base_directory' => '/',
+        'is_http_basic_auth_enabled' => false,
+        'redirect' => 'no',
+    ]);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->assertSuccessful()
+        ->assertSet('dockerfileLocation', $expected);
+})->with([
+    'Dockerfile' => ['dockerfile', '/Dockerfile'],
+    'Nixpacks' => ['nixpacks', null],
+]);
+
 test('networking section hints that internal ports can be set per domain', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
