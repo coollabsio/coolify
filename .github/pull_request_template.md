@@ -2,9 +2,13 @@
 
 ## Changes
 
-<!-- Describe what changes were made and why in your own words. This "Changes" section must be human-written and not AI-generated. -->
+<!-- List what changes were made in your own words. This "Changes" section must be human-written and not AI-generated. -->
 
 -
+
+## Why
+
+<!-- Explain why these changes are needed, what they try to achieve, and why they make sense for Coolify. This "Why" section must be human-written and not AI-generated. -->
 
 ## Issues
 
