@@ -384,6 +384,7 @@ class Server extends BaseModel
      */
     public function backfillPlaceholderIp(?string $ip): bool
     {
+        $ip = blank($ip) ? null : self::normalizeIp($ip);
         if (self::isPlaceholderIp($ip)) {
             return false;
         }
@@ -434,7 +435,7 @@ class Server extends BaseModel
         $hetznerService = new HetznerService($this->cloudProviderToken->token);
         $server = $hetznerService->getServer($this->hetzner_server_id);
         $status = $server['status'] ?? null;
-        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? data_get($server, 'public_net.ipv6.ip');
+        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? hetznerServerIpv6(data_get($server, 'public_net.ipv6.ip'));
 
         $updates = [];
         if ($this->hetzner_server_status !== $status) {
@@ -725,7 +726,7 @@ class Server extends BaseModel
                 ], $this);
             } else {
                 $url = Url::fromString($settings->fqdn);
-                $host = $url->getHost();
+                $host = $this->dashboardTraefikHost($url->getHost());
                 $schema = $url->getScheme();
                 $traefik_dynamic_conf = [
                     'http' => [
@@ -912,6 +913,14 @@ $siteAddress {
         }
 
         return ['gzip'];
+    }
+
+    /**
+     * Traefik matches an IPv6 Host() rule only without brackets (Host(`2a01:4f8::1`)).
+     */
+    public function dashboardTraefikHost(string $host): string
+    {
+        return trim($host, '[]');
     }
 
     public function dashboardCaddySiteAddress(InstanceSettings $settings, string $schema, string $host): string
@@ -1523,10 +1532,17 @@ $siteAddress {
             get: function ($value) {
                 return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
             },
-            set: function ($value) {
-                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
-            }
+            set: fn ($value) => self::normalizeIp($value),
         );
+    }
+
+    /**
+     * The form a server IP is stored in: unsafe characters removed (including IPv6 brackets) and
+     * IPv6 addresses in their short lower-case form (2A01:04F8::0001 -> 2a01:4f8::1).
+     */
+    public static function normalizeIp(?string $value): string
+    {
+        return normalizeIpAddress(preg_replace('/[^0-9a-zA-Z.:%-]/', '', (string) $value));
     }
 
     public function getIp(): Attribute

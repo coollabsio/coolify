@@ -321,10 +321,11 @@ class StandaloneMariadb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->mariadb_user);
                     $encodedPass = rawurlencode($this->mariadb_password);
 
-                    return "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mariadb_database}";
+                    return "mysql://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$this->mariadb_database}";
                 }
 
                 return null;

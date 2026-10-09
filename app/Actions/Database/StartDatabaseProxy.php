@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -58,6 +59,7 @@ class StartDatabaseProxy
         $configuration_dir = database_proxy_dir($database->uuid);
         $host_configuration_dir = devHostDockerPath($server, $configuration_dir);
         $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
+        $listenConfig = $this->buildListenConfig($database->public_port, $this->isNetworkIpv6Enabled($network, $server));
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -69,7 +71,7 @@ class StartDatabaseProxy
     }
     stream {
        server {
-            listen $database->public_port;
+            $listenConfig
             proxy_pass $containerName:$internalPort;
             $timeoutConfig
        }
@@ -162,6 +164,27 @@ class StartDatabaseProxy
         }
 
         return false;
+    }
+
+    /**
+     * Docker publishes the port on [::] too and forwards it to the container's IPv6 address
+     * when the network has IPv6 enabled, so nginx must listen there as well.
+     */
+    private function isNetworkIpv6Enabled(string $network, Server $server): bool
+    {
+        $safeNetwork = escapeshellarg($network);
+        $output = instant_remote_process(["docker network inspect {$safeNetwork} --format '{{.EnableIPv6}}'"], $server, false);
+
+        return trim((string) $output) === 'true';
+    }
+
+    private function buildListenConfig(int $port, bool $ipv6Enabled): string
+    {
+        if (! $ipv6Enabled) {
+            return "listen {$port};";
+        }
+
+        return "listen {$port};\n        listen [::]:{$port};";
     }
 
     private function buildProxyTimeoutConfig(?int $timeout): string

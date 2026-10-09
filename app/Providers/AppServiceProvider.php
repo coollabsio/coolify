@@ -8,7 +8,10 @@ use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
+use App\Support\AtomicFilesystem;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Console\ConfigCacheCommand;
+use Illuminate\Foundation\Console\RouteCacheCommand;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -25,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
+
+        // Requests must never read a partly written cache file. See AtomicFilesystem.
+        $this->app->extend(ConfigCacheCommand::class, fn () => new ConfigCacheCommand(new AtomicFilesystem));
+        $this->app->extend(RouteCacheCommand::class, fn () => new RouteCacheCommand(new AtomicFilesystem));
     }
 
     public function boot(): void

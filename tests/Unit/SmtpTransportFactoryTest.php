@@ -128,3 +128,18 @@ it('maps encryption to laravel mailer options', function (?string $mode, ?string
     'tls' => ['tls', 'smtps', 'tls'],
     'unset' => [null, null, null],
 ]);
+
+it('brackets an IPv6 smtp host', function (string $host) {
+    $transport = SmtpTransportFactory::fromSettings(smtpSettings(['smtp_host' => $host]));
+
+    expect($transport->getStream()->getHost())->toBe('[2001:db8::25]');
+})->with([
+    'raw' => '2001:db8::25',
+    'bracketed' => '[2001:db8::25]',
+]);
+
+it('keeps a hostname smtp host unchanged', function () {
+    $transport = SmtpTransportFactory::fromSettings(smtpSettings(['smtp_host' => 'smtp.example.com']));
+
+    expect($transport->getStream()->getHost())->toBe('smtp.example.com');
+});

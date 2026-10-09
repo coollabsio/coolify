@@ -721,7 +721,7 @@ class ByHetzner extends Component
             if ($this->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
                 $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
             } elseif ($this->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
+                $ipAddress = hetznerServerIpv6($hetznerServer['public_net']['ipv6']['ip']);
             }
 
             // Create server in Coolify database immediately so the Hetzner

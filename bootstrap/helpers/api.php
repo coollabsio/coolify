@@ -239,7 +239,11 @@ function sharedDataApplications(?Application $application = null): array
         'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
         'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
         'health_check_port' => 'integer|nullable|min:1|max:65535',
-        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_host' => ['string', function (string $attribute, mixed $value, Closure $fail): void {
+            if (! ValidationPatterns::isValidHealthCheckHost($value)) {
+                $fail('The health check host must be a hostname or an IP address.');
+            }
+        }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
         'health_check_scheme' => 'string|in:http,https',

@@ -358,11 +358,7 @@ class ServersController extends Controller
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;
-                $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
-                    $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
-
-                    return str(str($f[0])->explode(':')[0]);
-                })->filter(function (Stringable $fqdn) {
+                $fqdn = str($application->fqdn)->explode(',')->map(fn ($fqdn) => self::domainHostWithoutPort((string) $fqdn))->filter(function (Stringable $fqdn) {
                     return $fqdn->isNotEmpty();
                 });
 
@@ -401,11 +397,7 @@ class ServersController extends Controller
                 $service_applications = $service->applications;
                 if ($service_applications->count() > 0) {
                     foreach ($service_applications as $application) {
-                        $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
-                            $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
-
-                            return str(str($f[0])->explode(':')[0]);
-                        })->filter(function (Stringable $fqdn) {
+                        $fqdn = str($application->fqdn)->explode(',')->map(fn ($fqdn) => self::domainHostWithoutPort((string) $fqdn))->filter(function (Stringable $fqdn) {
                             return $fqdn->isNotEmpty();
                         });
                         $serviceIp = $server->ip;
@@ -597,7 +589,7 @@ class ServersController extends Controller
         if (! $privateKey) {
             return response()->json(['message' => 'Private key not found.'], 404);
         }
-        $foundServer = ModelsServer::whereIp($request->ip)->first();
+        $foundServer = ModelsServer::whereIp(ModelsServer::normalizeIp($request->ip))->first();
         if ($foundServer) {
             return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
         }
@@ -1124,5 +1116,18 @@ class ServersController extends Controller
         $message = $install ? 'Validation and installation started.' : 'Validation started.';
 
         return response()->json(['message' => $message], 201);
+    }
+
+    /**
+     * The host of a domain without the port: "[2a01:4f8::1]:8080" gives "[2a01:4f8::1]", "example.com:3000" gives "example.com".
+     */
+    private static function domainHostWithoutPort(string $fqdn): Stringable
+    {
+        $authority = (string) str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/')[0];
+        if (str_starts_with($authority, '[') && str_contains($authority, ']')) {
+            return str(substr($authority, 0, strpos($authority, ']') + 1));
+        }
+
+        return str(str($authority)->explode(':')[0]);
     }
 }

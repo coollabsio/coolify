@@ -53,3 +53,26 @@ it('preserves the configured smtp ehlo domain', function () {
 
     expect($config->get('mail.mailers.smtp.local_domain'))->toBe('coolify.example.com');
 });
+
+it('brackets an IPv6 smtp host in the laravel mail config', function (string $host, string $expected) {
+    $config = new Repository;
+
+    (new ConfigurationRepository($config))->updateMailConfig((object) [
+        'resend_enabled' => false,
+        'smtp_enabled' => true,
+        'smtp_encryption' => 'starttls',
+        'smtp_host' => $host,
+        'smtp_port' => 587,
+        'smtp_username' => null,
+        'smtp_password' => null,
+        'smtp_timeout' => null,
+        'smtp_from_address' => 'from@example.com',
+        'smtp_from_name' => 'Coolify',
+    ]);
+
+    expect($config->get('mail.mailers.smtp.host'))->toBe($expected);
+})->with([
+    'raw IPv6' => ['2001:db8::25', '[2001:db8::25]'],
+    'bracketed IPv6' => ['[2001:db8::25]', '[2001:db8::25]'],
+    'hostname' => ['smtp.example.com', 'smtp.example.com'],
+]);

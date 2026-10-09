@@ -932,3 +932,32 @@ describe('GitHub App name sync after the user switches the session team', functi
         expect($this->githubApp->fresh()->name)->toBe('synced-app');
     });
 });
+
+describe('GitHub webhook endpoint options for IPv6 instance addresses', function () {
+    test('brackets the public IPv6 address and keeps IPv4 unchanged', function (string $ipv6) {
+        config(['app.port' => 8000]);
+
+        InstanceSettings::findOrFail(0)->update([
+            'public_ipv4' => '203.0.113.10',
+            'public_ipv6' => $ipv6,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSet('ipv4', 'http://203.0.113.10:8000')
+            ->assertSet('ipv6', 'http://[2a01:4f8::1]:8000');
+    })->with([
+        'raw' => '2a01:4f8::1',
+        'bracketed' => '[2a01:4f8::1]',
+    ]);
+});

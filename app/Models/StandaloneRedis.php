@@ -339,11 +339,12 @@ class StandaloneRedis extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $redis_version = $this->getRedisVersion();
                     $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
                     $encodedPass = rawurlencode($this->connectionPassword());
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
-                    $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverHost}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';

@@ -128,7 +128,7 @@ class ServerTransferImporter
         $serverIp = (string) data_get($bundle, 'server.ip');
 
         $uuidConflict = Server::withTrashed()->where('uuid', $serverUuid)->exists() && $preserveUuids;
-        $existingIp = Server::where('ip', $serverIp)->first();
+        $existingIp = Server::where('ip', Server::normalizeIp($serverIp))->first();
         $ipConflict = $existingIp !== null;
 
         if (! $dryRun && $uuidConflict) {

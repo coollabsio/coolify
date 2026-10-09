@@ -669,6 +669,47 @@ describe('POST /api/v1/servers/hetzner', function () {
         $response->assertJsonFragment(['ip' => '2001:db8::1']);
     });
 
+    test('stores the server address of the Hetzner IPv6 network', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/ssh_keys' => Http::response([
+                'ssh_key' => ['id' => 123],
+            ], 201),
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/servers' => Http::response([
+                'server' => [
+                    'id' => 456,
+                    'public_net' => [
+                        'ipv4' => ['ip' => null],
+                        'ipv6' => ['ip' => '2a01:4f8:c016:bd23::/64'],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/servers/hetzner', [
+            'cloud_provider_token_id' => $this->hetznerToken->uuid,
+            'location' => 'nbg1',
+            'server_type' => 'cx11',
+            'image' => 15512617,
+            'private_key_uuid' => $this->privateKey->uuid,
+            'enable_ipv4' => false,
+            'enable_ipv6' => true,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonFragment(['ip' => '2a01:4f8:c016:bd23::1']);
+        $this->assertDatabaseHas('servers', [
+            'hetzner_server_id' => '456',
+            'ip' => '2a01:4f8:c016:bd23::1',
+        ]);
+    });
+
     test('rejects server creation when both public IP protocols are disabled', function () {
         Http::fake();
 

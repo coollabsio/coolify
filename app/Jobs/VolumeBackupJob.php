@@ -372,7 +372,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                     .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
                 'docker exec '.escapeshellarg($containerName).' mc alias set'.$resolveOptions.' temporary '
                     .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret),
-                'docker exec '.escapeshellarg($containerName).' mc cp '.escapeshellarg($backupLocation).' '
+                'docker exec '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
                     .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/'),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
         } finally {

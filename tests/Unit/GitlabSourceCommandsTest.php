@@ -210,8 +210,8 @@ it('applies OAuth git config to GitLab merge-request fetch and submodule checkou
     // The MR-ref fetch and submodule update must run through the OAuth-rewritten git, or private same-host submodules fail.
     expect($commands)
         ->toContain('oauth2:gitlab-access-token@gitlab.example.test')
-        ->toContain("http.version=HTTP/1.1 fetch origin 'merge-requests/2/head:pr-2-coolify'")
-        ->toContain('http.version=HTTP/1.1 submodule update --init --recursive');
+        ->toContain(".insteadOf=https://gitlab.example.test/' fetch origin 'merge-requests/2/head:pr-2-coolify'")
+        ->toContain(".insteadOf=https://gitlab.example.test/' submodule update --init --recursive");
 });
 
 it('uses a GitLab source private key only when it belongs to the source team', function (int $keyTeamId, bool $expectKey) {

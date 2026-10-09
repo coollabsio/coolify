@@ -6,11 +6,13 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Server\UpgradeSkippedLowDiskSpace;
 use App\Support\RemoteProcessCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
@@ -38,6 +40,61 @@ function updateCoolifyTestCreateRootServerAndSettings(array $settings = []): voi
         'update_check_frequency' => '0 * * * *',
     ], $settings));
     Once::flush();
+}
+
+function updateCoolifyTestActionWithStatus(string $status): UpdateCoolify
+{
+    return new class($status) extends UpdateCoolify
+    {
+        public function __construct(private string $status) {}
+
+        protected function readUpgradeStatus(): ?string
+        {
+            return $this->status;
+        }
+    };
+}
+
+function updateCoolifyTestActionWithDiskSpace(?float $availableGb): UpdateCoolify
+{
+    return new class($availableGb) extends UpdateCoolify
+    {
+        public function __construct(private ?float $availableGb) {}
+
+        protected function readUpgradeStatus(): ?string
+        {
+            return '';
+        }
+
+        protected function availableDiskSpaceGb(): ?float
+        {
+            return $this->availableGb;
+        }
+    };
+}
+
+function updateCoolifyTestPrepareUpgrade(): void
+{
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.coolify.helper_version' => '1.0.14',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'is_auto_update_enabled' => true,
+        'new_version_available' => true,
+        'docker_registry_url' => 'docker.io',
+    ]);
+
+    Http::fake([
+        '*' => Http::response([
+            'coolify' => ['v4' => ['version' => '4.0.10']],
+        ], 200),
+    ]);
 }
 
 afterEach(function () {
@@ -315,4 +372,85 @@ it('prevents downgrade even with manual update', function () {
         expect($e->getMessage())->toContain('4.0.10');
         expect($e->getMessage())->toContain('4.0.0');
     }
+});
+
+it('does not start a second upgrade while a recent upgrade status is in progress', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    updateCoolifyTestCreateRootServerAndSettings();
+    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    $action = updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(2)->toIso8601String());
+
+    expect(fn () => $action->handle(manual_update: true))
+        ->toThrow(Exception::class, 'Another Coolify upgrade is already running');
+
+    expect(Activity::query()->count())->toBe(0)
+        ->and(InstanceSettings::findOrFail(0)->new_version_available)->toBeFalsy();
+});
+
+it('starts an upgrade when the previous upgrade status is older than the lock expiry', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    updateCoolifyTestCreateRootServerAndSettings();
+    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(16)->toIso8601String())
+        ->handle(manual_update: true);
+
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
+        ->toContain("bash /data/coolify/source/upgrade.sh '4.0.10'");
+});
+
+it('skips an automatic update and notifies the root team when the disk is almost full', function () {
+    updateCoolifyTestPrepareUpgrade();
+    Notification::fake();
+    Team::findOrFail(0)->discordNotificationSettings()->update(['discord_enabled' => true, 'server_disk_usage_discord_notifications' => true]);
+
+    updateCoolifyTestActionWithDiskSpace(3.2)->handle();
+
+    expect(Activity::query()->count())->toBe(0)
+        ->and((bool) InstanceSettings::findOrFail(0)->new_version_available)->toBeTrue();
+    Notification::assertSentTo(
+        Team::findOrFail(0),
+        UpgradeSkippedLowDiskSpace::class,
+        fn (UpgradeSkippedLowDiskSpace $notification) => $notification->version === '4.0.10'
+            && $notification->availableGb === 3.2
+            && str_contains((string) $notification->toMail()->render(), '3.2 GB free'),
+    );
+});
+
+it('fails a manual update when the disk is almost full', function () {
+    updateCoolifyTestPrepareUpgrade();
+    Notification::fake();
+
+    expect(fn () => updateCoolifyTestActionWithDiskSpace(3.2)->handle(manual_update: true))
+        ->toThrow(Exception::class, 'Not enough free disk space to upgrade: 3.2 GB free, 5 GB required.');
+
+    expect(Activity::query()->count())->toBe(0);
+    Notification::assertNothingSent();
+});
+
+it('upgrades when the free disk space cannot be measured', function () {
+    updateCoolifyTestPrepareUpgrade();
+
+    updateCoolifyTestActionWithDiskSpace(null)->handle();
+
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
+        ->toEndWith("bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'docker.io'");
+});
+
+it('upgrades and tells the upgrade script to skip its disk space check when the user overrides it', function () {
+    updateCoolifyTestPrepareUpgrade();
+
+    updateCoolifyTestActionWithDiskSpace(3.2)->handle(manual_update: true, skipDiskSpaceCheck: true);
+
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
+        ->toEndWith("bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'docker.io' 'false' 'true'");
 });

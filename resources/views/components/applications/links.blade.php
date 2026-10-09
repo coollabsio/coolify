@@ -117,14 +117,14 @@
                         </a>
                     @else
                         <a class="{{ $linkItemClasses }}" target="_blank"
-                            href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">
-                            <span class="min-w-0 truncate">{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}</span>
+                            href="http://{{ formatHostForUrl($application->destination->server->ip) }}:{{ explode(':', $port)[0] }}">
+                            <span class="min-w-0 truncate">{{ formatHostForUrl($application->destination->server->ip) }}:{{ explode(':', $port)[0] }}</span>
                         </a>
                         @if (count($application->additional_servers) > 0)
                             @foreach ($application->additional_servers as $server)
                                 <a class="{{ $linkItemClasses }}" target="_blank"
-                                    href="http://{{ $server->ip }}:{{ explode(':', $port)[0] }}">
-                                    <span class="min-w-0 truncate">{{ $server->ip }}:{{ explode(':', $port)[0] }}</span>
+                                    href="http://{{ formatHostForUrl($server->ip) }}:{{ explode(':', $port)[0] }}">
+                                    <span class="min-w-0 truncate">{{ formatHostForUrl($server->ip) }}:{{ explode(':', $port)[0] }}</span>
                                 </a>
                             @endforeach
                         @endif

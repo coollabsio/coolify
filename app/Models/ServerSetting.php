@@ -330,7 +330,7 @@ class ServerSetting extends Model
         return match (true) {
             filled($fqdn) => $fqdn,
             filled($publicIpv4) => 'http://'.$publicIpv4.':8000',
-            filled($publicIpv6) => 'http://'.$publicIpv6.':8000',
+            filled($publicIpv6) => 'http://'.formatHostForUrl($publicIpv6).':8000',
             default => null,
         };
     }
@@ -392,7 +392,7 @@ class ServerSetting extends Model
         }
 
         $request = request();
-        $host = strtolower($request->getHost());
+        $host = normalizeIpAddress(strtolower($request->getHost()));
 
         if (
             $host === 'localhost' ||

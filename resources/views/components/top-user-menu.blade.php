@@ -8,7 +8,7 @@
     $userEmail = $user?->email ?? '';
     $userInitial = strtoupper(mb_substr($user?->name ?: ($user?->email ?: 'A'), 0, 1));
 @endphp
-<div @class(['relative', 'min-w-0' => $sidebar]) x-data="{
+<div @class(['relative', 'min-w-0 flex-1' => $sidebar]) x-data="{
     open: false,
     appearanceOpen: false,
     avatarUrl: @js($user?->avatar_path ? profile_avatar_url($user) : null),
@@ -23,10 +23,10 @@
     @click.outside="closePanel()">
     <button type="button" @click="open ? closePanel() : openPanel()"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
-        @if ($sidebar) :class="collapsed && 'w-8 justify-center px-0'" @endif
+        @if ($sidebar) :class="collapsed ? 'w-8 px-0' : 'w-full'" @endif
         @class([
-            'flex h-8 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 shadow-sm transition-colors hover:bg-neutral-200 dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]',
-            'max-w-36' => $sidebar,
+            'button rounded-lg px-2 normal-case',
+            'min-w-0' => $sidebar,
         ])>
         <img x-cloak x-show="avatarUrl" :src="avatarUrl" alt="{{ $userName }}"
             class="size-5 shrink-0 rounded-full object-cover">
@@ -35,7 +35,7 @@
             {{ $userInitial }}
         </span>
         @if ($sidebar)
-            <span class="min-w-0 truncate text-xs font-medium" :class="collapsed && 'hidden'">{{ $userName }}</span>
+            <span class="min-w-0 flex-1 truncate text-left text-xs font-medium" :class="collapsed && 'hidden'">{{ $userName }}</span>
         @endif
         <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint transition-transform"
             :class="[open && 'rotate-180', {{ $sidebar ? "collapsed && 'hidden'" : 'false' }}]"
@@ -88,8 +88,8 @@
             :aria-pressed="autoCollapse" title="Collapse the sidebar on pages that have a settings menu">
             <span class="flex items-center gap-2">
                 <svg class="size-4 opacity-80" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
-                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                    <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
                 Auto-collapse sidebar
             </span>

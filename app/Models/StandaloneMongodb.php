@@ -354,9 +354,10 @@ class StandaloneMongodb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->mongo_initdb_root_username);
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
-                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {

@@ -143,6 +143,7 @@ class ByIp extends Component
         $this->validate();
         try {
             $this->authorize('create', Server::class);
+            $this->ip = Server::normalizeIp($this->ip);
             $foundServer = Server::whereIp($this->ip)->first();
             if ($foundServer) {
                 return $this->dispatch('error', 'A server with this IP/Domain already exists.');

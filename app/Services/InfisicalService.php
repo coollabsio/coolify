@@ -39,11 +39,14 @@ class InfisicalService
     {
         $client = $this->client()->withToken($this->login());
         $secretPath = $secretPath ?: '/';
+        // Older Infisical versions do not expand ${KEY} references unless asked to.
+        $valueOptions = ['expandSecretReferences' => 'true', 'viewSecretValue' => 'true'];
 
         $response = $client->get($this->baseUrl.'/api/v4/secrets', [
             'projectId' => $projectId,
             'environment' => $environment,
             'secretPath' => $secretPath,
+            ...$valueOptions,
         ]);
 
         // Older self-hosted instances only expose the v3 endpoint.
@@ -52,6 +55,7 @@ class InfisicalService
                 'workspaceId' => $projectId,
                 'environment' => $environment,
                 'secretPath' => $secretPath,
+                ...$valueOptions,
             ]);
         }
 

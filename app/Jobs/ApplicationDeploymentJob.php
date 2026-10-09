@@ -307,6 +307,43 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Build the --add-host flags for the containers on the destination network.
+     *
+     * Build helper containers are named after their deployment uuid and only live for the
+     * duration of that deployment. BuildKit keys every RUN layer on the --add-host set,
+     * so letting one in gives the next build a different set and forces a full rebuild.
+     */
+    private function addHostFlags(Collection $containers): string
+    {
+        $containers = $containers->sort()->values();
+        $buildHelperNames = ApplicationDeploymentQueue::query()
+            ->whereIn('deployment_uuid', $containers->pluck('Name')->filter())
+            ->pluck('deployment_uuid');
+
+        $ips = collect([]);
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Name');
+            if ($containerName === 'coolify-proxy') {
+                continue;
+            }
+            if (isGeneratedContainerName($containerName)) {
+                continue;
+            }
+            if ($buildHelperNames->contains($containerName)) {
+                continue;
+            }
+            $containerIp = data_get($container, 'IPv4Address');
+            if ($containerName && $containerIp) {
+                $ips->put($containerName, str($containerIp)->before('/')->value());
+            }
+        }
+
+        return $ips->map(function ($ip, $name) {
+            return "--add-host $name:$ip";
+        })->implode(' ');
+    }
+
     public function handle(): void
     {
         // Check if deployment was cancelled before we even started
@@ -347,28 +384,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             if (! is_null($allContainers)) {
                 $allContainers = format_docker_command_output_to_json($allContainers);
-                $ips = collect([]);
-                if (count($allContainers) > 0) {
-                    $allContainers = $allContainers[0];
-                    $allContainers = collect($allContainers)->sort()->values();
-                    foreach ($allContainers as $container) {
-                        $containerName = data_get($container, 'Name');
-                        if ($containerName === 'coolify-proxy') {
-                            continue;
-                        }
-                        if (isGeneratedContainerName($containerName)) {
-                            continue;
-                        }
-                        $containerIp = data_get($container, 'IPv4Address');
-                        if ($containerName && $containerIp) {
-                            $containerIp = str($containerIp)->before('/');
-                            $ips->put($containerName, $containerIp->value());
-                        }
-                    }
-                }
-                $this->addHosts = $ips->map(function ($ip, $name) {
-                    return "--add-host $name:$ip";
-                })->implode(' ');
+                $this->addHosts = count($allContainers) > 0 ? $this->addHostFlags(collect($allContainers[0])) : '';
             }
 
             if ($this->application->dockerfile_target_build) {
@@ -1307,7 +1323,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Pushing image to docker registry ({$this->production_image_name}).");
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "docker push {$this->production_image_name}"),
+                    executeInDocker($this->deployment_uuid, 'docker push '.escapeshellarg($this->production_image_name)),
                     'hidden' => true,
                 ],
             );
@@ -1316,12 +1332,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry("Tagging and pushing image with {$this->application->docker_registry_image_tag} tag.");
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "docker tag {$this->production_image_name} {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"),
+                        executeInDocker($this->deployment_uuid, 'docker tag '.escapeshellarg($this->production_image_name).' '.escapeshellarg("{$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}")),
                         'ignore_errors' => true,
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, "docker push {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"),
+                        executeInDocker($this->deployment_uuid, 'docker push '.escapeshellarg("{$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}")),
                         'ignore_errors' => true,
                         'hidden' => true,
                     ],
@@ -1527,7 +1543,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         ]);
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
             $this->execute_remote_command([
-                "docker pull {$this->production_image_name} 2>/dev/null",
+                'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
                 'ignore_errors' => true,
                 'hidden' => true,
             ]);
@@ -2689,16 +2705,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->build_pack === 'dockerfile') {
             $this->add_build_env_variables_to_dockerfile();
         }
-        if ($this->application->build_pack === 'railpack') {
-            $this->build_railpack_image();
-        } else {
-            $this->build_image();
-        }
+        $this->build_pull_request_image();
 
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
         $this->push_to_docker_registry();
         $this->rolling_update();
+    }
+
+    private function build_pull_request_image(): void
+    {
+        match ($this->application->build_pack) {
+            'railpack' => $this->build_railpack_image(),
+            'static' => $this->build_static_image(),
+            default => $this->build_image(),
+        };
     }
 
     private function create_workdir()
@@ -3023,12 +3044,36 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+        $this->reuse_commit_message();
         $this->set_coolify_variables();
 
         // Restart helper container with actual SOURCE_COMMIT value
         if ($this->application->settings->use_build_secrets && $this->commit !== 'HEAD') {
             $this->application_deployment_queue->addLogEntry('Restarting helper container with actual SOURCE_COMMIT value.');
             $this->restart_builder_container_with_actual_commit();
+        }
+    }
+
+    /**
+     * The commit message is read from the cloned repository. Deployments that skip the build or fail
+     * before the clone reuse the message stored by an earlier deployment of the same commit.
+     */
+    private function reuse_commit_message(): void
+    {
+        if (filled($this->application_deployment_queue->commit_message) || $this->shouldResolveBranchHeadCommit()) {
+            return;
+        }
+
+        $commitMessage = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('commit', $this->commit)
+            ->whereNotNull('commit_message')
+            ->where('commit_message', '!=', '')
+            ->latest('id')
+            ->value('commit_message');
+
+        if (filled($commitMessage)) {
+            $this->application_deployment_queue->update(['commit_message' => $commitMessage]);
         }
     }
 
@@ -3881,6 +3926,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         $labels = $this->useDestinationNetworkInCaddyLabels($labels);
+        $labels = traefikHostRulesWithoutIpv6Brackets($labels);
         if ($this->application->settings->is_container_label_escape_enabled) {
             $labels = $labels->map(function ($value, $key) {
                 return escapeDollarSign($value);
@@ -4182,7 +4228,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $method = $this->sanitizeHealthCheckValue($this->application->health_check_method, '/^[A-Z]+$/', 'GET');
         $scheme = $this->sanitizeHealthCheckValue($this->application->health_check_scheme, '/^https?$/', 'http');
-        $host = $this->sanitizeHealthCheckValue($this->application->health_check_host, '/^[a-zA-Z0-9.\-_]+$/', 'localhost');
+        $host = ValidationPatterns::isValidHealthCheckHost($this->application->health_check_host)
+            ? formatHostForUrl($this->application->health_check_host)
+            : 'localhost';
         $path = $this->application->health_check_path
             ? $this->sanitizeHealthCheckValue($this->application->health_check_path, '#^[a-zA-Z0-9/\-_.~%,;]+$#', '/')
             : null;
