@@ -1925,6 +1925,38 @@ function legacyReplaceLocalSource(Stringable $source, Stringable $replacedWith):
     return $source;
 }
 
+function findLocalFileVolumeConfig(
+    Application|ServiceApplication|ServiceDatabase $resource,
+    Stringable $source,
+    Stringable $target,
+    int $pullRequestId = 0,
+): ?LocalFileVolume {
+    if ($resource instanceof Application) {
+        $mainDirectory = str(base_configuration_dir()."/applications/{$resource->uuid}");
+    } else {
+        $service = $resource->service;
+        if (! $service) {
+            return null;
+        }
+
+        $baseDirectory = (int) $service->compose_parsing_version >= 4 ? 'services' : 'applications';
+        $mainDirectory = str(base_configuration_dir()."/{$baseDirectory}/{$service->uuid}");
+    }
+
+    return $resource->fileStorages()
+        ->where('mount_path', $target->value())
+        ->get()
+        ->first(function (LocalFileVolume $volume) use ($pullRequestId, $source, $mainDirectory): bool {
+            $expectedSource = resolveComposeBindSource($source, $mainDirectory, $volume->fs_path)->value();
+            if ($pullRequestId !== 0 && $volume->is_preview_suffix_enabled) {
+                $expectedSource = addPreviewDeploymentSuffix($expectedSource, $pullRequestId);
+            }
+
+            return $volume->fs_path === $expectedSource
+                || ($pullRequestId === 0 && preg_match('/^'.preg_quote($expectedSource, '/').'-pr-\d+$/', $volume->fs_path) === 1);
+        });
+}
+
 /**
  * The host path of a local Compose bind source. A mount whose storage row already has the legacy path
  * (also with a preview suffix) keeps it, because its data is there.
@@ -3096,7 +3128,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                             validateComposeContentVolumeSource($volume);
-                            $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
+                            $foundConfig = findLocalFileVolumeConfig($savedService, $source, $target);
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
                                 if ($contentNotNull) {
@@ -3119,12 +3151,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                             LocalFileVolume::updateOrCreate(
                                 [
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService),
                                 ],
                                 [
-                                    'fs_path' => $source,
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
