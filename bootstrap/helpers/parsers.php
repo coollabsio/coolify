@@ -196,18 +196,38 @@ function validateComposeArrayVolumeSource(string $source): void
 }
 
 /**
- * Splits a top-level network `name:` that is one whole Compose variable (`${VAR}`, `${VAR:-default}`
- * or `${VAR-default}`), such as an external network that differs per server.
+ * Matches one braced Compose variable: `${VAR}`, `${VAR:-default}`, `${VAR-default}`,
+ * `${VAR:?error}`, `${VAR?error}`, `${VAR:+value}` or `${VAR+value}`.
+ */
+const COMPOSE_NETWORK_VARIABLE_PATTERN = '\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?([-?+])([^}]*))?\}';
+
+/**
+ * Splits a top-level network `name:` that is one whole Compose variable (see
+ * COMPOSE_NETWORK_VARIABLE_PATTERN), such as an external network that differs per server. Only the
+ * `-` operators give a default; the text after `?` is an error message and after `+` a value that
+ * Compose uses only when the variable is set.
  *
  * @return array{variable: string, default: ?string}|null
  */
 function composeNetworkNameVariable(string $name): ?array
 {
-    if (preg_match('/\A\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}\z/', $name, $matches) !== 1) {
+    if (preg_match('/\A'.COMPOSE_NETWORK_VARIABLE_PATTERN.'\z/', $name, $matches) !== 1) {
         return null;
     }
 
-    return ['variable' => $matches[1], 'default' => $matches[2] ?? null];
+    return ['variable' => $matches[1], 'default' => ($matches[2] ?? '') === '-' ? $matches[3] : null];
+}
+
+/**
+ * Tells if the text after the operator of a Compose variable is safe. A default or alternative value
+ * becomes part of the network name; an error message only shows in the Compose error, so it can
+ * also contain spaces and simple punctuation.
+ */
+function isSafeComposeNetworkVariableOperand(string $operator, string $operand): bool
+{
+    $pattern = $operator === '?' ? '/\A[A-Za-z0-9 _.,:!-]*\z/' : '/\A[A-Za-z0-9_.-]*\z/';
+
+    return preg_match($pattern, $operand) === 1;
 }
 
 /**
@@ -254,20 +274,19 @@ function validateComposeNetworkNameField(string $name): void
 }
 
 /**
- * Allows $VAR, ${VAR}, ${VAR:-default} and ${VAR-default} with safe defaults in a network value that Compose interpolates.
+ * Allows $VAR and the braced variables of COMPOSE_NETWORK_VARIABLE_PATTERN with safe operands in a network value that Compose interpolates.
  */
 function validateComposeNetworkNameWithVariables(string $name, string $context, ?string $serviceName = null): void
 {
     $variable = composeNetworkNameVariable($name);
-    if ($variable !== null) {
-        $isValid = $variable['default'] === null || ValidationPatterns::isValidDockerNetwork($variable['default']);
+    if ($variable !== null && $variable['default'] !== null) {
+        $isValid = ValidationPatterns::isValidDockerNetwork($variable['default']);
     } else {
         $hasSafeDefaults = true;
         $withoutVariables = preg_replace_callback(
-            '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}|\$[A-Za-z_][A-Za-z0-9_]*/',
+            '/'.COMPOSE_NETWORK_VARIABLE_PATTERN.'|\$[A-Za-z_][A-Za-z0-9_]*/',
             function (array $matches) use (&$hasSafeDefaults): string {
-                $default = $matches[2] ?? '';
-                if ($default !== '' && preg_match('/\A[A-Za-z0-9_.-]+\z/', $default) !== 1) {
+                if (! isSafeComposeNetworkVariableOperand($matches[2] ?? '', $matches[3] ?? '')) {
                     $hasSafeDefaults = false;
                 }
 
