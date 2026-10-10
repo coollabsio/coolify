@@ -29,6 +29,14 @@ class InstallPrerequisites
                 'command -v git >/dev/null || apt install -y git',
                 'command -v jq >/dev/null || apt install -y jq',
             ]);
+        } elseif ($supported_os_type->contains('amzn')) {
+            $command = $command->merge([
+                "echo 'Installing Prerequisites...'",
+                'dnf install -y findutils',
+                'command -v wget >/dev/null || dnf install -y wget',
+                'command -v git >/dev/null || dnf install -y git',
+                'command -v jq >/dev/null || dnf install -y jq',
+            ]);
         } elseif ($supported_os_type->contains('rhel')) {
             $command = $command->merge([
                 "echo 'Installing Prerequisites...'",
