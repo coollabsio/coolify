@@ -1,0 +1,23 @@
+# documentation: https://github.com/arianrhodsandlot/retroassembly
+# slogan: The personal retro game collection cabinet in your browser.
+# category: games
+# tags: retroassembly, retro-games, arcade, self-hosted, gaming
+# logo: svgs/retroassembly.png
+# ports: 8000
+
+services:
+  retroassembly:
+    image: 'arianrhodsandlot/retroassembly:v5.260124.0752'
+    environment:
+      - SERVICE_URL_RETROASSEMBLY_8000
+    volumes:
+      - 'retroassembly-data:/app/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'nc -z 127.0.0.1 8000'
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
