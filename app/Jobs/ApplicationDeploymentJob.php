@@ -2789,7 +2789,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
         $this->execute_remote_command(
             [
-                $runCommand,
+                dockerRunWithNameConflictRetryCommand($runCommand, $this->deployment_uuid),
                 'hidden' => true,
                 'skip_command_log' => filled($env_flags),
             ],
@@ -2802,13 +2802,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function restart_builder_container_with_actual_commit()
     {
-        // Stop the current helper container (no need for rm -f as it was started with --rm)
-        $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
-
-        // Clear cached env_args to force regeneration with actual SOURCE_COMMIT value
         $this->env_args = null;
-
-        // Restart the helper container with updated environment variables (including actual SOURCE_COMMIT)
         $this->prepare_builder_image(firstTry: false);
     }
 
