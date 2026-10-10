@@ -1297,7 +1297,7 @@ services:
       - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
       - DB_ENC_KEY=supabaserealtime
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - SECRET_KEY_BASE=${SECRET_PASSWORD_REALTIME}
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_REALTIME}
       - METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - ERL_AFLAGS=-proto_dist inet_tcp
       - DNS_NODES=''
