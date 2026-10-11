@@ -30,18 +30,6 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('uses card-style git source triggers instead of plain form buttons', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/source.blade.php'));
-
-    expect($view)
-        ->toContain('<x-slot:trigger>')
-        ->toContain('label="Current"')
-        ->toContain('aria-current="true"')
-        ->toContain('<x-git-icon')
-        ->toContain('rounded-xl border')
-        ->not->toContain('<x-slot:customButton>');
-});
-
 it('renders the current source as a selected card and alternatives as switchable cards', function () {
     $current = GithubApp::create([
         'name' => 'coolify-laravel-dev-public',

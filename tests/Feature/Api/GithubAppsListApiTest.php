@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -195,6 +196,39 @@ describe('GET /api/v1/github-apps', function () {
             'name' => 'System GitHub App',
             'is_system_wide' => true,
         ]);
+    });
+
+    test('does not return system-wide github app secrets owned by another team', function () {
+        $otherTeam = Team::factory()->create();
+        $otherPrivateKey = PrivateKey::create([
+            'name' => 'System Key',
+            'private_key' => validGithubAppsApiPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        GithubApp::create([
+            'name' => 'Foreign System GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 11111,
+            'installation_id' => 22222,
+            'client_id' => 'system-client-id',
+            'client_secret' => 'foreign-client-secret',
+            'webhook_secret' => 'foreign-webhook-secret',
+            'private_key_id' => $otherPrivateKey->id,
+            'team_id' => $otherTeam->id,
+            'is_system_wide' => true,
+        ]);
+
+        $sensitiveToken = createGithubAppsApiToken($this, ['read', 'read:sensitive']);
+
+        $response = $this->withToken($sensitiveToken)
+            ->getJson('/api/v1/github-apps')
+            ->assertSuccessful()
+            ->assertJsonFragment(['name' => 'Foreign System GitHub App']);
+
+        expect($response->json('0'))
+            ->not->toHaveKey('client_secret')
+            ->not->toHaveKey('webhook_secret');
     });
 
     test('does not return other teams github apps', function () {
@@ -426,6 +460,12 @@ describe('GitHub app API url normalization', function () {
             'is_system_wide' => false,
             'is_public' => false,
         ]);
+
+        // The GHE host is fictional, so resolve it to a public IP instead of hitting real DNS.
+        Http::macro('GitSource', fn (string $url) => Http::withOptions(SafeExternalUrl::httpClientOptions(
+            $url,
+            resolver: fn (string $host): array => ['93.184.216.34'],
+        )));
 
         Http::preventStrayRequests();
         Http::fake([

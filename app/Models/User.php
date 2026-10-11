@@ -11,6 +11,7 @@ use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
@@ -48,6 +49,7 @@ class User extends Authenticatable implements SendsEmail
         'name',
         'email',
         'password',
+        'current_team_id',
         'force_password_reset',
         'marketing_emails',
         'pending_email',
@@ -63,9 +65,12 @@ class User extends Authenticatable implements SendsEmail
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
+        'created_before_oauth_identities',
     ];
 
     protected $casts = [
+        'created_before_oauth_identities' => 'boolean',
+        'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
@@ -204,14 +209,38 @@ class User extends Authenticatable implements SendsEmail
     }
 
     /**
-     * Delete the user if they are not verified and have a force password reset.
+     * Delete the user if they are a provisional invitee that never joined any team.
      * This is used to clean up users that have been invited, did not accept the invitation (and did not verify their email and have a force password reset).
+     * Users that already belong to a team other than their own personal team, or still have pending invitations, are kept.
      */
-    public function deleteIfNotVerifiedAndForcePasswordReset()
+    public function deleteIfNotVerifiedAndForcePasswordReset(): void
     {
-        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
-            $this->delete();
+        if ($this->hasVerifiedEmail() || $this->force_password_reset !== true) {
+            return;
         }
+
+        if (TeamInvitation::whereEmail($this->email)->exists()) {
+            return;
+        }
+
+        if ($this->belongsToNonPersonalTeam()) {
+            return;
+        }
+
+        $this->delete();
+    }
+
+    /**
+     * Whether the user is a member of any team other than a personal team where they are the only member.
+     */
+    private function belongsToNonPersonalTeam(): bool
+    {
+        return $this->teams()
+            ->where(function ($query) {
+                $query->where('personal_team', false)
+                    ->orWhereHas('members', fn ($members) => $members->where('users.id', '!=', $this->id));
+            })
+            ->exists();
     }
 
     public function recreate_personal_team()
@@ -232,7 +261,7 @@ class User extends Authenticatable implements SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
@@ -275,7 +304,12 @@ class User extends Authenticatable implements SendsEmail
     public function sendVerificationEmail()
     {
         $mail = new MailMessage;
-        $url = URL::temporarySignedRoute(
+        // Sign the link for the configured instance URL instead of the request Host header.
+        $urlGenerator = clone URL::getFacadeRoot();
+        $instanceUrl = rtrim(base_url(), '/');
+        $urlGenerator->forceRootUrl($instanceUrl);
+        $urlGenerator->forceScheme(parse_url($instanceUrl, PHP_URL_SCHEME) ?: 'http');
+        $url = $urlGenerator->temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
@@ -372,6 +406,54 @@ class User extends Authenticatable implements SendsEmail
         return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
             return Team::find($sessionTeamId);
         });
+    }
+
+    /**
+     * Resolve the team to activate when the session has no current team
+     * (fresh login or an invalidated session).
+     *
+     * Returns the user's last active team when they still belong to it, or the
+     * sole team of a single-team user. Returns null when the choice is ambiguous
+     * (more than one team and no valid stored preference) — the caller must then
+     * prompt the user to pick a team instead of defaulting silently.
+     */
+    public function resolveStoredTeam(): ?Team
+    {
+        if (! is_null($this->current_team_id)) {
+            $storedTeam = $this->teams->firstWhere('id', $this->current_team_id);
+            if ($storedTeam) {
+                return $storedTeam;
+            }
+        }
+
+        if ($this->teams->count() === 1) {
+            return $this->teams->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * Reset the persisted active team when it points to the given team.
+     *
+     * Called when the user is removed from a team (or the team is deleted) so a
+     * stale current_team_id can never be trusted after the fact. Read paths
+     * already re-validate membership; this is defense-in-depth that clears the
+     * dangling value at the source event instead of relying on self-healing.
+     */
+    public function clearStoredTeamIfMatches(int $teamId): void
+    {
+        // Atomic conditional update: only null the column when the database value
+        // still points at this team, so a newer team selection made concurrently
+        // (in another request) is preserved rather than clobbered.
+        static::query()
+            ->whereKey($this->getKey())
+            ->where('current_team_id', $teamId)
+            ->update(['current_team_id' => null]);
+
+        if ($this->current_team_id === $teamId) {
+            $this->current_team_id = null;
+        }
     }
 
     public function role(): ?string
@@ -507,12 +589,31 @@ class User extends Authenticatable implements SendsEmail
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
 
+    public function oauthIdentities(): HasMany
+    {
+        return $this->hasMany(OauthIdentity::class);
+    }
+
+    public function hasSsoIdentity(): bool
+    {
+        return $this->oauthIdentities()->exists();
+    }
+
     /**
      * Check if the user has a password set.
-     * OAuth users are created without passwords.
      */
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    /**
+     * Whether destructive actions must be confirmed with the account password.
+     * Users with a linked OAuth identity only confirm with the dialog's typed
+     * confirmation, and users without a password have no way to confirm.
+     */
+    public function requiresPasswordConfirmation(): bool
+    {
+        return $this->hasPassword() && ! $this->hasSsoIdentity();
     }
 }

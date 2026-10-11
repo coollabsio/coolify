@@ -18,8 +18,10 @@
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
             ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
+            ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
             ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
             ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+            ['label' => 'Analytics', 'route' => 'project.service.analytics', 'icon' => 'analytics'],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
@@ -34,8 +36,8 @@
 
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
-            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics'],
+            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
             'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
         ];
 
@@ -45,6 +47,9 @@
                 ->filter()
                 ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
+
+        // Group that holds the current page — always kept open, even if collapsed before.
+        $activeGroup = (string) $groupedItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
         $storageSections = $applications
             ->concat($databases)
@@ -56,15 +61,26 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-            <aside class="application-settings-navigation min-w-0 xl:self-start">
+            <aside class="application-settings-navigation min-w-0 xl:self-start"
+                data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
                 <nav aria-label="Service settings"
+                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     @foreach ($groupedItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                                 aria-hidden="true"></div>
                         @endunless
-                        <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
+                        <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
+                            :aria-expanded="isOpen(@js($groupLabel))">
+                            <span>{{ $groupLabel }}</span>
+                            <svg class="size-3 shrink-0 opacity-60 transition-transform"
+                                :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
                         @foreach ($groupItems as $menuItem)
                             <a @class([
                                 'menu-item',
@@ -92,6 +108,7 @@
                                 </div>
                             @endif
                         @endforeach
+                        </div>
                     @endforeach
                 </nav>
             </aside>
@@ -116,7 +133,7 @@
                             </div>
                             <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                                 <div
-                                    class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
+                                    class="view-toggle">
                                     <button type="button" x-on:click="setViewMode('table')"
                                         class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                                         :class="viewMode === 'table'
@@ -143,12 +160,12 @@
 
                         <div :class="viewMode === 'grid'
                             ? 'grid grid-cols-1 gap-3 sm:grid-cols-2'
-                            : 'overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]'">
+                            : 'overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]'">
                             @if ($applications->isNotEmpty() || $databases->isNotEmpty())
                                 <div x-cloak x-show="viewMode === 'table'"
-                                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem_5rem] dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                                    class="grid min-w-[48rem] grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_5rem] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                                     <div>Resource</div>
-                                    <div class="hidden sm:block">Image</div>
+                                    <div>Image</div>
                                     <div class="justify-self-start">Status</div>
                                     <div></div>
                                 </div>
@@ -175,10 +192,14 @@
                             @endforeach
                         </div>
                     </div>
+                @elseif ($currentRoute === 'project.service.analytics')
+                    <livewire:project.service.analytics :service="$service"
+                        :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
                 @elseif ($currentRoute === 'project.service.domains')
                     <livewire:project.service.domains :service="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$service" />
+                    <livewire:project.shared.secret-manager-links :resource="$service" />
                 @elseif ($currentRoute === 'project.service.storages')
                     <div class="space-y-6">
                         <div

@@ -75,7 +75,7 @@
 <div class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto scrollbar">
     @if ($ask)
         <div
-            class="rounded-[10px] border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+            class="rounded-[10px] border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
             This will revalidate the server, install or update Docker Engine, Docker Compose, and related
             configuration. Docker Engine will restart, so running containers may be briefly unreachable.
         </div>
@@ -84,7 +84,7 @@
         </x-forms.button>
     @else
         <div data-validation-checkpoints
-            class="overflow-hidden rounded-[10px] border border-neutral-200 dark:border-white/[0.08]">
+            class="shrink-0 overflow-hidden rounded-[10px] border border-neutral-200 dark:border-white/[0.08]">
             <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
                 <h3 class="text-[13px] font-medium text-neutral-600 dark:text-fg-dim">Validation checkpoints</h3>
             </div>
@@ -107,7 +107,7 @@
                 </x-forms.button>
             </div>
         @elseif ($isInstalling)
-            <section class="application-settings-section">
+            <section class="application-settings-section validation-installation-logs">
                 <div class="application-settings-section-body">
                     <livewire:activity-monitor :header="$installationStep.' installation logs'" :showWaiting="false" />
                 </div>

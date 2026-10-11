@@ -20,6 +20,8 @@ class Upgrade extends Component
 
     public bool $devMode = false;
 
+    public bool $fullButton = false;
+
     protected $listeners = ['updateAvailable' => 'checkUpdate'];
 
     public function mount()
@@ -77,6 +79,13 @@ class Upgrade extends Component
                     report($e);
                 }
             })->afterResponse();
+
+            auditLog('ui.instance.upgrade_started', [
+                'team_id' => null,
+                'resource' => 'instance',
+                'from_version' => config('constants.coolify.version'),
+                'to_version' => get_latest_version_of_coolify(),
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -94,7 +103,7 @@ class Upgrade extends Component
             return ['status' => 'none'];
         }
 
-        $statusFile = '/data/coolify/source/.upgrade-status';
+        $statusFile = CoolifyUpgradeStatus::FILE;
 
         try {
             $content = instant_remote_process(

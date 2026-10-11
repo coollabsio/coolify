@@ -12,7 +12,7 @@ class ValidGitRepositoryUrl implements ValidationRule
 
     protected bool $allowIP;
 
-    public function __construct(bool $allowSSH = true, bool $allowIP = false)
+    public function __construct(bool $allowSSH = true, bool $allowIP = true)
     {
         $this->allowSSH = $allowSSH;
         $this->allowIP = $allowIP;
@@ -27,6 +27,13 @@ class ValidGitRepositoryUrl implements ValidationRule
             return;
         }
 
+        // Brackets are only allowed around an IPv6 host, so check the rest of the URL without it.
+        $valueWithoutIpv6Host = preg_replace_callback(
+            '/^((?:https?|git):\/\/|[a-zA-Z0-9._-]+@)\[([0-9A-Fa-f:.]+)\]/',
+            fn (array $matches): string => filter_var($matches[2], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? $matches[1].'ipv6-host' : $matches[0],
+            $value,
+        );
+
         // Check for dangerous shell metacharacters that could be used for command injection
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
@@ -36,7 +43,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         ];
 
         foreach ($dangerousChars as $char) {
-            if (str_contains($value, $char)) {
+            if (str_contains($valueWithoutIpv6Host, $char)) {
                 Log::warning('Git repository URL validation failed - dangerous character', [
                     'url' => $value,
                     'character' => $char,
@@ -63,7 +70,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         ];
 
         foreach ($dangerousPatterns as $pattern) {
-            if (preg_match($pattern, $value)) {
+            if (preg_match($pattern, $valueWithoutIpv6Host)) {
                 Log::warning('Git repository URL validation failed - dangerous pattern', [
                     'url' => $value,
                     'pattern' => $pattern,
@@ -77,15 +84,16 @@ class ValidGitRepositoryUrl implements ValidationRule
         }
 
         // Validate based on URL type
-        if (str_starts_with($value, 'git@')) {
+        if (preg_match('/^[a-zA-Z0-9._-]+@(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+):/', $value)) {
             if (! $this->allowSSH) {
                 $fail('SSH URLs are not allowed.');
 
                 return;
             }
 
-            // Validate SSH URL format (git@host:user/repo.git)
-            if (! preg_match('/^git@[a-zA-Z0-9\.\-]+:[a-zA-Z0-9\-_\/\.~]+$/', $value)) {
+            // Validate scp-style SSH URL format (user@host:user/repo.git)
+            $scp = parseScpStyleGitUrl($value);
+            if ($scp === null || preg_match('/^(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+)$/', $scp['host']) !== 1 || preg_match('/^[a-zA-Z0-9\-_\/.~]+$/', $scp['path']) !== 1) {
                 $fail('The :attribute is not a valid SSH repository URL.');
 
                 return;
@@ -99,9 +107,11 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
 
             $parsed = parse_url($value);
+            // parse_url() keeps the brackets around an IPv6 host.
+            $host = trim(strtolower($parsed['host'] ?? ''), '[]');
 
             // Check for IP addresses if not allowed
-            if (! $this->allowIP && filter_var($parsed['host'] ?? '', FILTER_VALIDATE_IP)) {
+            if (! $this->allowIP && filter_var($host, FILTER_VALIDATE_IP)) {
                 Log::warning('Git repository URL contains IP address', [
                     'url' => $value,
                     'ip' => request()->ip(),
@@ -113,9 +123,10 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
 
             // Check for localhost/internal addresses
-            $host = strtolower($parsed['host'] ?? '');
             $internalHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
-            if (in_array($host, $internalHosts) || str_ends_with($host, '.local')) {
+            $isReservedIp = filter_var($host, FILTER_VALIDATE_IP) !== false
+                && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) === false;
+            if (in_array($host, $internalHosts) || $isReservedIp || str_ends_with($host, '.local')) {
                 Log::warning('Git repository URL points to internal host', [
                     'url' => $value,
                     'host' => $host,
@@ -143,13 +154,13 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
         } elseif (str_starts_with($value, 'git://')) {
             // Validate git:// protocol URL (supports both git://host/path and git://host:port/path with tilde)
-            if (! preg_match('/^git:\/\/[a-zA-Z0-9\.\-]+(:[0-9]+)?[:\/][a-zA-Z0-9\-_\/\.~]+$/', $value)) {
+            if (! preg_match('/^git:\/\/(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9\.\-]+)(:[0-9]+)?[:\/][a-zA-Z0-9\-_\/\.~]+$/', $value)) {
                 $fail('The :attribute is not a valid git:// URL.');
 
                 return;
             }
         } else {
-            $fail('The :attribute must start with https://, http://, git://, or git@.');
+            $fail('The :attribute must start with https://, http://, git://, or be an SSH URL (user@host:path).');
 
             return;
         }

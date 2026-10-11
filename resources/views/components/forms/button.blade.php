@@ -80,6 +80,10 @@
 </button>
 @if ($authDisabled || filled($tooltip))
     <div x-ref="tip" x-show="visible" x-cloak :id="$id('button-tooltip')" role="tooltip"
+        x-transition:enter="transition-opacity ease-out duration-100"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-75"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
         class="auth-tooltip">
         {{ $tooltip ?: 'You do not have permission to perform this action.' }}
     </div>

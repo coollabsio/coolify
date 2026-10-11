@@ -28,9 +28,12 @@
                         <livewire:project.database.dragonfly.general :database="$database" />
                     @elseif ($database->type() === 'standalone-clickhouse')
                         <livewire:project.database.clickhouse.general :database="$database" />
+                    @elseif ($database->type() === 'standalone-sqlite')
+                        <livewire:project.database.sqlite.general :database="$database" />
                     @endif
                 @elseif ($currentRoute === 'project.database.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$database" />
+                    <livewire:project.shared.secret-manager-links :resource="$database" />
                 @elseif ($currentRoute === 'project.database.servers')
                     <livewire:project.shared.destination :resource="$database" />
                 @elseif ($currentRoute === 'project.database.persistent-storage')

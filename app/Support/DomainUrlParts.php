@@ -4,11 +4,11 @@ namespace App\Support;
 
 class DomainUrlParts
 {
-    public static function compose(string $scheme, string $host, string $port = '', string $path = ''): string
+    public static function compose(string $scheme, string $host, ?string $port = '', string $path = ''): string
     {
         $scheme = strtolower(trim($scheme)) === 'http' ? 'http' : 'https';
         $host = trim($host);
-        $port = trim($port);
+        $port = trim((string) $port);
         $path = trim($path);
 
         if ($path !== '' && ! str_starts_with($path, '/') && ! str_starts_with($path, '?') && ! str_starts_with($path, '#')) {
@@ -44,6 +44,15 @@ class DomainUrlParts
             'port' => isset($parts['port']) ? (string) $parts['port'] : '',
             'path' => $path,
         ];
+    }
+
+    public static function hasDnsRelevantChange(string $oldUrl, string $newUrl): bool
+    {
+        $old = self::split($oldUrl);
+        $new = self::split($newUrl);
+
+        return $old['scheme'] !== $new['scheme']
+            || strtolower($old['host']) !== strtolower($new['host']);
     }
 
     /**

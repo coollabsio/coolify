@@ -1,125 +1,110 @@
-# Conventions & Style
+# Convention and Style Best Practices
 
-## Follow Laravel Naming Conventions
+## Follow Project Naming Conventions
 
-| What | Convention | Good | Bad |
-|------|-----------|------|-----|
-| Controller | singular | `ArticleController` | `ArticlesController` |
-| Model | singular | `User` | `Users` |
-| Table | plural, snake_case | `article_comments` | `articleComments` |
-| Pivot table | singular alphabetical | `article_user` | `user_article` |
-| Column | snake_case, no model name | `meta_title` | `article_meta_title` |
-| Foreign key | singular model + `_id` | `article_id` | `articles_id` |
-| Route | plural | `articles/1` | `article/1` |
-| Route name | snake_case with dots | `users.show_active` | `users.show-active` |
-| Method | camelCase | `getAll` | `get_all` |
-| Variable | camelCase | `$articlesWithAuthor` | `$articles_with_author` |
-| Collection | descriptive, plural | `$activeUsers` | `$data` |
-| Object | descriptive, singular | `$activeUser` | `$users` |
-| View | kebab-case | `show-filtered.blade.php` | `showFiltered.blade.php` |
-| Config | snake_case | `google_calendar.php` | `googleCalendar.php` |
-| Enum | singular | `UserType` | `UserTypes` |
+Prefer Laravel's conventions in new code, but preserve an established project convention unless a coordinated rename is worthwhile.
 
-## Prefer Shorter Readable Syntax
+| Element | Convention | Example |
+| --- | --- | --- |
+| Controller | Singular resource name | `ArticleController` |
+| Model | Singular StudlyCase | `User` |
+| Table | Plural snake_case | `article_comments` |
+| Pivot table | Singular model names in alphabetical order, in snake_case | `article_user` |
+| Column | snake_case | `meta_title` |
+| Conventional foreign key | Singular model name plus `_id`, in snake_case | `article_id` |
+| Resource URI | Plural resource | `articles/1` |
+| Route name | Dotted segments; snake_case within a segment when needed | `users.show_active` |
+| Method | camelCase | `getAll` |
+| Variable | camelCase | `$articlesWithAuthor` |
+| Collection | Descriptive and plural | `$activeUsers` |
+| Object | Descriptive and singular | `$activeUser` |
+| View | kebab-case | `show-filtered.blade.php` |
+| Configuration file | snake_case | `google_calendar.php` |
+| Enumeration | Singular StudlyCase | `UserType` |
 
-| Verbose | Shorter |
-|---------|---------|
+## Prefer Clear, Idiomatic Syntax
+
+Use Laravel helpers and query methods when they communicate intent more directly. Do not shorten code when the result is ambiguous or loses useful type information.
+
+| More verbose | Idiomatic alternative |
+| --- | --- |
 | `Session::get('cart')` | `session('cart')` |
 | `$request->session()->get('cart')` | `session('cart')` |
-| `$request->input('name')` | `$request->name` |
 | `return Redirect::back()` | `return back()` |
 | `Carbon::now()` | `now()` |
-| `App::make('Class')` | `app('Class')` |
 | `->where('column', '=', 1)` | `->where('column', 1)` |
 | `->orderBy('created_at', 'desc')` | `->latest()` |
 | `->orderBy('created_at', 'asc')` | `->oldest()` |
-| `->first()->name` | `->value('name')` |
+| `->first()?->name` | `->value('name')` when only that value is needed |
 
-## Use Laravel String & Array Helpers
+Use typed request accessors such as `$request->string()`, `$request->integer()`, and `$request->boolean()` when their coercion matches the operation.
 
-Laravel provides `Str`, `Arr`, `Number`, and `Uri` helper classes that are more readable, chainable, and UTF-8 safe than raw PHP functions. Always prefer them.
+## Use Utilities When They Clarify Intent
 
-Strings — use `Str` and fluent `Str::of()` over raw PHP:
+Laravel's `Str`, `Arr`, `Number`, and `Uri` utilities provide expressive operations and framework-consistent behavior. Prefer them when they are clearer or safer than an equivalent PHP operation, not as an unconditional replacement for every built-in function.
+
 ```php
-// Incorrect
-$slug = strtolower(str_replace(' ', '-', $title));
-$short = substr($text, 0, 100) . '...';
-$class = substr(strrchr('App\Models\User', '\'), 1);
-
-// Correct
 $slug = Str::slug($title);
 $short = Str::limit($text, 100);
-$class = class_basename('App\Models\User');
-```
-
-Fluent strings — chain operations for complex transformations:
-```php
-// Incorrect
-$result = strtolower(trim(str_replace('_', '-', $input)));
-
-// Correct
+$class = class_basename(User::class);
 $result = Str::of($input)->trim()->replace('_', '-')->lower();
 ```
 
-Key `Str` methods to prefer: `Str::slug()`, `Str::limit()`, `Str::contains()`, `Str::before()`, `Str::after()`, `Str::between()`, `Str::camel()`, `Str::snake()`, `Str::kebab()`, `Str::headline()`, `Str::squish()`, `Str::mask()`, `Str::uuid()`, `Str::ulid()`, `Str::random()`, `Str::is()`.
+Use `Arr` for dot notation and common transformations:
 
-Arrays — use `Arr` over raw PHP:
 ```php
-// Incorrect
-$name = isset($array['user']['name']) ? $array['user']['name'] : 'default';
-
-// Correct
 $name = Arr::get($array, 'user.name', 'default');
+$public = Arr::only($attributes, ['name', 'email']);
 ```
 
-Key `Arr` methods: `Arr::get()`, `Arr::has()`, `Arr::only()`, `Arr::except()`, `Arr::first()`, `Arr::flatten()`, `Arr::pluck()`, `Arr::where()`, `Arr::wrap()`.
+Use `Number` for localized display formatting rather than values that will be stored or calculated:
 
-Numbers — use `Number` for display formatting:
 ```php
-Number::format(1000000);          // "1,000,000"
-Number::currency(1500, 'USD');    // "$1,500.00"
-Number::abbreviate(1000000);      // "1M"
-Number::fileSize(1024 * 1024);    // "1 MB"
-Number::percentage(75.5);         // "75.5%"
+Number::format(1000000);
+Number::currency(1500, 'USD');
+Number::fileSize(1024 * 1024);
 ```
 
-URIs — use `Uri` for URL manipulation:
+Use `Uri` when constructing or transforming a uniform resource identifier (URI) benefits from a structured API:
+
 ```php
 $uri = Uri::of('https://example.com/search')
     ->withQuery(['q' => 'laravel', 'page' => 1]);
 ```
 
-Use `$request->string('name')` to get a fluent `Stringable` directly from request input for immediate chaining.
+Check the documentation for the Laravel version supported by the project before using newer utility classes or methods.
 
-Use `search-docs` for the full list of available methods — these helpers are extensive.
+## Keep Presentation Code Maintainable
 
-## No Inline JS/CSS in Blade
+Prefer the project's asset pipeline, components, and existing conventions for substantial JavaScript and Cascading Style Sheets (CSS). Small page-specific scripts or styles can be reasonable in Blade layouts or stacks; avoid mixing large behavior and style blocks into templates.
 
-Do not put JS or CSS in Blade templates. Do not put HTML in PHP classes.
+Pass server data with an encoding mechanism appropriate to its context. For example, Blade's `Js::from()` safely formats data for JavaScript:
 
-Incorrect:
 ```blade
-let article = `{{ json_encode($article) }}`;
+<script>
+    const article = {{ Js::from($article) }};
+</script>
 ```
 
-Correct:
-```blade
-<button class="js-fav-article" data-article='@json($article)'>{{ $article->name }}</button>
-```
+Data attributes are useful for small scalar values, but serializing a large model into an attribute can expose unnecessary fields and complicate escaping.
 
-Pass data to JS via data attributes or use a dedicated PHP-to-JS package.
+## Write Comments That Explain Why
 
-## No Unnecessary Comments
+Prefer clear names and small units of code over comments that merely restate an operation. Add concise comments for non-obvious constraints, tradeoffs, workarounds, regular expressions, or external behavior that the code cannot express by itself. Keep comments accurate when behavior changes.
 
-Code should be readable on its own. Use descriptive method and variable names instead of comments. The only exception is config files, where descriptive comments are expected.
+Unhelpful:
 
-Incorrect:
 ```php
-// Check if there are any joins
-if (count((array) $builder->getQuery()->joins) > 0)
+// Check whether the query has joins.
+if (count((array) $builder->getQuery()->joins) > 0) {
+    // ...
+}
 ```
 
-Correct:
+Clearer:
+
 ```php
-if ($this->hasJoins())
+if ($this->hasJoins()) {
+    // ...
+}
 ```

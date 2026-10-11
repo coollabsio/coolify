@@ -11,7 +11,7 @@ All Coolify AI documentation has been consolidated in the **`.ai/`** directory f
 
 ## Quick Start
 
-- **For Claude Code**: Start with `CLAUDE.md` in the root directory
+- **For Claude Code**: Start with `AGENTS.md` in the root directory
 - **For Cursor IDE**: Start with `.ai/README.md` for navigation
 - **For All AI Tools**: Browse `.ai/` directory by topic
 
@@ -136,7 +136,7 @@ Use exact versions from `technology-stack.md`:
 5. **Form Authorization**: Security requirement, not optional
 
 ### When to Use Which File
-- **Quick commands**: `CLAUDE.md` or `development-workflow.md`
+- **Quick commands**: `AGENTS.md` or `development-workflow.md`
 - **Detailed patterns**: Topic-specific files in `.ai/patterns/`
 - **Testing**: `.ai/development/testing-patterns.md`
 - **Laravel specifics**: `.ai/development/laravel-boost.md`

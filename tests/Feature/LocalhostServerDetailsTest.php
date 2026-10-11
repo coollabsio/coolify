@@ -164,12 +164,14 @@ it('collects localhost server details after a successful connection check', func
         'connection_timeout' => 10,
     ]);
 
-    Process::fake([
-        '*' => Process::sequence([
-            Process::result(output: 'bin', exitCode: 0),
-            Process::result(output: localhostMetadataProcessOutput(), exitCode: 0),
-        ]),
-    ]);
+    // The connection check also runs SSH multiplexing commands, so answer by command, not by order.
+    Process::fake(function ($process) {
+        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+
+        return str_contains($command, '---PRETTY_NAME---')
+            ? Process::result(output: localhostMetadataProcessOutput(), exitCode: 0)
+            : Process::result(output: 'bin', exitCode: 0);
+    });
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->call('checkLocalhostConnection');

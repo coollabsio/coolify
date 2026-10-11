@@ -1,8 +1,27 @@
 <?php
 
+use App\Models\Team;
 use App\Models\User;
 use App\Policies\ApiTokenPolicy;
 use Laravel\Sanctum\PersonalAccessToken;
+
+function apiTokenForUserAndTeam(int $userId, int $teamId): PersonalAccessToken
+{
+    $token = Mockery::mock(PersonalAccessToken::class)->makePartial();
+    $token->tokenable_id = $userId;
+    $token->tokenable_type = User::class;
+    $token->team_id = $teamId;
+
+    return $token;
+}
+
+function apiTokenTeam(int $teamId): Team
+{
+    $team = new Team;
+    $team->id = $teamId;
+
+    return $team;
+}
 
 it('allows any user to view any api tokens', function () {
     $user = Mockery::mock(User::class)->makePartial();
@@ -28,10 +47,9 @@ it('allows any user to manage api tokens', function () {
 it('allows owner to view their own api token', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->id = 1;
+    $user->shouldReceive('currentTeam')->andReturn(apiTokenTeam(10));
 
-    $token = Mockery::mock(PersonalAccessToken::class)->makePartial();
-    $token->tokenable_id = 1;
-    $token->tokenable_type = User::class;
+    $token = apiTokenForUserAndTeam(1, 10);
 
     $policy = new ApiTokenPolicy;
     expect($policy->view($user, $token))->toBeTrue();
@@ -52,10 +70,9 @@ it('denies non-owner from viewing api token', function () {
 it('allows owner to update their own api token', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->id = 1;
+    $user->shouldReceive('currentTeam')->andReturn(apiTokenTeam(10));
 
-    $token = Mockery::mock(PersonalAccessToken::class)->makePartial();
-    $token->tokenable_id = 1;
-    $token->tokenable_type = User::class;
+    $token = apiTokenForUserAndTeam(1, 10);
 
     $policy = new ApiTokenPolicy;
     expect($policy->update($user, $token))->toBeTrue();
@@ -76,10 +93,9 @@ it('denies non-owner from updating api token', function () {
 it('allows owner to delete their own api token', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->id = 1;
+    $user->shouldReceive('currentTeam')->andReturn(apiTokenTeam(10));
 
-    $token = Mockery::mock(PersonalAccessToken::class)->makePartial();
-    $token->tokenable_id = 1;
-    $token->tokenable_type = User::class;
+    $token = apiTokenForUserAndTeam(1, 10);
 
     $policy = new ApiTokenPolicy;
     expect($policy->delete($user, $token))->toBeTrue();
@@ -96,6 +112,31 @@ it('denies non-owner from deleting api token', function () {
     $policy = new ApiTokenPolicy;
     expect($policy->delete($user, $token))->toBeFalse();
 });
+
+it('denies access to an owned api token from another team', function (string $ability) {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->id = 1;
+    $user->shouldReceive('currentTeam')->andReturn(apiTokenTeam(10));
+
+    $token = apiTokenForUserAndTeam(1, 20);
+
+    $policy = new ApiTokenPolicy;
+    expect($policy->{$ability}($user, $token))->toBeFalse();
+})->with(['view', 'update', 'delete']);
+
+it('denies access to an owned api token without team identifiers', function (string $ability) {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->id = 1;
+    $user->shouldReceive('currentTeam')->andReturnNull();
+
+    $token = Mockery::mock(PersonalAccessToken::class)->makePartial();
+    $token->tokenable_id = 1;
+    $token->tokenable_type = User::class;
+    $token->team_id = null;
+
+    $policy = new ApiTokenPolicy;
+    expect($policy->{$ability}($user, $token))->toBeFalse();
+})->with(['view', 'update', 'delete']);
 
 it('allows admin to use root permissions', function () {
     $user = Mockery::mock(User::class)->makePartial();

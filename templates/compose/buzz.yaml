@@ -16,7 +16,7 @@ services:
       - RELAY_URL=wss://${SERVICE_FQDN_BUZZ}
       - BUZZ_MEDIA_BASE_URL=${SERVICE_URL_BUZZ}/media
       - BUZZ_MEDIA_SERVER_DOMAIN=${SERVICE_FQDN_BUZZ}
-      - BUZZ_CORS_ORIGINS=${SERVICE_URL_BUZZ}
+      - BUZZ_CORS_ORIGINS=${SERVICE_URL_BUZZ},tauri://localhost,http://tauri.localhost
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-buzz}
       - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@redis:6379
       - BUZZ_S3_ENDPOINT=http://minio:9000

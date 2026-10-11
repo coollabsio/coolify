@@ -36,6 +36,9 @@
                 });
                 this.on('complete', function (file) {
                     $wire.filename = file.name;
+                    if (file.status === Dropzone.SUCCESS) {
+                        $wire.selectUploadedFile(file.name);
+                    }
                     $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
                     $wire.isUploading = false;
                 });
@@ -48,49 +51,71 @@
     </script>
     @endscript
         <div class="application-settings-workspace flex flex-col gap-6">
-            <x-callout type="danger" title="Existing data will be replaced">
-                Restoring a backup is destructive. Review the source and import command before continuing.
+            <x-callout type="danger" title="Restoring a backup changes database data">
+                Review the source and import command before continuing. Existing objects can cause the import to fail unless replacement is enabled.
             </x-callout>
 
             <x-application.settings-section title="Restore configuration"
                 description="Configure how the selected backup is applied to this database.">
                 <div class="space-y-4">
-            @if ($resourceDbType === 'standalone-postgresql')
-                @if ($dumpAll)
-                            <x-forms.textarea rows="6" readonly label="Import command"
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
-                @else
-                            <x-forms.input label="Import command"
-                                helper="Add --clean to replace conflicting objects or --verbose for detailed logs."
-                                wire:model="postgresqlRestoreCommand" canGate="update"
-                                :canResource="$this->resource" />
-                @endif
-            @elseif ($resourceDbType === 'standalone-mysql')
-                @if ($dumpAll)
-                            <x-forms.textarea rows="10" readonly label="Import command"
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
-                @else
-                            <x-forms.input label="Import command" wire:model="mysqlRestoreCommand"
-                                canGate="update" :canResource="$this->resource" />
-                @endif
-            @elseif ($resourceDbType === 'standalone-mariadb')
-                @if ($dumpAll)
-                            <x-forms.textarea rows="10" readonly label="Import command"
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
-                @else
-                            <x-forms.input label="Import command" wire:model="mariadbRestoreCommand"
-                                canGate="update" :canResource="$this->resource" />
-                @endif
+            @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
+                            <x-callout type="warning" title="Full restore overwrites administrator passwords">
+                                The backup replaces PostgreSQL administrator role passwords, including the destination administrator password.
+                                <span class="mt-1 block">If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
+                            </x-callout>
             @endif
+                            <x-forms.textarea rows="10" readonly label="Import command"
+                                helper="Coolify detects the backup format (SQL, archive, gzip, bz2, xz, zip, or tar) before it changes the database."
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
+                    @if ($resourceDbType !== 'standalone-sqlite')
                     <div class="max-w-sm">
                         <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
                             ['value' => true, 'label' => 'Backup contains all databases'],
                             ['value' => false, 'label' => 'Backup contains one database'],
                         ]" />
                     </div>
+                    @endif
+                    @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" live label="Replace objects that already exist"
+                                helper="Archive backups: drops matching tables, functions, types, and other PostgreSQL objects before restoring them. SQL backups: recreates the database before the restore."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="keepOwners" live label="Keep owners and privileges"
+                                helper="Archive backups: restores object owners and GRANTs from the backup. Leave this off for backups from another server (for example Amazon RDS): its roles usually do not exist here, and the whole restore would be rolled back."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if (in_array($resourceDbType, ['standalone-mysql', 'standalone-mariadb', 'mysql', 'mariadb'], true) && $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="restoreMysqlUsers" live label="Restore users and privileges (mysql system database)"
+                                helper="Off: the system databases (mysql, sys) of the backup are skipped, so this database keeps its own users and passwords. On: the users, passwords, and privileges of the backup replace the current ones."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        @if ($restoreMysqlUsers)
+                            <x-callout type="warning" title="Restoring users changes passwords">
+                                The backup replaces all users, passwords, and privileges, including the root password. After the next restart of the database, the passwords from the backup apply, so the credentials Coolify stores for this database, and its health check, may stop working.
+                                <span class="mt-1 block">Update the passwords in Coolify's database configuration after the restore.</span>
+                            </x-callout>
+                        @endif
+                    @endif
+                    @if ($resourceDbType === 'standalone-sqlite' && count($this->sqliteDatabaseFiles) > 0)
+                        <div class="max-w-sm">
+                            <x-forms.listbox id="sqliteDatabase" label="Restore into" live
+                                helper="The database file the backup replaces. Coolify preselects the file named in the backup file name."
+                                :options="collect($this->sqliteDatabaseFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()"
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if ($resourceDbType === 'standalone-mongodb')
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" live label="Replace collections that already exist"
+                                helper="Drops each collection from the backup before restoring it. Without this option, documents that already exist are skipped."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
                 </div>
             </x-application.settings-section>
 
@@ -101,7 +126,7 @@
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
                             ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
-                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                         <span
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
                             <x-reicon name="file" class="size-4" />
@@ -118,7 +143,7 @@
                             class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                             :class="restoreType === 's3'
                                 ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
-                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                             <span
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
                                 <x-reicon name="storages" class="size-4" />
@@ -135,7 +160,7 @@
             {{-- File Restore Section --}}
             @can('update', $this->resource)
                 <div x-cloak x-show="restoreType === 'file'"
-                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <form class="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div class="min-w-0 flex-1">
                             <x-forms.input label="File path on the server"
@@ -154,7 +179,7 @@
                     </div>
 
                     <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
-                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.025]!"
+                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
                         id="my-dropzone" wire:ignore>
                         @csrf
                     </form>
@@ -181,7 +206,7 @@
                                     <li>Copy backup file to database container</li>
                                     <li>Execute restore command</li>
                                 </ul>
-                                <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
+                                <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                             </x-modal-confirmation>
                         </div>
                     </div>
@@ -202,7 +227,7 @@
                             ->all();
                     @endphp
                     <div x-cloak x-show="restoreType === 's3'"
-                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.listbox id="s3StorageId" label="S3 storage" :options="$s3StorageOptions"
                                 placeholder="Select storage" live />
@@ -241,7 +266,7 @@
                                                 <li>Copy file into database container</li>
                                                 <li>Execute restore command</li>
                                             </ul>
-                                        <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
+                                        <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                                         </x-modal-confirmation>
                                 </div>
                             </div>

@@ -556,6 +556,7 @@ test('list_env_keys never returns values and is team scoped', function () {
         'resourceable_type' => Application::class,
         'resourceable_id' => $this->application->id,
         'is_preview' => false,
+        'is_shown_once' => true,
     ]);
 
     $response = mcpReadCall('list_env_keys', [
@@ -567,6 +568,7 @@ test('list_env_keys never returns values and is team scoped', function () {
     $raw = json_encode($body);
 
     expect(collect($body['data']['keys'])->pluck('key'))->toContain('DATABASE_URL');
+    expect(collect($body['data']['keys'])->firstWhere('key', 'DATABASE_URL')['is_shown_once'])->toBeTrue();
     expect($raw)->not->toContain('postgres://secret');
     expect($raw)->not->toContain('"value"');
     expect($raw)->not->toContain('real_value');
@@ -667,6 +669,18 @@ test('get_server_domains and get_server_resources are team scoped', function () 
     $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
     expect(mcpReadCall('get_server_domains', ['uuid' => $otherServer->uuid])->json('result.isError'))->toBeTrue();
     expect(mcpReadCall('get_server_resources', ['uuid' => $otherServer->uuid])->json('result.isError'))->toBeTrue();
+});
+
+test('get_server_domains returns IPv6 hosts with brackets and without the port', function () {
+    Application::query()->whereKey($this->application->id)->update([
+        'fqdn' => 'http://[2a01:4f8::1]:8080,https://app.example.com:8443/api,http://192.0.2.10:3000',
+    ]);
+
+    $domains = mcpReadCall('get_server_domains', ['uuid' => $this->server->uuid]);
+    $domains->assertOk();
+
+    expect(mcpReadJson($domains)['data']['domains'][0]['domains'])
+        ->toBe(['[2a01:4f8::1]', 'app.example.com', '192.0.2.10']);
 });
 
 test('get_server_domains filters polymorphic destinations by type and id', function () {
@@ -1187,6 +1201,7 @@ test('list_shared_env_keys returns names without values and is team scoped', fun
         'type' => 'project',
         'team_id' => $this->team->id,
         'project_id' => $this->project->id,
+        'is_shown_once' => true,
     ]);
 
     $response = mcpReadCall('list_shared_env_keys', [
@@ -1197,6 +1212,7 @@ test('list_shared_env_keys returns names without values and is team scoped', fun
     $body = mcpReadJson($response);
     $raw = json_encode($body);
     expect(collect($body['data']['keys'])->pluck('key'))->toContain('SHARED_API_URL');
+    expect(collect($body['data']['keys'])->firstWhere('key', 'SHARED_API_URL')['is_shown_once'])->toBeTrue();
     expect($raw)->not->toContain('secret.example.com');
     expect($raw)->not->toContain('"value"');
 

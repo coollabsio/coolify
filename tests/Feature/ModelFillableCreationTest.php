@@ -26,6 +26,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Subscription;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
@@ -837,6 +838,40 @@ it('creates StandaloneDragonfly with all fillable attributes', function () {
     expect($db->environment_id)->toBe($this->environment->id);
 });
 
+it('creates StandaloneSqlite with all fillable attributes', function () {
+    $db = StandaloneSqlite::create([
+        'uuid' => 'custom-sqlite-uuid',
+        'name' => 'Full Fillable SQLite',
+        'description' => 'SQLite with all attrs',
+        'sqlite_databases' => 'app.db,jobs.db',
+        'is_log_drain_enabled' => false,
+        'is_include_timestamps' => false,
+        'status' => 'running',
+        'image' => 'peakimages/sqlite:3.53.4-v0.1.0',
+        'limits_memory' => '1g',
+        'limits_memory_swap' => '2g',
+        'limits_memory_swappiness' => 30,
+        'limits_memory_reservation' => '512m',
+        'limits_cpus' => '2',
+        'limits_cpuset' => '0-1',
+        'limits_cpu_shares' => 512,
+        'started_at' => now()->subDay()->toISOString(),
+        'restart_count' => 0,
+        'last_restart_at' => null,
+        'last_restart_type' => null,
+        'last_online_at' => now()->toISOString(),
+        'custom_docker_run_options' => '',
+        'destination_type' => $this->destination->getMorphClass(),
+        'destination_id' => $this->destination->id,
+        'environment_id' => $this->environment->id,
+    ]);
+
+    expect($db->exists)->toBeTrue();
+    expect($db->uuid)->toBe('custom-sqlite-uuid');
+    expect($db->sqlite_databases)->toBe('app.db,jobs.db');
+    expect($db->environment_id)->toBe($this->environment->id);
+});
+
 it('creates StandaloneClickhouse with all fillable attributes', function () {
     $db = StandaloneClickhouse::create([
         'uuid' => 'custom-ch-uuid',
@@ -1047,14 +1082,15 @@ it('creates ScheduledTaskExecution with all fillable attributes', function () {
         'finished_at' => now()->toISOString(),
         'started_at' => now()->subMinute()->toISOString(),
         'retry_count' => 0,
-        'duration' => 60,
+        'duration' => '60.25',
         'error_details' => null,
     ]);
 
     expect($execution->exists)->toBeTrue();
     expect($execution->scheduled_task_id)->toBe($task->id);
     expect($execution->status)->toBe('success');
-    expect((float) $execution->duration)->toBe(60.0);
+    expect($execution->duration)->toBe(60.25);
+    expect($execution->toArray()['duration'])->toBe(60.25);
     expect($execution->retry_count)->toBe(0);
 });
 

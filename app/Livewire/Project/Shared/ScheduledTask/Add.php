@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use App\Models\Application;
 use App\Models\ScheduledTask;
+use App\Models\Service;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -59,13 +62,13 @@ class Add extends Component
         // Get the resource based on type and id
         switch ($this->type) {
             case 'application':
-                $this->resource = \App\Models\Application::findOrFail($this->id);
+                $this->resource = Application::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             case 'service':
-                $this->resource = \App\Models\Service::findOrFail($this->id);
+                $this->resource = Service::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             case 'standalone-postgresql':
-                $this->resource = \App\Models\StandalonePostgresql::findOrFail($this->id);
+                $this->resource = StandalonePostgresql::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             default:
                 throw new \Exception('Invalid resource type');
@@ -99,7 +102,7 @@ class Add extends Component
         }
     }
 
-    public function saveScheduledTask()
+    private function saveScheduledTask(): void
     {
         try {
             $task = new ScheduledTask;
@@ -108,7 +111,7 @@ class Add extends Component
             $task->frequency = $this->frequency;
             $task->container = $this->container;
             $task->timeout = $this->timeout;
-            $task->team_id = currentTeam()->id;
+            $task->team_id = $this->resource->team()->id;
 
             switch ($this->type) {
                 case 'application':
@@ -122,10 +125,18 @@ class Add extends Component
                     break;
             }
             $task->save();
+            auditLog('ui.scheduled_task.created', [
+                'team_id' => $task->team_id,
+                'scheduled_task_uuid' => $task->uuid,
+                'scheduled_task_name' => $task->name,
+                'resource_type' => $this->type,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+            ]);
             $this->dispatch('refreshTasks');
             $this->dispatch('success', 'Scheduled task added.');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 

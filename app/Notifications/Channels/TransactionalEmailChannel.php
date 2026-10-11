@@ -30,7 +30,7 @@ class TransactionalEmailChannel
         Mail::send(
             [],
             [],
-            fn (Message $message) => $message
+            fn (Message $message) => mail_from_message($message, $settings)
                 ->to($email)
                 ->subject($mailMessage->subject)
                 ->html((string) $mailMessage->render())

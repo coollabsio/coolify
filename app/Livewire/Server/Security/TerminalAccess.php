@@ -54,6 +54,11 @@ class TerminalAccess extends Component
             $this->isTerminalEnabled = $this->server->settings->is_terminal_enabled;
 
             $status = $this->isTerminalEnabled ? 'enabled' : 'disabled';
+            auditLog("ui.server.terminal_access.{$status}", [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
             $this->dispatch('success', "Terminal access has been {$status}.");
 
             return true;
@@ -62,10 +67,9 @@ class TerminalAccess extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->validate();
             // No other fields to sync for terminal access
         } else {

@@ -32,6 +32,7 @@
             <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Public access</h3>
             @php
                 $domainCount = 0;
+                $primaryDomain = null;
                 if ($buildPack === 'dockercompose') {
                     $composeDomains = $application->docker_compose_domains
                         ? json_decode($application->docker_compose_domains, true)
@@ -41,35 +42,57 @@
                             $domainString = data_get($serviceDomain, 'domain');
                             if (filled($domainString)) {
                                 $domainCount += countDomains($domainString);
+                                $primaryDomain ??= collect(explode(',', $domainString))
+                                    ->map(fn ($domain) => trim($domain))
+                                    ->first(fn ($domain) => filled($domain));
                             }
                         }
                     }
                 } elseif (filled($fqdn)) {
                     $domainCount = countDomains($fqdn);
+                    $primaryDomain = collect(explode(',', $fqdn))
+                        ->map(fn ($domain) => trim($domain))
+                        ->first(fn ($domain) => filled($domain));
                 }
+                $additionalDomainCount = max(0, $domainCount - 1);
             @endphp
-            <div class="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 dark:border-white/[0.07] dark:bg-white/[0.025]">
-                <div class="flex min-w-0 flex-1 items-center gap-3">
+            @php
+                $applicationDomainsUrl = route('project.application.domains', [
+                    'project_uuid' => $application->environment->project->uuid,
+                    'environment_uuid' => $application->environment->uuid,
+                    'application_uuid' => $application->uuid,
+                ]);
+            @endphp
+            <div class="group relative flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 transition-colors hover:bg-neutral-100 focus-within:ring-2 focus-within:ring-coollabs/40 dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] dark:focus-within:ring-warning/40">
+                <a class="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+                    aria-label="{{ $domainCount > 0 ? 'Manage application domains' : 'Add an application domain' }}"
+                    href="{{ $applicationDomainsUrl }}" {{ wireNavigate() }}>
                     <div class="flex size-9 shrink-0 items-center justify-center rounded-md bg-neutral-200/70 text-neutral-600 dark:bg-white/[0.07] dark:text-fg-dim">
                         <x-reicon name="globe" class="size-4" />
                     </div>
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-black dark:text-fg">
-                            {{ $domainCount }} configured {{ Str::plural('domain', $domainCount) }}
+                            @if ($primaryDomain)
+                                <span class="block truncate">{{ $primaryDomain }}</span>
+                            @else
+                                No public domain configured
+                            @endif
                         </p>
                         <p class="text-xs text-neutral-500 dark:text-fg-dim">
-                            Domains, DNS checks, and redirect settings
+                            @if ($additionalDomainCount > 0)
+                                +{{ $additionalDomainCount }} more {{ Str::plural('domain', $additionalDomainCount) }}
+                            @elseif ($domainCount === 0)
+                                Make this application available from a URL
+                            @else
+                                Manage DNS checks and redirect settings
+                            @endif
                         </p>
                     </div>
-                </div>
-                <a class="icon-button ml-auto shrink-0" title="Manage domains"
-                    aria-label="Manage domains"
-                    href="{{ route('project.application.domains', [
-                        'project_uuid' => $application->environment->project->uuid,
-                        'environment_uuid' => $application->environment->uuid,
-                        'application_uuid' => $application->uuid,
-                    ]) }}" {{ wireNavigate() }}>
-                    <x-reicon name="settings" class="size-4" />
+                </a>
+                <a class="button relative z-10 ml-auto shrink-0" aria-label="{{ $domainCount > 0 ? 'Manage application domains' : 'Add an application domain' }}"
+                    href="{{ $applicationDomainsUrl }}" {{ wireNavigate() }}>
+                    {{ $domainCount > 0 ? 'Manage domains' : 'Add domain' }}
+                    <x-reicon name="arrow-right" class="size-4" />
                 </a>
             </div>
             </section>
@@ -119,8 +142,7 @@
                 @else
                     <div class="flex flex-col gap-5">
                         @if ($buildPack === 'dockercompose')
-                            <div class="flex flex-col gap-2"
-                                @can('update', $application) x-init="$wire.dispatch('loadCompose', true)" @endcan>
+                            <div class="flex flex-col gap-2">
                                 <div x-data="{
                                     baseDir: @entangle('baseDirectory'),
                                     composeLocation: @entangle('dockerComposeLocation'),
@@ -258,18 +280,21 @@
                             @endif
                             @if ($buildPack !== 'dockercompose')
                                 @php
-                                    $hasBuildServers = \App\Models\Server::buildServers(currentTeam()->id)->exists();
+                                    $hasBuildServers = \App\Models\Server::buildServers($application->team()?->id)->exists();
                                     $buildServerOptions = [
                                         ['value' => false, 'label' => 'Deployment server'],
                                         $hasBuildServers
                                             ? ['value' => true, 'label' => 'Available build server (auto-select)']
                                             : ['value' => true, 'label' => 'No build servers connected', 'disabled' => true],
                                     ];
+                                    $buildServerFallbackPolicy = $application->environment->project->team->is_build_server_fallback_enabled
+                                        ? 'If no usable build server is available, Coolify builds on the deployment server.'
+                                        : 'If no usable build server is available, the deployment fails.';
                                 @endphp
                                 <div class="grid gap-4 pt-2 sm:grid-cols-2">
                                     <x-forms.listbox id="isBuildServerEnabled" label="Builder selection"
                                         onChange="instantSave" :options="$buildServerOptions"
-                                        helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                        helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. {{ $buildServerFallbackPolicy }} More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         x-bind:disabled="!canUpdate" />
                                 </div>
                             @endif
@@ -303,33 +328,40 @@
             @endif
             @if ($buildPack === 'dockercompose')
                 <div x-data="{ showRaw: true }" class="mt-5">
-                    <div class="mb-2 flex items-center justify-between gap-4">
-                        <h3>Docker Compose</h3>
-                        <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
-                            @click.prevent="showRaw = !showRaw"
-                            x-text="showRaw ? 'Show deployable compose' : 'Show raw compose'"></x-forms.button>
-                    </div>
-                    @if ($application->settings->is_raw_compose_deployment_enabled)
-                        <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
-                            label="Docker compose content (applicationId: {{ $application->id }})"
-                            helper="You need to modify the docker compose file in the git repository."
-                            monacoEditorLanguage="yaml" useMonacoEditor />
-                    @else
-                        @if ((int) $application->compose_parsing_version >= 3)
-                            <div x-show="showRaw">
-                                <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
-                                    label="Docker compose content (raw)"
+                    @can('update', $application)
+                        <div class="mb-2 flex items-center justify-between gap-4">
+                            <h3>Docker Compose</h3>
+                            <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
+                                @click.prevent="showRaw = !showRaw"
+                                x-text="showRaw ? 'Show deployable compose' : 'Show raw compose'"></x-forms.button>
+                        </div>
+                        @if ($application->settings->is_raw_compose_deployment_enabled)
+                            <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
+                                label="Docker compose content (applicationId: {{ $application->id }})"
+                                helper="You need to modify the docker compose file in the git repository."
+                                monacoEditorLanguage="yaml" useMonacoEditor />
+                        @else
+                            @if ((int) $application->compose_parsing_version >= 3)
+                                <div x-show="showRaw">
+                                    <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
+                                        label="Docker compose content (raw)"
+                                        helper="You need to modify the docker compose file in the git repository."
+                                        monacoEditorLanguage="yaml" useMonacoEditor />
+                                </div>
+                            @endif
+                            <div x-show="showRaw === false">
+                                <x-forms.textarea rows="10" readonly id="dockerCompose"
+                                    label="Docker compose content"
                                     helper="You need to modify the docker compose file in the git repository."
                                     monacoEditorLanguage="yaml" useMonacoEditor />
                             </div>
                         @endif
-                        <div x-show="showRaw === false">
-                            <x-forms.textarea rows="10" readonly id="dockerCompose"
-                                label="Docker compose content"
-                                helper="You need to modify the docker compose file in the git repository."
-                                monacoEditorLanguage="yaml" useMonacoEditor />
-                        </div>
-                    @endif
+                    @else
+                        <h3 class="mb-2">Docker Compose</h3>
+                        <x-callout type="info" title="Hidden (only admins can view)" class="mb-4">
+                            The Docker Compose file can contain secrets.
+                        </x-callout>
+                    @endcan
                     <div class="w-full sm:w-96">
                         <x-forms.checkbox label="Escape special characters in labels?"
                             helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
@@ -376,7 +408,8 @@
                         @if (
                             $application->destination->server->isSwarm() ||
                                 $application->additional_servers->count() > 0 ||
-                                $application->settings->is_build_server_enabled)
+                                $application->settings->is_build_server_enabled ||
+                                ! $application->destination->server->canBuildApplications())
                             <x-forms.input id="dockerRegistryImageName" required label="Image"
                                 placeholder="ghcr.io/your-org/your-app" x-bind:disabled="!canUpdate" />
                             <x-forms.input id="dockerRegistryImageTag"
@@ -399,7 +432,15 @@
             @endif
 
             @if ($buildPack !== 'dockercompose')
-                <x-application.settings-section id="networking-section" title="Networking" helper="Ports the container exposes, host port mappings and internal network aliases.">
+                @php
+                    $applicationDomainsUrl = route('project.application.domains', [
+                        'project_uuid' => $application->environment->project->uuid,
+                        'environment_uuid' => $application->environment->uuid,
+                        'application_uuid' => $application->uuid,
+                    ]);
+                    $portsExposesDomainHint = "You can also set a different internal port for each domain on the <a class='underline dark:text-white' href='{$applicationDomainsUrl}'>Domains</a> page.";
+                @endphp
+                <x-application.settings-section id="networking-section" title="Networking" helper="Ports the container exposes, host port mappings and internal network aliases. You can also set an internal port per domain.">
                 @if ($this->detectedPortInfo)
                     @if ($this->detectedPortInfo['isEmpty'])
                         <div
@@ -461,20 +502,30 @@
                     </x-callout>
                 @endif
                 <div class="grid gap-4 lg:grid-cols-[14rem_16rem_minmax(0,1fr)]">
+                    <div class="min-w-0">
                     @if ($isStatic || $buildPack === 'static')
                         <x-forms.input id="portsExposes" label="Ports exposes" readonly
+                            :helper="$portsExposesDomainHint"
+                            canGate="update" :canResource="$application"
                             x-bind:disabled="!canUpdate" />
                     @else
                         @if ($application->settings->is_container_label_readonly_enabled === false)
                             <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports exposes" readonly
-                                helper="Readonly labels are disabled. You can set the ports manually in the labels section."
+                                :helper="'Readonly labels are disabled. You can set the ports manually in the labels section.<br><br>'.$portsExposesDomainHint"
+                                canGate="update" :canResource="$application"
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports exposes"
-                                helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly."
+                                :helper="'A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly.<br><br>'.$portsExposesDomainHint"
+                                canGate="update" :canResource="$application"
                                 x-bind:disabled="!canUpdate" />
                         @endif
                     @endif
+                    <p class="mt-1.5 text-xs text-neutral-500 dark:text-fg-dim">
+                        You can also set an internal port per domain on
+                        <a class="underline dark:text-white" href="{{ $applicationDomainsUrl }}" {{ wireNavigate() }}>Domains</a>.
+                    </p>
+                    </div>
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input placeholder="3000:3000" id="portsMappings" label="Port mappings"
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Format:</span> host:container<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span> 3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host."

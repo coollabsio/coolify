@@ -87,29 +87,6 @@ If existing pages and components support dark mode, new pages and components mus
 </div>
 ```
 
-## Common Patterns
-
-### Flexbox Layout
-
-<!-- Flexbox Layout -->
-```html
-<div class="flex items-center justify-between gap-4">
-    <div>Left content</div>
-    <div>Right content</div>
-</div>
-```
-
-### Grid Layout
-
-<!-- Grid Layout -->
-```html
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div>Card 1</div>
-    <div>Card 2</div>
-    <div>Card 3</div>
-</div>
-```
-
 ## Common Pitfalls
 
 - Using deprecated v3 utilities (bg-opacity-*, flex-shrink-*, etc.)

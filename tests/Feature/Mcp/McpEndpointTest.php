@@ -12,6 +12,7 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
     InstanceSettings::query()->where('id', 0)->delete();
     InstanceSettings::query()->delete();
     $settings = new InstanceSettings(['is_mcp_server_enabled' => true]);
@@ -116,6 +117,17 @@ test('MCP endpoint rejects unauthenticated requests', function () {
     $response->assertStatus(401);
 });
 
+test('MCP endpoint works when the REST API is disabled and its IP allow-list excludes the client', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    mcpListTools($token)->assertOk();
+    test()->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/v1/version')
+        ->assertForbidden();
+});
+
 test('MCP endpoint lists tools for an authenticated token', function () {
     $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
 
@@ -123,6 +135,7 @@ test('MCP endpoint lists tools for an authenticated token', function () {
     $response->assertOk();
 
     $toolNames = collect($response->json('result.tools'))->pluck('name')->all();
+    expect(json_encode($response->json('result.tools')))->not->toContain('host_path');
     expect($toolNames)->toContain(
         'get_infrastructure_overview',
         'list_servers',
@@ -139,8 +152,58 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_logs',
         'list_env_keys',
     );
-    expect($toolNames)->not->toContain('get_resource_status');
+    expect($toolNames)->not->toContain(
+        'get_resource_status',
+        'create_storage',
+        'update_storage',
+    );
     expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
+});
+
+test('MCP endpoint accepts the legacy initialize handshake', function () {
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = mcpPost([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => (object) [],
+            'clientInfo' => ['name' => 'test-client', 'version' => '1.0.0'],
+        ],
+    ], $token);
+
+    $response->assertOk();
+    expect($response->json('result.protocolVersion'))->toBe('2025-06-18');
+});
+
+test('MCP endpoint serves 2026-07-28 protocol requests with MCP headers', function () {
+    Project::create(['name' => 'Mine', 'team_id' => $this->team->id]);
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = test()->withHeaders([
+        'Authorization' => 'Bearer '.$token,
+        'Accept' => 'application/json, text/event-stream',
+        'MCP-Protocol-Version' => '2026-07-28',
+        'Mcp-Method' => 'tools/call',
+        'Mcp-Name' => 'list_projects',
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'list_projects',
+            'arguments' => (object) [],
+            '_meta' => [
+                'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                'io.modelcontextprotocol/clientCapabilities' => (object) [],
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+    expect(mcpToolJson($response)['_pagination']['total'])->toBe(1);
 });
 
 test('list_projects returns summary + pagination scoped to the token team', function () {

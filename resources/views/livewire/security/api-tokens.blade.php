@@ -10,13 +10,15 @@
             <x-application.settings-section title="API disabled"
                 description="Enable the Coolify API before creating access tokens.">
                 <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
-                    size="sm">
-                    <x-slot:actions>
-                        <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                            Open settings
-                        </a>
-                    </x-slot:actions>
+                    description="{{ isInstanceAdmin() ? 'Enable API access in instance settings to issue tokens.' : 'Ask an instance admin to enable API access.' }}"
+                    icon-name="keys" size="sm">
+                    @if (isInstanceAdmin())
+                        <x-slot:actions>
+                            <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
+                                Enable API access
+                            </a>
+                        </x-slot:actions>
+                    @endif
                 </x-empty>
             </x-application.settings-section>
         </div>
@@ -107,9 +109,18 @@
             @endcan
 
             @if (session()->has('token'))
-                <x-application.settings-section title="Copy your token"
-                    description="This value will not be shown again after you leave this page.">
-                    <x-forms.copy-button :text="session('token')" />
+                <x-application.settings-section title="Copy your token">
+                    <div class="flex flex-col gap-3">
+                        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                            This value will not be shown again after you leave this page.
+                        </p>
+                        <div class="relative">
+                            <input type="text" value="{{ session('token') }}" readonly
+                                class="input w-full pr-12! font-mono text-[12px] text-black dark:text-fg">
+                            <x-copy-button :value="session('token')" label="Copy token"
+                                class="absolute top-1/2 right-2 -translate-y-1/2" />
+                        </div>
+                    </div>
                 </x-application.settings-section>
             @endif
 

@@ -133,16 +133,11 @@
                         @endif
 
                         <div class="flex flex-col gap-4">
-                            <x-forms.datalist label="Extra SSH keys" id="selectedDigitalOceanSshKeyIds"
-                                helper="Existing keys from the DigitalOcean account." :multiple="true"
-                                :disabled="count($digitalOceanSshKeys) === 0"
-                                :placeholder="count($digitalOceanSshKeys) ? 'Search SSH keys' : 'No account keys found'">
-                                @foreach ($digitalOceanSshKeys as $sshKey)
-                                    <option value="{{ $sshKey['id'] }}">
-                                        {{ $sshKey['name'] ?? $sshKey['fingerprint'] }}
-                                    </option>
-                                @endforeach
-                            </x-forms.datalist>
+                            <x-forms.listbox label="Extra SSH keys" id="selectedDigitalOceanSshKeyIds"
+                                helper="Existing keys from the DigitalOcean account." multiple searchable
+                                :disabled="count($digitalOceanSshKeys) === 0" searchPlaceholder="Search SSH keys…"
+                                :placeholder="count($digitalOceanSshKeys) ? 'Select SSH keys' : 'No account keys found'"
+                                :options="collect($digitalOceanSshKeys)->map(fn ($sshKey) => ['value' => $sshKey['id'], 'label' => $sshKey['name'] ?? $sshKey['fingerprint']])->values()->all()" />
 
                             <div class="grid gap-3 lg:grid-cols-2">
                                 <x-forms.checkbox id="enable_ipv6" label="Enable IPv6" fullWidth />

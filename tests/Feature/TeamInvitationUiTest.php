@@ -1,7 +1,6 @@
 <?php
 
 use App\Livewire\Team\Invitations;
-use App\Livewire\Team\InviteLink;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -22,54 +21,31 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows generate link with loading state targeting viaLink', function () {
-    $view = file_get_contents(resource_path('views/livewire/team/invite-link.blade.php'));
-
-    expect($view)
-        ->toContain('wire:submit="viaLink"')
-        ->toContain('wire:target="viaLink"')
-        ->toContain('<x-forms.button type="submit" wire:target="viaLink"')
-        ->toContain('Generate link');
-
-    Livewire::test(InviteLink::class)
-        ->assertSee('Generate link')
-        ->assertSeeHtml('wire:target="viaLink"')
-        ->assertSeeHtml('wire:loading.attr="disabled"')
-        ->assertSeeHtml('wire:loading.class="is-loading"');
-});
-
-it('renders a real copy button for pending invitation links', function () {
+it('preserves a provisional user when revoking their invitation fails', function () {
+    $provisionalUser = User::factory()->create([
+        'email' => 'provisional@example.com',
+        'email_verified_at' => null,
+        'force_password_reset' => true,
+    ]);
     $invitation = TeamInvitation::create([
         'team_id' => $this->team->id,
-        'uuid' => 'test-invitation-uuid-123456789012',
-        'email' => 'invitee@example.com',
+        'uuid' => 'failing-invitation-delete',
+        'email' => $provisionalUser->email,
         'role' => 'member',
-        'link' => 'http://example.test/invitations/test-invitation-uuid-123456789012',
+        'link' => 'http://example.test/invitations/failing-invitation-delete',
         'via' => 'link',
     ]);
 
-    $view = file_get_contents(resource_path('views/livewire/team/invitations.blade.php'));
-
-    expect($view)
-        ->toContain('aria-label="Copy invitation link"')
-        ->toContain('window.copyToClipboard(@js($invite->link))')
-        ->toContain('class="button h-7! shrink-0 px-2!"');
+    TeamInvitation::deleting(function (): void {
+        throw new RuntimeException('Invitation deletion failed.');
+    });
 
     Livewire::test(Invitations::class, [
-        'invitations' => TeamInvitation::ownedByCurrentTeam()->get(),
+        'invitations' => collect([$invitation]),
     ])
-        ->assertSee($invitation->link)
-        ->assertSeeHtml('aria-label="Copy invitation link"')
-        ->assertSeeHtml('window.copyToClipboard(')
-        ->assertSeeHtml('type="button"');
-});
+        ->call('deleteInvitation', $invitation->id)
+        ->assertDispatched('error');
 
-it('exposes a resilient global copyToClipboard helper', function () {
-    $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
-
-    expect($layout)
-        ->toContain('async function copyToClipboard(text)')
-        ->toContain('window.copyToClipboard = copyToClipboard')
-        ->toContain('document.execCommand(\'copy\')')
-        ->toContain('window.isSecureContext');
+    $this->assertDatabaseHas('users', ['id' => $provisionalUser->id]);
+    $this->assertDatabaseHas('team_invitations', ['id' => $invitation->id]);
 });

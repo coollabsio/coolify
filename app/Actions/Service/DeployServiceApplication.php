@@ -2,6 +2,7 @@
 
 namespace App\Actions\Service;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -32,11 +33,13 @@ class DeployServiceApplication
         $commands = collect([
             'echo '.escapeshellarg("Saved configuration files to {$workdir}."),
             'touch '.escapeshellarg("{$workdir}/.env"),
+            ...EnsureContentFilesOnServer::echoCommands($serviceApplication->fileStorages()->get(), $service->server),
+            ...StartService::composeVolumeWarningCommands($service),
         ]);
 
         if ($pullLatestImages) {
             $commands->push('echo Pulling image for service.');
-            $commands->push("docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName}");
+            $commands->push("docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName} < /dev/null");
         }
 
         if ($service->networks()->count() > 0) {
@@ -48,7 +51,8 @@ class DeployServiceApplication
         if ($forceRebuild) {
             $upCommand .= ' --build';
         }
-        $upCommand .= " {$safeComposeServiceName}";
+        // No stdin for Compose prompts: they would read the next script lines (see StartService).
+        $upCommand .= " {$safeComposeServiceName} < /dev/null";
         $commands->push('echo Starting service container.');
         $commands->push($upCommand);
 
@@ -61,6 +65,6 @@ class DeployServiceApplication
             $commands->push("docker network connect --alias {$networkAlias} {$network} {$containerName} >/dev/null 2>&1 || true");
         }
 
-        return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
     }
 }

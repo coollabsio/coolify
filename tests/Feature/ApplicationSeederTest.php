@@ -36,4 +36,8 @@ it('seeds the default applications without railpack examples', function () {
 
     expect(Application::query()->where('build_pack', 'railpack')->exists())->toBeFalse();
     expect(Application::query()->whereIn('uuid', ['railpack-nodejs', 'railpack-static'])->exists())->toBeFalse();
+
+    expect(Application::query()
+        ->whereIn('git_repository', ['coollabsio/coolify-examples', 'coollabsio/coolify'])
+        ->pluck('git_branch')->unique()->all())->toBe(['main']);
 });

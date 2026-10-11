@@ -36,8 +36,10 @@
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
-                        <x-callout type="warning" title="Configuration out of sync">
-                            Restart the proxy to apply the saved configuration.
+                        <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
+                    @elseif ($server->hasPendingProxyConfiguration())
+                        <x-callout type="warning" title="Restart required">
+                            Restart the proxy to apply TLS certificate changes.
                         </x-callout>
                     @else
                         <div class="flex items-start gap-3">
@@ -61,10 +63,10 @@
                     helper="Control generated labels and requests that do not match a running resource.">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.listbox id="generateExactLabels" label="Generated labels"
-                            helper="Generate labels only for the selected proxy implementation."
+                            helper="<ul class='list-disc space-y-1 pl-4'><li><span class='font-semibold'>All supported proxies:</span> Traefik and Caddy labels are both generated, so switching the proxy keeps routing working.</li><li><span class='font-semibold'>Active proxy only:</span> generates fewer labels, but all resources must be redeployed to become accessible again after each proxy switch.</li></ul>"
                             onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Keep compatible labels'],
-                                ['value' => true, 'label' => 'Generate exact proxy labels'],
+                                ['value' => false, 'label' => 'Labels for all supported proxies'],
+                                ['value' => true, 'label' => 'Labels for the active proxy only'],
                             ]" />
                         <x-forms.listbox id="redirectEnabled" label="Unknown requests"
                             helper="Override the default 503 response for unknown hosts and stopped services."
@@ -78,6 +80,11 @@
                                 label="Redirect URL"
                                 helper="Leave empty to keep a custom 503 response without redirecting." />
                         @endif
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="letsencrypt"
+                                id="certificateResolver" label="Certificate resolver"
+                                helper="Traefik certificate resolver for generated HTTPS routes. Leave empty if Traefik uses your own certificates (for example Cloudflare Origin CA certificates in a dynamic configuration). Redeploy resources to apply the change." />
+                        @endif
                     </div>
                 </x-application.settings-section>
 
@@ -90,6 +97,7 @@
 
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
                     <x-application.settings-section id="server-proxy-file-section" :title="$proxyTitle"
+                        x-init="$wire.loadProxyConfiguration()"
                         helper="Edit the generated proxy compose configuration used on this server.">
                         <x-slot:actions>
                             @can('update', $server)
@@ -109,24 +117,36 @@
                         </x-slot:actions>
 
                         @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                            @if ($server->detected_traefik_version === 'latest')
+                            @if ($this->traefikVersionForWarning === 'latest')
                                 <x-callout type="warning" title="Unpinned Traefik version">
                                     The proxy uses the <span class="font-mono">latest</span> tag. Pin
                                     <span class="font-mono">traefik:{{ $this->latestTraefikVersion }}</span>
                                     for predictable updates.
                                 </x-callout>
-                            @elseif($this->isTraefikOutdated)
+                            @endif
+                            @if ($this->isTraefikOutdated)
                                 <x-callout type="warning" title="Traefik patch update available">
-                                    Version {{ $this->latestTraefikVersion }} is available. Test the update before
-                                    applying it to production servers.
-                                </x-callout>
-                            @elseif($this->newerTraefikBranchAvailable)
-                                <x-callout type="info" title="New Traefik minor version available">
-                                    {{ $this->newerTraefikBranchAvailable }} is available. Review the Traefik
-                                    changelog for breaking changes before upgrading.
+                                    {{ $server->detected_traefik_version ? 'Running version' : 'Configured image' }}
+                                    v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
+                                    for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
+                                    to production servers.
                                 </x-callout>
                             @endif
+                            @if ($this->newerTraefikBranchAvailable)
+                                <x-callout type="info" title="New Traefik minor version available">
+                                    {{ $this->newerTraefikBranchAvailable }} is available (latest patch:
+                                    {{ $this->latestNewerTraefikVersion }}). Review the Traefik changelog for breaking
+                                    changes before upgrading.
+                                </x-callout>
+                            @endif
+                        @elseif ($this->outdatedCaddyImage)
+                            <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
+
+                        <div wire:loading.flex wire:target="loadProxyConfiguration"
+                            class="min-h-32 items-center justify-center">
+                            <x-loading text="Loading proxy configuration…" />
+                        </div>
 
                         @if ($proxySettings)
                             <div class="relative mt-4" wire:loading.class="pointer-events-none opacity-50"

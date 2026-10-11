@@ -202,6 +202,9 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Broadcast events to update UI
             ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
             ServerReachabilityChanged::dispatch($this->server);
+            if ($this->server->isSentinelEnabled()) {
+                CheckAndStartSentinelJob::dispatch($this->server);
+            }
 
         } catch (\Throwable $e) {
             Log::error('ValidateAndInstallServer: Exception occurred', [

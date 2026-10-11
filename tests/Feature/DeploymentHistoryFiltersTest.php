@@ -4,6 +4,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Livewire\Project\Application\Deployment\Index;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
@@ -61,30 +62,41 @@ it('filters deployment history by server', function () {
         ->and($result['deployments']->pluck('server_id')->unique()->sole())->toBe($secondServer->id);
 });
 
-it('always shows source filters and includes server filters', function () {
-    $component = file_get_contents(app_path('Livewire/Project/Application/Deployment/Index.php'));
-    $view = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
-    $filterComponent = file_get_contents(resource_path('views/components/table/filter.blade.php'));
-    $loadingComponent = file_get_contents(resource_path('views/components/table/loading.blade.php'));
+it('keeps a pull request filter from the URL when it has no deployment records yet', function () {
+    $application = Application::factory()->create();
+    $component = new Index;
+    $component->application = $application;
+    $component->pull_request_id = '41';
 
-    expect($component)
-        ->toContain('public array $serverFilterOptions = [];')
-        ->toContain('public array $deploymentFilters = [];')
-        ->toContain('public function toggleDeploymentFilter(string $filter): void')
-        ->toContain("'value' => \"server:{\$serverId}\"")
-        ->and($view)
-        ->toContain('@if (count($sourceFilterOptions) > 0)')
-        ->toContain('count($serverFilterOptions) > 0')
-        ->toContain('>Server</span>')
-        ->toContain('<x-table.filter')
-        ->toContain("wire:click=\"toggleDeploymentFilter('{{ \$option['value'] }}')\"")
-        ->toContain("in_array(\$option['value'], \$deploymentFilters, true)")
-        ->toContain('<x-table.loading id="deployment-table-filter-loading"')
-        ->not->toContain('class="size-3.5" wire:loading.remove')
-        ->not->toContain('<span>All deployments</span>')
-        ->and($filterComponent)
-        ->toContain('aria-multiselectable="true"')
-        ->toContain('Reset filters')
-        ->and($loadingComponent)
-        ->toContain('wire:loading.flex');
+    $method = new ReflectionMethod(Index::class, 'loadPullRequestOptions');
+    $method->invoke($component);
+
+    expect($component->pull_request_id)->toBe('41')
+        ->and($component->pullRequestOptions)->toContain([
+            'value' => '41',
+            'label' => 'Pull request #41',
+        ]);
+});
+
+it('includes every configured preview in the pull request filter options', function () {
+    $application = Application::factory()->create();
+    foreach ([41, 72] as $pullRequestId) {
+        ApplicationPreview::query()->create([
+            'application_id' => $application->id,
+            'pull_request_id' => $pullRequestId,
+            'pull_request_html_url' => "https://github.com/example/repository/pull/{$pullRequestId}",
+        ]);
+    }
+
+    $component = new Index;
+    $component->application = $application;
+
+    $method = new ReflectionMethod(Index::class, 'loadPullRequestOptions');
+    $method->invoke($component);
+
+    expect($component->pullRequestOptions)->toBe([
+        ['value' => '', 'label' => 'All deployments'],
+        ['value' => '72', 'label' => 'Pull request #72'],
+        ['value' => '41', 'label' => 'Pull request #41'],
+    ]);
 });

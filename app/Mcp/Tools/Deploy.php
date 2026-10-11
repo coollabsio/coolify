@@ -42,6 +42,9 @@ class Deploy extends Tool
 
         $force = filter_var($request->get('force'), FILTER_VALIDATE_BOOLEAN);
         $pullRequestId = (int) ($request->get('pull_request_id') ?? 0);
+        if ($pullRequestId < 0 || $pullRequestId > 2147483647) {
+            return $this->mcpError($request, 'pull_request_id must be between 0 and 2147483647.', ['resource_uuid' => $uuid]);
+        }
         $deploymentUuid = new_public_id();
 
         $result = queue_application_deployment(

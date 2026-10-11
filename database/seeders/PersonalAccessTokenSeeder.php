@@ -6,7 +6,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class PersonalAccessTokenSeeder extends Seeder
 {
@@ -74,33 +74,35 @@ class PersonalAccessTokenSeeder extends Seeder
             ],
         ];
 
-        // First, remove all existing development tokens for this user
-        $deletedCount = PersonalAccessToken::where('tokenable_id', $user->id)
-            ->where('tokenable_type', get_class($user))
-            ->whereIn('name', array_column($testTokens, 'name'))
-            ->delete();
+        DB::transaction(function () use ($user, $team, $testTokens) {
+            // First, remove all existing development tokens for this user
+            $deletedCount = PersonalAccessToken::where('tokenable_id', $user->id)
+                ->where('tokenable_type', get_class($user))
+                ->whereIn('name', array_column($testTokens, 'name'))
+                ->delete();
 
-        if ($deletedCount > 0) {
-            $this->command->info("Removed {$deletedCount} existing development token(s).");
-        }
+            if ($deletedCount > 0) {
+                $this->command->info("Removed {$deletedCount} existing development token(s).");
+            }
 
-        // Now create fresh tokens
-        foreach ($testTokens as $tokenData) {
-            // Create the token with a simple format: Bearer {scope}
-            // The token format in the database is the hash of the plain text token
-            $plainTextToken = $tokenData['token'];
+            // Now create fresh tokens
+            foreach ($testTokens as $tokenData) {
+                // Create the token with a simple format: Bearer {scope}
+                // The token format in the database is the hash of the plain text token
+                $plainTextToken = $tokenData['token'];
 
-            PersonalAccessToken::create([
-                'tokenable_type' => get_class($user),
-                'tokenable_id' => $user->id,
-                'name' => $tokenData['name'],
-                'token' => hash('sha256', $plainTextToken),
-                'abilities' => $tokenData['abilities'],
-                'team_id' => $team->id,
-            ]);
+                PersonalAccessToken::create([
+                    'tokenable_type' => get_class($user),
+                    'tokenable_id' => $user->id,
+                    'name' => $tokenData['name'],
+                    'token' => hash('sha256', $plainTextToken),
+                    'abilities' => $tokenData['abilities'],
+                    'team_id' => $team->id,
+                ]);
 
-            $this->command->info("Created token '{$tokenData['name']}' with Bearer token: {$plainTextToken}");
-        }
+                $this->command->info("Created token '{$tokenData['name']}' with Bearer token: {$plainTextToken}");
+            }
+        });
 
         $this->command->info('');
         $this->command->info('Test API tokens created successfully!');

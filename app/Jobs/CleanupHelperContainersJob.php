@@ -17,7 +17,25 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Release the per-server lock after an hour if a worker dies before finishing.
+     */
+    public int $uniqueFor = 3600;
+
     public function __construct(public Server $server) {}
+
+    /**
+     * Keep the lock per server; a class-wide lock queued only one server per cleanup run.
+     */
+    public function uniqueId(): string
+    {
+        return $this->server->uuid;
+    }
+
+    private static function helperContainersCommand(): string
+    {
+        return 'docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image|test("(^|/)coollabsio/coolify-helper(:|@)")))\'';
+    }
 
     public function handle(): void
     {
@@ -36,7 +54,7 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                 'active_deployment_uuids' => $activeDeployments,
             ]);
 
-            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("'.coolifyRegistryUrl().'/coollabsio/coolify-helper")))\''], $this->server, false);
+            $containers = instant_remote_process_with_timeout([self::helperContainersCommand()], $this->server, false);
             $helperContainers = collect(json_decode($containers));
 
             if ($helperContainers->count() > 0) {
