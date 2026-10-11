@@ -34,6 +34,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
@@ -5953,7 +5954,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $errorClass = get_class($exception);
 
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
-        if ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
+        if ($exception instanceof TimeoutExceededException) {
+            $this->application_deployment_queue->addLogEntry("Deployment failed: Timeout of {$this->timeout} seconds exceeded. Increase the deployment timeout in the Server settings (Advanced > Builds).", 'stderr');
+        } elseif ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
             $this->application_deployment_queue->addLogEntry('Deployment failed.', 'stderr');
         } else {
             $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
