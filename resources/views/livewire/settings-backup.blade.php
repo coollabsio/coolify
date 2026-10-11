@@ -8,7 +8,8 @@
         @if ($server->isFunctional())
             @if (isset($database) && isset($backup))
                 <form wire:submit="submit">
-                    <x-unsaved-bar action="submit" />
+                    {{-- Exclude is_backup_before_update_enabled (instantSave) so the bar does not flash. --}}
+                    <x-unsaved-bar action="submit" targets="description" />
 
                     <x-application.settings-section title="Instance database">
                         <div class="grid gap-4 lg:grid-cols-2">
@@ -25,6 +26,18 @@
 
                 <livewire:project.database.backup-edit :backup="$backup" :available-s3-storages="$s3s"
                     :status="data_get($database, 'status')" />
+
+                <x-application.settings-section title="Backup before update"
+                    description="Back up the Coolify database before an update is installed. If the backup fails, the update is not installed.">
+                    <div class="max-w-md">
+                        <x-forms.listbox id="is_backup_before_update_enabled" label="Database backup"
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]"
+                            helper="Runs this backup once before every manual or automatic update, in addition to the schedule." />
+                    </div>
+                </x-application.settings-section>
 
                 <livewire:project.database.backup-executions :backup="$backup" />
             @else
