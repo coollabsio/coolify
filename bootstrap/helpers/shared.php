@@ -5378,6 +5378,37 @@ function dockerComposeEnvironmentVariableShouldBeUnset(?string $dockerCompose, s
     return extractDockerComposeEnvironmentVariableReferences($dockerCompose)->contains($key);
 }
 
+/** @param Collection<int, EnvironmentVariable> $environmentVariables */
+function preserveLegacyDockerComposeNullAssignments(Collection $environment, Collection $environmentVariables): Collection
+{
+    foreach ($environmentVariables as $environmentVariable) {
+        if (! $environmentVariable->preservesLegacyComposeNull() || ! $environment->has($environmentVariable->key)) {
+            continue;
+        }
+
+        $key = $environmentVariable->key;
+        $value = $environment->get($key);
+        if ($value === null || $value === '$'.$key) {
+            $environment->put($key, '');
+
+            continue;
+        }
+        if (! is_string($value) || ! str_starts_with($value, '${')) {
+            continue;
+        }
+        $reference = extractBalancedBraceContent($value);
+        if ($reference === null || $reference['end'] !== strlen($value) - 1) {
+            continue;
+        }
+        $split = splitOnOperatorOutsideNested($reference['content']);
+        if (($split['variable'] ?? $reference['content']) === $key) {
+            $environment->put($key, '');
+        }
+    }
+
+    return $environment;
+}
+
 function syncDockerComposeEnvironmentVariableRequiredState(Application|Service $resource): void
 {
     $dockerCompose = $resource->docker_compose_raw ?? $resource->docker_compose;
@@ -5388,7 +5419,8 @@ function syncDockerComposeEnvironmentVariableRequiredState(Application|Service $
     }
 
     $environmentVariables->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
-        $isRequired = dockerComposeEnvironmentVariableIsRequired($dockerCompose, $environmentVariable->key);
+        $isRequired = ! $environmentVariable->preservesLegacyComposeNull()
+            && dockerComposeEnvironmentVariableIsRequired($dockerCompose, $environmentVariable->key);
         if ((bool) $environmentVariable->is_required !== $isRequired) {
             $environmentVariable->update(['is_required' => $isRequired]);
         }

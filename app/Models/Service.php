@@ -1619,7 +1619,7 @@ class Service extends BaseModel
         });
         foreach ($sorted as $env) {
             $resolvedValue = $this->resolveSecretManagerDotenvValue($env);
-            if (dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
+            if (! $env->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
                 continue;
             }
             $envs->push("{$env->key}={$resolvedValue}");

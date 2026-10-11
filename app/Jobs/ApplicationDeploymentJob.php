@@ -1883,7 +1883,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function shouldOmitBlankComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool
     {
-        return $this->build_pack === 'dockercompose' && dockerComposeEnvironmentVariableShouldBeUnset(
+        return $this->build_pack === 'dockercompose' && ! $environmentVariable->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset(
             $this->application->docker_compose_raw ?? $this->application->docker_compose,
             $environmentVariable->key,
             $environmentVariable->value

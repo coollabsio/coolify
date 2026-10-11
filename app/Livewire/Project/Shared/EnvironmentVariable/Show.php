@@ -324,6 +324,7 @@ class Show extends Component
             return;
         }
 
+        $this->env->preserve_compose_null = false;
         $this->value = null;
         $this->submit();
     }

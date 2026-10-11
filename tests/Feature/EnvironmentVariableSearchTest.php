@@ -872,3 +872,56 @@ it('authorizes removing a Compose override on the server', function (string $rol
     $component->call('useComposeDefault')->assertForbidden();
     expect($variable->fresh()->value)->toBe('debug');
 })->with(['member', 'other-team']);
+
+it('preserves migrated null Compose assignments through parsing and comment-only saves', function () {
+    $compose = "services:\n  app:\n    image: nginx\n    environment:\n      COLON: \${COLON:-default}\n      DASH: \${DASH-default}\n      REQUIRED_NULL: \${REQUIRED_NULL:?required}\n      PASSTHROUGH:\n";
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => $compose,
+    ]);
+    foreach (['COLON', 'DASH', 'REQUIRED_NULL', 'PASSTHROUGH'] as $key) {
+        $env = $service->environment_variables()->create(['key' => $key, 'value' => null]);
+        $env->forceFill(['preserve_compose_null' => true])->save();
+    }
+
+    $parsed = $service->parse();
+    foreach (['COLON', 'DASH', 'REQUIRED_NULL', 'PASSTHROUGH'] as $key) {
+        $env = $service->environment_variables()->where('key', $key)->firstOrFail();
+        expect(data_get($parsed, 'services.app.environment.'.$key))->toBe('');
+        Livewire::test(Show::class, ['env' => $env, 'type' => 'service'])
+            ->call('loadValues')->set('comment', 'unchanged value')->call('submit');
+        expect($env->fresh()->value)->toBeNull()
+            ->and($env->fresh()->preserve_compose_null)->toBeTrue()
+            ->and($env->fresh()->comment)->toBe('unchanged value');
+    }
+    expect($service->fresh()->docker_compose_raw)->toBe($compose);
+});
+
+it('explicitly releases a migrated null variable to Compose defaults', function () {
+    $compose = "services:\n  app:\n    image: nginx\n    environment:\n      LOG_LEVEL: \${LOG_LEVEL:-info}\n";
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => $compose,
+    ]);
+    $env = $service->environment_variables()->create(['key' => 'LOG_LEVEL', 'value' => null]);
+    $env->forceFill(['preserve_compose_null' => true])->save();
+
+    Livewire::test(Show::class, ['env' => $env, 'type' => 'service'])->call('useComposeDefault');
+
+    expect($env->fresh()->value)->toBeNull()
+        ->and($env->fresh()->preserve_compose_null)->toBeFalse()
+        ->and(data_get($service->parse(), 'services.app.environment.LOG_LEVEL'))->toBe('${LOG_LEVEL:-info}');
+});
+
+it('releases null compatibility after an explicit value edit', function () {
+    $service = Service::factory()->create(['environment_id' => $this->environment->id]);
+    $env = $service->environment_variables()->create(['key' => 'EDITED', 'value' => null]);
+    $env->forceFill(['preserve_compose_null' => true])->save();
+
+    $env->update(['value' => 'configured']);
+    expect($env->fresh()->preserve_compose_null)->toBeFalse();
+    $env->update(['value' => null]);
+    expect($env->fresh()->preserve_compose_null)->toBeFalse();
+});

@@ -73,6 +73,7 @@ class EnvironmentVariable extends BaseModel
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',
+        'preserve_compose_null' => 'boolean',
         'is_multiline' => 'boolean',
         'is_preview' => 'boolean',
         'is_runtime' => 'boolean',
@@ -129,8 +130,16 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
+                $environmentVariable->preserve_compose_null = false;
+            }
             $environmentVariable->updateIsShared();
         });
+    }
+
+    public function preservesLegacyComposeNull(): bool
+    {
+        return $this->preserve_compose_null && $this->value === null;
     }
 
     public function service()

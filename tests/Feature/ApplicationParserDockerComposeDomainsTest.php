@@ -794,3 +794,29 @@ test('applicationParser preserves an existing required value matching the Compos
 
     expect($variable->fresh()->value)->toBe('configured');
 });
+
+it('preserves migrated null assignments separately for production and previews', function (int $pullRequestId) {
+    $compose = "services:\n  app:\n    image: nginx\n    environment:\n      LEGACY: \${LEGACY:-default}\n";
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+    ]);
+    $env = $application->environment_variables()->create(['key' => 'LEGACY', 'value' => null]);
+    $env->forceFill(['preserve_compose_null' => true])->save();
+    $previewEnv = $application->environment_variables_preview()->where('key', 'LEGACY')->firstOrFail();
+    $previewEnv->update(['value' => 'preview-value']);
+    $previewId = $pullRequestId ? ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => $pullRequestId,
+        'pull_request_html_url' => 'https://example.invalid/pull/42',
+    ])->id : null;
+
+    $parsed = applicationParser($application, $pullRequestId, $previewId);
+
+    expect(data_get($parsed, 'services.'.($pullRequestId ? 'app-pr-42' : 'app').'.environment.LEGACY'))
+        ->toBe($pullRequestId ? '${LEGACY:-default}' : '')
+        ->and($application->fresh()->docker_compose_raw)->toBe($compose);
+})->with([0, 42]);
