@@ -3,6 +3,10 @@
         {{ $github_app->name ?: 'GitHub App' }} | Sources | Coolify
     </x-slot>
 
+    @if (session('error'))
+        <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
+    @endif
+
     @if (data_get($github_app, 'app_id'))
         @php
             $githubAppRouteParameters = ['github_app_uuid' => $github_app->uuid];

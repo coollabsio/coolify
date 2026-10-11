@@ -911,6 +911,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -1501,6 +1506,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2093,6 +2103,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -2579,6 +2594,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -3044,6 +3064,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -3755,6 +3780,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -16670,6 +16700,14 @@
                                             "type": "boolean",
                                             "example": false
                                         },
+                                        "traefik_certificate_resolver": {
+                                            "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "example": "letsencrypt"
+                                        },
                                         "configuration": {
                                             "description": "Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.",
                                             "type": [
@@ -16704,7 +16742,7 @@
                     "Servers"
                 ],
                 "summary": "Update server proxy",
-                "description": "Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.",
+                "description": "Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.",
                 "operationId": "update-server-proxy",
                 "parameters": [
                     {
@@ -16735,6 +16773,13 @@
                                     },
                                     "generate_exact_labels": {
                                         "type": "boolean"
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
                                     },
                                     "proxy_type": {
                                         "description": "Proxy type (case-insensitive).",
@@ -16782,6 +16827,12 @@
                                         },
                                         "generate_exact_labels": {
                                             "type": "boolean"
+                                        },
+                                        "traefik_certificate_resolver": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
                                         },
                                         "configuration": {
                                             "type": [
@@ -18014,6 +18065,13 @@
                                     "is_gzip_enabled": {
                                         "type": [
                                             "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for this service application. Null uses the server setting, \"none\" uses no resolver.",
+                                        "type": [
+                                            "string",
                                             "null"
                                         ]
                                     },
@@ -23918,6 +23976,11 @@
                     "is_gzip_enabled": {
                         "type": "boolean"
                     },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver override. Null uses the server setting, \"none\" uses no resolver."
+                    },
                     "is_stripprefix_enabled": {
                         "type": "boolean"
                     },
@@ -24386,6 +24449,11 @@
                             "anonymized",
                             "off"
                         ]
+                    },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates."
                     },
                     "is_reachable": {
                         "type": "boolean"

@@ -607,3 +607,71 @@ test('PATCH /api/v1/applications/{uuid} rejects a non-string container name pref
 
     expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
 });
+
+test('PATCH /api/v1/applications/{uuid} sets the Traefik certificate resolver', function (?string $resolver) {
+    $this->application->settings->update(['traefik_certificate_resolver' => 'previous']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['traefik_certificate_resolver' => $resolver])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->traefik_certificate_resolver)->toBe($resolver);
+})->with([
+    'custom resolver' => ['cloudflare'],
+    'no resolver' => ['none'],
+    'server setting' => [null],
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects an unsafe Traefik certificate resolver', function (mixed $resolver) {
+    $this->application->settings->update(['traefik_certificate_resolver' => 'previous']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['traefik_certificate_resolver' => $resolver])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect($this->application->fresh()->settings->traefik_certificate_resolver)->toBe('previous');
+})->with([
+    'label injection' => ['a.b=c'],
+    'whitespace' => ['lets encrypt'],
+    'non-string' => [['cloudflare']],
+]);
+
+test('application creation accepts a Traefik certificate resolver', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/resolver-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'traefik_certificate_resolver' => 'none',
+        ])
+        ->assertCreated();
+
+    expect(Application::where('uuid', $response->json('uuid'))->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none');
+});
+
+test('application creation rejects an unsafe Traefik certificate resolver', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/resolver-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'traefik_certificate_resolver' => 'a.b=c',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect(Application::query()->where('git_repository', 'like', '%resolver-test%')->exists())->toBeFalse();
+});

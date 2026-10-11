@@ -334,9 +334,10 @@ class StandaloneKeydb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $encodedPass = rawurlencode($this->connectionPassword());
-                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://:{$encodedPass}@{$serverHost}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';

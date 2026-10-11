@@ -76,6 +76,12 @@ class IntegrationToken extends BaseModel
         return $this->provider === 'cloudflare' && data_get($this->metadata, 'automatic_dns', true) !== false;
     }
 
+    /** New Cloudflare records are created proxied (orange cloud) when enabled, so the server IP is not exposed. */
+    public function proxiedDnsEnabled(): bool
+    {
+        return $this->provider === 'cloudflare' && data_get($this->metadata, 'proxied_dns') === true;
+    }
+
     public function dopplerTokenType(): ?string
     {
         if ($this->provider !== 'doppler') {

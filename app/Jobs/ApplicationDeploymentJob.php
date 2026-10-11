@@ -35,6 +35,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
@@ -1376,7 +1377,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Pushing image to docker registry ({$this->production_image_name}).");
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "docker push {$this->production_image_name}"),
+                    executeInDocker($this->deployment_uuid, 'docker push '.escapeshellarg($this->production_image_name)),
                     'hidden' => true,
                 ],
             );
@@ -1385,12 +1386,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry("Tagging and pushing image with {$this->application->docker_registry_image_tag} tag.");
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "docker tag {$this->production_image_name} {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"),
+                        executeInDocker($this->deployment_uuid, 'docker tag '.escapeshellarg($this->production_image_name).' '.escapeshellarg("{$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}")),
                         'ignore_errors' => true,
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, "docker push {$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}"),
+                        executeInDocker($this->deployment_uuid, 'docker push '.escapeshellarg("{$this->application->docker_registry_image_name}:{$this->application->docker_registry_image_tag}")),
                         'ignore_errors' => true,
                         'hidden' => true,
                     ],
@@ -1596,7 +1597,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         ]);
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
             $this->execute_remote_command([
-                "docker pull {$this->production_image_name} 2>/dev/null",
+                'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
                 'ignore_errors' => true,
                 'hidden' => true,
             ]);
@@ -1811,6 +1812,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $envs->push($env->key.'='.$this->resolve_environment_variable($env));
             }
 
@@ -1878,6 +1883,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables_preview as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $envs->push($env->key.'='.$this->resolve_environment_variable($env));
             }
 
@@ -1892,6 +1901,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     return $env->is_runtime && ! in_array($env->key, $previewKeys);
                 });
                 foreach ($fallback_production_vars as $env) {
+                    if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                        continue;
+                    }
+
                     $envs->push($env->key.'='.$this->resolve_environment_variable($env));
                 }
             }
@@ -1919,6 +1932,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $key->startsWith('SERVICE_FQDN_')
             || $key->startsWith('SERVICE_URL_')
             || $key->startsWith('SERVICE_NAME_');
+    }
+
+    private function shouldOmitBlankComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool
+    {
+        return $this->build_pack === 'dockercompose' && ! $environmentVariable->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset(
+            $this->application->docker_compose_raw ?? $this->application->docker_compose,
+            $environmentVariable->key,
+            $environmentVariable->value
+        );
     }
 
     private function save_runtime_environment_variables()
@@ -2172,6 +2194,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
                     continue;
                 }
@@ -2230,6 +2256,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
                     continue;
                 }
@@ -3527,7 +3557,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $environmentPrefix = $this->railpack_build_environment_prefix($controlVariables);
         $secretFlags = $this->railpack_build_secret_flags($variables);
-        $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version');
+        // The helper image sets RAILPACK_VERSION, so the frontend always matches the Railpack CLI in the helper.
+        // Helper images without it fall back to the version of the Railpack CLI itself.
+        $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v${RAILPACK_VERSION:-$(railpack --version | cut -d " " -f 3)}';
 
         $buildxBuildCommand = "{$environmentPrefix}DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack"
             ." {$this->addHosts} --network host"
@@ -3939,6 +3971,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $resolvedValue = $this->uses_remote_secret_references($env)
                     ? $this->resolve_environment_variable_raw($env)
                     : $env->getResolvedValueWithServer($this->mainServer);
@@ -3957,6 +3993,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $resolvedValue = $this->uses_remote_secret_references($env)
                     ? $this->resolve_environment_variable_raw($env)
                     : $env->getResolvedValueWithServer($this->mainServer);
@@ -3992,6 +4032,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         $labels = $this->useDestinationNetworkInCaddyLabels($labels);
+        $labels = traefikHostRulesWithoutIpv6Brackets($labels);
         if ($this->application->settings->is_container_label_escape_enabled) {
             $labels = $labels->map(function ($value, $key) {
                 return escapeDollarSign($value);
@@ -4293,7 +4334,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $method = $this->sanitizeHealthCheckValue($this->application->health_check_method, '/^[A-Z]+$/', 'GET');
         $scheme = $this->sanitizeHealthCheckValue($this->application->health_check_scheme, '/^https?$/', 'http');
-        $host = $this->sanitizeHealthCheckValue($this->application->health_check_host, '/^[a-zA-Z0-9.\-_]+$/', 'localhost');
+        $host = ValidationPatterns::isValidHealthCheckHost($this->application->health_check_host)
+            ? formatHostForUrl($this->application->health_check_host)
+            : 'localhost';
         $path = $this->application->health_check_path
             ? $this->sanitizeHealthCheckValue($this->application->health_check_path, '#^[a-zA-Z0-9/\-_.~%,;]+$#', '/')
             : null;
@@ -6014,7 +6057,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $errorClass = get_class($exception);
 
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
-        if ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
+        if ($exception instanceof TimeoutExceededException) {
+            $this->application_deployment_queue->addLogEntry("Deployment failed: Timeout of {$this->timeout} seconds exceeded. Increase the deployment timeout in the Server settings (Advanced > Builds).", 'stderr');
+        } elseif ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
             $this->application_deployment_queue->addLogEntry('Deployment failed.', 'stderr');
         } else {
             $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');

@@ -889,7 +889,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
 
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
 
             $this->s3_uploaded = true;

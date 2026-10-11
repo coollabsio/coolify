@@ -128,3 +128,24 @@ it('reports whether the running version has reached the target', function (strin
     'missing running version' => ['', '4.3.1', false],
     'missing target version' => ['4.3.1', '', false],
 ]);
+
+it('detects a running upgrade only for recent intermediate steps', function (string $step, int $minutesAgo, bool $expected) {
+    $now = Carbon::parse('2026-08-13T12:00:00+00:00');
+    $content = "{$step}|Some message|".$now->copy()->subMinutes($minutesAgo)->toIso8601String();
+
+    expect(CoolifyUpgradeStatus::isRunning($content, $now))->toBe($expected);
+})->with([
+    'recent step 1' => ['1', 0, true],
+    'step 5 at lock expiry' => ['5', 15, true],
+    'step 3 after lock expiry' => ['3', 16, false],
+    'complete' => ['6', 1, false],
+    'error' => ['error', 1, false],
+]);
+
+it('does not detect a running upgrade for empty or malformed status', function (string $content) {
+    expect(CoolifyUpgradeStatus::isRunning($content))->toBeFalse();
+})->with([
+    'empty' => '',
+    'missing fields' => '3|Pulling Docker images',
+    'invalid timestamp' => '3|Pulling Docker images|not-a-date',
+]);

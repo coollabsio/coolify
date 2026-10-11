@@ -170,6 +170,28 @@ YAML);
     expect($application->environment_variables()->where('key', 'SHARED_NETWORK')->exists())->toBeFalse();
 });
 
+test('required network name variables are created without their error message as value', function () {
+    $application = makeComposeApplicationWithNetworks(<<<'YAML'
+  shared:
+    external: true
+    name: ${SHARED_NETWORK?error}
+  other:
+    name: ${OTHER_NETWORK:+other-network}
+  plain:
+    name: plain-network
+YAML);
+
+    $application->parse();
+
+    $variables = $application->environment_variables()->get()->keyBy('key');
+
+    expect($variables->has('SHARED_NETWORK'))->toBeTrue()
+        ->and((string) $variables->get('SHARED_NETWORK')->value)->toBe('')
+        ->and($variables->has('OTHER_NETWORK'))->toBeTrue()
+        ->and((string) $variables->get('OTHER_NETWORK')->value)->toBe('')
+        ->and($application->fresh()->docker_compose)->toContain('${SHARED_NETWORK?error}');
+});
+
 test('the deployment .env of a compose application contains the network name variable', function () {
     $application = makeComposeApplicationWithNetworks(<<<'YAML'
   shared:

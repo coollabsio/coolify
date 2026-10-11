@@ -733,6 +733,7 @@ class ServerTransferExporter
             'is_include_timestamps' => (bool) ($app->is_include_timestamps ?? false),
             'is_gzip_enabled' => (bool) ($app->is_gzip_enabled ?? true),
             'is_stripprefix_enabled' => (bool) ($app->is_stripprefix_enabled ?? true),
+            'traefik_certificate_resolver' => $app->traefik_certificate_resolver ?? null,
             'environment_variables' => method_exists($app, 'environment_variables')
                 ? $this->exportEnvVars($app->environment_variables()->get())
                 : [],

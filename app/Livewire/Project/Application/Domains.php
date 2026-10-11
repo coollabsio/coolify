@@ -2064,7 +2064,7 @@ class Domains extends Component
         $lowerHost = strtolower($host);
 
         // Always skip bare IPs and localhost.
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
             return null;
         }
 
