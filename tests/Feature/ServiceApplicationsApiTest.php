@@ -290,6 +290,38 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
         'text' => 'unlimited',
     ]);
 
+    test('updates the traefik certificate resolver', function (?string $initial, ?string $value) {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update(['traefik_certificate_resolver' => $initial]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'traefik_certificate_resolver' => $value,
+        ])->assertSuccessful()
+            ->assertJsonPath('traefik_certificate_resolver', $value);
+
+        expect($ctx->serviceApplication->fresh()->traefik_certificate_resolver)->toBe($value);
+    })->with([
+        'custom resolver' => [null, 'cloudflare'],
+        'no resolver' => [null, 'none'],
+        'server setting' => ['cloudflare', null],
+    ]);
+
+    test('rejects an invalid traefik certificate resolver', function () {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update(['traefik_certificate_resolver' => 'cloudflare']);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'traefik_certificate_resolver' => 'a.b=c',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+        expect($ctx->serviceApplication->fresh()->traefik_certificate_resolver)->toBe('cloudflare');
+    });
+
     test('returns 422 for invalid url scheme', function () {
         $ctx = createServiceWithApplicationForApiTest($this);
 

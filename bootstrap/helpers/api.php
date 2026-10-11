@@ -8,6 +8,7 @@ use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\ServerSetting;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
@@ -204,6 +205,7 @@ function sharedDataApplications(?Application $application = null): array
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
+        'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
         'is_raw_compose_deployment_enabled' => 'boolean',
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
@@ -476,6 +478,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');
+    $request->offsetUnset('traefik_certificate_resolver');
     $request->offsetUnset('is_raw_compose_deployment_enabled');
     $request->offsetUnset('is_log_drain_enabled');
     $request->offsetUnset('is_gpu_enabled');

@@ -77,6 +77,11 @@ class ServerSetting extends Model
      */
     public const string TRAEFIK_CERTIFICATE_RESOLVER_PATTERN = '/^[A-Za-z0-9_-]+$/';
 
+    /**
+     * Resolver value that turns the resolver off (no certresolver label) on a resource or server.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_NONE = 'none';
+
     public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
 
     public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;

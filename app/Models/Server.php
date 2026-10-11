@@ -1163,12 +1163,13 @@ $siteAddress {
 
     /**
      * Traefik certificate resolver for generated HTTPS routers, or null when the proxy uses its own certificates.
+     * A resource value overrides the server value; "none" turns the resolver off.
      */
-    public function traefikCertificateResolver(): ?string
+    public function traefikCertificateResolver(?string $resourceResolver = null): ?string
     {
-        $resolver = data_get($this, 'settings.traefik_certificate_resolver');
+        $resolver = filled($resourceResolver) ? $resourceResolver : data_get($this, 'settings.traefik_certificate_resolver');
 
-        return filled($resolver) ? $resolver : null;
+        return filled($resolver) && $resolver !== ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE ? $resolver : null;
     }
 
     public function isTrafficAnalyticsEnabled(): bool
