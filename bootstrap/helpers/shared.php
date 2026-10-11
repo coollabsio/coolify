@@ -3488,7 +3488,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection,
                                         domainPortOverrides: $domainPortOverrides,
-                                        certificate_resolver: $resource->server->traefikCertificateResolver(),
+                                        certificate_resolver: $resource->server->traefikCertificateResolver(data_get($savedService, 'traefik_certificate_resolver')),
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -3526,7 +3526,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection,
                                 domainPortOverrides: $domainPortOverrides,
-                                certificate_resolver: $resource->server->traefikCertificateResolver(),
+                                certificate_resolver: $resource->server->traefikCertificateResolver(data_get($savedService, 'traefik_certificate_resolver')),
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -4301,7 +4301,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
-                                            certificate_resolver: $server->traefikCertificateResolver(),
+                                            certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
                                         )
                                     );
                                     break;
@@ -4342,7 +4342,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,
-                                    certificate_resolver: $server->traefikCertificateResolver(),
+                                    certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
