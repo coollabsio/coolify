@@ -1618,6 +1618,9 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
+            if (! $env->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
+                continue;
+            }
             $envs->push($this->composeEnvironmentFileLine($env));
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));

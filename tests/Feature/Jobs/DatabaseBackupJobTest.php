@@ -330,7 +330,7 @@ test('database backup job escapes the S3 copy destination argument', function ()
     $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
 
     expect($source)->toContain('$escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");')
-        ->and($source)->toContain('mc cp {$escapedBackupLocation} {$escapedS3Destination}')
+        ->and($source)->toContain('mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}')
         ->and($source)->not->toContain('mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/');
 });
 

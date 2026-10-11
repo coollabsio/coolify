@@ -1781,3 +1781,36 @@ it('keeps dollars literal in runtime JSON values', function () {
 
     expect($runtimeEnvs)->toContain('JSON_CONFIG='.escapeComposeEnvFileValue('{"price":"$5"}'));
 });
+it('omits only unset Compose overrides from production and preview runtime files', function (int $pullRequestId) {
+    Server::flushIdentityMap();
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      INHERITED: \${INHERITED:-info}\n      EMPTY: \${EMPTY-default}\n",
+    ]);
+    $application->update(['docker_compose' => $application->docker_compose_raw]);
+    foreach (['INHERITED' => null, 'EMPTY' => ''] as $key => $value) {
+        createApplicationEnvironmentVariable($application, ['key' => $key, 'value' => $value]);
+        $application->environment_variables_preview()->where('key', $key)->firstOrFail()->update(['value' => $value]);
+    }
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['pull_request_id' => $pullRequestId]);
+    $variables = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($variables->contains(fn (string $line) => str_starts_with($line, 'INHERITED=')))->toBeFalse()
+        ->and($variables->contains('EMPTY='.escapeComposeEnvFileValue('')))->toBeTrue();
+})->with([0, 42]);
+
+it('includes migrated null Compose overrides in production and preview runtime files', function (int $pullRequestId) {
+    Server::flushIdentityMap();
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      LEGACY: \${LEGACY:-info}\n",
+    ]);
+    $application->update(['docker_compose' => $application->docker_compose_raw]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LEGACY', 'value' => null]);
+    foreach ([$application->environment_variables(), $application->environment_variables_preview()] as $relation) {
+        $relation->where('key', 'LEGACY')->firstOrFail()->forceFill(['preserve_compose_null' => true])->save();
+    }
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['pull_request_id' => $pullRequestId]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables')->contains('LEGACY='.escapeComposeEnvFileValue('')))->toBeTrue();
+})->with([0, 42]);

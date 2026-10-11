@@ -394,6 +394,18 @@ it('copies the parent domain port override onto a generated preview domain', fun
         ->toBe([8080]);
 });
 
+it('uses the preview url template scheme instead of the parent scheme', function (string $template, string $expected) {
+    $this->application->update(['preview_url_template' => $template]);
+
+    $preview = createPreviewForPortTests($this->application, 2163);
+
+    expect($preview->generatedPreviewDomain('http://app.example.com/api')['url'])->toBe($expected);
+})->with([
+    'explicit https' => ['https://{{pr_id}}.preview.example.com', 'https://2163.preview.example.com/api'],
+    'explicit uppercase https' => ['HTTPS://{{pr_id}}.preview.example.com', 'https://2163.preview.example.com/api'],
+    'scheme-less inherits parent' => ['{{pr_id}}.preview.example.com', 'http://2163.preview.example.com/api'],
+]);
+
 it('keeps every generated preview domain port override in the legacy compose parser', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Models\StandaloneClickhouse;
 use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -36,6 +37,7 @@ class StartClickhouse
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
 
@@ -178,15 +180,15 @@ class StartClickhouse
             }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_USER'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'CLICKHOUSE_USER')) {
             $environment_variables->push("CLICKHOUSE_USER={$this->database->clickhouse_admin_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'CLICKHOUSE_PASSWORD')) {
             $environment_variables->push("CLICKHOUSE_PASSWORD={$this->database->clickhouse_admin_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_DB'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'CLICKHOUSE_DB')) {
             $environment_variables->push("CLICKHOUSE_DB={$this->database->clickhouse_db}");
         }
 

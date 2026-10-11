@@ -161,7 +161,7 @@ class CleanupDocker implements ShouldBeUnique
         );
 
         $commands = [
-            'docker container prune -f --filter "label=coolify.managed=true" --filter "label!=coolify.proxy=true" --filter "label!=coolify.type=database" --filter "label!=coolify.type=application" --filter "label!=coolify.type=service"',
+            $this->buildContainerPruneCommand(),
             $imagePruneCmd,
             'docker builder prune -af',
             "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImageWithVersion} docker buildx prune --builder coolify-railpack -af 2>/dev/null || true",
@@ -205,6 +205,20 @@ class CleanupDocker implements ShouldBeUnique
         }
 
         return instant_remote_process([$command], $server, false, timeout: $remaining);
+    }
+
+    /**
+     * Build a command that removes stopped Coolify containers, except the proxy and the
+     * containers of databases, applications and services.
+     *
+     * docker container prune only excludes a container that matches all of its label!= filters
+     * together, so we list the stopped containers and filter them by label in the shell.
+     */
+    private function buildContainerPruneCommand(): string
+    {
+        return "docker ps -a --filter status=created --filter status=exited --filter status=dead --filter label=coolify.managed=true --format '{{.ID}} coolify.proxy={{.Label \"coolify.proxy\"}} coolify.type={{.Label \"coolify.type\"}}' | ".
+            "grep -v -E 'coolify\.proxy=true |coolify\.type=(database|application|service)$' | ".
+            "awk '{print $1}' | xargs -r docker rm";
     }
 
     /**

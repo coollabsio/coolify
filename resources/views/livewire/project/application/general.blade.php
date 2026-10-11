@@ -109,7 +109,7 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="buildPack" label="Build strategy" live :options="[
                             ['value' => 'railpack', 'label' => 'Railpack'],
-                            ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                            ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Compose'],
@@ -121,6 +121,9 @@
                             ]" x-bind:disabled="!canUpdate" />
                         @endif
                     </div>
+                    @if ($buildPack === 'nixpacks')
+                        <x-nixpacks-deprecated-callout class="mt-4" />
+                    @endif
                 </div>
             @endif
             @if ($application->could_set_build_commands() || ($isStatic && $buildPack !== 'static'))

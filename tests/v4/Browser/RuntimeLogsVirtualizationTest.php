@@ -124,3 +124,23 @@ it('streams only new lines and appends them to the loaded log', function () {
 
     $page->screenshot(filename: 'runtime-logs-virtualized-stream');
 });
+
+it('falls back to the default level filters when the saved filters are invalid', function () {
+    $page = visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertSee('Dashboard');
+
+    $page->script('localStorage.setItem("coolify-log-filters", "{")');
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->assertSee('log line 00001');
+
+    // A valid saved preference is still applied.
+    $page->script('localStorage.setItem("coolify-log-filters", JSON.stringify({ info: false }))');
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->wait(1)
+        ->assertDontSee('log line 00001');
+
+    $page->screenshot(filename: 'runtime-logs-invalid-saved-filters');
+});

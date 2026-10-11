@@ -6,6 +6,7 @@ use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Rules\SafeExternalUrl;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -28,6 +29,8 @@ class Proxy extends Component
 
     public bool $generateExactLabels = false;
 
+    public ?string $certificateResolver = null;
+
     /**
      * Cache the versions.json file data in memory for this component instance.
      * This avoids multiple file reads during a single request/render cycle.
@@ -49,6 +52,7 @@ class Proxy extends Component
         return [
             'generateExactLabels' => 'required|boolean',
             'redirectUrl' => ['nullable', new SafeExternalUrl],
+            'certificateResolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
         ];
     }
 
@@ -65,8 +69,10 @@ class Proxy extends Component
     {
         if ($toModel) {
             $this->server->settings->generate_exact_labels = $this->generateExactLabels;
+            $this->server->settings->traefik_certificate_resolver = $this->certificateResolver ?: null;
         } else {
             $this->generateExactLabels = $this->server->settings->generate_exact_labels ?? false;
+            $this->certificateResolver = $this->server->settings->traefik_certificate_resolver;
         }
     }
 
@@ -162,13 +168,24 @@ class Proxy extends Component
         try {
             $this->authorize('update', $this->server);
             $this->validate();
-            $this->syncData(true);
-            $changedFields = auditChangedFields($this->server->settings);
-            $this->server->settings->save();
-            $this->auditProxyUpdate($changedFields);
+            $this->saveSettings();
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function saveSettings(): void
+    {
+        $this->syncData(true);
+        $changedFields = auditChangedFields($this->server->settings);
+        $this->server->settings->save();
+        $this->auditProxyUpdate($changedFields);
+
+        // Coolify's own dashboard and catch-all routes use the resolver too.
+        if (in_array('traefik_certificate_resolver', $changedFields, true)) {
+            $this->server->setupDynamicProxyConfiguration();
+            $this->server->setupDefaultRedirect();
         }
     }
 
@@ -195,6 +212,7 @@ class Proxy extends Component
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->save();
+            $this->saveSettings();
             auditLog('ui.server.proxy.configuration_saved', $this->proxyAuditContext());
             $this->server->setupDefaultRedirect();
             $this->dispatch('refreshServerShow');
