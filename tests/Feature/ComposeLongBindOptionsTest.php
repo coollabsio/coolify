@@ -65,7 +65,7 @@ YAML;
 /**
  * Parses the Compose file as a Service or a Compose Application, twice like a second save.
  *
- * @return array{volume: mixed, storages: Collection, directory: string}
+ * @return array{volume: mixed, volumes: array<int, mixed>, storages: Collection, directory: string}
  */
 function parseLongBind(string $kind, string $compose): array
 {
@@ -97,6 +97,7 @@ function parseLongBind(string $kind, string $compose): array
 
     return [
         'volume' => $parsed['services']['probe']['volumes'][0],
+        'volumes' => $parsed['services']['probe']['volumes'],
         'storages' => $owner->fileStorages()->where('mount_path', '/fixture')->get(),
         'directory' => $directory,
     ];
@@ -154,4 +155,28 @@ it('removes the storage that an earlier save created when a bind keeps its missi
     $kind === 'service' ? serviceParser($resource->fresh()) : applicationParser($resource->fresh());
 
     expect($owner->fileStorages()->where('mount_path', '/fixture')->exists())->toBeFalse();
+})->with(['service', 'application']);
+
+it('does not give a long-form bind the mode of an earlier short-syntax volume', function (string $kind) {
+    $result = parseLongBind($kind, <<<'YAML'
+services:
+  probe:
+    image: alpine:3.22
+    volumes:
+      - 'database_data:/backup/data:ro'
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - type: bind
+        source: /var/backups
+        target: /archive
+        read_only: false
+YAML);
+
+    expect($result['volumes'][1])->toBe('/var/run/docker.sock:/var/run/docker.sock:ro')
+        ->and($result['volumes'][2])->toBe([
+            'type' => 'bind',
+            'source' => '/var/backups',
+            'target' => '/archive',
+            'read_only' => false,
+            'bind' => ['create_host_path' => true],
+        ]);
 })->with(['service', 'application']);
