@@ -1334,18 +1334,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 continue;
             }
+            /** The repository copy already put the Git file or directory at this path; do not delete or write it. */
+            $fileStorage->pending_initialization = false;
             $fileStorage->save();
-            try {
-                $fileStorage->deleteStorageOnServer($this->mainServer, $composeFileName, $projectDirectory, $envFile);
-            } catch (Throwable $e) {
-                $this->logStorageWarning($fileStorage, $e->getMessage());
-
-                continue;
-            }
-            $error = $fileStorage->initializeOnServer($composeFileName, $projectDirectory, $envFile, $this->mainServer);
-            if ($error !== null) {
-                $this->logStorageWarning($fileStorage, $error);
-            }
         }
     }
 

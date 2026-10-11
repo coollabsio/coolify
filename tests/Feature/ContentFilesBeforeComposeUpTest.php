@@ -435,6 +435,7 @@ test('the content file check and write are safe for non-root servers', function 
 
     runComposeStart($this, ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
 
+    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     expect(contentFilesStateChecks())->not->toBeEmpty()
         ->and(contentFilesStateChecks()[0])->toContain("sudo bash -c 'sh -c ");
@@ -553,6 +554,7 @@ test('the storage save job replaces an empty directory with the content file', f
 
     (new ServerStorageSaveJob($volume))->handle();
 
+    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     Process::assertRan(fn ($process) => str_contains($process->command, "rmdir {$escapedPath}")
         && str_contains($process->command, base64_encode(CONTENT_FILES_UP_CONTENT))
@@ -624,3 +626,26 @@ test('starting a service runs its commands on the deployment queue', function (b
     'cloud' => [false, 'deployments'],
     'self-hosted' => [true, 'high'],
 ]);
+
+test('a preserve-repository deployment keeps a Git file that a new storage mounts', function () {
+    $this->application->settings()->update(['is_preserve_repository_enabled' => true]);
+    $volume = contentFilesVolume($this->application, 'config/from-git.conf', ['content' => null, 'is_directory' => true]);
+    $volume->forceFill(['pending_initialization' => true])->saveQuietly();
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+
+    runComposeStart($this, [
+        'preserveRepository' => true,
+        'saved_outputs' => collect(['file_stat_'.$volume->id => 'regular file']),
+    ]);
+
+    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
+    $escapedPath = escapeshellarg($volume->fs_path);
+    $changesGitFile = fn (string $command) => str_contains($command, "rm -rf {$escapedPath}")
+        || str_contains($command, "touch {$escapedPath}")
+        || str_contains($command, "tee {$escapedPath}");
+    expect(array_filter(ContentFilesUpRecorder::ssh(), $changesGitFile))->toBeEmpty();
+    $volume = $volume->fresh();
+    expect($volume->is_directory)->toBeFalse()
+        ->and((bool) $volume->is_based_on_git)->toBeTrue()
+        ->and($volume->pending_initialization)->toBeFalse();
+});
