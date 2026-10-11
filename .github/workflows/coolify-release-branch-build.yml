@@ -1,0 +1,144 @@
+name: Build Coolify Release Branch
+
+on:
+  push:
+    branches: ["release/v*"]
+    paths-ignore:
+      - .github/workflows/coolify-helper.yml
+      - .github/workflows/coolify-helper-next.yml
+      - .github/workflows/pr-quality.yaml
+      - docker/coolify-helper/Dockerfile
+      - docker/testing-host/Dockerfile
+      - templates/**
+      - CHANGELOG.md
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: coolify-release-branch-build-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  DOCKER_REGISTRY: docker.io
+  IMAGE_NAME: coollabsio/coolify
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      dev_version: ${{ steps.version.outputs.dev_version }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve version from branch name
+        id: version
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if [[ ! "${BRANCH}" =~ ^release/v([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Invalid release branch: ${BRANCH}. Expected release/vX.Y, such as release/v4.5."
+            exit 1
+          fi
+
+          DEV_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}-dev"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "dev_version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${DEV_VERSION}.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push release branch image (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            COOLIFY_VERSION=${{ needs.prepare.outputs.version }}
+          tags: |
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        registry: [ghcr.io, docker.io]
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        if: matrix.registry == 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        if: matrix.registry == 'docker.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish release branch manifest on ${{ matrix.registry }}
+        env:
+          REGISTRY: ${{ matrix.registry }}
+          DEV_VERSION: ${{ needs.prepare.outputs.dev_version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          docker buildx imagetools create \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-aarch64" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:${DEV_VERSION}"
+
+  notify:
+    needs: [prepare, build, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
+          status: ${{ contains(needs.*.result, 'failure') && 'failure' || (contains(needs.*.result, 'cancelled') && 'cancelled' || 'success') }}

@@ -8,6 +8,7 @@ use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\ServerSetting;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
@@ -204,6 +205,7 @@ function sharedDataApplications(?Application $application = null): array
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
+        'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
         'is_raw_compose_deployment_enabled' => 'boolean',
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
@@ -239,7 +241,11 @@ function sharedDataApplications(?Application $application = null): array
         'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
         'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
         'health_check_port' => 'integer|nullable|min:1|max:65535',
-        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_host' => ['string', function (string $attribute, mixed $value, Closure $fail): void {
+            if (! ValidationPatterns::isValidHealthCheckHost($value)) {
+                $fail('The health check host must be a hostname or an IP address.');
+            }
+        }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
         'health_check_scheme' => 'string|in:http,https',
@@ -472,6 +478,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');
+    $request->offsetUnset('traefik_certificate_resolver');
     $request->offsetUnset('is_raw_compose_deployment_enabled');
     $request->offsetUnset('is_log_drain_enabled');
     $request->offsetUnset('is_gpu_enabled');

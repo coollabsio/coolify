@@ -57,7 +57,7 @@
                         <x-forms.input id="branch" required label="Branch" />
                         <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
                             ['value' => 'railpack', 'label' => 'Railpack'],
-                            ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                            ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Docker Compose'],
@@ -75,6 +75,10 @@
                             <x-forms.input id="publish_directory" required label="Publish directory" />
                         @endif
                     </div>
+
+                    @if ($build_pack === 'nixpacks')
+                        <x-nixpacks-deprecated-callout />
+                    @endif
 
                     @if ($build_pack === 'dockercompose')
                         <div x-data="{

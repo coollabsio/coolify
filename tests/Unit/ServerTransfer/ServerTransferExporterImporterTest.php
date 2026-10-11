@@ -1013,3 +1013,41 @@ test('export warns about secret manager links without exporting the integration 
 
     expect($result['warnings'])->toContain($warning);
 });
+
+test('transfer keeps the Traefik certificate resolver of applications and service applications', function () {
+    $this->application->settings->update(['traefik_certificate_resolver' => 'none']);
+    $serviceApp = new ServiceApplication;
+    $serviceApp->forceFill([
+        'service_id' => $this->service->id,
+        'name' => 'whoami',
+        'fqdn' => 'https://whoami.example.com',
+        'image' => 'traefik/whoami:latest',
+        'traefik_certificate_resolver' => 'cloudflare',
+        'status' => 'running:healthy',
+    ]);
+    $serviceApp->uuid = 'svc-app-resolver';
+    $serviceApp->save();
+    $originalAppUuid = $this->application->uuid;
+
+    $bundle = $this->exporter->export($this->server);
+
+    ServiceApplication::withoutEvents(function () {
+        ServiceApplication::withTrashed()->get()->each->forceDelete();
+    });
+    DB::table('environment_variables')->delete();
+    DB::table('local_persistent_volumes')->delete();
+    DB::table('scheduled_database_backups')->delete();
+    DB::table('scheduled_tasks')->delete();
+    DB::table('services')->delete();
+    DB::table('applications')->delete();
+    DB::table('standalone_postgresqls')->delete();
+    DB::table('standalone_dockers')->delete();
+    DB::table('servers')->delete();
+    $this->privateKey->delete();
+    Tag::query()->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none')
+        ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
+});

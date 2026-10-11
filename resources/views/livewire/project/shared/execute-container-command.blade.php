@@ -33,10 +33,6 @@
         $consoleThemeKeys = collect($consoleThemes)->pluck('key')->values();
         $consoleThemeNames = collect($consoleThemes)->pluck('name', 'key');
         $consoleThemeAccents = collect($consoleThemes)->pluck('accent', 'key');
-        $containerOptions = $containers->map(fn ($container) => [
-            'value' => data_get($container, 'server.uuid').':'.data_get($container, 'container.Names'),
-            'label' => data_get($container, 'container.Names').' · '.data_get($container, 'server.name'),
-        ])->values();
     @endphp
 
     @if (in_array($type, ['application', 'database', 'service', 'server'], true))
@@ -78,7 +74,7 @@
                 containerOpen: false,
                 targetChosen: @js($selected_container !== 'default'),
                 selectedContainer: @entangle('selected_container').live,
-                containerOptions: @js($containerOptions),
+                containerOptions: @entangle('containerOptions'),
                 init() {
                     const savedTheme = localStorage.getItem('coolify-console-theme');
                     this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';

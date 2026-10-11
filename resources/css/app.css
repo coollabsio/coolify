@@ -2317,7 +2317,7 @@ html[data-theme="custom"] textarea:disabled {
     gap: 0.5rem;
     width: 100%;
     min-width: 0;
-    height: 2.25rem;
+    height: 2rem;
     padding: 0 0.625rem 0 0.75rem;
     overflow: hidden;
     border-radius: 8px;
