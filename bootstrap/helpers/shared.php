@@ -3488,6 +3488,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection,
                                         domainPortOverrides: $domainPortOverrides,
+                                        certificate_resolver: $resource->server->traefikCertificateResolver(),
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -3525,6 +3526,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection,
                                 domainPortOverrides: $domainPortOverrides,
+                                certificate_resolver: $resource->server->traefikCertificateResolver(),
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -4299,6 +4301,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
+                                            certificate_resolver: $server->traefikCertificateResolver(),
                                         )
                                     );
                                     break;
@@ -4339,6 +4342,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,
+                                    certificate_resolver: $server->traefikCertificateResolver(),
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
