@@ -18,6 +18,7 @@ use Symfony\Component\Yaml\Yaml;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     InstanceSettings::forceCreate(['id' => 0]);
 
     $this->user = User::factory()->create();
@@ -450,7 +451,7 @@ YAML,
         ->and($row['environmentVariable']['references'])->toBe([]);
 });
 
-it('does not use a required Compose expression message as its value', function () {
+it('preserves required Compose prefills for service template compatibility', function () {
     $dockerCompose = <<<'YAML'
 services:
   app:
@@ -468,7 +469,7 @@ YAML;
     $parsedCompose = $service->parse();
     $environmentVariable = $service->environment_variables()->where('key', 'API_TOKEN')->firstOrFail();
 
-    expect($environmentVariable->value)->toBeNull()
+    expect($environmentVariable->value)->toBe('API_TOKEN must be set')
         ->and((bool) $environmentVariable->is_required)->toBeTrue()
         ->and(data_get($parsedCompose, 'services.app.environment.API_TOKEN'))->toBe('${API_TOKEN:?API_TOKEN must be set}')
         ->and(Yaml::parse($service->fresh()->docker_compose_raw))->toBe(Yaml::parse($dockerCompose));
@@ -592,7 +593,7 @@ YAML;
         ->and(Yaml::parse($service->fresh()->docker_compose_raw))->toBe(Yaml::parse($storedDockerCompose));
 });
 
-it('presents a Compose fallback as a placeholder and restores it when cleared', function () {
+it('preserves explicit empty values and removes overrides only on request', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
         'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
@@ -616,13 +617,16 @@ it('presents a Compose fallback as a placeholder and restores it when cleared', 
         ],
     ])->call('loadValues');
 
-    $component->assertSet('value', null)
+    $component->assertSet('value', 'info')
         ->set('value', 'debug')
         ->call('submit')
-        ->set('value', null)
+        ->set('value', '')
         ->call('submit');
 
-    expect($environmentVariable->fresh()->value)->toBe('info');
+    expect($environmentVariable->fresh()->value)->toBe('');
+
+    $component->call('useComposeDefault');
+    expect($environmentVariable->fresh()->value)->toBeNull();
 });
 
 it('searches service environment variables without requiring preview variables', function () {
@@ -809,3 +813,62 @@ it('hides the preview section when search filters out all preview variables', fu
         ->toBe(['API_KEY'])
         ->and($component->instance()->environmentVariablesPreview)->toHaveCount(0);
 });
+
+it('keeps a required stored value when saving only a comment', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      LEVEL: \${LEVEL:-info}\n      CHECK: \${LEVEL:?required}\n",
+    ]);
+    $variable = $service->environment_variables()->create(['key' => 'LEVEL', 'value' => 'info', 'is_required' => true]);
+    $component = Livewire::test(Show::class, [
+        'env' => $variable,
+        'type' => 'service',
+        'composeInfo' => dockerComposeEnvironmentVariableInfo($service->docker_compose_raw, 'LEVEL'),
+    ])->call('loadValues')->set('comment', 'Keep this value')->call('submit');
+
+    expect($variable->fresh()->value)->toBe('info')
+        ->and($variable->fresh()->comment)->toBe('Keep this value');
+    $component->call('useComposeDefault');
+    expect($variable->fresh()->value)->toBe('info');
+});
+
+it('preserves existing required service template values on repeated parses', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => "services:\n  app:\n    image: alpine\n    environment:\n      TZ: \${TZ:?UTC}\n",
+    ]);
+    $variable = $service->environment_variables()->create(['key' => 'TZ', 'value' => 'UTC']);
+    $service->parse();
+    $service->parse();
+    expect($variable->fresh()->value)->toBe('UTC');
+});
+
+it('prefills required service template values without saving fallback overrides', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => "services:\n  app:\n    image: alpine\n    environment:\n      TZ: \${TZ:?UTC}\n      LEVEL: \${LEVEL:-info}\n  worker:\n    image: alpine\n    environment:\n      LEVEL: \${LEVEL:-warn}\n",
+    ]);
+    $service->parse();
+    expect($service->environment_variables()->where('key', 'TZ')->firstOrFail()->value)->toBe('UTC')
+        ->and($service->environment_variables()->where('key', 'LEVEL')->firstOrFail()->value)->toBeNull();
+});
+
+it('authorizes removing a Compose override on the server', function (string $role) {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      LEVEL: \${LEVEL:-info}\n",
+    ]);
+    $variable = $service->environment_variables()->create(['key' => 'LEVEL', 'value' => 'debug']);
+    $component = Livewire::test(Show::class, ['env' => $variable, 'type' => 'service']);
+    $user = User::factory()->create();
+    if ($role === 'member') {
+        $this->team->members()->attach($user, ['role' => 'member']);
+    }
+    $this->actingAs($user);
+    $component->call('useComposeDefault')->assertForbidden();
+    expect($variable->fresh()->value)->toBe('debug');
+})->with(['member', 'other-team']);

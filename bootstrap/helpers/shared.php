@@ -5364,9 +5364,9 @@ function dockerComposeEnvironmentVariableIsRequired(?string $dockerCompose, stri
     return preg_match('/(?<!\$)\$\{'.$key.'(?::\?|\?)/', $dockerCompose) === 1;
 }
 
-function dockerComposeEnvironmentVariableRequiresUnsetWhenBlank(?string $dockerCompose, string $key): bool
+function dockerComposeEnvironmentVariableShouldBeUnset(?string $dockerCompose, string $key, ?string $value): bool
 {
-    if (blank($dockerCompose)) {
+    if ($value !== null || blank($dockerCompose)) {
         return false;
     }
 
@@ -5375,9 +5375,7 @@ function dockerComposeEnvironmentVariableRequiresUnsetWhenBlank(?string $dockerC
         return true;
     }
 
-    $key = preg_quote($key, '/');
-
-    return preg_match('/(?<!\$)\$\{'.$key.'(?:-|\?)/', $dockerCompose) === 1;
+    return extractDockerComposeEnvironmentVariableReferences($dockerCompose)->contains($key);
 }
 
 function syncDockerComposeEnvironmentVariableRequiredState(Application|Service $resource): void

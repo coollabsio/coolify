@@ -1742,10 +1742,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'is_required' => $isRequired,
                             ]);
 
-                            if ($isRequired && $envVar->value === $defaultValue) {
-                                $envVar->update(['value' => null, 'is_required' => true]);
-                            }
-
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {
                                 $searchPos = 0;
@@ -3028,7 +3024,10 @@ function serviceParser(Service $resource): Collection
 
                 continue;
             }
+            $referenceContent = extractBalancedBraceContent($value->value());
+            $primaryReference = $referenceContent === null ? null : splitOnOperatorOutsideNested($referenceContent['content']);
             extractDockerComposeEnvironmentVariableReferences($value->value())
+                ->reject(fn (string $reference): bool => $value->startsWith('$') && $reference === ($primaryReference['variable'] ?? null) && str_contains($primaryReference['operator'], '?'))
                 ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_'))
                 ->each(function (string $reference) use ($resource): void {
                     $environmentVariable = $resource->environment_variables()->firstOrCreate([
@@ -3101,15 +3100,11 @@ function serviceParser(Service $resource): Collection
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                             ], [
-                                'value' => $isRequired ? null : $defaultValue,
+                                'value' => $isRequired ? $defaultValue : null,
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
-
-                            if ($isRequired && $envVar->value === $defaultValue) {
-                                $envVar->update(['value' => null, 'is_required' => true]);
-                            }
 
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {

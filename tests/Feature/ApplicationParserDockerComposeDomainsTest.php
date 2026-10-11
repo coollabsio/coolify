@@ -27,6 +27,7 @@ function disableExactProxyLabels(Application $application): Application
 }
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     $this->user = User::factory()->create();
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team);
@@ -777,4 +778,19 @@ YAML,
         ->toBeFalse()
         ->and($frontendLabels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
         ->toBeFalse();
+});
+
+test('applicationParser preserves an existing required value matching the Compose message', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    environment:\n      TOKEN: \${TOKEN:?configured}\n",
+    ]);
+    $variable = $application->environment_variables()->create(['key' => 'TOKEN', 'value' => 'configured']);
+
+    applicationParser($application);
+
+    expect($variable->fresh()->value)->toBe('configured');
 });

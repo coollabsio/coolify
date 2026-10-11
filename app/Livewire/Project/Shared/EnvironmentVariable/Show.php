@@ -251,9 +251,6 @@ class Show extends Component
     private function hydrateValueFields(): void
     {
         $this->value = $this->env->value;
-        if (($this->composeInfo['default'] ?? null) === $this->value) {
-            $this->value = null;
-        }
         $this->is_shared = (bool) ($this->env->is_shared ?? false);
 
         if ($this->is_shared) {
@@ -318,6 +315,19 @@ class Show extends Component
         $this->submit();
     }
 
+    public function useComposeDefault(): void
+    {
+        $this->authorize('update', $this->env);
+        $this->loadValues();
+        $composeInfo = $this->serverComposeInfo();
+        if ($this->env->is_shown_once || $composeInfo === null || $composeInfo['default'] === null || $composeInfo['required']) {
+            return;
+        }
+
+        $this->value = null;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
@@ -341,10 +351,6 @@ class Show extends Component
                 $this->dispatch('error', 'Required environment variables cannot be empty.');
 
                 return;
-            }
-
-            if (! $this->isSharedVariable && blank($this->value) && ($composeInfo['default'] ?? null) !== null) {
-                $this->value = $composeInfo['default'];
             }
 
             $this->serialize();

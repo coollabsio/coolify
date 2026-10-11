@@ -193,6 +193,11 @@
                             @if ($composeInfo['default'] !== null)
                                 Compose default: <span class="font-mono">{{ $composeInfo['default'] }}</span>.
                             @endif
+                            @if ($composeInfo['default'] !== null && !$composeInfo['required'] && $canEditValue && !$isLocked)
+                                <x-forms.button type="button" wire:click="useComposeDefault">
+                                    Use Compose default
+                                </x-forms.button>
+                            @endif
                             @if ($composeInfo['required'])
                                 Compose requires this variable to have a value.
                             @endif

@@ -126,11 +126,13 @@ services:
       ESCAPED: $${ESCAPED-nope}
 YAML;
 
-    expect(dockerComposeEnvironmentVariableRequiresUnsetWhenBlank($yaml, 'BARE'))->toBeTrue()
-        ->and(dockerComposeEnvironmentVariableRequiresUnsetWhenBlank($yaml, 'DASH'))->toBeTrue()
-        ->and(dockerComposeEnvironmentVariableRequiresUnsetWhenBlank($yaml, 'QUESTION'))->toBeTrue()
-        ->and(dockerComposeEnvironmentVariableRequiresUnsetWhenBlank($yaml, 'COLON_DASH'))->toBeFalse()
-        ->and(dockerComposeEnvironmentVariableRequiresUnsetWhenBlank($yaml, 'ESCAPED'))->toBeFalse();
+    expect(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'BARE', null))->toBeTrue()
+        ->and(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'DASH', null))->toBeTrue()
+        ->and(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'QUESTION', null))->toBeTrue()
+        ->and(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'COLON_DASH', null))->toBeTrue()
+        ->and(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'ESCAPED', null))->toBeFalse()
+        ->and(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'DASH', ''))->toBeFalse()
+        ->and(dockerComposeEnvironmentVariableShouldBeUnset($yaml, 'COLON_DASH', 'debug'))->toBeFalse();
 });
 
 test('extracts fallback and required metadata from derived Compose values', function () {
