@@ -65,8 +65,7 @@
                 class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
                 <span class="flex items-center gap-2.5 min-w-0">
                     <x-reicon name="search" class="menu-item-icon" />
-                    <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search<span
-                            x-show="hasPageSearch" x-cloak class="text-[11px] opacity-70"> page &amp; global</span></span>
+                    <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search</span>
                 </span>
                 <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
                     :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
@@ -262,13 +261,13 @@
         @if ($deploymentsIndicator)
             <livewire:deployments-indicator variant="sidebar" />
         @endif
-        <div class="flex items-center gap-1" :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
+        <div class="flex items-center gap-1" :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
             <x-top-user-menu sidebar />
             <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
                 class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
                 <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
-                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                    <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
             </button>
         </div>

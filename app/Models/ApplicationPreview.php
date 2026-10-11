@@ -337,6 +337,10 @@ class ApplicationPreview extends BaseModel
         $previewFqdn = str_replace('{{random}}', $random, $template);
         $previewFqdn = str_replace('{{domain}}', $host, $previewFqdn);
         $previewFqdn = str_replace('{{pr_id}}', (string) $this->pull_request_id, $previewFqdn);
+        if (preg_match('#^(https?)://(.*)$#i', $previewFqdn, $matches)) {
+            $schema = strtolower($matches[1]);
+            $previewFqdn = $matches[2];
+        }
         $previewUrl = "{$schema}://{$previewFqdn}{$path}";
         $sourceCanonical = DomainPortOverrides::withoutPort($sourceDomain);
         $port = $url->getPort() ?? ($this->application->domain_port_overrides[$sourceCanonical] ?? null);

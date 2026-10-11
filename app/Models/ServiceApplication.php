@@ -38,6 +38,7 @@ class ServiceApplication extends BaseModel
         'is_gzip_enabled',
         'is_stripprefix_enabled',
         'is_force_https_enabled',
+        'traefik_certificate_resolver',
         'last_online_at',
         'is_migrated',
     ];

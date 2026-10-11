@@ -379,11 +379,12 @@ class StandaloneClickhouse extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
                     $database = $this->clickhouse_db ?? 'default';
 
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$database}";
                 }
 
                 return null;

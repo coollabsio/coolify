@@ -49,6 +49,15 @@
                                     <li>{{ $requirement }}</li>
                                 @endforeach
                             </ul>
+                            @can('view', $github_app)
+                                <div class="mt-2">
+                                    <a href="{{ getPermissionsPath($github_app) }}" class="button" target="_blank"
+                                        rel="noopener noreferrer">
+                                        Update on GitHub
+                                        <x-external-link />
+                                    </a>
+                                </div>
+                            @endcan
                         </x-callout>
                     @endif
                 </x-application.settings-section>

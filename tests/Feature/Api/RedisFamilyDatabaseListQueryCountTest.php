@@ -133,12 +133,12 @@ it('does not query environment variables per Redis database in the environment d
     }
 });
 
-it('creates a missing Redis username variable only once when the variables are loaded', function () {
+it('reads a missing Redis username as default without creating a variable', function () {
     $redis = create_standalone_redis($this->environment->id, $this->destination);
     $redis->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->delete();
     $redis->load('runtime_environment_variables');
 
     expect($redis->redis_username)->toBe('default')
-        ->and($redis->redis_username)->toBe('default')
-        ->and($redis->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->count())->toBe(1);
+        ->and($redis->fresh()->redis_username)->toBe('default')
+        ->and($redis->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->count())->toBe(0);
 });
