@@ -1618,7 +1618,11 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$this->resolveSecretManagerDotenvValue($env)}");
+            $resolvedValue = $this->resolveSecretManagerDotenvValue($env);
+            if (! $env->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
+                continue;
+            }
+            $envs->push("{$env->key}={$resolvedValue}");
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
         instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
