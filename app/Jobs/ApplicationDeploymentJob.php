@@ -34,6 +34,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
@@ -3461,7 +3462,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $environmentPrefix = $this->railpack_build_environment_prefix($controlVariables);
         $secretFlags = $this->railpack_build_secret_flags($variables);
-        $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version');
+        // The helper image sets RAILPACK_VERSION, so the frontend always matches the Railpack CLI in the helper.
+        // Helper images without it fall back to the version of the Railpack CLI itself.
+        $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v${RAILPACK_VERSION:-$(railpack --version | cut -d " " -f 3)}';
 
         $buildxBuildCommand = "{$environmentPrefix}DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack"
             ." {$this->addHosts} --network host"
@@ -5951,7 +5954,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $errorClass = get_class($exception);
 
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
-        if ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
+        if ($exception instanceof TimeoutExceededException) {
+            $this->application_deployment_queue->addLogEntry("Deployment failed: Timeout of {$this->timeout} seconds exceeded. Increase the deployment timeout in the Server settings (Advanced > Builds).", 'stderr');
+        } elseif ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
             $this->application_deployment_queue->addLogEntry('Deployment failed.', 'stderr');
         } else {
             $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');

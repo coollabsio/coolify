@@ -60,6 +60,7 @@ class StartDatabaseProxy
         $host_configuration_dir = devHostDockerPath($server, $configuration_dir);
         $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
         $listenConfig = $this->buildListenConfig($database->public_port, $this->isNetworkIpv6Enabled($network, $server));
+        $upstreamConfig = $this->buildUpstreamConfig($containerName, $internalPort);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -70,9 +71,10 @@ class StartDatabaseProxy
         worker_connections  1024;
     }
     stream {
+       resolver 127.0.0.11 valid=10s;
        server {
             $listenConfig
-            proxy_pass $containerName:$internalPort;
+            $upstreamConfig
             $timeoutConfig
        }
     }
@@ -185,6 +187,15 @@ class StartDatabaseProxy
         }
 
         return "listen {$port};\n        listen [::]:{$port};";
+    }
+
+    /**
+     * The upstream is a variable so nginx resolves it through Docker's DNS on new connections.
+     * A literal host is resolved only once at startup, so a restarted database with a new IP would break the proxy.
+     */
+    private function buildUpstreamConfig(string $host, int $port): string
+    {
+        return "set \$upstream {$host}:{$port};\n        proxy_pass \$upstream;";
     }
 
     private function buildProxyTimeoutConfig(?int $timeout): string

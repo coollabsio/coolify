@@ -4057,7 +4057,7 @@ class ApplicationsController extends Controller
             $is_shown_once = $item->get('is_shown_once') ?? false;
             $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $key)->first();
+                $env = $application->environment_variables_preview()->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
 
@@ -4096,7 +4096,7 @@ class ApplicationsController extends Controller
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $key)->first();
+                $env = $application->environment_variables()->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_literal != $is_literal) {

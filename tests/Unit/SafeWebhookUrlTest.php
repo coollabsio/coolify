@@ -4,7 +4,9 @@ use App\Models\InstanceSettings;
 use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
+use PurplePixie\PhpDns\DNSAnswer;
 use PurplePixie\PhpDns\DNSQuery;
+use PurplePixie\PhpDns\DNSResult;
 use PurplePixie\PhpDns\DNSTypes;
 use Tests\TestCase;
 
@@ -484,4 +486,82 @@ it('accepts bracketed IPv6 custom dns servers from instance settings', function 
     $method = new ReflectionMethod(SafeWebhookUrl::class, 'customDnsServers');
 
     expect($method->invoke(new SafeWebhookUrl))->toBe(['1.1.1.1', '2606:4700:4700::1111']);
+});
+
+/**
+ * Fakes a resolver like 1.1.1.1 that sets the TC bit on the UDP answer for A records.
+ */
+function bindTruncatingDnsResolver(ArrayObject $queries, string $truncatedError = 'Response too big for UDP, retry with TCP'): void
+{
+    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queries, $truncatedError) {
+        return new class($parameters['udp'], $queries, $truncatedError) extends DNSQuery
+        {
+            private string $fakeError = '';
+
+            public function __construct(
+                private readonly bool $useUdp,
+                private readonly ArrayObject $queries,
+                private readonly string $truncatedError,
+            ) {
+                parent::__construct('192.0.2.1');
+            }
+
+            public function query(string $question, string $typeName = DNSTypes::NAME_A)
+            {
+                $this->queries->append([$typeName, $this->useUdp ? 'udp' : 'tcp']);
+                $this->fakeError = '';
+
+                if ($typeName === DNSTypes::NAME_A && $this->useUdp) {
+                    $this->fakeError = $this->truncatedError;
+
+                    return false;
+                }
+
+                $answer = new DNSAnswer;
+                $ip = $typeName === DNSTypes::NAME_A ? '172.64.66.1' : '2606:4700:113::1';
+                $answer->addResult(new DNSResult($typeName, 0, 'IN', 300, $ip, $question, '', []));
+
+                return $answer;
+            }
+
+            public function hasError(): bool
+            {
+                return $this->fakeError !== '';
+            }
+
+            public function getLasterror(): string
+            {
+                return $this->fakeError;
+            }
+        };
+    });
+}
+
+it('retries custom dns lookups over TCP when the UDP answer is truncated', function () {
+    $queries = new ArrayObject;
+    bindTruncatingDnsResolver($queries);
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'resolveHostWithCustomDnsServers');
+
+    expect($method->invoke(new SafeWebhookUrl, 'bucket.r2.cloudflarestorage.com', ['1.1.1.1']))
+        ->toBe(['172.64.66.1', '2606:4700:113::1'])
+        ->and($queries->getArrayCopy())->toBe([
+            [DNSTypes::NAME_A, 'udp'],
+            [DNSTypes::NAME_A, 'tcp'],
+            [DNSTypes::NAME_AAAA, 'udp'],
+        ]);
+});
+
+it('does not retry custom dns lookups over TCP for other UDP failures', function () {
+    $queries = new ArrayObject;
+    bindTruncatingDnsResolver($queries, 'Failed to read data buffer');
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'resolveHostWithCustomDnsServers');
+
+    expect($method->invoke(new SafeWebhookUrl, 'bucket.r2.cloudflarestorage.com', ['1.1.1.1']))
+        ->toBe(['2606:4700:113::1'])
+        ->and($queries->getArrayCopy())->toBe([
+            [DNSTypes::NAME_A, 'udp'],
+            [DNSTypes::NAME_AAAA, 'udp'],
+        ]);
 });
