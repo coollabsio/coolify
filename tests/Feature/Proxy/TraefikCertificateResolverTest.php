@@ -149,3 +149,43 @@ test('proxy page saves an empty resolver as none and rejects unsafe names', func
 
     expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBeNull();
 });
+
+function traefikCertificateResolverApplicationOverrideLabels(Server $server, ?string $applicationResolver): array
+{
+    $project = Project::factory()->create(['team_id' => $server->team_id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $application = Application::factory()->createOne([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://example.com',
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]);
+    $application->settings->update(['traefik_certificate_resolver' => $applicationResolver]);
+
+    return generateLabelsApplication($application->fresh());
+}
+
+test('an application resolver overrides the server resolver on generated HTTPS routers', function (?string $applicationResolver, ?string $expectedResolver) {
+    $this->server->settings->update(['traefik_certificate_resolver' => 'letsencrypt']);
+
+    $labels = collect(traefikCertificateResolverApplicationOverrideLabels($this->server->fresh(), $applicationResolver));
+    $resolverLabels = $labels->filter(fn ($label) => str_contains($label, 'certresolver'));
+
+    expect($labels->filter(fn ($label) => str_contains($label, '.tls=true')))->not->toBeEmpty();
+
+    if ($expectedResolver === null) {
+        expect($resolverLabels)->toBeEmpty();
+
+        return;
+    }
+
+    expect($resolverLabels)->not->toBeEmpty()
+        ->and($resolverLabels->every(fn ($label) => str_ends_with($label, '.tls.certresolver='.$expectedResolver)))->toBeTrue();
+})->with([
+    'none turns the resolver off' => ['none', null],
+    'custom resolver' => ['cloudflare', 'cloudflare'],
+    'null uses the server resolver' => [null, 'letsencrypt'],
+]);

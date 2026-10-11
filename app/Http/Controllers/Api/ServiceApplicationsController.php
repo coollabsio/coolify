@@ -7,6 +7,7 @@ use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Service\UpdateServiceApplicationFromApi;
 use App\Http\Controllers\Controller;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
@@ -257,6 +258,7 @@ class ServiceApplicationsController extends Controller
                         'exclude_from_status' => new OA\Property(property: 'exclude_from_status', type: 'boolean', nullable: true),
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
+                        'traefik_certificate_resolver' => new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
                         'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
                         'max_restart_count' => new OA\Property(property: 'max_restart_count', type: 'integer', minimum: 0, nullable: true, description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'),
@@ -331,6 +333,7 @@ class ServiceApplicationsController extends Controller
             'exclude_from_status',
             'is_log_drain_enabled',
             'is_gzip_enabled',
+            'traefik_certificate_resolver',
             'is_stripprefix_enabled',
             'is_force_https_enabled',
             'max_restart_count',
@@ -346,6 +349,7 @@ class ServiceApplicationsController extends Controller
             'exclude_from_status' => 'sometimes|boolean',
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
+            'traefik_certificate_resolver' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
             'is_stripprefix_enabled' => 'sometimes|boolean',
             'is_force_https_enabled' => 'sometimes|boolean',
             'max_restart_count' => 'sometimes|integer|min:0',

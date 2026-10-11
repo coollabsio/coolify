@@ -592,6 +592,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -978,6 +982,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1364,6 +1372,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1691,6 +1703,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2004,6 +2020,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2471,6 +2491,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -11361,6 +11385,9 @@ paths:
                   type: [boolean, 'null']
                 is_gzip_enabled:
                   type: [boolean, 'null']
+                traefik_certificate_resolver:
+                  description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'
+                  type: [string, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
                 is_force_https_enabled:
@@ -15257,6 +15284,10 @@ components:
           type: boolean
         is_gzip_enabled:
           type: boolean
+        traefik_certificate_resolver:
+          type: string
+          nullable: true
+          description: 'Traefik certificate resolver override. Null uses the server setting, "none" uses no resolver.'
         is_stripprefix_enabled:
           type: boolean
         connect_to_docker_network:
