@@ -130,6 +130,9 @@
                                     v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
                                     for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
                                     to production servers.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
                             @if ($this->newerTraefikBranchAvailable)
