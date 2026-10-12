@@ -114,31 +114,35 @@ final class SensitiveDataRedactor
      */
     private function chunks(string $text): iterable
     {
-        if (strlen($text) <= self::CHUNK_BYTES) {
-            yield $text;
-
-            return;
-        }
-
-        $chunk = '';
-        $insidePrivateKey = false;
-        foreach (preg_split('/(?<=\n)/', $text) ?: [$text] as $line) {
-            $chunk .= $line;
-            if (preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/', $line) === 1) {
-                $insidePrivateKey = true;
+        $length = strlen($text);
+        $offset = 0;
+        while ($offset < $length) {
+            $end = $this->lineEnd($text, $offset + self::CHUNK_BYTES);
+            $chunk = substr($text, $offset, $end - $offset);
+            if (preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----(?![\s\S]*-----END [A-Z ]*PRIVATE KEY-----)/', $chunk) === 1) {
+                $end = preg_match('/-----END [A-Z ]*PRIVATE KEY-----/', $text, $match, PREG_OFFSET_CAPTURE, $end) === 1
+                    ? $this->lineEnd($text, $match[0][1] + strlen($match[0][0]))
+                    : $length;
+                $chunk = substr($text, $offset, $end - $offset);
             }
-            if (preg_match('/-----END [A-Z ]*PRIVATE KEY-----/', $line) === 1) {
-                $insidePrivateKey = false;
-            }
-            if (! $insidePrivateKey && strlen($chunk) >= self::CHUNK_BYTES) {
-                yield $chunk;
-                $chunk = '';
-            }
-        }
 
-        if ($chunk !== '') {
             yield $chunk;
+            $offset = $end;
         }
+    }
+
+    /**
+     * Find the end of the line that contains $position, without copying the text.
+     */
+    private function lineEnd(string $text, int $position): int
+    {
+        if ($position >= strlen($text)) {
+            return strlen($text);
+        }
+
+        $newline = strpos($text, "\n", $position);
+
+        return $newline === false ? strlen($text) : $newline + 1;
     }
 
     /**

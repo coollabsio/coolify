@@ -8,6 +8,7 @@ use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -215,7 +216,10 @@ class EnvironmentVariable extends BaseModel
         return $this->resolveRealValue(revealLockedSharedVariables: false);
     }
 
-    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true): ?string
+    /**
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     */
+    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true, ?Collection $sharedVariables = null): ?string
     {
         if (! $this->relationLoaded('resourceable')) {
             $this->load('resourceable');
@@ -236,7 +240,7 @@ class EnvironmentVariable extends BaseModel
             $resource->load('destination.server');
         }
 
-        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables, $sharedVariables);
 
         return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
     }
@@ -344,9 +348,12 @@ class EnvironmentVariable extends BaseModel
     }
 
     /** @return array<int, string> */
-    public function logRedactionValues(): array
+    /**
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables  Preloaded shared variables, to avoid one query per reference.
+     */
+    public function logRedactionValues(?Collection $sharedVariables = null): array
     {
-        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false);
+        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false, sharedVariables: $sharedVariables);
         if (! is_string($resolvedValue) || $resolvedValue === '') {
             return [];
         }
@@ -420,14 +427,29 @@ class EnvironmentVariable extends BaseModel
         if ($includePreview && $resource instanceof Application) {
             $variables = $variables->merge($resource->environment_variables_preview ?? []);
         }
+        if ($variables->isEmpty()) {
+            return ['known' => [], 'locked' => []];
+        }
+
+        // Load the resource relations once and share them, so each variable does not load its own copy.
+        $resource->loadMissing('environment.project.team');
+        if (method_exists($resource, 'server')) {
+            $resource->loadMissing('server');
+        }
+        if (method_exists($resource, 'destination')) {
+            $resource->loadMissing('destination.server');
+        }
+        // Use copies so the resource's own loaded variables do not get a reference back to the resource.
+        $variables = $variables->map(fn (self $variable): self => (clone $variable)->setRelation('resourceable', $resource));
+        $sharedVariables = self::sharedVariablesReferencedBy($variables, $resource->team()?->id);
 
         $redactAllValues = $resource->redactsAllEnvValuesInLogs();
         $secrets = ['known' => [], 'locked' => []];
         foreach ($variables as $variable) {
-            if ($variable->isLockedForLogs()) {
-                $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues());
+            if ($variable->isLockedForLogs($sharedVariables)) {
+                $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues($sharedVariables));
             } elseif ($redactAllValues) {
-                $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues());
+                $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues($sharedVariables));
             }
         }
 
@@ -436,31 +458,60 @@ class EnvironmentVariable extends BaseModel
 
     /**
      * A variable is locked when it is locked itself or references a locked shared variable.
+     *
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables  Preloaded shared variables of the resource's team.
      */
-    public function isLockedForLogs(): bool
+    public function isLockedForLogs(?Collection $sharedVariables = null): bool
     {
         if ($this->is_shown_once) {
             return true;
         }
 
-        if (preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $this->value, $references, PREG_SET_ORDER) === 0) {
+        $references = self::sharedVariableReferences($this->value);
+        if ($references === []) {
             return false;
         }
 
-        $teamId = $this->resourceable?->team()?->id;
-        if ($teamId === null) {
+        $sharedVariables ??= self::sharedVariablesReferencedBy(collect([$this]), $this->resourceable?->team()?->id);
+        if ($sharedVariables === null) {
             return true;
         }
 
-        return SharedEnvironmentVariable::query()
-            ->where('team_id', $teamId)
-            ->where('is_shown_once', true)
-            ->where(function (Builder $query) use ($references): void {
-                foreach ($references as [, $type, $key]) {
-                    $query->orWhere(fn (Builder $reference) => $reference->where('type', $type)->where('key', $key));
-                }
-            })
-            ->exists();
+        return $sharedVariables->contains(fn (SharedEnvironmentVariable $shared): bool => $shared->is_shown_once
+            && in_array(['type' => $shared->type, 'key' => $shared->key], $references, true));
+    }
+
+    /**
+     * Load every shared variable that the given variables reference, with one query.
+     *
+     * @param  Collection<int, self>  $variables
+     * @return Collection<int, SharedEnvironmentVariable>|null Null when the team is unknown.
+     */
+    private static function sharedVariablesReferencedBy(Collection $variables, ?int $teamId): ?Collection
+    {
+        if ($teamId === null) {
+            return null;
+        }
+
+        $keys = $variables
+            ->flatMap(fn (self $variable): array => self::sharedVariableReferences($variable->value))
+            ->pluck('key')
+            ->unique()
+            ->values();
+
+        return $keys->isEmpty()
+            ? collect()
+            : SharedEnvironmentVariable::query()->where('team_id', $teamId)->whereIn('key', $keys)->get();
+    }
+
+    /**
+     * @return array<int, array{type: string, key: string}>
+     */
+    private static function sharedVariableReferences(?string $value): array
+    {
+        preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $value, $matches, PREG_SET_ORDER);
+
+        return array_map(fn (array $match): array => ['type' => $match[1], 'key' => $match[2]], $matches);
     }
 
     public function resolveReferencedValue(): ?string
@@ -481,7 +532,10 @@ class EnvironmentVariable extends BaseModel
             ->first()?->value ?? $value;
     }
 
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true)
+    /**
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     */
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true, ?Collection $sharedVariables = null)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
@@ -516,11 +570,15 @@ class EnvironmentVariable extends BaseModel
             if (is_null($id)) {
                 continue;
             }
-            $found = SharedEnvironmentVariable::where('type', $type)
-                ->where('key', $variable)
-                ->where('team_id', $resource->team()->id)
-                ->where("{$type}_id", $id)
-                ->first();
+            $found = $sharedVariables !== null
+                ? $sharedVariables->first(fn (SharedEnvironmentVariable $shared): bool => $shared->type === $type->value()
+                    && $shared->key === $variable->value()
+                    && (int) $shared->{"{$type}_id"} === (int) $id)
+                : SharedEnvironmentVariable::where('type', $type)
+                    ->where('key', $variable)
+                    ->where('team_id', $resource->team()->id)
+                    ->where("{$type}_id", $id)
+                    ->first();
             if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }
