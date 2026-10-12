@@ -13,6 +13,8 @@ else
     REGISTRY_URL="docker.io"
 fi
 SKIP_BACKUP=${4:-false}
+SKIP_DISK_SPACE_CHECK=${5:-false}
+REQUIRED_DISK_SPACE_GB=5
 STATUS_FILE="/data/coolify/source/.upgrade-status"
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
@@ -52,6 +54,24 @@ echo "Target Version: ${LATEST_IMAGE}" >>"$LOGFILE"
 echo "Helper Version: ${LATEST_HELPER_VERSION}" >>"$LOGFILE"
 echo "Registry URL: ${REGISTRY_URL}" >>"$LOGFILE"
 echo "============================================================" >>"$LOGFILE"
+
+# Stop before anything changes when the disk is almost full.
+# A full disk during the upgrade can leave Coolify broken.
+if [ "$SKIP_DISK_SPACE_CHECK" != "true" ]; then
+    DOCKER_ROOT_DIR=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)
+    AVAILABLE_KB=$(df -Pk /data/coolify "${DOCKER_ROOT_DIR:-/var/lib/docker}" 2>/dev/null | awk 'NR>1 && $4 ~ /^[0-9]+$/ {print $4}' | sort -n | head -n1)
+    if [ -n "$AVAILABLE_KB" ] && [ "$AVAILABLE_KB" -lt $((REQUIRED_DISK_SPACE_GB * 1024 * 1024)) ]; then
+        AVAILABLE_GB=$(awk -v kb="$AVAILABLE_KB" 'BEGIN {printf "%.1f", kb / 1024 / 1024}')
+        log "ERROR: Not enough free disk space: ${AVAILABLE_GB} GB free, ${REQUIRED_DISK_SPACE_GB} GB required"
+        write_status "error" "Not enough free disk space: ${AVAILABLE_GB} GB free, ${REQUIRED_DISK_SPACE_GB} GB required. Free up disk space and try again."
+        echo "     ERROR: Not enough free disk space: ${AVAILABLE_GB} GB free, ${REQUIRED_DISK_SPACE_GB} GB required."
+        echo "     Free up disk space (for example: docker system prune) and try again."
+        exit 1
+    fi
+    log "Disk space check passed (${AVAILABLE_KB:-unknown} KB free)"
+else
+    log "Disk space check skipped"
+fi
 
 log_section "Step 1/6: Downloading configuration files"
 write_status "1" "Downloading configuration files"

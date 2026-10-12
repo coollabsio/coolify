@@ -72,6 +72,7 @@ use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
 use PurplePixie\PhpDns\DNSQuery;
+use PurplePixie\PhpDns\DNSResult;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -1494,19 +1495,9 @@ function sslip(Server $server)
     if (isDev() && $server->id === 0) {
         return 'http://127.0.0.1.sslip.io';
     }
-    if ($server->ip === 'host.docker.internal') {
-        $baseIp = base_ip();
+    $ip = $server->ip === 'host.docker.internal' ? base_ip() : $server->ip;
 
-        return "http://$baseIp.sslip.io";
-    }
-    // ipv6
-    if (str($server->ip)->contains(':')) {
-        $ipv6 = str($server->ip)->replace(':', '-');
-
-        return "http://{$ipv6}.sslip.io";
-    }
-
-    return "http://{$server->ip}.sslip.io";
+    return 'http://'.sslipHostLabel($ip).'.sslip.io';
 }
 
 function service_templates_cache_key(): string
@@ -2352,10 +2343,8 @@ function validateDNSEntry(string $fqdn, Server $server)
     $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            $query = createDnsQuery($dns_server);
-            $results = $query->query($host, $type);
-            if ($results === false || $query->hasError()) {
-            } else {
+            $results = queryDnsServer($dns_server, $host, $type);
+            if ($results !== false) {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
                         if (isCloudflareIp($result->getData())) {
@@ -2376,13 +2365,38 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function createDnsQuery(string $dnsServer): DNSQuery
+function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DNSQuery
 {
     return app()->make(DNSQuery::class, [
-        'server' => $dnsServer,
+        'server' => formatHostForUrl($dnsServer),
         'port' => 53,
-        'timeout' => 5,
+        'timeout' => $timeout,
+        'udp' => $udp,
     ]);
+}
+
+/**
+ * Query one DNS server for one record type. When the UDP answer is truncated (TC bit),
+ * retry over TCP: resolvers such as 1.1.1.1 can truncate even small answers, and the
+ * records would otherwise be silently dropped.
+ *
+ * @return iterable<int, DNSResult>|false
+ */
+function queryDnsServer(string $dnsServer, string $host, string $type, int $timeout = 5): iterable|false
+{
+    $query = createDnsQuery($dnsServer, $timeout);
+    $records = $query->query($host, $type);
+
+    if ($records === false && str_contains($query->getLasterror(), 'too big for UDP')) {
+        $query = createDnsQuery($dnsServer, $timeout, udp: false);
+        $records = $query->query($host, $type);
+    }
+
+    if ($records === false || $query->hasError()) {
+        return false;
+    }
+
+    return $records;
 }
 
 function isCloudflareIp(string $ip): bool
@@ -2398,6 +2412,72 @@ function isCloudflareIp(string $ip): bool
     ];
 
     return ipMatch($ip, $cloudflareIps);
+}
+
+/**
+ * The one stored form of an IP address: no spaces, no brackets, and IPv6 in its short lower-case
+ * form (2A01:04F8::0001 becomes 2a01:4f8::1). IPv4 addresses and hostnames stay as they are.
+ */
+function normalizeIpAddress(string $value): string
+{
+    $value = trim($value);
+    $withoutBrackets = trim($value, '[]');
+    if (filter_var($withoutBrackets, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+        return inet_ntop(inet_pton($withoutBrackets));
+    }
+
+    return $value;
+}
+
+/**
+ * The host for a URL or a "host:port" value: an IPv6 address gets brackets ([2a01:4f8::1]), so
+ * that its colons are not read as the port. Other hosts stay as they are.
+ */
+function formatHostForUrl(string $host): string
+{
+    $normalized = normalizeIpAddress($host);
+
+    return filter_var($normalized, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "[{$normalized}]" : $normalized;
+}
+
+/**
+ * Hetzner gives an IPv6 network (2a01:4f8:c016:bd23::/64), not an address. The server uses the
+ * first address of the network (2a01:4f8:c016:bd23::1).
+ */
+function hetznerServerIpv6(?string $network): ?string
+{
+    if (blank($network)) {
+        return null;
+    }
+    $address = str($network)->before('/')->value();
+    if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+        return null;
+    }
+    if (str_contains($network, '/')) {
+        $address = inet_ntop(inet_pton($address) | inet_pton('::1'));
+    }
+
+    return normalizeIpAddress($address);
+}
+
+/**
+ * The sslip.io label for an IP address. IPv6 colons become dashes, and a "0" is added where the
+ * address starts or ends with "::", because a DNS label cannot start or end with a dash.
+ */
+function sslipHostLabel(string $ip): string
+{
+    $ip = normalizeIpAddress($ip);
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+        return $ip;
+    }
+    if (str_starts_with($ip, '::')) {
+        $ip = '0'.$ip;
+    }
+    if (str_ends_with($ip, '::')) {
+        $ip .= '0';
+    }
+
+    return str_replace(':', '-', $ip);
 }
 
 function ipMatch($ip, $cidrs, &$match = null)
@@ -2508,8 +2588,8 @@ function checkIPAgainstAllowlist($ip, $allowlist)
                 return true;
             }
 
-            // Direct IP comparison
-            if ($ip === $allowed) {
+            // Direct IP comparison; IPv6 can be written in more than one form
+            if (normalizeIpAddress((string) $ip) === normalizeIpAddress((string) $allowed)) {
                 return true;
             }
         }
@@ -4713,7 +4793,7 @@ function parseScpStyleGitUrl(?string $gitRepository): ?array
         return null;
     }
 
-    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>[^:]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
+    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>\[[0-9A-Fa-f:.]+\]|[^:\[\]]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
         return null;
     }
 
