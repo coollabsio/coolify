@@ -233,7 +233,7 @@ function streamBackupFromServer(Server $server, string $filename, string $conten
 
     $disk = Storage::build([
         'driver' => 'sftp',
-        'host' => $server->ip,
+        'host' => formatHostForUrl($server->ip),
         'port' => (int) $server->port,
         'username' => $server->user,
         'privateKey' => $privateKey->getKeyLocation(),

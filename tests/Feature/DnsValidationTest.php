@@ -267,3 +267,43 @@ it('validateDNSEntry treats equivalent IPv6 notations as the same address', func
 
     expect(validateDNSEntry('https://example.com', $server))->toBeTrue();
 });
+
+it('passes bracketed IPv6 custom dns servers to the dns query', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+        ['id' => 0],
+        [
+            'is_dns_validation_enabled' => true,
+            'custom_dns_servers' => '2606:4700:4700::1111,[2001:db8::53],192.0.2.1',
+        ]
+    ));
+
+    $queriedServers = new ArrayObject;
+    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queriedServers) {
+        $queriedServers->append($parameters['server']);
+
+        return new class('192.0.2.1') extends DNSQuery
+        {
+            public function query(string $question, string $typeName = DNSTypes::NAME_A): false
+            {
+                return false;
+            }
+
+            public function hasError(): bool
+            {
+                return true;
+            }
+        };
+    });
+
+    $action = new class extends CheckDomainDns
+    {
+        protected function resolveWithSystemDns(string $host, string $type): array
+        {
+            return [];
+        }
+    };
+
+    $action->handle(['example' => 'https://example.com'], new Server(['ip' => '203.0.113.10']), '203.0.113.10');
+
+    expect($queriedServers->getArrayCopy())->toBe(['[2606:4700:4700::1111]', '[2001:db8::53]', '192.0.2.1']);
+});

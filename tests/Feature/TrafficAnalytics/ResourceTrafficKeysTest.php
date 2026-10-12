@@ -237,6 +237,18 @@ it('merges overviews, paths, breakdowns, and series of several keys', function (
         ->and($aggregator->series()[0]['s2xx'])->toBe(5);
 });
 
+it('folds the overflow path rows of all keys into one unlinked row', function () {
+    $aggregator = new TrafficAnalyticsAggregator([]);
+    $domains = ['k-api' => 'api.test', 'k-web' => 'web.test'];
+    $domainForKey = fn (string $key) => $domains[$key] ?? null;
+
+    $aggregator->addPaths(collect([TrafficPathData::fromSentinel(['path' => '__other__', 'app' => 'k-api', 'requests' => 7, 's4xx' => 1, 'p95' => 3])]), $domainForKey);
+    $aggregator->addPaths(collect([TrafficPathData::fromSentinel(['path' => '__other__', 'app' => 'k-web', 'requests' => 5, 's4xx' => 2, 'p95' => 8])]), $domainForKey);
+
+    expect($aggregator->topPaths())->toHaveCount(1)
+        ->and($aggregator->topPaths()[0])->toMatchArray(['path' => '__other__', 'domain' => null, 'requests' => 12, 's4xx' => 3, 'p95' => 8.0]);
+});
+
 it('shows a compose application with the data of all its compose service keys', function () {
     $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');

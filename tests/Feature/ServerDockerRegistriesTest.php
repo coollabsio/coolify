@@ -698,6 +698,7 @@ it('logs in to several servers at once from the overview page', function () {
         ->set('password', 'token')
         ->call('login')
         ->assertHasErrors('selectedServers')
+        ->assertSee('Choose at least one server.')
         ->set('password', 'token')
         ->set('selectedServers', [$this->server->uuid, $secondServer->uuid])
         ->call('login')

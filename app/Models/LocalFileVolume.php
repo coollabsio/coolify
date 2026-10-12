@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Stringable;
-use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
 {
@@ -691,7 +690,7 @@ class LocalFileVolume extends BaseModel
         }
 
         try {
-            $services = data_get(Yaml::parse($compose), 'services', []);
+            $services = data_get(parseDockerComposeYaml($compose), 'services', []);
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     if (is_string($volume)) {
@@ -777,7 +776,7 @@ class LocalFileVolume extends BaseModel
             }
 
             // Parse the docker-compose content
-            $compose = Yaml::parse($actualService->docker_compose_raw);
+            $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
             if (! isset($compose['services'])) {
                 return false;
             }

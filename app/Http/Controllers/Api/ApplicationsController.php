@@ -35,7 +35,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
 
 class ApplicationsController extends Controller
 {
@@ -55,6 +54,7 @@ class ApplicationsController extends Controller
         'docker_images_to_keep',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
+        'traefik_certificate_resolver',
         'is_raw_compose_deployment_enabled',
         'is_log_drain_enabled',
         'is_gpu_enabled',
@@ -211,7 +211,9 @@ class ApplicationsController extends Controller
 
         $regenerateLabels = ! $application->wasRecentlyCreated
             && $application->settings->is_container_label_readonly_enabled
-            && (array_key_exists('is_gzip_enabled', $settings) || array_key_exists('is_stripprefix_enabled', $settings));
+            && (array_key_exists('is_gzip_enabled', $settings)
+                || array_key_exists('is_stripprefix_enabled', $settings)
+                || array_key_exists('traefik_certificate_resolver', $settings));
 
         $application->settings->fill($settings)->save();
 
@@ -431,6 +433,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -626,6 +629,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -821,6 +825,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -987,6 +992,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -1149,6 +1155,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -2764,7 +2771,7 @@ class ApplicationsController extends Controller
         $dockerComposeDomainsResponse = null;
         if ($isCompose) {
             try {
-                $compose = Yaml::parse($application->docker_compose_raw ?? '');
+                $compose = parseDockerComposeYaml($application->docker_compose_raw ?? '');
             } catch (\Throwable) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -3143,6 +3150,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -3484,7 +3492,7 @@ class ApplicationsController extends Controller
                 }
             }
 
-            $yaml = Yaml::parse($application->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($application->docker_compose_raw);
             $services = data_get($yaml, 'services', []);
             $existingDockerComposeDomains = json_decode($application->docker_compose_domains ?? '[]', true) ?? [];
             $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson, $existingDockerComposeDomains) {
@@ -4058,7 +4066,7 @@ class ApplicationsController extends Controller
             $is_shown_once = $item->get('is_shown_once') ?? false;
             $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $key)->first();
+                $env = $application->environment_variables_preview()->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
 
@@ -4097,7 +4105,7 @@ class ApplicationsController extends Controller
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $key)->first();
+                $env = $application->environment_variables()->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_literal != $is_literal) {
@@ -4921,8 +4929,8 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
-            $customLabels = base64_decode($request->custom_labels);
-            if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
+            $customLabels = decodeBase64EncodedLabels($request->custom_labels);
+            if ($customLabels === null) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -4930,6 +4938,7 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->offsetSet('custom_labels', base64_encode($customLabels));
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;

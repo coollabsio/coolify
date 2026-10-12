@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Service model',
@@ -1611,7 +1610,7 @@ class Service extends BaseModel
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = Yaml::parse($this->docker_compose);
+                $dockerCompose = parseDockerComposeYaml($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
@@ -1632,10 +1631,22 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$this->resolveSecretManagerDotenvValue($env)}");
+            if (! $env->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
+                continue;
+            }
+            $envs->push($this->composeEnvironmentFileLine($env));
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
         instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+    }
+
+    /**
+     * Build a KEY="value" line for the service .env file, which Docker Compose reads.
+     * Only plain values allow $VAR interpolation, so $SERVICE_* references keep working.
+     */
+    public function composeEnvironmentFileLine(EnvironmentVariable $environmentVariable): string
+    {
+        return $environmentVariable->key.'='.$this->resolveSecretManagerDotenvValue($environmentVariable);
     }
 
     public function parse(bool $isNew = false): Collection

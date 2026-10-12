@@ -2122,7 +2122,7 @@ it('keeps local-first archive creation and mc copy when retaining a local volume
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, '>')
         && ! str_contains($process->command, 'mc pipe'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp')
+    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp --resolve ')
         && ! str_contains($process->command, 'mc pipe'));
 });
 
