@@ -13,7 +13,23 @@ final class RedactSensitiveData
 
     public function __invoke(Logger $logger): void
     {
+        if (! self::enabled()) {
+            return;
+        }
+
         $logger->pushProcessor(fn (LogRecord $record): LogRecord => $this->redact($record));
+    }
+
+    /**
+     * Self-hosted instances may turn off framework log redaction. Cloud always redacts.
+     */
+    public static function enabled(): bool
+    {
+        if (! app()->bound('config')) {
+            return true;
+        }
+
+        return isCloud() || config('logging.redaction_enabled', true) !== false;
     }
 
     private function redact(LogRecord $record): LogRecord

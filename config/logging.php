@@ -52,6 +52,19 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Log Redaction
+    |--------------------------------------------------------------------------
+    |
+    | Secrets are removed from every log channel before a line is written.
+    | Self-hosted instances can set LOG_REDACTION_ENABLED=false to write the
+    | raw text, for example while debugging. Coolify Cloud always redacts.
+    |
+    */
+
+    'redaction_enabled' => (bool) env('LOG_REDACTION_ENABLED', true),
+
     'channels' => [
         'stack' => [
             'driver' => 'stack',
