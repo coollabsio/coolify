@@ -4,6 +4,8 @@ use App\Actions\Node\CreateOperation;
 use App\Actions\Node\RecoverStaleOperations;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
+use App\Jobs\DeployNodeWorkloadJob;
+use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\RecoverStaleNodeOperationsJob;
 use App\Models\InstanceSettings;
 use App\Models\Node;
@@ -18,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -60,6 +63,15 @@ function staleOperation(object $test, string $commandType, NodeOperationStatus $
     ]);
 
     return $operation->refresh();
+}
+
+function acknowledge(NodeOperation $operation): void
+{
+    NodeOperation::query()->whereKey($operation->id)->update([
+        'result' => ['command_id' => $operation->uuid, 'runtime_id' => 'runtime-1'],
+        'updated_at' => $operation->updated_at,
+    ]);
+    $operation->refresh();
 }
 
 function fakeInventory(object $test, ?string $state): void
@@ -116,9 +128,10 @@ it('does not touch operations that are still within the stale limit', function (
     Http::assertNothingSent();
 });
 
-it('marks a stale deployment as succeeded when the requested revision runs', function () {
+it('marks a stale deployment as succeeded when Sentinel acknowledged the running container', function () {
     fakeInventory($this, 'running');
     $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::RUNNING);
+    acknowledge($operation);
 
     RecoverStaleOperations::run();
 
@@ -127,15 +140,42 @@ it('marks a stale deployment as succeeded when the requested revision runs', fun
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.deploy'));
 });
 
-it('closes a stale deployment without replaying it when the revision does not run', function () {
-    fakeInventory($this, null);
+it('replays a stale deployment with the same operation when inventory cannot prove it ran', function (?string $state) {
+    Queue::fake();
+    fakeInventory($this, $state);
     $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::RUNNING);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::UNCERTAIN);
+    Queue::assertPushed(DeployNodeWorkloadJob::class, fn (DeployNodeWorkloadJob $job): bool => $job->operationId === $operation->id);
+})->with([
+    'the revision already runs' => ['running'],
+    'the revision does not run' => [null],
+]);
+
+it('replays a stale uncertain restart with the same operation', function () {
+    Queue::fake();
+    fakeInventory($this, 'running');
+    $operation = staleOperation($this, 'workload.lifecycle.v1', NodeOperationStatus::UNCERTAIN, ['revision_uuid' => $this->revision->uuid, 'action' => NodeWorkloadAction::RESTART->value]);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::UNCERTAIN);
+    Queue::assertPushed(ManageNodeWorkloadJob::class, fn (ManageNodeWorkloadJob $job): bool => $job->operationId === $operation->id);
+});
+
+it('closes a stale deployment after the replay limit', function () {
+    Queue::fake();
+    fakeInventory($this, null);
+    $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::UNCERTAIN);
+    NodeOperation::query()->whereKey($operation->id)->update(['attempt_count' => 3, 'updated_at' => $operation->updated_at]);
 
     RecoverStaleOperations::run();
 
     expect($operation->refresh()->status)->toBe(NodeOperationStatus::TIMED_OUT)
         ->and($operation->error)->toBe('The operation stopped before completion. The workload reconciler creates a new operation from the current desired state.');
-    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.deploy'));
+    Queue::assertNothingPushed();
 });
 
 it('verifies a stale uncertain lifecycle operation instead of replaying it', function () {
@@ -148,15 +188,27 @@ it('verifies a stale uncertain lifecycle operation instead of replaying it', fun
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.lifecycle'));
 });
 
-it('confirms an uncertain deployment before the stale limit when the requested revision runs', function () {
+it('confirms an uncertain deployment before the stale limit when Sentinel acknowledged it', function () {
     fakeInventory($this, 'running');
     $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::UNCERTAIN, minutesAgo: 2);
+    acknowledge($operation);
 
     RecoverStaleOperations::run();
 
     expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
         ->and($operation->result['verification']['converged'])->toBeTrue();
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.deploy'));
+});
+
+it('keeps an unacknowledged uncertain deployment open until the stale limit even when the revision runs', function () {
+    Queue::fake();
+    fakeInventory($this, 'running');
+    $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::UNCERTAIN, minutesAgo: 2);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::UNCERTAIN);
+    Queue::assertNothingPushed();
 });
 
 it('keeps an uncertain deployment open until the stale limit when the revision does not run yet', function () {

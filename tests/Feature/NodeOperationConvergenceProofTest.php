@@ -69,10 +69,18 @@ it('does not confirm a redeploy of the same revision from a container that preda
     expect($verification['converged'])->toBeFalse();
 });
 
-it('confirms a deployment when the container started after the dispatch', function () {
-    proofContainer($this, 'running', now());
+it('does not use the Node clock as proof for a deployment', function () {
+    proofContainer($this, 'running', now()->addMinute());
 
-    expect(VerifyDeploymentConvergence::run(proofOperation($this, 'workload.deploy.v1'))['converged'])->toBeTrue();
+    expect(VerifyDeploymentConvergence::run(proofOperation($this, 'workload.deploy.v1'))['converged'])->toBeFalse();
+});
+
+it('does not confirm a deployment that Flux acknowledged for another container', function () {
+    proofContainer($this, 'running', now()->subHour());
+    $operation = proofOperation($this, 'workload.deploy.v1');
+    $operation->update(['result' => ['command_id' => $operation->uuid, 'runtime_id' => 'another-runtime']]);
+
+    expect(VerifyDeploymentConvergence::run($operation)['converged'])->toBeFalse();
 });
 
 it('confirms a deployment that Flux acknowledged for the observed container', function () {
@@ -93,12 +101,12 @@ it('does not confirm a restart from a container that predates the dispatch', fun
     expect($verification['converged'])->toBeFalse();
 });
 
-it('confirms a restart when the container started after the dispatch', function () {
-    proofContainer($this, 'running', now());
+it('does not use the Node clock as proof for a restart', function () {
+    proofContainer($this, 'running', now()->addMinute());
 
     expect(VerifyWorkloadLifecycleConvergence::run(
         proofOperation($this, 'workload.lifecycle.v1', ['action' => NodeWorkloadAction::RESTART->value]),
-    )['converged'])->toBeTrue();
+    )['converged'])->toBeFalse();
 });
 
 it('confirms a restart that Flux acknowledged', function () {

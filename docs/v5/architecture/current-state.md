@@ -165,10 +165,13 @@ Node page also shows durable operation states and provides a **Recover**
 button for an `uncertain` operation.
 
 Recovery reuses the existing operation UUID. It never creates a new command for
-the same attempt. A redeploy or restart is successful only when Coolify has
-proof that this command took effect: Sentinel acknowledged the operation UUID,
-or the container started after the operation was dispatched. A running
-container from before the dispatch is not proof. A stale move releases the
+the same attempt. A redeploy or restart is successful only when Sentinel
+acknowledged the operation UUID. A running container is not proof, and Coolify
+does not compare Node clock times with its own. Without proof, recovery sends
+the same operation UUID again, at most three dispatch attempts in total.
+Sentinel's command journal then returns the stored result, or runs the command
+once if it never ran. Start, stop, and remove are still confirmed from the
+container state, because that state alone proves them. A stale move releases the
 target placement that the move attached, unless the target became ready.
 
 ### Workload lifecycle

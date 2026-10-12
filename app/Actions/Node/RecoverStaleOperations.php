@@ -3,6 +3,8 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
+use App\Jobs\DeployNodeWorkloadJob;
+use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\MoveNodeWorkloadJob;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
@@ -28,6 +30,9 @@ class RecoverStaleOperations
     ];
 
     private const WORKLOAD_COMMANDS = ['workload.deploy.v1', 'workload.lifecycle.v1'];
+
+    /** Dispatch attempts after which a stale workload operation is closed instead of sent again. */
+    private const MAX_REPLAYS = 3;
 
     private const NETWORK_COMMANDS = [
         'network.wireguard.key.ensure.v1',
@@ -132,6 +137,9 @@ class RecoverStaleOperations
         }
 
         $verification = $this->verify($operation);
+        if ($verification !== null && ! $verification['converged'] && $operation->attempt_count < self::MAX_REPLAYS) {
+            return $this->replay($operation);
+        }
         if (! ($verification['converged'] ?? false)) {
             return $this->close($operation, $error);
         }
@@ -147,6 +155,27 @@ class RecoverStaleOperations
         }
 
         return $claimed !== null;
+    }
+
+    /**
+     * Inventory cannot prove that a deploy or restart ran, so send the same operation UUID again.
+     * The Sentinel command journal returns the stored result, or runs the command once if it never ran.
+     */
+    private function replay(NodeOperation $operation): bool
+    {
+        if ($operation->status !== NodeOperationStatus::UNCERTAIN) {
+            $operation = ClaimOperation::run($operation, NodeOperationStatus::UNCERTAIN, error: 'The worker stopped before it received a result. Coolify sends the same command again.');
+            if ($operation === null) {
+                return false;
+            }
+        }
+
+        match ($operation->command_type) {
+            'workload.deploy.v1' => DeployNodeWorkloadJob::dispatch($operation->id),
+            'workload.lifecycle.v1' => ManageNodeWorkloadJob::dispatch($operation->id),
+        };
+
+        return true;
     }
 
     /** @return array<string, mixed>|null */

@@ -275,7 +275,7 @@ it('fails when the deployed revision is not running after inventory refresh', fu
         ->and($this->operation->error)->toBe('The requested workload revision is not running.');
 });
 
-it('recovers an uncertain deployment from observed state without replaying the command', function () {
+it('replays an uncertain deployment with the same operation UUID instead of trusting the running container', function () {
     $this->operation->update([
         'status' => NodeOperationStatus::UNCERTAIN,
         'error' => 'The deployment result is unknown.',
@@ -283,7 +283,14 @@ it('recovers an uncertain deployment from observed state without replaying the c
     ]);
     Http::fake(function ($request) {
         if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
-            return Http::response('Deployment must not be replayed.', 500);
+            // The Sentinel command journal returns the stored result of the first attempt.
+            return Http::response([
+                'command_id' => $request['command_id'],
+                'observed_at_unix_ms' => 1_700_000_000_090,
+                'runtime_id' => 'runtime-existing',
+                'name' => $request['name'],
+                'image' => $request['image'],
+            ]);
         }
 
         return Http::response([
@@ -312,9 +319,11 @@ it('recovers an uncertain deployment from observed state without replaying the c
     (new DeployNodeWorkloadJob($this->operation->id))->handle();
 
     expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
-        ->and($this->operation->attempt_count)->toBe(0)
+        ->and($this->operation->attempt_count)->toBe(1)
+        ->and($this->operation->result['command_id'])->toBe($this->operation->uuid)
         ->and($this->operation->result['verification']['runtime_id'])->toBe('runtime-existing');
-    Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/v1/commands/workload.deploy'));
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/v1/commands/workload.deploy')
+        && $request['command_id'] === $this->operation->uuid);
 });
 
 it('keeps recovery uncertain when Flux remains unavailable', function () {

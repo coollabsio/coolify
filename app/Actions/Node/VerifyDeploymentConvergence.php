@@ -41,17 +41,13 @@ class VerifyDeploymentConvergence
 
     /**
      * A redeploy can reuse the running revision, so a running container alone does not prove this command ran.
-     * Flux must have acknowledged this command for the container, or the container must have started after dispatch.
+     * Only the Sentinel acknowledgement for this operation is proof. Container start times come from the Node
+     * clock, so they are not compared with Coolify times. Without proof, recovery replays the same operation UUID,
+     * and the Sentinel command journal returns the stored result or runs the command once.
      */
     private function tookEffect(NodeOperation $operation, NodeContainer $container): bool
     {
-        if (data_get($operation->result, 'command_id') === $operation->uuid
-            && data_get($operation->result, 'runtime_id') === $container->runtime_id) {
-            return true;
-        }
-
-        return $operation->dispatched_at !== null
-            && $container->runtime_started_at !== null
-            && $container->runtime_started_at->greaterThanOrEqualTo($operation->dispatched_at);
+        return data_get($operation->result, 'command_id') === $operation->uuid
+            && data_get($operation->result, 'runtime_id') === $container->runtime_id;
     }
 }
