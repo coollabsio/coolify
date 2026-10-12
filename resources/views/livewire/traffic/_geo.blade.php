@@ -91,8 +91,9 @@
             </div>
 
             {{-- Ranked, scrollable lists (60%). Hover a row to face it on the globe.
-                 `target` is an ISO-A2 code or a [lat, lon] pair. --}}
-            <div class="min-w-0" x-data="{
+                 `target` is an ISO-A2 code or a [lat, lon] pair. The key re-creates the
+                 Alpine state when city data appears or disappears between renders. --}}
+            <div class="min-w-0" wire:key="geo-lists-{{ $globeId }}-{{ $hasCities ? 'cities' : 'countries' }}" x-data="{
                 view: @js($hasCities) && localStorage.getItem('traffic-geo-view') === 'cities' ? 'cities' : 'countries',
                 setView(next) {
                     this.view = next;

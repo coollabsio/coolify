@@ -7,6 +7,8 @@ uses(RefreshDatabase::class);
 
 class FakeBrowserCityTrafficClient extends SentinelTrafficClient
 {
+    public static bool $withCities = true;
+
     protected function raw(string $url): string
     {
         $responses = [
@@ -21,7 +23,7 @@ class FakeBrowserCityTrafficClient extends SentinelTrafficClient
                 ['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000],
                 ['value' => 'FR', 'requests' => 400, 'bytes_out' => 10000],
             ],
-            '/traffic/breakdown/city' => [
+            '/traffic/breakdown/city' => ! self::$withCities ? [] : [
                 ['value' => 'DE|BE|Berlin', 'requests' => 450, 'bytes_out' => 11000, 'lat' => 52.52, 'lon' => 13.405],
                 ['value' => 'FR|IDF|Paris', 'requests' => 400, 'bytes_out' => 10000, 'lat' => 48.85, 'lon' => 2.35],
                 ['value' => 'DE||', 'requests' => 150, 'bytes_out' => 4000],
@@ -39,6 +41,7 @@ class FakeBrowserCityTrafficClient extends SentinelTrafficClient
 }
 
 beforeEach(function () {
+    FakeBrowserCityTrafficClient::$withCities = true;
     $this->stack = seedBrowserResourceStack();
 
     $server = $this->stack['server'];
@@ -66,4 +69,22 @@ it('switches between the country and city lists and remembers the selection', fu
         ->assertDontSee('Germany')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'analytics-geo-cities');
+});
+
+it('shows the country list again when city data disappears while Cities is selected', function () {
+    loginAndSkipBoarding();
+
+    $page = visit('/analytics');
+
+    $page->click('button:visible:has-text("Cities")')
+        ->assertSee('Berlin, BE, DE');
+
+    // The next render (a range change) reads from a Sentinel with no city data.
+    FakeBrowserCityTrafficClient::$withCities = false;
+
+    $page->click('button:visible:has-text("7 days")')
+        ->assertDontSee('Berlin, BE, DE')
+        ->assertSee('Germany')
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'analytics-geo-cities-gone');
 });

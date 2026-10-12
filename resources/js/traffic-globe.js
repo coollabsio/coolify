@@ -235,8 +235,8 @@ function mountTrafficGlobe(canvas, data, dark) {
     });
     resizeObserver.observe(canvas);
 
-    const intersectionObserver = new IntersectionObserver(([entry]) => {
-        visible = entry.isIntersecting;
+    const intersectionObserver = new IntersectionObserver((entries) => {
+        visible = entries[entries.length - 1].isIntersecting;
         if (visible) {
             wake();
         }
