@@ -147,5 +147,7 @@ it('does not detect a running upgrade for empty or malformed status', function (
 })->with([
     'empty' => '',
     'missing fields' => '3|Pulling Docker images',
+    'blank timestamp' => '3|Pulling Docker images|',
+    'whitespace timestamp' => "3|Pulling Docker images| \t",
     'invalid timestamp' => '3|Pulling Docker images|not-a-date',
 ]);

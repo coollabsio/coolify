@@ -73,7 +73,7 @@ class ScheduledBackups extends Component
 
     public function render(): View
     {
-        $this->database->loadMissing('scheduledBackups.s3');
+        $this->database->loadMissing(['scheduledBackups.s3', 'scheduledBackups.s3Storages']);
 
         return view('livewire.project.database.scheduled-backups');
     }

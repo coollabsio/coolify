@@ -131,8 +131,21 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
+        $maintenanceServers = data_get($this->resource, 'is_maintenance_enabled') ? $this->resource->maintenanceServers() : null;
+
         $this->deleteLocalResource();
 
+        if ($maintenanceServers) {
+            try {
+                // Removes the maintenance route of the deleted resource.
+                $this->resource->syncMaintenancePage($maintenanceServers);
+            } catch (\Throwable $e) {
+                Log::warning('Maintenance page cleanup failed while deleting resource.', [
+                    'resource_id' => $this->resource->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     private function deleteLocalResource(): void
