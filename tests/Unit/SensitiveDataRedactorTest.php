@@ -121,3 +121,12 @@ it('redacts arrayable objects and hides unknown objects', function () {
         ->and($result['unknown'])->toStartWith('[object ')
         ->and($result['status'])->toBe(ApplicationDeploymentStatus::FINISHED);
 });
+
+it('redacts keys that end with a sensitive name', function () {
+    $redactor = new SensitiveDataRedactor;
+
+    expect($redactor->redactValue(['smtp_password' => 'hunter2', 'githubToken' => 'abc', 'X-Webhook-Secret' => 'def', 'token_count' => 5, 'password_reset_at' => 'today']))
+        ->toBe(['smtp_password' => REDACTED, 'githubToken' => REDACTED, 'X-Webhook-Secret' => REDACTED, 'token_count' => 5, 'password_reset_at' => 'today'])
+        ->and($redactor->redactText('smtp_password=hunter2 "db-password": "p w" max_tokens=100'))
+        ->toBe('smtp_password='.REDACTED.' "db-password": '.REDACTED.' max_tokens=100');
+});

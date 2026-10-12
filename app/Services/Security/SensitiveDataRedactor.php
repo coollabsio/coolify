@@ -174,9 +174,12 @@ final class SensitiveDataRedactor
     {
         $assignmentKeys = array_diff(self::SENSITIVE_KEYS, ['authorization', 'proxy_authorization']);
         $keys = implode('|', array_map(fn (string $key): string => preg_quote($key, '/'), $assignmentKeys));
-        $keys = '(?i:'.$keys.')|[A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*';
+        // A key matches when it is a sensitive name or ends with one, such as smtp_password or github-token.
+        $keys = '(?i:(?:[a-z0-9]+[_-])*(?:'.$keys.'))|[A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*';
         $value = '(?:"[^"\r\n]*"|\'[^\'\r\n]*\'|[^\s,;}\]]+)';
-        $result = preg_replace('/(?<![\w-])(["\']?(?:'.$keys.')["\']?\s*[=:]\s*)'.$value.'/', '$1'.REDACTED, $text);
+        // Skip values that an earlier rule already replaced, such as the token in https://x-access-token:<REDACTED>@host.
+        $alreadyRedacted = '(?!'.preg_quote(REDACTED, '/').')';
+        $result = preg_replace('/(?<![\w-])(["\']?(?:'.$keys.')["\']?\s*[=:]\s*)'.$alreadyRedacted.$value.'/', '$1'.REDACTED, $text);
         if ($result === null) {
             throw new \RuntimeException('Log redaction failed.');
         }
@@ -217,8 +220,14 @@ final class SensitiveDataRedactor
 
     private function isSensitiveKey(string $key): bool
     {
-        $normalized = strtolower(preg_replace('/[-\s]+/', '_', $key) ?? $key);
+        $normalized = strtolower(preg_replace(['/([a-z0-9])([A-Z])/', '/[-\s]+/'], ['$1_$2', '_'], $key) ?? $key);
 
-        return in_array($normalized, self::SENSITIVE_KEYS, true);
+        foreach (self::SENSITIVE_KEYS as $sensitiveKey) {
+            if ($normalized === $sensitiveKey || str_ends_with($normalized, '_'.$sensitiveKey)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
