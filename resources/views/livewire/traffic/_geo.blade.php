@@ -1,13 +1,13 @@
 {{--
     Shared geo visualization for traffic analytics: a lightweight interactive 3D
-    dotted globe (WebGL, via cobe — see resources/js/traffic-globe.js) with a
-    request-volume marker per country, beside a scrollable ranked country list.
-    Hovering a country row rotates the globe to face it. Driven by the `country`
-    breakdown; each row is ['value' => ISO-A2, 'requests', 'bytesOut']. The globe
-    live-updates from the host's `refreshChartData-{chartId}-status` payload
-    (`geo` key), so `$chartId` must be in scope.
+    dotted globe (WebGL, via cobe — see resources/js/traffic-globe.js) beside a
+    scrollable ranked country list, and a city list when Sentinel has city data.
+    Hovering a row rotates the globe to face it. The globe live-updates from the
+    host's `refreshChartData-{chartId}-status` payload (`geo` key), so `$chartId`
+    must be in scope.
 
-    @param iterable $countries    country-breakdown rows
+    @param iterable $countries    country-breakdown rows: ['value' => ISO-A2, 'requests', 'bytesOut']
+    @param array    $cities       output of trafficCityRows(); empty when there is no city data
     @param ?string  $attribution  optional Sentinel attribution note
 --}}
 @php
@@ -25,9 +25,6 @@
         fn ($r) => preg_match('/^[A-Z]{2}$/', $r['value']) && countryName($r['value']) !== 'Unknown'
     );
 
-    // Initial marker payload for the globe, keyed by ISO-A2 request volume.
-    $geoInit = $known->map(fn ($r) => ['code' => $r['value'], 'requests' => $r['requests']])->values()->all();
-
     $countryRows = $known->values();
     if ($unknown->isNotEmpty()) {
         $countryRows->push([
@@ -39,8 +36,17 @@
     $countryRows = $countryRows->sortByDesc('requests')->values();
     $maxRequests = max(1, (int) $countryRows->max('requests'));
 
+    $cityRows = collect($cities ?? []);
+    $hasCities = $cityRows->isNotEmpty();
+    $maxCityRequests = max(1, (int) $cityRows->max('requests'));
+
+    // Initial marker payload for the globe: cities when available, else countries.
+    $geoInit = trafficGeoMarkers($known->all(), $cityRows->all());
+
     $hasData = $countryRows->isNotEmpty();
     $globeId = ($chartId ?? 'traffic').'-globe';
+    $listClass = 'overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-300 dark:scrollbar-thumb-white/10';
+    $rowClass = 'group flex min-h-10 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.03]';
 @endphp
 
 <div class="flex flex-col">
@@ -84,18 +90,38 @@
                 </div>
             </div>
 
-            {{-- Ranked, scrollable country list (60%). Hover a row to face it on the globe. --}}
+            {{-- Ranked, scrollable lists (60%). Hover a row to face it on the globe.
+                 `target` is an ISO-A2 code or a [lat, lon] pair. --}}
             <div class="min-w-0" x-data="{
-                focus(code) {
+                view: @js($hasCities) && localStorage.getItem('traffic-geo-view') === 'cities' ? 'cities' : 'countries',
+                setView(next) {
+                    this.view = next;
+                    localStorage.setItem('traffic-geo-view', next);
+                },
+                focus(target) {
                     const g = document.getElementById('{!! $globeId !!}');
-                    if (g && g._trafficGlobe) { g._trafficGlobe.focus(code); }
+                    if (g && g._trafficGlobe) { g._trafficGlobe.focus(target); }
                 },
                 blur() {
                     const g = document.getElementById('{!! $globeId !!}');
                     if (g && g._trafficGlobe) { g._trafficGlobe.resume(); }
                 },
             }">
-                <div class="max-h-[320px] overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-300 dark:scrollbar-thumb-white/10">
+                @if ($hasCities)
+                    <div class="mb-2 inline-flex rounded-md p-0.5 ring-1 ring-neutral-200 dark:ring-white/[0.08]"
+                        role="group" aria-label="Location detail">
+                        @foreach (['countries' => 'Countries', 'cities' => 'Cities'] as $viewKey => $viewLabel)
+                            <button type="button" @click="setView('{{ $viewKey }}')"
+                                :aria-pressed="view === '{{ $viewKey }}' ? 'true' : 'false'"
+                                class="h-6 rounded px-2 text-[12px] font-medium transition-colors"
+                                :class="view === '{{ $viewKey }}'
+                                    ? 'bg-neutral-100 text-black dark:bg-white/[0.09] dark:text-fg'
+                                    : 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg'">{{ $viewLabel }}</button>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div x-show="view === 'countries'" class="{{ $hasCities ? 'max-h-[286px]' : 'max-h-[320px]' }} {{ $listClass }}">
                     @foreach ($countryRows as $row)
                         @php
                             $isUnknown = $row['value'] === '';
@@ -103,7 +129,7 @@
                         @endphp
                         <div wire:key="geo-country-{{ $globeId }}-{{ $loop->index }}"
                             @if (! $isUnknown) @mouseenter="focus('{{ $row['value'] }}')" @mouseleave="blur()" @endif
-                            class="group flex min-h-10 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.03]">
+                            class="{{ $rowClass }}">
                             @php $flagUrl = $isUnknown ? null : countryFlagUrl($row['value']); @endphp
                             @if ($flagUrl)
                                 <img src="{{ $flagUrl }}" srcset="{{ countryFlagUrl($row['value'], '48x36') }} 2x" alt=""
@@ -125,6 +151,37 @@
                         </div>
                     @endforeach
                 </div>
+
+                @if ($hasCities)
+                    <div x-show="view === 'cities'" x-cloak class="max-h-[286px] {{ $listClass }}">
+                        @foreach ($cityRows as $row)
+                            @php
+                                $hasCoordinates = $row['lat'] !== null && $row['lon'] !== null;
+                                $width = min(100, round(($row['requests'] / $maxCityRequests) * 100, 1));
+                                $flagUrl = countryFlagUrl($row['country']);
+                            @endphp
+                            <div wire:key="geo-city-{{ $globeId }}-{{ md5($row['key']) }}"
+                                @if ($hasCoordinates) @mouseenter="focus([{{ (float) $row['lat'] }}, {{ (float) $row['lon'] }}])" @mouseleave="blur()" @endif
+                                class="{{ $rowClass }}">
+                                @if ($flagUrl)
+                                    <img src="{{ $flagUrl }}" srcset="{{ countryFlagUrl($row['country'], '48x36') }} 2x" alt=""
+                                        loading="lazy" width="20" height="15"
+                                        class="h-[15px] w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/5 dark:ring-white/10"
+                                        onerror="this.style.visibility='hidden'">
+                                @else
+                                    <span class="shrink-0 text-[14px] leading-none" aria-hidden="true">🌐</span>
+                                @endif
+                                <span class="min-w-0 flex-1 truncate text-[12px] text-black dark:text-fg">{{ $row['label'] }}</span>
+                                <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
+                                    <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
+                                </div>
+                                <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                                    title="{{ number_format($row['requests']) }} requests">{{ compactNumber($row['requests']) }}</span>
+                                <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($row['bytesOut']) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
 

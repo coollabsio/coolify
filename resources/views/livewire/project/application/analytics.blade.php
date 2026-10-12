@@ -157,10 +157,12 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
             @include('livewire.traffic._paths-list', ['paths' => $topPaths])
         </x-application.settings-section>
 
-        <x-application.settings-section id="analytics-country-section" title="Countries"
-            helper="Request volume by visitor country for the selected range." flush>
+        @php $cityRows = trafficCityRows(data_get($breakdowns, 'city', [])); @endphp
+        <x-application.settings-section id="analytics-country-section" :title="$cityRows === [] ? 'Countries' : 'Locations'"
+            helper="Request volume by visitor location for the selected range." flush>
             @include('livewire.traffic._geo', [
                 'countries' => data_get($breakdowns, 'country', []),
+                'cities' => $cityRows,
                 'attribution' => $attribution,
             ])
         </x-application.settings-section>

@@ -27,7 +27,7 @@ class FakeGeoTrafficClient extends SentinelTrafficClient
     }
 }
 
-function fakeGeoResponses(array $countryRows): array
+function fakeGeoResponses(array $countryRows, array $cityRows = []): array
 {
     return [
         '/traffic/apps' => json_encode([]),
@@ -41,6 +41,7 @@ function fakeGeoResponses(array $countryRows): array
         ]),
         '/traffic/paths' => json_encode([]),
         '/traffic/breakdown/country' => json_encode($countryRows),
+        '/traffic/breakdown/city' => json_encode($cityRows),
         '/traffic/attribution' => json_encode(['attribution' => 'GeoIP data by MaxMind']),
     ];
 }
@@ -134,4 +135,82 @@ it('mounts the globe from the element itself when country data arrives after the
     $component->call('loadData')
         ->assertSeeHtml('id="global-analytics-globe" x-ref="canvas"')
         ->assertSeeHtml('window.mountTrafficGlobe(canvas');
+});
+
+it('renders the city list and the switch when Sentinel returns city data', function () {
+    $server = bootGeoServer();
+
+    $fake = new FakeGeoTrafficClient($server);
+    $fake->responses = fakeGeoResponses(
+        [['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000]],
+        [
+            ['value' => 'DE|BE|Berlin', 'requests' => 400, 'bytes_out' => 9000, 'lat' => 52.52, 'lon' => 13.405],
+            ['value' => 'DE||', 'requests' => 150, 'bytes_out' => 4000],
+            ['value' => '__other__', 'requests' => 50, 'bytes_out' => 2000],
+        ],
+    );
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee('Locations')
+        ->assertSeeHtml('aria-label="Location detail"')
+        ->assertSee('Cities')
+        ->assertSee('Germany')
+        ->assertSee('Berlin, BE, DE')
+        ->assertSee('Unknown, DE')
+        ->assertSee('Other')
+        // City markers, not the country centroid, go to the globe.
+        ->assertSeeHtml('lat\u0022:52.52')
+        // Only the row with coordinates turns the globe on hover.
+        ->assertSeeHtml('focus([52.52, 13.405])');
+});
+
+it('shows no switch and country markers when Sentinel returns no city data', function () {
+    $server = bootGeoServer();
+
+    $fake = new FakeGeoTrafficClient($server);
+    $fake->responses = fakeGeoResponses([
+        ['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000],
+    ]);
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee('Countries')
+        ->assertDontSeeHtml('aria-label="Location detail"')
+        ->assertSeeHtml('code\u0022:\u0022DE');
+});
+
+it('shows no switch when the GeoIP database has countries only', function () {
+    $server = bootGeoServer();
+
+    $fake = new FakeGeoTrafficClient($server);
+    $fake->responses = fakeGeoResponses(
+        [['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000]],
+        [['value' => 'DE||', 'requests' => 600, 'bytes_out' => 15000]],
+    );
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertDontSeeHtml('aria-label="Location detail"')
+        ->assertDontSee('Unknown, DE');
+});
+
+it('escapes a city name that contains quotes or HTML', function () {
+    $server = bootGeoServer();
+
+    $fake = new FakeGeoTrafficClient($server);
+    $fake->responses = fakeGeoResponses(
+        [['value' => 'US', 'requests' => 600, 'bytes_out' => 15000]],
+        [['value' => "US|MO|O'Fallon <b>x</b>", 'requests' => 400, 'bytes_out' => 9000, 'lat' => 38.81, 'lon' => -90.7]],
+    );
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee("O'Fallon <b>x</b>, MO, US")
+        ->assertDontSeeHtml('<b>x</b>, MO, US')
+        ->assertSeeHtml('focus([38.81, -90.7])');
 });
