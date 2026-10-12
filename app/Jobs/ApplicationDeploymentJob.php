@@ -216,8 +216,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $dockerSecretsSupported = false;
 
-    private bool $dockerSecretsAvailable = false;
-
     private bool $useBuildtimeEnvironmentLauncher = false;
 
     private bool $skip_build = false;
@@ -506,7 +504,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->dockerBuildkitSupported = false;
         $this->dockerBuildxAvailable = false;
         $this->dockerSecretsSupported = false;
-        $this->dockerSecretsAvailable = false;
 
         $serverToCheck = $this->use_build_server ? $this->build_server : $this->server;
         $serverName = $this->use_build_server ? "build server ({$serverToCheck->name})" : "deployment server ({$serverToCheck->name})";
@@ -558,19 +555,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            if ($this->dockerBuildkitSupported) {
+            if ($this->application->settings->use_build_secrets && $this->dockerBuildkitSupported) {
                 $secretsTest = instant_remote_process(
                     ["docker build --help 2>&1 | grep -q 'secret' && echo 'supported' || echo 'not-supported'"],
                     $serverToCheck
                 );
 
                 if (trim($secretsTest) === 'supported') {
-                    $this->dockerSecretsAvailable = true;
-                    if ($this->application->settings->use_build_secrets) {
-                        $this->dockerSecretsSupported = true;
-                        $this->application_deployment_queue->addLogEntry('Build secrets are enabled and will be used for enhanced security.');
-                    }
-                } elseif ($this->application->settings->use_build_secrets) {
+                    $this->dockerSecretsSupported = true;
+                    $this->application_deployment_queue->addLogEntry('Build secrets are enabled and will be used for enhanced security.');
+                } else {
                     $this->application_deployment_queue->addLogEntry("Docker on {$serverName} does not support build secrets. Using traditional build arguments.");
                 }
             }
@@ -578,7 +572,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->dockerBuildkitSupported = false;
             $this->dockerBuildxAvailable = false;
             $this->dockerSecretsSupported = false;
-            $this->dockerSecretsAvailable = false;
             $this->application_deployment_queue->addLogEntry("Could not detect BuildKit capabilities on {$serverName}: {$e->getMessage()}");
         }
     }
@@ -1763,7 +1756,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     continue;
                 }
 
-                $envs->push($env->key.'='.$this->resolve_environment_variable($env));
+                $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
             // Check for PORT environment variable mismatch with ports_exposes
@@ -1834,7 +1827,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     continue;
                 }
 
-                $envs->push($env->key.'='.$this->resolve_environment_variable($env));
+                $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
             // Fall back to production env vars for keys not overridden by preview vars,
@@ -1852,7 +1845,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         continue;
                     }
 
-                    $envs->push($env->key.'='.$this->resolve_environment_variable($env));
+                    $envs->push($this->runtimeEnvironmentAssignment($env));
                 }
             }
 
@@ -1870,6 +1863,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Return the generated environment variables instead of storing them globally
         return $envs;
+    }
+
+    /**
+     * A KEY="value" line for the runtime .env file, which Docker Compose reads. Variables saved
+     * before exact escaping keep the old line, so their containers get the same value as before.
+     */
+    private function runtimeEnvironmentAssignment(EnvironmentVariable $environmentVariable): string
+    {
+        if (! $this->application->useExactEscaping($environmentVariable)) {
+            return $environmentVariable->key.'='.$this->resolve_environment_variable($environmentVariable);
+        }
+
+        $resolvedValue = (string) $environmentVariable->get_real_environment_variables_with_server(
+            $environmentVariable->value,
+            $this->application,
+            $this->mainServer,
+        );
+
+        if (RemoteSecretReferences::containsReference($environmentVariable->value) || RemoteSecretReferences::containsReference($resolvedValue)) {
+            return $environmentVariable->key.'='.escapeComposeEnvFileValue($this->resolve_environment_variable_raw($environmentVariable));
+        }
+
+        return $environmentVariable->key.'='.escapeComposeEnvFileValue(
+            $resolvedValue,
+            allowInterpolation: $this->application->environmentVariableAllowsInterpolation($environmentVariable, $resolvedValue),
+        );
     }
 
     private function isGeneratedDockerComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool
@@ -2121,6 +2140,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
+            $sorted_environment_variables = $this->withoutLegacyEnvironmentVariableKeys($sorted_environment_variables);
 
             // For Docker Compose, filter out generated SERVICE_* variables as we generate these
             if ($this->build_pack === 'dockercompose') {
@@ -2183,6 +2203,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
+            $sorted_environment_variables = $this->withoutLegacyEnvironmentVariableKeys($sorted_environment_variables);
 
             // For Docker Compose, filter out generated SERVICE_* variables as we generate these with PR-specific values
             if ($this->build_pack === 'dockercompose') {
@@ -2343,23 +2364,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $environmentVariables = $this->pull_request_id === 0
             ? $this->application->environment_variables()->get(['key', 'is_buildtime', 'is_runtime'])
             : $this->application->environment_variables_preview()->get(['key', 'is_buildtime', 'is_runtime']);
-        $validatesBuildtimeKeys = $buildsImage && $this->deploymentPassesBuildtimeVariables();
+        $passesBuildtimeVariables = $this->deploymentPassesBuildtimeVariables();
 
         foreach ($environmentVariables as $environmentVariable) {
             $key = (string) $environmentVariable->key;
-            $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
-            if (($environmentVariable->is_buildtime && $validatesBuildtimeKeys) || ! $isEnvFileSafe) {
-                $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
+            if (ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                continue;
+            }
 
-                continue;
+            $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
+            $isLegacyBuildtimeKey = preg_match('/\A[A-Za-z0-9_.-]+\z/', $key) === 1;
+            $isPassedToBuild = $environmentVariable->is_buildtime && $passesBuildtimeVariables && $buildsImage;
+            if (! $isEnvFileSafe || ($isPassedToBuild && ! $isLegacyBuildtimeKey)) {
+                $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
             }
-            // The deployment start already logged the warnings.
-            if ($buildsImage) {
-                continue;
-            }
-            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
-                $this->logLegacyEnvironmentVariableKey($key, (bool) $environmentVariable->is_buildtime, (bool) $environmentVariable->is_runtime);
-            }
+
+            $this->logLegacyEnvironmentVariableKey($key, (bool) $environmentVariable->is_buildtime, (bool) $environmentVariable->is_runtime, $passesBuildtimeVariables);
         }
     }
 
@@ -2372,7 +2392,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $this->application->build_pack !== 'dockerimage';
     }
 
-    private function logLegacyEnvironmentVariableKey(string $key, bool $isBuildtime, bool $isRuntime): void
+    private function logLegacyEnvironmentVariableKey(string $key, bool $isBuildtime, bool $isRuntime, bool $passesBuildtimeVariables): void
     {
         $suggestedKey = (string) preg_replace('/[^A-Za-z0-9_]/', '_', $key);
         if (preg_match('/\A[0-9]/', $suggestedKey) === 1) {
@@ -2381,16 +2401,31 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
 
-        if ($isBuildtime) {
-            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. It is not used as a build-time variable unless the deployment builds an image, and that build fails until you rename it.", 'stderr');
-        }
-        if ($isRuntime) {
-            $this->application_deployment_queue->addLogEntry("⚠️ Runtime variable {$displayKey} uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.", 'stderr');
-        }
-        if (! $isBuildtime && ! $isRuntime) {
-            $this->application_deployment_queue->addLogEntry("⚠️ Variable {$displayKey} uses a name that new variables cannot use. This deployment does not use it.", 'stderr');
+        if ($isBuildtime && $passesBuildtimeVariables) {
+            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. It is skipped during the build".($isRuntime ? ', but is still passed to the container.' : '.'), 'stderr');
+        } else {
+            if ($isBuildtime) {
+                $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. This deployment does not build an image, so it is not used as a build-time variable. Rename it before you use it in a build.", 'stderr');
+            }
+            if ($isRuntime) {
+                $this->application_deployment_queue->addLogEntry("⚠️ Runtime variable {$displayKey} uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.", 'stderr');
+            }
+            if (! $isBuildtime && ! $isRuntime) {
+                $this->application_deployment_queue->addLogEntry("⚠️ Variable {$displayKey} uses a name that new variables cannot use. This deployment does not use it.", 'stderr');
+            }
         }
         $this->application_deployment_queue->addLogEntry('   Suggested name: '.ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey), type: 'info');
+    }
+
+    /**
+     * Skip build-time variables with names that new variables can no longer use (such as my-var).
+     * validateDeploymentEnvironmentVariableKeys() logs a warning for them before the deployment starts.
+     */
+    private function withoutLegacyEnvironmentVariableKeys(Collection $environmentVariables): Collection
+    {
+        return $environmentVariables->filter(
+            fn (EnvironmentVariable $environmentVariable): bool => ValidationPatterns::isValidEnvironmentVariableKey((string) $environmentVariable->key)
+        );
     }
 
     private function logInvalidBuildtimeEnvironmentVariableKey(string $key, string $origin): void
@@ -2426,6 +2461,33 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $displaySuggestedKey = ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey);
 
         $this->application_deployment_queue->addLogEntry("   Suggested name: {$displaySuggestedKey}", type: 'info');
+    }
+
+    /**
+     * Remove variables with dotted names from a Nixpacks or Railpack build.
+     *
+     * Nixpacks and Railpack cut these names at the first dot, and their Debian-based
+     * images run build commands through dash, which drops dotted names from the
+     * environment. The variables are still available at runtime.
+     */
+    private function withoutDottedBuildVariables(Collection $variables, string $builder): Collection
+    {
+        $dottedKeys = $variables->keys()
+            ->map(fn ($key): string => (string) $key)
+            ->filter(fn (string $key): bool => str_contains($key, '.'))
+            ->values();
+
+        if ($dottedKeys->isEmpty()) {
+            return $variables;
+        }
+
+        foreach ($dottedKeys as $key) {
+            $this->application_deployment_queue->addLogEntry('⚠️ Build-time variable '.ValidationPatterns::displayShellEnvironmentVariableKey($key)." has a dot in its name, which {$builder} cannot pass to the build. It is skipped during the build, but is still passed to the container.", 'stderr');
+            $this->logSuggestedShellEnvironmentVariableKey($key);
+        }
+        $this->application_deployment_queue->addLogEntry('   If the build needs the value, rename the variable. Otherwise, disable "Available at Buildtime" for it.', type: 'info');
+
+        return $variables->reject(fn ($value, $key): bool => str_contains((string) $key, '.'));
     }
 
     private function save_buildtime_environment_variables()
@@ -3218,7 +3280,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 // Do any modifications here
                 // We need to generate envs here because nixpacks need to know to generate a proper Dockerfile
                 $this->generate_env_variables();
-                $merged_envs = collect(data_get($parsed, 'variables', []))->merge($this->env_args);
+                $merged_envs = $this->withoutDottedBuildVariables(
+                    collect(data_get($parsed, 'variables', []))->merge($this->env_args),
+                    'Nixpacks',
+                );
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
                 if (count($aptPkgs) === 0) {
                     $aptPkgs = ['curl', 'wget'];
@@ -3388,8 +3453,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ? $this->application->railpack_environment_variables()->get()
             : $this->application->railpack_environment_variables_preview()->get();
 
-        $variables = $genericBuildVariables
-            ->merge($railpackVariables)
+        $variables = $this->withoutLegacyEnvironmentVariableKeys($genericBuildVariables->merge($railpackVariables))
             ->mapWithKeys(function (EnvironmentVariable $environmentVariable) {
                 $value = $this->normalize_resolved_build_variable_value($environmentVariable);
                 if (is_null($value) || $value === '') {
@@ -3398,6 +3462,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return [$environmentVariable->key => $value];
             });
+        $variables = $this->withoutDottedBuildVariables($variables, 'Railpack');
 
         if ($this->application->install_command) {
             $variables->put('RAILPACK_INSTALL_CMD', $this->application->install_command);
@@ -3899,6 +3964,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)
                 ->get();
+            $envs = $this->withoutLegacyEnvironmentVariableKeys($envs);
 
             if ($this->build_pack === 'dockercompose') {
                 $envs = $envs->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
@@ -3921,6 +3987,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)
                 ->get();
+            $envs = $this->withoutLegacyEnvironmentVariableKeys($envs);
 
             if ($this->build_pack === 'dockercompose') {
                 $envs = $envs->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
@@ -4930,21 +4997,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->analyzeBuildTimeVariables($variables);
         }
 
-        $requiresDottedEnvironmentSecrets = $this->application->build_pack === 'nixpacks'
-            && $variables->keys()->contains(fn ($key): bool => str_contains((string) $key, '.'));
-
-        if ($requiresDottedEnvironmentSecrets) {
-            if (! $this->dockerSecretsAvailable) {
-                $dottedKeys = $variables->keys()
-                    ->filter(fn ($key): bool => str_contains((string) $key, '.'))
-                    ->implode(', ');
-
-                throw new DeploymentException("Dotted Nixpacks build-time environment variable names require Docker BuildKit secret support: {$dottedKeys}. Rename these keys to use underscores instead of dots, or upgrade Docker on the build server.");
-            }
-
-            $this->dockerSecretsSupported = true;
-        }
-
         if ($this->dockerSecretsSupported) {
             $this->generate_build_secrets($variables);
             $this->build_args = '';
@@ -5129,6 +5181,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)
                 ->get();
+            $envs = $this->withoutLegacyEnvironmentVariableKeys($envs);
             foreach ($envs as $env) {
                 $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $env->key, 'the generated Dockerfile');
                 $argsToInsert->push("ARG {$key}");
@@ -5148,6 +5201,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)
                 ->get();
+            $envs = $this->withoutLegacyEnvironmentVariableKeys($envs);
             foreach ($envs as $env) {
                 $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $env->key, 'the generated Dockerfile');
                 $argsToInsert->push("ARG {$key}");
@@ -5238,37 +5292,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return;
         }
 
-        $dottedKeys = $variables->keys()
-            ->map(fn ($key): string => (string) $key)
-            ->filter(fn (string $key): bool => str_contains($key, '.'));
-
-        if ($dottedKeys->isNotEmpty()) {
-            $originalDockerfile = $dockerfile;
-            $dockerfile = $dockerfile->map(function (string $line) use ($dottedKeys): ?string {
-                $trimmedLine = trim($line);
-
-                if (! str_starts_with($trimmedLine, 'ARG ') && ! str_starts_with($trimmedLine, 'ENV ')) {
-                    return $line;
-                }
-
-                [$instruction, $arguments] = explode(' ', $trimmedLine, 2);
-                $filteredArguments = collect(preg_split('/\s+/', $arguments))
-                    ->reject(function (string $argument) use ($dottedKeys): bool {
-                        $key = str($argument)->before('=')->toString();
-
-                        return $dottedKeys->contains($key);
-                    });
-
-                if ($filteredArguments->isEmpty()) {
-                    return null;
-                }
-
-                return $instruction.' '.$filteredArguments->implode(' ');
-            })->filter()->values();
-
-            $modified = $dockerfile->all() !== $originalDockerfile->values()->all();
-        }
-
         // Generate mount strings for all secrets
         $mountStrings = $variables->map(function ($value, $key) {
             $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the generated Dockerfile');
@@ -5279,7 +5302,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Add mount for the secrets hash to ensure cache invalidation
         $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
 
-        $modified ??= false;
+        $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
             $trimmed = ltrim($line);
 
