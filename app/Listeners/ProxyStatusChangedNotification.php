@@ -33,6 +33,7 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
 
         if ($status === 'running') {
             $server->setupDefaultRedirect();
+            $server->setupMaintenancePages();
             $server->setupDynamicProxyConfiguration();
             $server->proxy->force_stop = false;
             $server->save();

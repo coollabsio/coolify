@@ -16,6 +16,7 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
@@ -202,22 +203,22 @@ class ServerTransferExporter
             }
         }
 
-        $collectVolumeS3 = function ($resource) use (&$s3Ids): void {
+        $collectBackupS3 = function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup) use (&$s3Ids): void {
+            $s3Ids->push($backup->s3_storage_id, ...$backup->s3Storages()->pluck('s3_storages.id')->all());
+        };
+
+        $collectVolumeS3 = function ($resource) use ($collectBackupS3): void {
             if (method_exists($resource, 'persistentStorages')) {
                 foreach ($resource->persistentStorages as $volume) {
                     foreach ($volume->scheduledBackups as $vb) {
-                        if ($vb->s3_storage_id) {
-                            $s3Ids->push($vb->s3_storage_id);
-                        }
+                        $collectBackupS3($vb);
                     }
                 }
             }
             if (method_exists($resource, 'fileStorages')) {
                 foreach ($resource->fileStorages as $file) {
                     foreach ($file->scheduledBackups as $vb) {
-                        if ($vb->s3_storage_id) {
-                            $s3Ids->push($vb->s3_storage_id);
-                        }
+                        $collectBackupS3($vb);
                     }
                 }
             }
@@ -226,9 +227,7 @@ class ServerTransferExporter
         foreach ($databases as $database) {
             if (method_exists($database, 'scheduledBackups')) {
                 foreach ($database->scheduledBackups as $backup) {
-                    if ($backup->s3_storage_id) {
-                        $s3Ids->push($backup->s3_storage_id);
-                    }
+                    $collectBackupS3($backup);
                 }
             }
             $database->loadMissing(['persistentStorages.scheduledBackups', 'fileStorages.scheduledBackups']);
@@ -257,9 +256,7 @@ class ServerTransferExporter
             }
             foreach ($service->databases as $serviceDb) {
                 foreach ($serviceDb->scheduledBackups as $backup) {
-                    if ($backup->s3_storage_id) {
-                        $s3Ids->push($backup->s3_storage_id);
-                    }
+                    $collectBackupS3($backup);
                 }
                 $collectVolumeS3($serviceDb);
             }
@@ -981,6 +978,7 @@ class ServerTransferExporter
                 'timeout' => $backup->timeout,
                 'disable_local_backup' => (bool) ($backup->disable_local_backup ?? false),
                 's3_storage_uuid' => $backup->s3?->uuid,
+                's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                 'had_s3_storage' => filled($backup->s3_storage_id),
             ];
         }
@@ -1193,6 +1191,7 @@ class ServerTransferExporter
                         'retention_max_storage_s3' => $backup->retention_max_storage_s3,
                         'timeout' => $backup->timeout,
                         's3_storage_uuid' => $backup->s3?->uuid,
+                        's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                         'had_s3_storage' => filled($backup->s3_storage_id),
                     ];
                 }

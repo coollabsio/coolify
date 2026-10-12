@@ -43,6 +43,7 @@ class ListDatabaseBackups extends Tool
         $backups = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)
             ->where('database_id', $database->id)
             ->where('database_type', $database->getMorphClass())
+            ->with(['s3', 's3Storages'])
             ->get()
             ->map(fn ($backup) => $this->scrubSensitive([
                 'uuid' => $backup->uuid,
@@ -51,6 +52,7 @@ class ListDatabaseBackups extends Tool
                 'database_backup_retention_amount_locally' => $backup->database_backup_retention_amount_locally ?? null,
                 'save_s3' => $backup->save_s3 ?? null,
                 's3_storage_uuid' => $backup->s3?->uuid ?? null,
+                's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->all(),
                 'created_at' => $backup->created_at,
                 'updated_at' => $backup->updated_at,
             ]))

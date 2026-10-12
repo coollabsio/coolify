@@ -2,7 +2,9 @@
 
 namespace App\Actions\Server;
 
+use App\Jobs\DatabaseBackupJob;
 use App\Models\Server;
+use App\Models\StandalonePostgresql;
 use App\Notifications\Server\UpgradeSkippedLowDiskSpace;
 use App\Services\CoolifyUpgradeDiskSpace;
 use App\Services\CoolifyUpgradeStatus;
@@ -24,6 +26,7 @@ class UpdateCoolify
     public function handle($manual_update = false, bool $skipDiskSpaceCheck = false)
     {
         if (isDev()) {
+            $this->backupDatabase();
             Sleep::for(10)->seconds();
 
             return;
@@ -116,9 +119,26 @@ class UpdateCoolify
             return;
         }
 
+        $this->backupDatabase();
         $this->update($skipDiskSpaceCheck);
         $settings->new_version_available = false;
         $settings->save();
+    }
+
+    private function backupDatabase(): void
+    {
+        $backup = StandalonePostgresql::find(0)?->scheduledBackups()->first();
+        if (! $backup || ! instanceSettings()->is_backup_before_update_enabled) {
+            return;
+        }
+
+        // Runs inline so the update waits for the result. dispatchSync() would go through the job's
+        // WithoutOverlapping middleware, which silently drops the run while the scheduled backup is running.
+        $job = new DatabaseBackupJob($backup);
+        $job->handle();
+        if ($job->backup_log?->status !== 'success') {
+            throw new \Exception('The database backup failed, so the update was not started.');
+        }
     }
 
     private function update(bool $skipDiskSpaceCheck)

@@ -135,9 +135,6 @@ class CleanupDocker implements ShouldBeUnique
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
         $helperImageWithoutPrefix = 'coollabsio/coolify-helper';
         $helperImageWithoutPrefixVersion = "coollabsio/coolify-helper:$helperImageVersion";
-        $buildxMetadataVolume = isDev() && $server->isLocalhost()
-            ? 'coolify-buildx'
-            : '$HOME/.docker/buildx';
 
         $cleanupLog = [];
 
@@ -164,7 +161,8 @@ class CleanupDocker implements ShouldBeUnique
             $this->buildContainerPruneCommand(),
             $imagePruneCmd,
             'docker builder prune -af',
-            "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImageWithVersion} docker buildx prune --builder coolify-railpack -af 2>/dev/null || true",
+            // The prune fails on a stopped builder, so start it first.
+            railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, 'docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; docker buildx prune --builder coolify-railpack -af'),
             "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
             "docker images --filter before=$helperImageWithoutPrefixVersion --filter reference=$helperImageWithoutPrefix | grep $helperImageWithoutPrefix | awk '{print $3}' | xargs -r docker rmi -f",
         ];

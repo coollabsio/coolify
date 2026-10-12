@@ -21,6 +21,7 @@ class InstanceSettings extends Model
         'public_port_max',
         'do_not_track',
         'is_auto_update_enabled',
+        'is_backup_before_update_enabled',
         'is_registration_enabled',
         'disable_registration_when_oauth_enabled',
         'next_channel',
@@ -90,6 +91,7 @@ class InstanceSettings extends Model
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
+        'is_backup_before_update_enabled' => 'boolean',
         'is_registration_enabled' => 'boolean',
         'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',

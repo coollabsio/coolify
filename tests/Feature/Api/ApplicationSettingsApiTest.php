@@ -295,6 +295,35 @@ test('deployment parsing keeps commas in raw custom label values', function () {
         ->and($this->application->fresh()->custom_labels)->toBe(base64_encode($labels));
 });
 
+test('http basic auth hash settings are saved and applied to managed labels', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => true,
+        'http_basic_auth_username' => 'api-user',
+        'http_basic_auth_password' => 'api-password',
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['http_basic_auth_bcrypt_cost' => 4])
+        ->assertOk();
+
+    expect($this->application->fresh()->parseContainerLabels())->toContain('.basicauth.users=api-user:$2y$04$');
+});
+
+test('rejects http basic auth settings that are not supported', function (string $field, mixed $value) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [$field => $value])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors($field);
+})->with([
+    'Argon2id on a proxy without it' => ['http_basic_auth_hash_algorithm', 'argon2id'],
+    'unknown algorithm' => ['http_basic_auth_hash_algorithm', 'md5'],
+    'bcrypt cost above 14' => ['http_basic_auth_bcrypt_cost', 15],
+    'Argon2id memory above 256 MiB' => ['http_basic_auth_argon2id_memory_cost', 262145],
+    'Argon2id iterations above 12' => ['http_basic_auth_argon2id_time_cost', 13],
+    'password longer than 72 characters' => ['http_basic_auth_password', str_repeat('a', 73)],
+]);
+
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [

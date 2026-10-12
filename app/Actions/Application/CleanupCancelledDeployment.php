@@ -28,6 +28,12 @@ class CleanupCancelledDeployment
                     if (str($containerExists)->trim()->isNotEmpty()) {
                         instant_remote_process(["docker rm -f {$deploymentUuid}"], $server);
                         $containerStopped = true;
+
+                        // A removed helper cannot stop the Railpack builder, which keeps the memory of its builds.
+                        if ($deployment->application?->build_pack === 'railpack') {
+                            $helperImage = coolifyHelperImage().':'.getHelperVersion();
+                            instant_remote_process([railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImage, 'true')], $server, false);
+                        }
                     }
                 } catch (\Throwable $e) {
                     $firstError ??= $e;

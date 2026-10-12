@@ -77,31 +77,31 @@
                     </div>
 
                     @if ($build_pack === 'dockercompose')
-                        <div x-data="{
-                            baseDir: @js($base_directory),
-                            composeLocation: @js($docker_compose_location),
-                            normalize(path) {
-                                if (!path || path.trim() === '') return '/';
-                                const normalized = path.trim().replace(/\/+$/, '');
-                                return normalized.startsWith('/') ? normalized : '/' + normalized;
-                            },
-                        }" class="grid gap-4 sm:grid-cols-2">
-                            <x-forms.input placeholder="/" wire:model.defer="base_directory"
-                                label="Base directory" helper="Repository directory used as the build root."
-                                x-model="baseDir" @blur="baseDir = normalize(baseDir)" />
-                            <x-forms.input placeholder="/docker-compose.yaml"
-                                wire:model.defer="docker_compose_location" label="Compose file"
-                                helper="Path relative to the base directory." x-model="composeLocation"
-                                @blur="composeLocation = normalize(composeLocation)" />
-                            <p class="sm:col-span-2 text-xs text-neutral-500 dark:text-fg-dim">
-                                Resolved file:
-                                <code class="font-mono text-coollabs dark:text-warning"
-                                    x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></code>
-                            </p>
-                        </div>
+                        <x-forms.repository-paths class="sm:grid-cols-2" base="base_directory"
+                            file="docker_compose_location" fileLabel="Compose file"
+                            defaultFile="/docker-compose.yaml" />
                     @else
                         <x-forms.input wire:model="base_directory" label="Base directory"
                             helper="Repository directory used as the build root." />
+                    @endif
+
+                    @include('livewire.project.new.partials.smart-scan-summary')
+
+                    {{-- Dockerfile: pick a detected file or type a path --}}
+                    @if ($build_pack === 'dockerfile')
+                        <x-forms.listbox id="selectedDockerfile" label="Dockerfile" live searchable allowCustom placeholder="/Dockerfile"
+                            emptyText="No Dockerfiles detected. Type a path in the search field."
+                            searchPlaceholder="Search or type a path…"
+                            helper="Select a detected Dockerfile, or type a path relative to the base directory."
+                            :options="collect($detectedDockerfiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
+                    @endif
+
+                    {{-- Docker Compose file selector: pick a detected file or type a path --}}
+                    @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 0)
+                        <x-forms.listbox id="selectedDockerComposeFile" label="Docker Compose File" live searchable allowCustom
+                            searchPlaceholder="Search or type a path…"
+                            helper="Select a detected Docker Compose file, or type a path relative to the base directory."
+                            :options="collect($detectedDockerComposeFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
                     @endif
                 </div>
             </section>

@@ -260,6 +260,23 @@ it('pins docker config while running railpack buildx commands', function () {
         ->toContain('DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack');
 });
 
+it('stops the railpack builder after the build when no other build uses it', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'uuid' => 'application-uuid',
+    ]);
+
+    $command = invokeRailpackMethod($job, $reflection, 'railpack_build_command', ['coollabsio/coolify:test', collect([])]);
+
+    $sharedLock = strpos($command, 'flock -s 9');
+    $build = strpos($command, 'docker buildx build --builder coolify-railpack');
+    $stop = strpos($command, 'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack');
+
+    expect($sharedLock)->not->toBeFalse()
+        ->and($build)->toBeGreaterThan($sharedLock)
+        ->and($stop)->toBeGreaterThan($build)
+        ->and($command)->toEndWith('exit $status');
+});
+
 it('filters reserved docker client variables from railpack build secrets', function () {
     [$job, $reflection] = makeRailpackDeploymentJob([
         'uuid' => 'application-uuid',
