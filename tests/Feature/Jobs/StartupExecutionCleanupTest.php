@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTask;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\Notification;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+
     // Freeze time for consistent testing
     Carbon::setTestNow('2025-01-15 12:00:00');
 
@@ -185,7 +188,8 @@ test('app:init handles cleanup when no stuck executions exist', function () {
 
 test('cleanup does not send notifications even when team has notification settings', function () {
     // Create a team with notification settings enabled
-    $team = Team::factory()->create([
+    $team = Team::factory()->create();
+    $team->emailNotificationSettings()->update([
         'smtp_enabled' => true,
         'smtp_from_address' => 'test@example.com',
     ]);
@@ -213,4 +217,14 @@ test('cleanup does not send notifications even when team has notification settin
 
     // Assert NO notifications were sent despite team having notification settings
     Notification::assertNothingSent();
+});
+
+test('app:init does not cache the testing configuration into the shared bootstrap cache', function () {
+    $cachedConfig = app()->getCachedConfigPath();
+    $before = file_exists($cachedConfig) ? filemtime($cachedConfig) : null;
+
+    Artisan::call('app:init');
+
+    clearstatcache();
+    expect(file_exists($cachedConfig) ? filemtime($cachedConfig) : null)->toBe($before);
 });

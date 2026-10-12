@@ -32,8 +32,11 @@ class Init extends Command
 
     public function handle()
     {
-        Artisan::call('optimize:clear');
-        Artisan::call('optimize');
+        // Tests share bootstrap/cache with a running instance, so they must not cache the testing config.
+        if (! app()->runningUnitTests()) {
+            Artisan::call('optimize:clear');
+            Artisan::call('optimize');
+        }
 
         try {
             $this->pullTemplatesFromCDN();

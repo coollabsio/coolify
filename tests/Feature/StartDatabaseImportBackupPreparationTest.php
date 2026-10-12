@@ -140,6 +140,7 @@ test('s3 backups are prepared in the s3 helper and streamed into the database co
     $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
     $filesystem->shouldReceive('build')->once()->andReturn($disk);
     Storage::swap($filesystem);
+    Storage::fake('ssh-keys');
     Process::fake();
 
     $activity = app(StartDatabaseImport::class)->handle(

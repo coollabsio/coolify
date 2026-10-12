@@ -178,3 +178,5 @@
 - Put only immutable identity (the workload UUID) in container labels. Keep mutable routing data, such as domains and internal names, in Coolify and replicate it to Corrosion with the cluster network revision, so a change needs no redeploy.
 
 - When a new resource type is added (nodes, node workloads), add it to every emptiness and deletion guard: `Environment::isEmpty`, `Project::isEmpty`, `Team::deletionBlockers`. Otherwise a parent delete orphans the resource.
+- Host-side test runs share `storage/` and `bootstrap/cache/` with the dev container through bind mounts. Tests must never write real caches or SSH keys there: fake the `ssh-keys` disk (done globally in `tests/Pest.php`, and again after any `Storage::swap()`), and keep commands such as `app:init` from running `optimize` under `runningUnitTests()`. A leaked `config.php` makes the dev app run with the testing config.
+- Pin the `serversideup/php` base image to an exact tag. The floating `8.4-fpm-nginx-alpine` tag moved to v5, which moved user bundles to `user-bundles.d`; Coolify's own `s6-rc.d/user` bundle then replaces the base bundle, and php-fpm and nginx never start.

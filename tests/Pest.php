@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
@@ -15,7 +16,11 @@ use Tests\TestCase;
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
+// Host-side runs share storage/ with the dev container. Never write test SSH keys into the real key
+// directory, because root-owned files there make it unwritable for php-fpm.
+uses(TestCase::class)
+    ->beforeEach(fn () => Storage::fake('ssh-keys'))
+    ->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
 
 /*
 |--------------------------------------------------------------------------

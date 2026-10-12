@@ -74,6 +74,7 @@ test('s3 import activity command does not contain storage key or secret', functi
     $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
     $filesystem->shouldReceive('build')->once()->andReturn($disk);
     Storage::swap($filesystem);
+    Storage::fake('ssh-keys');
 
     Process::fake();
     Queue::fake();
