@@ -158,16 +158,18 @@ host-local operation.
 
 ### Operation recovery policy
 
-The first release uses manual recovery. The Node page shows durable operation
-states and provides a **Recover** button for an `uncertain` deployment. An
-operator can also refresh workload and container state before recovery.
+`RecoverStaleNodeOperationsJob` runs every five minutes. It recovers
+operations that stay `queued`, `dispatched`, `running`, or `uncertain` for
+longer than `constants.node.operation_stale_after_minutes` (default 20). The
+Node page also shows durable operation states and provides a **Recover**
+button for an `uncertain` operation.
 
-Coolify does not yet run a scheduled stale-operation recovery job. This keeps
-the first deployment slice small. Add automatic recovery later if normal use
-shows that operations often remain `queued`, `dispatched`, `running`, or
-`uncertain` after a queue worker or control-plane restart. Automatic recovery
-must reuse the existing operation UUID. It must not create a new deployment
-command for the same attempt.
+Recovery reuses the existing operation UUID. It never creates a new command for
+the same attempt. A redeploy or restart is successful only when Coolify has
+proof that this command took effect: Sentinel acknowledged the operation UUID,
+or the container started after the operation was dispatched. A running
+container from before the dispatch is not proof. A stale move releases the
+target placement that the move attached, unless the target became ready.
 
 ### Workload lifecycle
 
@@ -387,11 +389,9 @@ cross-instance command routing are not implemented yet.
 - multi-Flux routing and horizontal scaling;
 - complete application deployment orchestration, volumes, secrets, networks,
   proxy configuration, health gates, rollback, and placement;
-- scheduled recovery of stale Node operations. Recovery is manual for now;
 - HTTPS for ingress Nodes;
 - the remaining Podman volume, secret, network, and builder
   capabilities that will move from the earlier coold design into Sentinel;
-- on-demand Sentinel log transport;
 - retirement of the existing Sentinel container.
 
 ## Next safe step

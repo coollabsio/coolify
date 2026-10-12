@@ -178,8 +178,6 @@ it('cleans an applied Node network before detaching it and reconciles survivors'
     $leavingIp = $leaving->fresh()->wireguard_ip;
     $cluster->update(['network_status' => 'active']);
     $leaving->update(['network_applied_revision' => $cluster->desired_revision]);
-    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
-    $leaving->workloads()->attach($workload, ['container_ip' => '100.64.0.2']);
     $leaving->update(['is_usable' => true]);
     Cache::put($leaving->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => [
         'network.cluster.leave.v1',

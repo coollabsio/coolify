@@ -20,6 +20,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -278,6 +279,7 @@ it('recovers an uncertain deployment from observed state without replaying the c
     $this->operation->update([
         'status' => NodeOperationStatus::UNCERTAIN,
         'error' => 'The deployment result is unknown.',
+        'dispatched_at' => Carbon::createFromTimestampMs(1_700_000_000_000),
     ]);
     Http::fake(function ($request) {
         if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
@@ -295,6 +297,7 @@ it('recovers an uncertain deployment from observed state without replaying the c
                 'health_status' => null,
                 'restart_count' => 0,
                 'ports' => [],
+                'started_at_unix_ms' => 1_700_000_000_050,
                 'labels' => [
                     'coolify.managed' => 'true',
                     'coolify.instance' => 'instance-test',

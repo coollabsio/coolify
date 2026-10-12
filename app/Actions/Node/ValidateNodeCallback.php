@@ -12,7 +12,7 @@ class ValidateNodeCallback
     public function handle(Node $node, string $callbackUrl): string
     {
         return instant_remote_process(
-            [self::validationScript($callbackUrl)],
+            [InstallSentinel::hostCommand($node, self::validationScript($callbackUrl))],
             $node,
             timeout: 20,
             disableMultiplexing: true,

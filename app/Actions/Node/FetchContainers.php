@@ -56,7 +56,8 @@ class FetchContainers
         }
 
         $data = $validator->validated();
-        $observedAt = Carbon::createFromTimestampMs($data['observed_at_unix_ms'])->toIso8601String();
+        $snapshotObservedAt = Carbon::createFromTimestampMs($data['observed_at_unix_ms']);
+        $observedAt = $snapshotObservedAt->toIso8601String();
         $containers = collect($data['containers'])->map(fn (array $container): array => [
             'runtime_id' => $container['runtime_id'],
             'name' => $container['name'],
@@ -75,8 +76,8 @@ class FetchContainers
             'observed_at' => $observedAt,
         ])->all();
 
-        ReconcileContainers::run($node, $containers);
-        $node->mergeMetadata(['container_inventory_observed_at' => $observedAt]);
+        // The snapshot and its observed time are stored together; an older concurrent snapshot is skipped.
+        ReconcileContainers::run($node, $containers, $snapshotObservedAt);
 
         return count($containers);
     }

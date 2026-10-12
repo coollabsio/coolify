@@ -1,19 +1,20 @@
 @php
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $networkActivated = $cluster->hasActivatedNetwork();
+    $cidrLocked = $networkActivated || $cluster->nodes()->exists();
 @endphp
 
 <x-application.settings-section id="node-cluster-private-network-section" title="Private network"
-    helper="The private CIDR can change only before the network is activated.">
+    helper="The private CIDR can change only while the cluster has no servers. The network settings are locked after activation.">
     <form wire:submit="saveSettings" class="flex flex-col gap-4">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <x-forms.input id="cidr" label="Private CIDR" required :disabled="$networkActivated"
+            <x-forms.input id="cidr" label="Private CIDR" required :disabled="$cidrLocked"
                 canGate="update" :canResource="$cluster"
-                :helper="$networkActivated ? 'The network is active, so the CIDR is locked.' : null" />
+                :helper="$networkActivated ? 'The network is active, so the CIDR is locked.' : ($cidrLocked ? 'Remove all servers to change the CIDR.' : null)" />
             <x-forms.input id="wireguardInterface" label="WireGuard interface" required canGate="update"
-                :canResource="$cluster" />
+                :canResource="$cluster" :disabled="$networkActivated" />
             <x-forms.input id="wireguardPort" type="number" min="1" max="65535" label="UDP port" required
-                canGate="update" :canResource="$cluster" />
+                canGate="update" :canResource="$cluster" :disabled="$networkActivated" />
         </div>
         @if ($canUpdateCluster)
             <div class="flex">

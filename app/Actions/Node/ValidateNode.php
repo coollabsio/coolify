@@ -13,7 +13,7 @@ class ValidateNode
 
     public function handle(Node $node): bool
     {
-        $output = instant_remote_process([self::PODMAN_VALIDATION_COMMAND], $node, false, no_sudo: true);
+        $output = instant_remote_process([InstallSentinel::hostCommand($node, self::PODMAN_VALIDATION_COMMAND)], $node, false);
         $isUsable = is_string($output) && json_decode(trim($output), true) !== null;
 
         $node->update([

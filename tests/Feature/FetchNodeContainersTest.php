@@ -235,3 +235,30 @@ it('keeps the first dns name permanent and suffixes only a later mesh collision'
         $secondWorkload->id => $suffixedName,
     ]);
 });
+
+it('ignores a container snapshot older than the stored inventory', function () {
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'internal-secret');
+    $snapshot = fn (int $observedAtMs, string $runtimeId): array => [
+        'command_id' => "command-{$runtimeId}",
+        'observed_at_unix_ms' => $observedAtMs,
+        'containers' => [[
+            'runtime_id' => $runtimeId,
+            'name' => "container-{$runtimeId}",
+            'image' => 'docker.io/library/nginx:latest',
+            'state' => 'running',
+            'ports' => [],
+            'labels' => [],
+        ]],
+    ];
+    Http::fakeSequence('http://flux:7080/v1/commands/container.list')
+        ->push($snapshot(1_789_237_260_000, 'newer'))
+        ->push($snapshot(1_789_237_200_000, 'older'));
+    $node = Node::factory()->create(['team_id' => Team::factory()]);
+
+    FetchContainers::run($node);
+    FetchContainers::run($node);
+
+    expect($node->containers()->pluck('runtime_id')->all())->toBe(['newer'])
+        ->and(data_get($node->fresh()->metadata, 'container_inventory_observed_at'))->toBe('2026-09-12T18:21:00+00:00');
+});

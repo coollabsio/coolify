@@ -4,6 +4,7 @@
         $blockerDetails = [
             'projects' => ['label' => 'project', 'route' => 'project.index'],
             'servers' => ['label' => 'server', 'route' => 'server.index'],
+            'nodes' => ['label' => 'node', 'route' => 'server.index'],
             'sources' => ['label' => 'Git source', 'route' => 'source.all'],
         ];
     @endphp

@@ -197,6 +197,15 @@ SCRIPT;
         return 'printf %s '.escapeshellarg(base64_encode($script)).' | base64 -d | bash';
     }
 
+    /**
+     * Send a multi-line host script so a non-root SSH user runs the whole script under one `sudo bash`.
+     * Root users receive the script unchanged.
+     */
+    public static function hostCommand(Node $node, string $script): string
+    {
+        return $node->isNonRoot() ? self::remoteCommand($script) : $script;
+    }
+
     public static function serviceUnit(): string
     {
         return <<<'UNIT'

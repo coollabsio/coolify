@@ -69,7 +69,8 @@ class NodeWorkload extends BaseModel
      */
     public function team(): ?Team
     {
-        return data_get($this, 'environment.project.team');
+        // team_id is the owner that NodeWorkloadPolicy checks; the project relation can be gone.
+        return Team::query()->find($this->team_id);
     }
 
     public function type(): string

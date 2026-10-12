@@ -8,6 +8,7 @@ use App\Models\Node;
 use App\Models\NodeContainer;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,9 +19,11 @@ class ReconcileContainers
     use AsAction;
 
     /**
+     * Returns false when the snapshot is older than the stored inventory and was skipped.
+     *
      * @param  list<array<string, mixed>>  $observations
      */
-    public function handle(Node $node, array $observations): void
+    public function handle(Node $node, array $observations, ?CarbonInterface $snapshotObservedAt = null): bool
     {
         $containers = Validator::make(['containers' => $observations], [
             'containers' => ['array'],
@@ -38,7 +41,14 @@ class ReconcileContainers
             'containers.*.observed_at' => ['required', 'date'],
         ])->validate()['containers'];
 
-        DB::transaction(function () use ($node, $containers): void {
+        return DB::transaction(function () use ($node, $containers, $snapshotObservedAt): bool {
+            if ($snapshotObservedAt !== null) {
+                $locked = Node::query()->lockForUpdate()->findOrFail($node->id);
+                $storedObservedAt = data_get($locked->metadata, 'container_inventory_observed_at');
+                if (is_string($storedObservedAt) && Carbon::parse($storedObservedAt)->greaterThan($snapshotObservedAt)) {
+                    return false;
+                }
+            }
             $runtimeIds = [];
 
             foreach ($containers as $container) {
@@ -71,6 +81,12 @@ class ReconcileContainers
                 $missing->whereNotIn('runtime_id', $runtimeIds);
             }
             $missing->delete();
+
+            if ($snapshotObservedAt !== null) {
+                $node->mergeMetadata(['container_inventory_observed_at' => $snapshotObservedAt->toIso8601String()]);
+            }
+
+            return true;
         });
     }
 

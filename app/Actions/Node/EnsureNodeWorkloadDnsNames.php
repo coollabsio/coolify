@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeWorkload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,6 +21,8 @@ class EnsureNodeWorkloadDnsNames
         }
 
         return DB::transaction(function () use ($node): array {
+            // Shares the per-cluster lock with internal DNS renames.
+            NodeCluster::query()->whereKey($node->node_cluster_id)->lockForUpdate()->first();
             $workloads = NodeWorkload::query()
                 ->whereHas('nodes', fn ($query) => $query->where('node_cluster_id', $node->node_cluster_id))
                 ->orderBy('id')

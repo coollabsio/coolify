@@ -2,6 +2,7 @@
 
 namespace App\Rules;
 
+use App\Models\InstanceSettings;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Translation\PotentiallyTranslatedString;
@@ -62,6 +63,32 @@ class PrivateIpv4Cidr implements ValidationRule
         $secondRange = self::range($second);
 
         return $firstRange['start'] <= $secondRange['end'] && $secondRange['start'] <= $firstRange['end'];
+    }
+
+    /**
+     * Returns the first IPv4 literal inside the CIDR. Hostnames and IPv6 addresses are ignored.
+     *
+     * @param  iterable<?string>  $addresses
+     */
+    public static function firstContainedAddress(string $cidr, iterable $addresses): ?string
+    {
+        $range = self::range($cidr);
+        foreach ($addresses as $address) {
+            if (filled($address) && filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                $ip = self::ip($address);
+                if ($ip >= $range['start'] && $ip <= $range['end']) {
+                    return $address;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** IPv4 address of the Coolify host, which Sentinel's cluster firewall must never drop. */
+    public static function coolifyHostAddress(): ?string
+    {
+        return InstanceSettings::query()->whereKey(0)->value('public_ipv4');
     }
 
     private static function ip(string $ip): int

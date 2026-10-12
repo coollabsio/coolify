@@ -33,6 +33,7 @@ it('creates a node-bound Sentinel token', function () {
     $token = $node->ensureValidSentinelToken();
     $payload = json_decode(decrypt($token), true);
 
-    expect($payload)->toBe(['node_uuid' => $node->uuid])
+    expect($payload['node_uuid'])->toBe($node->uuid)
+        ->and($payload['nonce'])->toHaveLength(32)
         ->and($node->fresh()->sentinel_token)->toBe($token);
 });

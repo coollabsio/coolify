@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
+use App\Jobs\MoveNodeWorkloadJob;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use Illuminate\Support\Carbon;
@@ -103,12 +104,24 @@ class RecoverStaleOperations
             in_array($operation->command_type, NodeOperation::BACKGROUND_COMMAND_TYPES, true) => $this->close($operation, 'The operation stopped before completion. The next scheduled run replaces it.'),
             in_array($operation->command_type, self::NETWORK_COMMANDS, true) => $this->close($operation, 'The network step stopped before completion. Reconcile the cluster network again.'),
             in_array($operation->command_type, self::WORKLOAD_COMMANDS, true) => $this->recoverWorkload($operation),
+            $operation->command_type === 'workload.move.v1' => $this->recoverMove($operation),
             default => ClaimOperation::run(
                 $operation,
                 NodeOperationStatus::FAILED,
                 error: self::COORDINATED_ERRORS[$operation->command_type] ?? 'The operation stopped before completion.',
             ) !== null,
         };
+    }
+
+    /** A killed move worker never detached the target that it attached, so the workload would run on both servers. */
+    private function recoverMove(NodeOperation $operation): bool
+    {
+        $claimed = ClaimOperation::run($operation, NodeOperationStatus::FAILED, error: self::COORDINATED_ERRORS['workload.move.v1']);
+        if ($claimed !== null) {
+            MoveNodeWorkloadJob::releaseTarget($claimed);
+        }
+
+        return $claimed !== null;
     }
 
     private function recoverWorkload(NodeOperation $operation): bool

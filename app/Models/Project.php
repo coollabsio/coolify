@@ -156,7 +156,13 @@ class Project extends BaseModel
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
-            $this->services()->count() == 0;
+            $this->services()->count() == 0 &&
+            $this->nodeWorkloads()->count() == 0;
+    }
+
+    public function nodeWorkloads()
+    {
+        return $this->hasManyThrough(NodeWorkload::class, Environment::class);
     }
 
     public function databases(array $with = []): Collection

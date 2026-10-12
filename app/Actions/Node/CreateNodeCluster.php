@@ -29,6 +29,10 @@ class CreateNodeCluster
                 if (NodeCluster::query()->lockForUpdate()->get(['cidr'])->contains(fn (NodeCluster $cluster): bool => PrivateIpv4Cidr::overlaps($cluster->cidr, $cidr))) {
                     throw new DomainException('The cluster CIDR overlaps an existing cluster network.');
                 }
+                $hostAddress = PrivateIpv4Cidr::firstContainedAddress($cidr, [PrivateIpv4Cidr::coolifyHostAddress()]);
+                if ($hostAddress !== null) {
+                    throw new DomainException("The cluster CIDR contains the Coolify server address {$hostAddress}. Choose a range that does not include it.");
+                }
 
                 return NodeCluster::query()->create(['team_id' => $team->id, 'created_by_user_id' => $creator->id, 'name' => $name, 'description' => $description, 'cidr' => $cidr]);
             });
@@ -38,9 +42,11 @@ class CreateNodeCluster
     private function nextCidr(): string
     {
         $used = NodeCluster::query()->pluck('cidr')->all();
+        $hostAddress = PrivateIpv4Cidr::coolifyHostAddress();
         for ($i = 0; $i < 4096; $i++) {
             $cidr = '10.'.(240 + intdiv($i, 256)).'.'.($i % 256).'.0/24';
-            if (! collect($used)->contains(fn (string $existing): bool => PrivateIpv4Cidr::overlaps($existing, $cidr))) {
+            if (PrivateIpv4Cidr::firstContainedAddress($cidr, [$hostAddress]) === null
+                && ! collect($used)->contains(fn (string $existing): bool => PrivateIpv4Cidr::overlaps($existing, $cidr))) {
                 return $cidr;
             }
         }

@@ -11,7 +11,7 @@ class PrepareNodeHost
 
     public function handle(Node $node): string
     {
-        return instant_remote_process([self::installationScript()], $node, timeout: 900, disableMultiplexing: true);
+        return instant_remote_process([InstallSentinel::hostCommand($node, self::installationScript())], $node, timeout: 900, disableMultiplexing: true);
     }
 
     public static function installationScript(): string

@@ -55,6 +55,7 @@ function staleOperation(object $test, string $commandType, NodeOperationStatus $
     );
     NodeOperation::query()->whereKey($operation->id)->update([
         'status' => $status,
+        'dispatched_at' => $status === NodeOperationStatus::QUEUED ? null : now()->subMinutes($minutesAgo + 1),
         'updated_at' => now()->subMinutes($minutesAgo),
     ]);
 
@@ -79,6 +80,7 @@ function fakeInventory(object $test, ?string $state): void
                 'health_status' => null,
                 'restart_count' => 0,
                 'ports' => [],
+                'started_at_unix_ms' => now()->getTimestampMs(),
                 'labels' => [
                     'coolify.managed' => 'true',
                     'coolify.instance' => 'instance-test',
@@ -240,4 +242,22 @@ it('schedules stale operation recovery every five minutes on one scheduler', fun
     expect($event)->not->toBeNull()
         ->and($event->expression)->toBe('*/5 * * * *')
         ->and($event->onOneServer)->toBeTrue();
+});
+
+it('detaches the target that a stale move attached', function () {
+    Http::preventStrayRequests();
+    $target = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->node->private_key_id,
+        'node_cluster_id' => $this->cluster->id,
+    ]);
+    $target->workloads()->attach($this->workload);
+    $operation = staleOperation($this, 'workload.move.v1', NodeOperationStatus::RUNNING, ['target_node_uuid' => $target->uuid]);
+    NodeOperation::query()->whereKey($operation->id)->update(['result' => ['target_attached' => true], 'updated_at' => now()->subMinutes(30)]);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
+        ->and($target->workloads()->whereKey($this->workload->id)->exists())->toBeFalse()
+        ->and($this->node->workloads()->whereKey($this->workload->id)->exists())->toBeTrue();
 });

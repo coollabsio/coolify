@@ -204,6 +204,35 @@ it('does not replay an uncertain operation or create a duplicate', function () {
     Queue::assertNothingPushed();
 });
 
+it('keeps reconciling later workloads when one workload cannot be reconciled', function () {
+    // Memory pressure rejects the deployment of the first workload; the stop of the second must still be sent.
+    $this->node->update(['metadata' => [...$this->node->metadata, 'memory_used_bytes' => 990]]);
+    $stoppedWorkload = NodeWorkload::factory()->create([
+        'team_id' => $this->team->id,
+        'desired_state' => NodeWorkloadDesiredState::STOPPED,
+    ]);
+    $this->node->workloads()->attach($stoppedWorkload);
+    $stoppedRevision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $stoppedWorkload->id]);
+    NodeContainer::factory()->create([
+        'node_id' => $this->node->id,
+        'node_workload_id' => $stoppedWorkload->id,
+        'node_workload_revision_id' => $stoppedRevision->id,
+        'image' => $stoppedRevision->image,
+        'state' => 'running',
+        'management_state' => NodeContainerManagementState::MANAGED,
+        'is_managed' => true,
+    ]);
+
+    $count = ReconcileNodeWorkloads::run($this->node);
+
+    $operation = $this->node->operations()->sole();
+    expect($count)->toBe(1)
+        ->and($operation->node_workload_id)->toBe($stoppedWorkload->id)
+        ->and(data_get($operation->request, 'action'))->toBe(NodeWorkloadAction::STOP->value);
+    Queue::assertPushed(ManageNodeWorkloadJob::class, fn ($job) => $job->operationId === $operation->id);
+    Queue::assertNotPushed(DeployNodeWorkloadJob::class);
+});
+
 function createManagedContainer(object $test, NodeWorkloadRevision $revision, string $state): NodeContainer
 {
     return NodeContainer::factory()->create([

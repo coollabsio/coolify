@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -244,4 +245,11 @@ test('team deletion rolls back all database changes when an operation fails', fu
 
     expect(Team::find($this->teamToDelete->id))->not->toBeNull()
         ->and($this->teamToDelete->members()->whereKey($member->id)->exists())->toBeTrue();
+});
+
+test('nodes block team deletion', function () {
+    Node::factory()->create(['team_id' => $this->teamToDelete->id]);
+
+    expect($this->teamToDelete->isEmpty())->toBeFalse()
+        ->and($this->teamToDelete->deletionBlockers())->toBe(['nodes' => 1]);
 });

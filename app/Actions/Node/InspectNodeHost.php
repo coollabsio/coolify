@@ -29,7 +29,7 @@ printf 'memory_bytes=%s\n' "$(awk '/MemTotal/ { print $2 * 1024 }' /proc/meminfo
 printf 'package_manager=%s\n' "$package_manager"
 printf 'podman_installed=%s\n' "$(command -v podman >/dev/null && echo 1 || echo 0)"
 SH;
-        $output = instant_remote_process([$command], $node, timeout: 30, disableMultiplexing: true);
+        $output = instant_remote_process([InstallSentinel::hostCommand($node, $command)], $node, timeout: 30, disableMultiplexing: true);
         if (! is_string($output) || blank($output)) {
             throw new RuntimeException('Coolify could not inspect this server.');
         }

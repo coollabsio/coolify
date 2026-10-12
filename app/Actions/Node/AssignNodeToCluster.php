@@ -6,6 +6,7 @@ use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\User;
+use App\Rules\PrivateIpv4Cidr;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -32,6 +33,9 @@ class AssignNodeToCluster
             }
             $ip = $node->wireguard_ip;
             if ($node->node_cluster_id === null) {
+                if (PrivateIpv4Cidr::firstContainedAddress($cluster->cidr, [$node->ip]) !== null) {
+                    throw new DomainException("The server address {$node->ip} is inside the cluster CIDR {$cluster->cidr}. Use a cluster range that does not include server addresses.");
+                }
                 if ($cluster->nodes()->count() >= 100) {
                     throw new DomainException('A full-mesh cluster supports at most 100 servers.');
                 }

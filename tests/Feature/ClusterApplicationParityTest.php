@@ -349,7 +349,7 @@ describe('danger zone', function () {
 
                 return Http::response([
                     'command_id' => 'inventory-'.Str::uuid(),
-                    'observed_at_unix_ms' => 1_700_000_000_100,
+                    'observed_at_unix_ms' => now()->getTimestampMs(),
                     'containers' => [],
                 ]);
             });

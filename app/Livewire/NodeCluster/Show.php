@@ -96,8 +96,17 @@ class Show extends Component
             'wireguardInterface' => ['required', 'regex:/^[a-zA-Z0-9_.-]{1,15}$/'],
             'wireguardPort' => ['required', 'integer', 'between:1,65535'],
         ]);
-        if ($this->cluster->hasActivatedNetwork() && $validated['cidr'] !== $this->cluster->cidr) {
-            $this->addError('cidr', 'An active cluster CIDR cannot be changed.');
+        if ($this->cluster->hasActivatedNetwork()) {
+            foreach (['cidr' => 'cidr', 'wireguardInterface' => 'wireguard_interface', 'wireguardPort' => 'wireguard_port'] as $field => $column) {
+                if ($validated[$field] !== $this->cluster->{$column}) {
+                    $this->addError($field, 'This network setting cannot be changed on an active cluster.');
+
+                    return;
+                }
+            }
+        }
+        if ($validated['cidr'] !== $this->cluster->cidr && $this->cluster->nodes()->exists()) {
+            $this->addError('cidr', 'Remove all servers from this cluster before changing its CIDR.');
 
             return;
         }
@@ -117,7 +126,13 @@ class Show extends Component
         $this->authorize('update', $this->cluster);
         $this->validate(['nodeUuid' => ['required', 'string']], [], ['nodeUuid' => 'server']);
         $node = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->where('uuid', $this->nodeUuid)->firstOrFail();
-        AssignNodeToCluster::run($this->cluster, $node, auth()->user());
+        try {
+            AssignNodeToCluster::run($this->cluster, $node, auth()->user());
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
         $this->cluster->refresh();
         $this->reset('nodeUuid');
         $this->dispatch('close-modal');
@@ -148,7 +163,13 @@ class Show extends Component
     {
         $this->authorize('update', $this->cluster);
         $node = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
-        RemoveNodeFromCluster::run($this->cluster, $node, auth()->user());
+        try {
+            RemoveNodeFromCluster::run($this->cluster, $node, auth()->user());
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
         $this->cluster->refresh();
         $this->dispatch('success', 'Server removed from the cluster.');
     }

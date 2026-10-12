@@ -89,11 +89,19 @@ class Node extends BaseModel
     {
         $token = $this->sentinel_token;
         if (! is_string($token) || ! preg_match('/\A[a-zA-Z0-9._\-+=\/]+\z/', $token)) {
-            $token = encrypt(json_encode(['node_uuid' => $this->uuid]));
+            $token = $this->newSentinelToken();
             $this->forceFill(['sentinel_token' => $token])->saveQuietly();
         }
 
         return $token;
+    }
+
+    /**
+     * The node UUID routes the lookup; the nonce makes every issued token distinct so rotation revokes the old one.
+     */
+    public function newSentinelToken(): string
+    {
+        return encrypt(json_encode(['node_uuid' => $this->uuid, 'nonce' => Str::random(32)]));
     }
 
     public function ensureSentinelUrl(): string

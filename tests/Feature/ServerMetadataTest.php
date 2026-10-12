@@ -2,6 +2,7 @@
 
 use App\Livewire\Server\Show;
 use App\Livewire\Server\ValidateAndInstall;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -13,6 +14,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     config()->set('constants.sentinel.host_enabled', false);
     $user = User::factory()->create();
     $this->team = Team::factory()->create();

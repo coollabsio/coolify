@@ -265,7 +265,7 @@ class SentinelController extends Controller
         }
 
         $node = Node::query()->where('uuid', $nodeUuid)->first();
-        if ($node === null || $node->sentinel_token !== $token) {
+        if ($node === null || ! is_string($node->sentinel_token) || ! hash_equals($node->sentinel_token, $token)) {
             return null;
         }
 

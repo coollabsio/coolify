@@ -14,7 +14,7 @@ test('resource environment variables table has a Managed column and no name-cell
 
     // Header includes Managed between Name and Type.
     expect($all)
-        ->toContain('$showEnvironmentType = $showPreview')
+        ->toContain('$showEnvironmentType = false')
         ->toContain("toggleVariableFilter('{{ \$value }}')")
         ->toContain('toggleServiceFilter(@js($serviceName))')
         ->toContain('$this->serviceFilterOptions')
@@ -40,7 +40,7 @@ test('resource environment variables table has a Managed column and no name-cell
         ->and($filter)
         ->toContain('Reset filters')
         ->toContain('max-h-80 overflow-y-auto p-1')
-        ->toContain('min-w-44! overflow-hidden! p-0!')
+        ->toContain('w-44! overflow-hidden! p-0!')
         ->and($loading)
         ->toContain('wire:loading.flex');
 

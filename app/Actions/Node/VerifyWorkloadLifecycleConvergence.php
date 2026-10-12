@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeWorkloadAction;
+use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -30,7 +31,8 @@ class VerifyWorkloadLifecycleConvergence
             NodeWorkloadAction::START, NodeWorkloadAction::RESTART => $container !== null
                 && $container->node_workload_revision_id === $operation->node_workload_revision_id
                 && $container->image === $operation->revision->image
-                && $container->state === 'running',
+                && $container->state === 'running'
+                && ($action === NodeWorkloadAction::START || $this->restarted($operation, $container)),
             NodeWorkloadAction::STOP => $container !== null && in_array($container->state, ['exited', 'stopped'], true),
             NodeWorkloadAction::REMOVE => $container === null,
         };
@@ -42,5 +44,20 @@ class VerifyWorkloadLifecycleConvergence
             'state' => $container?->state ?? 'missing',
             'image' => $container?->image,
         ];
+    }
+
+    /**
+     * The old container keeps running when a restart never reached the Node, so require Flux to have
+     * acknowledged this command or the container to have started after dispatch.
+     */
+    private function restarted(NodeOperation $operation, NodeContainer $container): bool
+    {
+        if (data_get($operation->result, 'command_id') === $operation->uuid) {
+            return true;
+        }
+
+        return $operation->dispatched_at !== null
+            && $container->runtime_started_at !== null
+            && $container->runtime_started_at->greaterThanOrEqualTo($operation->dispatched_at);
     }
 }

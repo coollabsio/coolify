@@ -12,11 +12,13 @@ use App\Models\NodeCluster;
 use App\Models\PrivateKey;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
+use DomainException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Throwable;
@@ -45,6 +47,7 @@ class Onboarding extends Component
 
     public string $clusterName = '';
 
+    #[Locked]
     #[Url(as: 'server', except: '')]
     public ?string $nodeUuid = null;
 
@@ -138,6 +141,7 @@ class Onboarding extends Component
     {
         $node = $this->onboardingNode();
         $this->authorize('update', $node);
+        abort_unless(data_get($node->metadata, 'onboarding.status') === 'review', 422, 'This server is not waiting for installation.');
         $validated = $this->validate([
             'clusterMode' => ['required', Rule::in(['existing', 'new'])],
             'clusterUuid' => [
@@ -148,11 +152,28 @@ class Onboarding extends Component
             'clusterName' => [$this->clusterMode === 'new' ? 'required' : 'nullable', 'string', 'max:255'],
         ]);
 
-        $cluster = $validated['clusterMode'] === 'new'
-            ? CreateNodeCluster::run(currentTeam(), auth()->user(), $validated['clusterName'])
-            : NodeCluster::query()->where('team_id', currentTeam()->id)->where('uuid', $validated['clusterUuid'])->firstOrFail();
+        $createCluster = $validated['clusterMode'] === 'new';
+        abort_if($createCluster && $node->node_cluster_id !== null, 422, 'This server already belongs to a cluster.');
 
-        AssignNodeToCluster::run($cluster, $node);
+        try {
+            $cluster = $createCluster
+                ? CreateNodeCluster::run(currentTeam(), auth()->user(), $validated['clusterName'])
+                : NodeCluster::query()->where('team_id', currentTeam()->id)->where('uuid', $validated['clusterUuid'])->firstOrFail();
+            try {
+                AssignNodeToCluster::run($cluster, $node);
+            } catch (DomainException $exception) {
+                if ($createCluster) {
+                    $cluster->delete();
+                }
+                throw $exception;
+            }
+        } catch (DomainException $exception) {
+            $field = $createCluster ? 'clusterName' : 'clusterUuid';
+            $this->addError($field, $exception->getMessage());
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
         $this->setQueued($node);
         OnboardNodeJob::dispatch($node->id, auth()->id());
         $this->step = 3;
@@ -162,6 +183,7 @@ class Onboarding extends Component
     {
         $node = $this->onboardingNode();
         $this->authorize('update', $node);
+        abort_unless(data_get($node->metadata, 'onboarding.status') === 'failed', 422, 'Only a failed installation can be retried.');
         abort_if($node->cluster === null, 422, 'Select a cluster before retrying installation.');
         $this->setQueued($node);
         OnboardNodeJob::dispatch($node->id, auth()->id());

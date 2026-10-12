@@ -13,6 +13,7 @@ use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Throwable;
 
 class ReconcileNodeWorkloads
 {
@@ -68,7 +69,12 @@ class ReconcileNodeWorkloads
                 continue;
             }
 
-            $operationCount += $this->reconcileWorkload($node, $workload, $revision);
+            // One workload that cannot be reconciled (pressure, capability, a racing operation) must not block the rest.
+            try {
+                $operationCount += $this->reconcileWorkload($node, $workload, $revision);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
 
         return $operationCount;

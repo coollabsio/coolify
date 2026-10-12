@@ -12,6 +12,7 @@ use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\RepairFluxTrust;
+use App\Actions\Node\RotateSentinelToken;
 use App\Actions\Node\UpgradeSentinel;
 use App\Actions\Node\ValidateNode;
 use App\Actions\Sentinel\FetchFluxNodeInformation;
@@ -126,7 +127,7 @@ class Show extends Component
     public function refreshContainers(): void
     {
         try {
-            $this->authorize('view', $this->node);
+            $this->authorize('update', $this->node);
             $count = FetchContainers::run($this->node);
             $this->loadNodeData();
             $label = $count === 1 ? 'container' : 'containers';
@@ -214,6 +215,10 @@ class Show extends Component
             ]);
 
             $workload = DB::transaction(function () use ($field, $workloadUuid): ?NodeWorkload {
+                // Serializes DNS name allocation per cluster so concurrent renames cannot both pass the collision check.
+                if ($this->node->node_cluster_id !== null) {
+                    NodeCluster::query()->whereKey($this->node->node_cluster_id)->lockForUpdate()->first();
+                }
                 $workload = NodeWorkload::query()
                     ->where('uuid', $workloadUuid)
                     ->where('team_id', $this->node->team_id)
@@ -308,6 +313,40 @@ class Show extends Component
     public function repairFluxTrust(): void
     {
         $this->runAction(fn () => RepairFluxTrust::run($this->node), 'Sentinel Flux trust repaired.');
+    }
+
+    public function rotateSentinelToken(): void
+    {
+        $this->authorize('manageSentinel', $this->node);
+        $this->runAction(fn () => RotateSentinelToken::run($this->node), 'Sentinel token rotated. The previous token no longer works.');
+    }
+
+    public function deleteNode(): void
+    {
+        $this->authorize('delete', $this->node);
+
+        try {
+            $deleted = DB::transaction(function (): bool {
+                $node = Node::query()->whereKey($this->node->id)->lockForUpdate()->firstOrFail();
+                if ($node->node_cluster_id !== null || $node->workloads()->exists()) {
+                    return false;
+                }
+
+                return (bool) $node->delete();
+            });
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return;
+        }
+
+        if (! $deleted) {
+            $this->dispatch('error', 'Remove this server from its cluster and move or delete its applications before deleting it.');
+
+            return;
+        }
+
+        $this->redirectRoute('server.index', navigate: true);
     }
 
     public function renewFluxCertificate(): void

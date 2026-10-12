@@ -8,6 +8,7 @@ use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
+use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\Team;
 use App\Models\User;
@@ -29,8 +30,12 @@ class DeleteNodeWorkloadJob implements ShouldQueue
 {
     use Queueable;
 
+    /** Exception code of a failure that `handle()` already reported to the team. */
+    private const REPORTED_FAILURE = 1;
+
     public int $tries = 1;
 
+    /** Removals run one server after another, so every server gets the lifecycle job budget. */
     public int $timeout = 900;
 
     public function __construct(
@@ -39,6 +44,8 @@ class DeleteNodeWorkloadJob implements ShouldQueue
         public bool $deleteFromCoolifyOnly = false,
     ) {
         $this->onQueue('high');
+        $servers = NodeWorkload::query()->find($workloadId)?->nodes()->count() ?? 0;
+        $this->timeout = max($this->timeout, $servers * (new ManageNodeWorkloadJob(0))->timeout + 120);
     }
 
     public function handle(): void
@@ -54,7 +61,7 @@ class DeleteNodeWorkloadJob implements ShouldQueue
             if ($failures !== []) {
                 $this->reportFailure($workload, $failures);
 
-                throw new RuntimeException("Application {$workload->name} could not be deleted: ".implode(' ', $failures));
+                throw new RuntimeException("Application {$workload->name} could not be deleted: ".implode(' ', $failures), self::REPORTED_FAILURE);
             }
         }
 
@@ -120,6 +127,27 @@ class DeleteNodeWorkloadJob implements ShouldQueue
             ->whereKey($clusterIds)
             ->get()
             ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, $requestedBy));
+    }
+
+    /**
+     * The worker stopped mid-removal: hand the in-flight removal to stale recovery like the
+     * lifecycle job does, and tell the team that the application was not deleted.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        $workload = NodeWorkload::query()->with('nodes')->find($this->workloadId);
+        if ($workload === null || ($exception instanceof RuntimeException && $exception->getCode() === self::REPORTED_FAILURE)) {
+            return;
+        }
+        NodeOperation::query()
+            ->where('node_workload_id', $workload->id)
+            ->where('command_type', 'workload.lifecycle.v1')
+            ->whereIn('status', [NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED, NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING])
+            ->where('request->action', NodeWorkloadAction::REMOVE->value)
+            ->pluck('id')
+            ->each(fn (int $operationId) => (new ManageNodeWorkloadJob($operationId))->failed($exception));
+
+        $this->reportFailure($workload, ['The deletion worker stopped before completion. '.($exception?->getMessage() ?? '')]);
     }
 
     /** @param list<string> $failures */

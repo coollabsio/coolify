@@ -135,6 +135,22 @@
                 </div>
                 <x-forms.button wire:click="repairFluxTrust">Repair trust</x-forms.button>
             </div>
+            <div class="flex flex-wrap items-center justify-between gap-3 py-4">
+                <div class="min-w-0">
+                    <p class="text-[13px] font-medium text-black dark:text-fg">Rotate token</p>
+                    <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                        Issue a new Sentinel token and reinstall Sentinel with it. Use this if the token may have leaked.
+                    </p>
+                </div>
+                <x-modal-confirmation title="Rotate Sentinel token?" buttonTitle="Rotate token"
+                    submitAction="rotateSentinelToken" :actions="[
+                        'A new token is issued and Sentinel is reinstalled on this server over SSH.',
+                        'The previous token stops working immediately.',
+                        'If the server cannot be reached, the previous token is kept.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                    warningMessage="The control connection drops briefly while Sentinel restarts."
+                    step2ButtonText="Rotate token" />
+            </div>
             @if (isDev() && auth()->user()?->can('update', instanceSettings()))
                 <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                     <div class="min-w-0">

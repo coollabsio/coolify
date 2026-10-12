@@ -23,6 +23,9 @@ class RemoveNodeFromCluster
         if ($node->node_cluster_id !== $cluster->id || $node->team_id !== $cluster->team_id) {
             throw new DomainException('The server does not belong to this cluster.');
         }
+        if ($node->workloads()->exists()) {
+            throw new DomainException('Move or delete the applications on this server before removing it from the cluster.');
+        }
         if ($node->containers()->where('is_managed', true)->whereIn('state', ['configured', 'created', 'running', 'paused', 'restarting', 'removing'])->exists()) {
             throw new DomainException('Stop and remove managed containers from this server before removing it from the cluster.');
         }
