@@ -17,9 +17,9 @@
                 </x-forms.button>
             </x-slot:actions>
 
-            <div wire:loading.flex wire:target="loadTraefikCertificates"
-                class="min-h-24 items-center justify-center">
-                <x-loading text="Loading TLS certificates…" />
+            <div wire:loading.block wire:target="loadTraefikCertificates"
+                class="hidden overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
+                <x-skeleton.table flush :rows="4" />
             </div>
 
             <div wire:loading.remove wire:target="loadTraefikCertificates">

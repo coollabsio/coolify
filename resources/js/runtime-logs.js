@@ -13,6 +13,7 @@ import {
 export const MAX_CLIENT_LOG_LINES = 50000;
 export const STREAM_INTERVAL_MS = 2000;
 const ESTIMATED_ROW_HEIGHT = 44;
+const ESTIMATED_TEXT_ROW_HEIGHT = 20;
 
 const TIMESTAMP_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z) (.*)$/s;
 
@@ -187,6 +188,7 @@ export function initializeRuntimeLogsComponent() {
             scrollDebounce: null,
             destroyed: false,
             colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
+            textView: localStorage.getItem('coolify-log-text-view') === 'true',
             logFilters: readLogFilters(localStorage.getItem('coolify-log-filters')),
             searchQuery: '',
             appliedQuery: '',
@@ -222,7 +224,7 @@ export function initializeRuntimeLogsComponent() {
                 virtualizer = new Virtualizer({
                     count: 0,
                     getScrollElement: () => this.$refs.viewport ?? null,
-                    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+                    estimateSize: () => (this.textView ? ESTIMATED_TEXT_ROW_HEIGHT : ESTIMATED_ROW_HEIGHT),
                     getItemKey: (index) => filtered[index]?.id ?? index,
                     overscan: 12,
                     // Keep the visible rows in place when old lines are trimmed from the top.
@@ -370,6 +372,7 @@ export function initializeRuntimeLogsComponent() {
             },
 
             toggleLogDetails(id, event) {
+                if (this.textView) return;
                 if (window.getSelection()?.toString()) return;
                 if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
                 if (event.type === 'keydown') event.preventDefault();
@@ -377,7 +380,7 @@ export function initializeRuntimeLogsComponent() {
             },
 
             isLogExpanded(id) {
-                return this.expandedLogs[id] === true;
+                return !this.textView && this.expandedLogs[id] === true;
             },
 
             toggleLogFilter(level) {
@@ -389,6 +392,18 @@ export function initializeRuntimeLogsComponent() {
             toggleColorLogs() {
                 this.colorLogs = !this.colorLogs;
                 localStorage.setItem('coolify-color-logs', this.colorLogs);
+            },
+
+            // Plain text lines without columns, row borders, or expandable details.
+            toggleTextView() {
+                this.textView = !this.textView;
+                localStorage.setItem('coolify-log-text-view', this.textView);
+                this.$nextTick(() => {
+                    virtualizer?.measure();
+                    this.$refs.list?.querySelectorAll('.runtime-log-virtual-row').forEach((el) => this.measureRow(el));
+                    this.updateVirtualizer();
+                    if (this.alwaysScroll) this.scrollToBottom();
+                });
             },
 
             downloadLogs() {

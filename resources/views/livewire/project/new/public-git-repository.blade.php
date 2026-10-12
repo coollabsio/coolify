@@ -64,7 +64,7 @@
                             helper="You can choose another branch after the application is created." />
                         <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
                             ['value' => 'railpack', 'label' => 'Railpack'],
-                            ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                            ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Docker Compose'],
@@ -84,6 +84,10 @@
                                 helper="Directory containing the generated static assets." />
                         @endif
                     </div>
+
+                    @if ($build_pack === 'nixpacks')
+                        <x-nixpacks-deprecated-callout />
+                    @endif
 
                     {{-- Dockerfile: pick a detected file or type a path --}}
                     @if ($build_pack === 'dockerfile')

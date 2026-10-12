@@ -107,6 +107,19 @@
                                         <li>{{ $requirement }}</li>
                                     @endforeach
                                 </ul>
+                                @can('view', $this->selectedApp)
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <a href="{{ getPermissionsPath($this->selectedApp) }}" class="button"
+                                            target="_blank" rel="noopener noreferrer">
+                                            Update on GitHub
+                                            <x-external-link />
+                                        </a>
+                                        <a href="{{ route('source.github.permissions', ['github_app_uuid' => $this->selectedApp->uuid]) }}"
+                                            class="button" {{ wireNavigate() }}>
+                                            Open App permissions
+                                        </a>
+                                    </div>
+                                @endcan
                             </x-callout>
                         @endif
 

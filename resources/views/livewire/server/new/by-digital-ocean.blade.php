@@ -17,9 +17,7 @@
             @if ($loading_data)
                 <x-application.settings-section title="Loading DigitalOcean"
                     description="Fetching regions, sizes, images, and account resources.">
-                    <div class="flex min-h-40 items-center justify-center">
-                        <x-loading text="Loading DigitalOcean data..." />
-                    </div>
+                    <x-skeleton.form :fields="6" label="Loading DigitalOcean data" />
                 </x-application.settings-section>
             @elseif ($provider_data_error)
                 <x-application.settings-section title="Unable to load DigitalOcean"

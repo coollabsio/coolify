@@ -742,9 +742,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'noop',
                         'rule' => 'PathPrefix(`/`)',
-                        'tls' => [
-                            'certResolver' => 'letsencrypt',
-                        ],
+                        'tls' => $this->traefikCertificateResolver() ? ['certResolver' => $this->traefikCertificateResolver()] : [],
                         'priority' => -1000,
                     ],
                 ],
@@ -1135,6 +1133,8 @@ class Server extends BaseModel
                 ];
 
                 if ($schema === 'https') {
+                    $certificateResolver = $this->traefikCertificateResolver();
+                    $tls = $certificateResolver ? ['certresolver' => $certificateResolver] : [];
                     $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = $this->dashboardHttpMiddlewares($settings);
 
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
@@ -1146,9 +1146,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify',
                         'rule' => "Host(`{$host}`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-reverb-wss'] = [
                         'entryPoints' => [
@@ -1156,9 +1154,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify-reverb',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
                         'entryPoints' => [
@@ -1166,9 +1162,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify-reverb',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
                         'entryPoints' => [
@@ -1176,9 +1170,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify-terminal',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                 }
                 $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
@@ -1496,6 +1488,17 @@ $siteAddress {
     public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
+    }
+
+    /**
+     * Traefik certificate resolver for generated HTTPS routers, or null when the proxy uses its own certificates.
+     * A resource value overrides the server value; "none" turns the resolver off.
+     */
+    public function traefikCertificateResolver(?string $resourceResolver = null): ?string
+    {
+        $resolver = filled($resourceResolver) ? $resourceResolver : data_get($this, 'settings.traefik_certificate_resolver');
+
+        return filled($resolver) && $resolver !== ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE ? $resolver : null;
     }
 
     public function isTrafficAnalyticsEnabled(): bool
