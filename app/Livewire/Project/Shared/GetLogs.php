@@ -217,19 +217,13 @@ class GetLogs extends Component
     }
 
     /**
-     * Environment values of the application or service whose logs are exported.
+     * Environment values and database credentials of the resource whose logs are exported.
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
     private function logRedactionSecrets(): array
     {
-        $resource = $this->resource;
-        if (! $resource instanceof Application && ! $resource instanceof Service) {
-            $resource = $this->servicesubtype?->service;
-        }
-        if (! $resource instanceof Application && ! $resource instanceof Service) {
-            return ['known' => [], 'locked' => []];
-        }
+        $resource = $this->resource ?? $this->servicesubtype?->service;
 
         return EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: $resource instanceof Application && filled($this->pull_request));
     }

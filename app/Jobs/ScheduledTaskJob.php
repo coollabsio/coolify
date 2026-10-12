@@ -183,7 +183,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                     $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = $this->redact(instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->task->timeout ?? 300, disableMultiplexing: true));
+                    $this->task_output = $this->redact(instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->task->timeout ?? 300, disableMultiplexing: true) ?? '');
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,

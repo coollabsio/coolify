@@ -5,6 +5,7 @@ namespace App\Services\Security;
 use DateTimeInterface;
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
+use RuntimeException;
 use Stringable;
 use Throwable;
 use UnitEnum;
@@ -98,9 +99,12 @@ final class SensitiveDataRedactor
     {
         $text = sanitize_utf8_text($text);
         $text = preg_replace('/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -\/]*[@-~])/', '', $text);
+        if ($text === null) {
+            throw new RuntimeException('Log normalization failed.');
+        }
         $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
         if ($text === null) {
-            throw new \RuntimeException('Log normalization failed.');
+            throw new RuntimeException('Log normalization failed.');
         }
 
         return $text;
@@ -181,7 +185,7 @@ final class SensitiveDataRedactor
         $alreadyRedacted = '(?!'.preg_quote(REDACTED, '/').')';
         $result = preg_replace('/(?<![\w-])(["\']?(?:'.$keys.')["\']?\s*[=:]\s*)'.$alreadyRedacted.$value.'/', '$1'.REDACTED, $text);
         if ($result === null) {
-            throw new \RuntimeException('Log redaction failed.');
+            throw new RuntimeException('Log redaction failed.');
         }
 
         return $result;
@@ -211,7 +215,7 @@ final class SensitiveDataRedactor
         foreach ($patterns as $pattern => $replacement) {
             $text = preg_replace($pattern, $replacement, $text);
             if ($text === null) {
-                throw new \RuntimeException('Log redaction failed.');
+                throw new RuntimeException('Log redaction failed.');
             }
         }
 

@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,3 +119,22 @@ it('redacts the service environment values in control error messages', function 
     expect(json_encode($response))->toContain('restart failed near')
         ->not->toContain(MCP_LOG_CANARY);
 });
+
+it('redacts standalone database passwords in get_logs output and errors', function (bool $fails) {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-database',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+        'postgres_password' => 'xy',
+        'status' => 'running:healthy',
+    ]);
+    fakeMcpApplicationContainer(fn () => $fails
+        ? Process::result(errorOutput: 'failed near xy', exitCode: 1)
+        : Process::result(output: 'booted xy'));
+
+    $response = mcpLogRedactionCall(['read', 'read:sensitive'], 'get_logs', ['resource' => 'database', 'uuid' => $database->uuid]);
+    $data = json_decode($response['result']['content'][0]['text'], true)['data'];
+
+    expect($data[$fails ? 'message' : 'logs'])->toBe(($fails ? 'failed near ' : 'booted ').REDACTED);
+})->with([false, true]);

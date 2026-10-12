@@ -4,15 +4,25 @@ use App\Livewire\Project\Shared\GetLogs;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 
@@ -21,6 +31,7 @@ uses(RefreshDatabase::class);
 const GET_LOGS_EXPORT_CANARY = 'coolify-canary-exported-env-value';
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     $user = User::factory()->create();
     $team = Team::factory()->create();
     $user->teams()->attach($team, ['role' => 'owner']);
@@ -64,3 +75,74 @@ it('redacts the resource environment values when copying or downloading logs', f
         ->call($action)
         ->assertReturned('2026-09-28T10:00:01Z booted with '.REDACTED);
 })->with(['application', 'service'])->with(['copyLogs', 'downloadAllLogs']);
+
+it('redacts stored and effective database passwords in exported logs', function (string $path, bool $remote) {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-database',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+        'postgres_password' => 'xy',
+        'status' => 'running:healthy',
+    ]);
+    EnvironmentVariable::query()->create([
+        'key' => 'POSTGRES_PASSWORD',
+        'value' => $remote ? '{{vault.DB_PASSWORD}}' : 'effective-database-canary',
+        'resourceable_type' => $database->getMorphClass(),
+        'resourceable_id' => $database->id,
+        'is_preview' => false,
+    ]);
+    if ($remote) {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response(['DB_PASSWORD' => 'effective-database-canary']),
+        ]);
+        $token = IntegrationToken::factory()->create([
+            'team_id' => $database->team()->id,
+            'provider' => 'doppler',
+            'capabilities' => ['secrets'],
+        ]);
+        $database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    }
+    Process::fake(fn ($process) => match (true) {
+        str_contains($process->command, 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => $database->uuid, 'Labels' => '', 'State' => 'running'])),
+        str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+        str_contains($process->command, 'docker logs') => Process::result(output: 'booted xy effective-database-canary'),
+        default => Process::result(output: ''),
+    });
+
+    if ($path === 'api') {
+        InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+        $user = auth()->user();
+        $accessToken = $user->createToken('database-logs', ['read', 'read:sensitive']);
+        $accessToken->accessToken->update(['team_id' => $database->team()->id]);
+        $token = $accessToken->plainTextToken;
+        auth()->forgetGuards();
+        $this->withToken($token)->getJson("/api/v1/databases/{$database->uuid}/logs")
+            ->assertOk()->assertJsonPath('logs', 'booted '.REDACTED.' '.REDACTED);
+    } else {
+        Livewire::test(GetLogs::class, ['server' => $this->server, 'container' => $database->uuid, 'resource' => $database])
+            ->call($path)->assertReturned('booted '.REDACTED.' '.REDACTED);
+    }
+})->with(['copyLogs', 'downloadAllLogs', 'api'])->with([false, true]);
+
+it('redacts stored database credentials even without environment variables', function (string $model, array $attributes) {
+    $database = new $model($attributes);
+    if ($database instanceof StandaloneMongodb) {
+        $database->mongo_initdb_root_password = encrypt($attributes['mongo_initdb_root_password']);
+    }
+    $database->setRelation('runtime_environment_variables', collect());
+
+    $secrets = EnvironmentVariable::logRedactionSecretsFor($database);
+
+    expect(sanitizeLogsForExport('booted '.implode(' ', array_values($attributes)), $secrets))
+        ->toBe('booted '.implode(' ', array_fill(0, count($attributes), REDACTED)));
+})->with([
+    'postgres' => [StandalonePostgresql::class, ['postgres_password' => 'xy']],
+    'mysql' => [StandaloneMysql::class, ['mysql_password' => 'xy', 'mysql_root_password' => 'zw']],
+    'mariadb' => [StandaloneMariadb::class, ['mariadb_password' => 'xy', 'mariadb_root_password' => 'zw']],
+    'mongodb' => [StandaloneMongodb::class, ['mongo_initdb_root_password' => 'xy']],
+    'clickhouse' => [StandaloneClickhouse::class, ['clickhouse_admin_password' => 'xy']],
+    'keydb' => [StandaloneKeydb::class, ['keydb_password' => 'xy']],
+    'dragonfly' => [StandaloneDragonfly::class, ['dragonfly_password' => 'xy']],
+]);

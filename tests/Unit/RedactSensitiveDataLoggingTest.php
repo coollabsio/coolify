@@ -3,13 +3,14 @@
 use App\Logging\RedactSensitiveAuditData;
 use App\Logging\RedactSensitiveData;
 use App\Services\Security\SensitiveDataRedactor;
+use Illuminate\Log\Logger;
 use Monolog\Handler\TestHandler;
-use Monolog\Logger;
+use Monolog\Logger as MonologLogger;
 
 it('redacts messages, nested context, and exceptions before a handler receives the record', function () {
     $secret = 'coolify-canary-secret-a91f0c';
     $handler = new TestHandler;
-    $logger = new Logger('test', [$handler]);
+    $logger = new Logger(new MonologLogger('test', [$handler]));
 
     (new RedactSensitiveData(new SensitiveDataRedactor))($logger);
 
@@ -33,7 +34,7 @@ it('redacts messages, nested context, and exceptions before a handler receives t
 it('keeps redacted traces and previous exceptions', function () {
     $secret = 'coolify-canary-secret-previous';
     $handler = new TestHandler;
-    $logger = new Logger('test', [$handler]);
+    $logger = new Logger(new MonologLogger('test', [$handler]));
 
     (new RedactSensitiveData(new SensitiveDataRedactor))($logger);
 
@@ -62,7 +63,7 @@ it('wires redaction into all persistent and remote log channels', function () {
 it('keeps email addresses in the audit log while still redacting secrets', function () {
     $secret = 'coolify-canary-secret-audit';
     $handler = new TestHandler;
-    $logger = new Logger('audit', [$handler]);
+    $logger = new Logger(new MonologLogger('audit', [$handler]));
 
     (new RedactSensitiveAuditData(new SensitiveDataRedactor))($logger);
 

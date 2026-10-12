@@ -25,6 +25,9 @@ trait ExecuteRemoteCommand
     /** @var array{known: array<int, string>, locked: array<int, string>}|null */
     private ?array $logRedactionSecrets = null;
 
+    /** @var array<int, string>|null */
+    private ?array $remoteSecretLogRedactionValues = null;
+
     private function redact_sensitive_info(string $text): string
     {
         try {
@@ -36,7 +39,9 @@ trait ExecuteRemoteCommand
             return REDACTED;
         }
 
-        $remoteSecrets = isset($this->remote_secrets_cache) ? EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache) : [];
+        $remoteSecrets = isset($this->remote_secrets_cache)
+            ? ($this->remoteSecretLogRedactionValues ??= EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache))
+            : [];
 
         return app(SensitiveDataRedactor::class)->redactText(
             $text,

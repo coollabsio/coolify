@@ -42,6 +42,8 @@ class DockerCleanupExecutions extends Component
 
     public function refreshExecutions(): void
     {
+        $this->authorize('view', $this->server);
+
         $this->executions = $this->server->dockerCleanupExecutions()
             ->orderBy('created_at', 'desc')
             ->take(20)
@@ -57,6 +59,8 @@ class DockerCleanupExecutions extends Component
 
     public function selectExecution($key): void
     {
+        $this->authorize('view', $this->server);
+
         if ($key == $this->selectedKey) {
             $this->selectedKey = null;
             $this->selectedExecution = null;
@@ -76,6 +80,8 @@ class DockerCleanupExecutions extends Component
 
     public function polling()
     {
+        $this->authorize('view', $this->server);
+
         if ($this->selectedExecution && $this->isPollingActive) {
             $this->selectedExecution->refresh();
             if ($this->selectedExecution->status !== 'running') {
@@ -87,6 +93,8 @@ class DockerCleanupExecutions extends Component
 
     public function loadMoreLogs()
     {
+        $this->authorize('view', $this->server);
+
         $this->currentPage++;
     }
 

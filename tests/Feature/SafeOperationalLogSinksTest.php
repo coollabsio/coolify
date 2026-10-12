@@ -222,3 +222,15 @@ it('redacts permanent scheduled task failures in the execution, error log, and f
         ->and($execution->message.$execution->error_details)->not->toContain($secret);
     Notification::assertSentTo($team, TaskFailed::class, fn (TaskFailed $notification): bool => $notification->output === 'password leaked '.REDACTED);
 });
+
+it('records scheduled tasks that print literal null as successful with empty output', function () {
+    [$task, $team] = makeScheduledTaskRedactionFixture('coolify-canary-null-output');
+    Process::fake(fn () => Process::result(output: "null\n"));
+
+    (new ScheduledTaskJob($task))->handle();
+
+    expect($task->executions()->sole())
+        ->status->toBe('success')
+        ->message->toBe('');
+    Notification::assertSentTo($team, TaskSuccess::class, fn (TaskSuccess $notification): bool => $notification->output === '');
+});

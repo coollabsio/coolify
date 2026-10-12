@@ -3,7 +3,7 @@
 namespace App\Logging;
 
 use App\Services\Security\SensitiveDataRedactor;
-use Monolog\Logger;
+use Illuminate\Log\Logger;
 use Monolog\LogRecord;
 use Throwable;
 
@@ -17,7 +17,7 @@ final class RedactSensitiveData
             return;
         }
 
-        $logger->pushProcessor(fn (LogRecord $record): LogRecord => $this->redact($record));
+        $logger->getLogger()->pushProcessor(fn (LogRecord $record): LogRecord => $this->redact($record));
     }
 
     /**

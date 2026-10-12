@@ -109,7 +109,7 @@ class GetLogs extends Tool
     }
 
     /**
-     * Environment values of the application or service that owns the log output.
+     * Environment values and database credentials of the resource that owns the log output.
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
@@ -119,7 +119,7 @@ class GetLogs extends Tool
             $resource = $resource->service;
         }
 
-        return EnvironmentVariable::logRedactionSecretsFor($resource instanceof Application || $resource instanceof Service ? $resource : null);
+        return EnvironmentVariable::logRedactionSecretsFor($resource);
     }
 
     /**

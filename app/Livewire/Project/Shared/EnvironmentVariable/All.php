@@ -161,6 +161,11 @@ class All extends Component
 
             $this->dispatch('success', 'Log redaction setting updated.');
         } catch (\Throwable $e) {
+            if ($this->resource instanceof Application || $this->resource instanceof Service) {
+                $this->resource->refresh();
+                $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+            }
+
             return handleError($e, $this);
         }
     }

@@ -163,6 +163,32 @@ it('passes remote secrets from the deployment job into stored log entries', func
         ->toContain(REDACTED);
 });
 
+it('caches normalized remote secrets only after they are loaded', function () {
+    $job = new class
+    {
+        use ExecuteRemoteCommand;
+
+        public ?array $remote_secrets_cache = null;
+    };
+    $redact = new ReflectionMethod($job, 'redact_sensitive_info');
+
+    expect($redact->invoke($job, 'ordinary output'))->toBe('ordinary output');
+
+    $job->remote_secrets_cache = ['PIN' => '4821'];
+    expect($redact->invoke($job, 'pin 4821'))->toBe('pin '.REDACTED);
+
+    $cache = new ReflectionProperty($job, 'remoteSecretLogRedactionValues');
+    $normalized = $cache->getValue($job);
+    expect($normalized)->toContain('4821');
+
+    expect($redact->invoke($job, 'another pin 4821'))->toBe('another pin '.REDACTED)
+        ->and($cache->getValue($job))->toBe($normalized);
+
+    $otherJob = new ($job::class);
+    $otherJob->remote_secrets_cache = ['PIN' => '7392'];
+    expect($redact->invoke($otherJob, 'pin 7392'))->toBe('pin '.REDACTED);
+});
+
 it('starts a new log list when stored logs are corrupted', function () {
     [, $deployment] = makeSafeDeploymentLogFixture();
     ApplicationDeploymentQueue::query()->whereKey($deployment->id)->update(['logs' => '{not json']);

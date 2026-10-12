@@ -417,18 +417,31 @@ class EnvironmentVariable extends BaseModel
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
-    public static function logRedactionSecretsFor(Application|Service|null $resource, bool $includePreview = false): array
+    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false): array
     {
         if ($resource === null) {
             return ['known' => [], 'locked' => []];
         }
 
-        $variables = collect($resource->environment_variables ?? []);
+        $isDatabase = ! $resource instanceof Application && ! $resource instanceof Service;
+        $secrets = ['known' => [], 'locked' => []];
+        if ($isDatabase) {
+            foreach (array_keys($resource->getAttributes()) as $attribute) {
+                if (str_contains($attribute, 'password')) {
+                    $value = $resource->getAttribute($attribute);
+                    if (is_string($value) && $value !== '') {
+                        $secrets['locked'][] = $value;
+                    }
+                }
+            }
+        }
+
+        $variables = collect($isDatabase ? $resource->runtime_environment_variables : $resource->environment_variables);
         if ($includePreview && $resource instanceof Application) {
             $variables = $variables->merge($resource->environment_variables_preview ?? []);
         }
         if ($variables->isEmpty()) {
-            return ['known' => [], 'locked' => []];
+            return $secrets;
         }
 
         // Load the resource relations once and share them, so each variable does not load its own copy.
@@ -443,10 +456,15 @@ class EnvironmentVariable extends BaseModel
         $variables = $variables->map(fn (self $variable): self => (clone $variable)->setRelation('resourceable', $resource));
         $sharedVariables = self::sharedVariablesReferencedBy($variables, $resource->team()?->id);
 
-        $redactAllValues = $resource->redactsAllEnvValuesInLogs();
-        $secrets = ['known' => [], 'locked' => []];
+        $redactAllValues = ! $isDatabase && $resource->redactsAllEnvValuesInLogs();
         foreach ($variables as $variable) {
-            if ($variable->isLockedForLogs($sharedVariables)) {
+            if ($isDatabase) {
+                $secrets['locked'] = array_merge(
+                    $secrets['locked'],
+                    $variable->logRedactionValues($sharedVariables),
+                    self::remoteSecretLogRedactionValues([$resource->resolveSecretManagerEnvironmentVariableValue($variable)]),
+                );
+            } elseif ($variable->isLockedForLogs($sharedVariables)) {
                 $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues($sharedVariables));
             } elseif ($redactAllValues) {
                 $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues($sharedVariables));

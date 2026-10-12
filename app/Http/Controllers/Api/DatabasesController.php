@@ -2745,7 +2745,10 @@ class DatabasesController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = sanitizeLogsForExport(getContainerLogs($database->destination->server, $container['ID'], $lines, $showTimestamps));
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($database->destination->server, $container['ID'], $lines, $showTimestamps),
+            EnvironmentVariable::logRedactionSecretsFor($database),
+        );
 
         return response()->json([
             'logs' => $logs,

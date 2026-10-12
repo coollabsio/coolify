@@ -3,7 +3,7 @@
 namespace App\Logging;
 
 use App\Services\Security\SensitiveDataRedactor;
-use Monolog\Logger;
+use Illuminate\Log\Logger;
 
 /**
  * Redacts the audit log like every other channel, but keeps email addresses so the log still records who acted.

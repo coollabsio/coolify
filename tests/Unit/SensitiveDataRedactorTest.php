@@ -65,6 +65,21 @@ it('normalizes invalid utf8 and removes unsafe control characters', function () 
         ->and($result)->toContain("\nnext");
 });
 
+it('suppresses logs when ANSI normalization exceeds the PCRE backtrack limit', function () {
+    $backtrackLimit = ini_get('pcre.backtrack_limit');
+    ini_set('pcre.backtrack_limit', '0');
+    set_error_handler(static fn (): bool => true, E_DEPRECATED);
+
+    try {
+        $result = (new SensitiveDataRedactor)->redactText("\e[31msecret");
+    } finally {
+        restore_error_handler();
+        ini_set('pcre.backtrack_limit', $backtrackLimit);
+    }
+
+    expect($result)->toBe(SensitiveDataRedactor::FAILURE_MESSAGE);
+});
+
 it('redacts large text completely without truncating it', function () {
     $line = str_repeat('a', 1000)."\n";
     $text = str_repeat($line, 600).'password=coolify-canary-tail-secret'."\n".'last line';

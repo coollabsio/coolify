@@ -103,7 +103,9 @@ it('does not put the command of a timed out registry login in the error', functi
     Process::fake(fn () => throw remoteProcessTimeout());
 
     expect(fn () => DockerRegistryLogins::login($this->server, 'ghcr.io', 'user', 'SECRET_COMMAND_VALUE'))
-        ->toThrow(fn (RuntimeException $exception) => expect($exception->getMessage())->not->toContain('SECRET_COMMAND_VALUE'));
+        ->toThrow(fn (RuntimeException $exception) => expect($exception->getMessage())
+            ->not->toContain('SECRET_COMMAND_VALUE')
+            ->and($exception->getCode())->toBe(124));
 });
 
 it('stores a redacted error when a coolify task fails permanently', function () {

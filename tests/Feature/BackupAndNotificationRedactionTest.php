@@ -67,7 +67,7 @@ beforeEach(function () {
 function redactionMysqlBackup(Team $team, Environment $environment, StandaloneDocker $destination, ?S3Storage $s3 = null): ScheduledDatabaseBackup
 {
     $database = create_standalone_mysql($environment->id, $destination, [
-        'mysql_root_password' => 'Sh0rt',
+        'mysql_root_password' => str_repeat('x', 5),
         'mysql_database' => 'app',
         'status' => 'running:healthy',
     ]);
@@ -97,10 +97,11 @@ function backupRedactionToken(User $user, Team $team, array $abilities): array
 
 it('redacts the database password from the stored execution and the failure notification', function () {
     $backup = redactionMysqlBackup($this->team, $this->environment, $this->destination);
-    Process::fake(function ($process) {
+    $password = $backup->database->mysql_root_password;
+    Process::fake(function ($process) use ($password) {
         $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
         if (str_contains($command, 'mysqldump')) {
-            return Process::result(errorOutput: "mysqldump: Got error: 1045: Access denied for user 'root' with password Sh0rt", exitCode: 1);
+            return Process::result(errorOutput: "mysqldump: Got error: 1045: Access denied for user 'root' with password {$password}", exitCode: 1);
         }
 
         return Process::result(output: '');
@@ -111,9 +112,9 @@ it('redacts the database password from the stored execution and the failure noti
     $execution = $backup->executions()->latest('id')->firstOrFail();
     expect($execution->status)->toBe('failed')
         ->and($execution->message)->toContain('Access denied')
-        ->and($execution->message)->not->toContain('Sh0rt');
+        ->and($execution->message)->not->toContain($password);
     Notification::assertSentTo($this->team, BackupFailed::class, fn (BackupFailed $notification) => str_contains((string) $notification->output, 'Access denied')
-        && ! str_contains((string) $notification->output, 'Sh0rt'));
+        && ! str_contains((string) $notification->output, $password));
 });
 
 it('redacts the S3 key and secret from a permanently failed database backup', function () {
