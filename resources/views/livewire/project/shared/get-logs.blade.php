@@ -42,13 +42,9 @@
                 <div class="runtime-log-toolbar logs-viewer-toolbar">
                     <div class="logs-viewer-toolbar-controls">
                         <div class="logs-viewer-actions">
-                            <button x-on:click="refresh()" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
-                                class="runtime-log-icon-button order-8">
-                                <x-reicon name="refresh" class="size-3.5" />
-                            </button>
                             <button wire:click="toggleStreamLogs"
                                 title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
-                                class="runtime-log-icon-button order-9 {{ $streamLogs ? 'runtime-log-icon-button-active' : '' }}">
+                                class="runtime-log-icon-button {{ $streamLogs ? 'runtime-log-icon-button-active' : '' }}">
                                 @if ($streamLogs)
                                     {{-- Pause icon --}}
                                     <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
@@ -63,156 +59,29 @@
                                     </svg>
                                 @endif
                             </button>
-                            <button
-                                x-on:click="
-                                    $wire.copyLogs().then(logs => {
-                                        if (!navigator.clipboard?.writeText) {
-                                            Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
-                                            return;
-                                        }
-                                        navigator.clipboard.writeText(logs).then(() => {
-                                            Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                        }).catch(() => {
-                                            Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
-                                        });
-                                    }).catch(() => {
-                                        Livewire.dispatch('error', ['Failed to prepare logs for clipboard.']);
-                                    });
-                                "
-                                title="Copy Logs"
-                                class="runtime-log-icon-button order-6">
-                                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-                                </svg>
+                            <button x-on:click="refresh()" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
+                                class="runtime-log-icon-button">
+                                <x-reicon name="refresh" class="size-3.5" />
                             </button>
-                            <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative order-7 shrink-0">
-                                <button x-on:click="downloadMenuOpen = !downloadMenuOpen" title="Download Logs"
-                                    class="runtime-log-icon-button">
-                                    <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                    </svg>
-                                </button>
-                                <div x-show="downloadMenuOpen" x-on:click.away="downloadMenuOpen = false"
-                                    x-transition:enter="transition ease-out duration-100"
-                                    x-transition:enter-start="transform opacity-0 scale-95"
-                                    x-transition:enter-end="transform opacity-100 scale-100"
-                                    x-transition:leave="transition ease-in duration-75"
-                                    x-transition:leave-start="transform opacity-100 scale-100"
-                                    x-transition:leave-end="transform opacity-0 scale-95"
-                                    class="runtime-log-menu listbox-panel left-auto! right-0! z-[90]! min-w-52!">
-                                    <div>
-                                        <button x-on:click="downloadLogs(); downloadMenuOpen = false"
-                                            class="listbox-option">
-                                            Download displayed logs
-                                        </button>
-                                        <button x-on:click="
-                                            downloadingAllLogs = true;
-                                            $wire.downloadAllLogs().then(logs => {
-                                                if (!logs) return;
-                                                const blob = new Blob([logs], { type: 'text/plain' });
-                                                const url = URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                const timestamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
-                                                a.download = containerName + '-all-logs-' + timestamp + '.txt';
-                                                a.click();
-                                                URL.revokeObjectURL(url);
-                                                Livewire.dispatch('success', ['All logs downloaded.']);
-                                            }).finally(() => {
-                                                downloadingAllLogs = false;
-                                                downloadMenuOpen = false;
-                                            });
-                                        "
-                                            :disabled="downloadingAllLogs"
-                                            :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
-                                            class="listbox-option">
-                                            <span x-show="!downloadingAllLogs">Download all logs</span>
-                                            <span x-show="downloadingAllLogs" class="flex items-center gap-2">
-                                                <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                Downloading...
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <button wire:click="toggleTimestamps" title="Toggle Timestamps"
-                                class="runtime-log-icon-button order-1 {{ $showTimeStamps ? 'runtime-log-icon-button-active' : '' }}">
-                                <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                            </button>
-                            <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
-                                :class="colorLogs ? 'runtime-log-icon-button-active' : ''"
-                                class="runtime-log-icon-button order-3">
-                                <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                    stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
-                                </svg>
-                            </button>
-                            <x-table.dropdown panel-class="runtime-log-menu min-w-40!">
-                                <x-slot:trigger><button type="button" title="Filter Log Levels"
-                                    :class="Object.values(logFilters).some(v => !v) ? 'runtime-log-icon-button-active' : ''"
-                                    class="runtime-log-icon-button" aria-haspopup="listbox" :aria-expanded="open">
-                                    <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
-                                    </svg>
-                                </button></x-slot:trigger>
-                                    <div>
-                                        <button type="button" class="listbox-option" x-on:click="toggleLogFilter('error')">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                                            <span class="flex-1 text-left">Error</span>
-                                            <span x-show="logFilters.error">✓</span>
-                                        </button>
-                                        <button type="button" class="listbox-option" x-on:click="toggleLogFilter('warning')">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
-                                            <span class="flex-1 text-left">Warning</span>
-                                            <span x-show="logFilters.warning">✓</span>
-                                        </button>
-                                        <button type="button" class="listbox-option" x-on:click="toggleLogFilter('debug')">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
-                                            <span class="flex-1 text-left">Debug</span>
-                                            <span x-show="logFilters.debug">✓</span>
-                                        </button>
-                                        <button type="button" class="listbox-option" x-on:click="toggleLogFilter('info')">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                                            <span class="flex-1 text-left">Info</span>
-                                            <span x-show="logFilters.info">✓</span>
-                                        </button>
-                                    </div>
-                            </x-table.dropdown>
                             <button title="Follow Logs" :class="alwaysScroll ? 'runtime-log-icon-button-active' : ''"
                                 x-on:click="toggleScroll"
-                                class="runtime-log-icon-button order-2">
+                                class="runtime-log-icon-button">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                         stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                                 </svg>
                             </button>
                             <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen"
-                                class="runtime-log-icon-button order-5">
+                                class="runtime-log-icon-button">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <g fill="none">
-                                        <path
-                                            d="M24 0v24H0V0h24ZM12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035c-.01-.004-.019-.001-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427c-.002-.01-.009-.017-.017-.018Zm.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093c.012.004.023 0 .029-.008l.004-.014l-.034-.614c-.003-.012-.01-.02-.02-.022Zm-.715.002a.023.023 0 0 0-.027.006l-.006.014l-.034.614c0 .012.007.02.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01l-.184-.092Z" />
                                         <path fill="currentColor"
                                             d="M9.793 12.793a1 1 0 0 1 1.497 1.32l-.083.094L6.414 19H9a1 1 0 0 1 .117 1.993L9 21H4a1 1 0 0 1-.993-.883L3 20v-5a1 1 0 0 1 1.993-.117L5 15v2.586l4.793-4.793ZM20 3a1 1 0 0 1 .993.883L21 4v5a1 1 0 0 1-1.993.117L19 9V6.414l-4.793 4.793a1 1 0 0 1-1.497-1.32l.083-.094L17.586 5H15a1 1 0 0 1-.117-1.993L15 3h5Z" />
                                     </g>
                                 </svg>
                             </button>
                             <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen"
-                                class="runtime-log-icon-button order-5">
+                                class="runtime-log-icon-button">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                         stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
@@ -254,6 +123,133 @@
                                     <x-reicon name="x" class="size-3" />
                                 </button>
                             </div>
+                            <div class="runtime-log-menus">
+                            {{-- Display settings and level filters --}}
+                            <x-table.dropdown panel-class="runtime-log-menu min-w-48! max-h-none!" role="menu">
+                                <x-slot:trigger><button type="button" title="View Options"
+                                    :class="Object.values(logFilters).some(v => !v) ? 'button-highlighted' : ''"
+                                    class="button" aria-haspopup="menu" :aria-expanded="open">
+                                    <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                                    </svg>
+                                    <span>View</span>
+                                    <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open ? 'rotate-180' : ''" />
+                                </button></x-slot:trigger>
+                                <div>
+                                    <p class="runtime-log-menu-label">Display</p>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="$wire.showTimeStamps" wire:click="toggleTimestamps">
+                                        <span class="flex-1 text-left">Timestamps</span>
+                                        <span x-show="$wire.showTimeStamps">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="textView" x-on:click="toggleTextView">
+                                        <span class="flex-1 text-left">Text view</span>
+                                        <span x-show="textView">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="colorLogs" x-on:click="toggleColorLogs">
+                                        <span class="flex-1 text-left">Color by level</span>
+                                        <span x-show="colorLogs">✓</span>
+                                    </button>
+                                    <p class="runtime-log-menu-label">Log levels</p>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="logFilters.error" x-on:click="toggleLogFilter('error')">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                                        <span class="flex-1 text-left">Error</span>
+                                        <span x-show="logFilters.error">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="logFilters.warning" x-on:click="toggleLogFilter('warning')">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                                        <span class="flex-1 text-left">Warning</span>
+                                        <span x-show="logFilters.warning">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="logFilters.debug" x-on:click="toggleLogFilter('debug')">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                                        <span class="flex-1 text-left">Debug</span>
+                                        <span x-show="logFilters.debug">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="logFilters.info" x-on:click="toggleLogFilter('info')">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                                        <span class="flex-1 text-left">Info</span>
+                                        <span x-show="logFilters.info">✓</span>
+                                    </button>
+                                </div>
+                            </x-table.dropdown>
+                            {{-- Copy and download --}}
+                            <x-table.dropdown panel-class="runtime-log-menu min-w-52!" role="menu">
+                                <x-slot:trigger><button type="button" title="Copy or Download Logs"
+                                    class="button" aria-haspopup="menu" :aria-expanded="open">
+                                    <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                    <span>Export</span>
+                                    <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open ? 'rotate-180' : ''" />
+                                </button></x-slot:trigger>
+                                <div x-data="{ downloadingAllLogs: false }">
+                                    <button type="button" role="menuitem" class="listbox-option"
+                                        x-on:click="
+                                            open = false;
+                                            $wire.copyLogs().then(logs => {
+                                                if (!navigator.clipboard?.writeText) {
+                                                    Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                                                    return;
+                                                }
+                                                navigator.clipboard.writeText(logs).then(() => {
+                                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                                }).catch(() => {
+                                                    Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+                                                });
+                                            }).catch(() => {
+                                                Livewire.dispatch('error', ['Failed to prepare logs for clipboard.']);
+                                            });
+                                        ">
+                                        <span class="flex-1 text-left">Copy logs</span>
+                                    </button>
+                                    <button type="button" role="menuitem" class="listbox-option"
+                                        x-on:click="downloadLogs(); open = false">
+                                        <span class="flex-1 text-left">Download displayed logs</span>
+                                    </button>
+                                    <button type="button" role="menuitem" x-on:click="
+                                        downloadingAllLogs = true;
+                                        $wire.downloadAllLogs().then(logs => {
+                                            if (!logs) return;
+                                            const blob = new Blob([logs], { type: 'text/plain' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            const timestamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+                                            a.download = containerName + '-all-logs-' + timestamp + '.txt';
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            Livewire.dispatch('success', ['All logs downloaded.']);
+                                        }).finally(() => {
+                                            downloadingAllLogs = false;
+                                            open = false;
+                                        });
+                                    "
+                                        :disabled="downloadingAllLogs"
+                                        :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
+                                        class="listbox-option">
+                                        <span x-show="!downloadingAllLogs" class="flex-1 text-left">Download all logs</span>
+                                        <span x-show="downloadingAllLogs" class="flex items-center gap-2">
+                                            <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Downloading...
+                                        </span>
+                                    </button>
+                                </div>
+                            </x-table.dropdown>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -276,9 +272,9 @@
                     </div>
                     {{-- Alpine renders only the visible rows. Livewire must not morph them. --}}
                     <div id="logs" wire:ignore x-cloak x-show="lineCount > 0"
-                        :class="{ 'runtime-log-without-time': !$wire.showTimeStamps }"
+                        :class="{ 'runtime-log-without-time': !$wire.showTimeStamps, 'runtime-log-text-view': textView }"
                         class="font-logs max-w-full cursor-default text-[11px] leading-relaxed sm:text-xs">
-                        <div x-ref="columns" class="runtime-log-columns" aria-hidden="true">
+                        <div x-ref="columns" x-show="!textView" class="runtime-log-columns" aria-hidden="true">
                             <span x-show="$wire.showTimeStamps">Time</span>
                             <span>Type</span>
                             <span>Message</span>
@@ -288,7 +284,7 @@
                                 <div class="runtime-log-virtual-row" :data-index="row.index"
                                     :style="{ transform: 'translateY(' + (row.start - scrollMargin) + 'px)' }"
                                     x-init="$nextTick(() => measureRow($el))">
-                                    <div data-log-line role="button" tabindex="0" :data-log-level="row.line.level"
+                                    <div data-log-line :role="textView ? null : 'button'" :tabindex="textView ? null : 0" :data-log-level="row.line.level"
                                         :class="colorLogs ? 'log-' + row.line.level : ''"
                                         :aria-expanded="isLogExpanded(row.line.id)"
                                         x-on:click="toggleLogDetails(row.line.id, $event)"

@@ -17,9 +17,7 @@
             @if ($loading_data)
                 <x-application.settings-section title="Loading Vultr"
                     description="Fetching regions, plans, operating systems, and account resources.">
-                    <div class="flex min-h-40 items-center justify-center">
-                        <x-loading text="Loading Vultr data..." />
-                    </div>
+                    <x-skeleton.form :fields="6" label="Loading Vultr data" />
                 </x-application.settings-section>
             @elseif ($provider_data_error)
                 <x-application.settings-section title="Unable to load Vultr"
