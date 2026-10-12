@@ -35,8 +35,9 @@
                 </div>
 
                 @if (!$loaded)
-                    <div class="p-6">
-                        <x-loading text="Reading images from the Docker daemon" />
+                    <div role="status">
+                        <span class="sr-only">Reading images from the Docker daemon</span>
+                        <x-skeleton.table flush :rows="6" />
                     </div>
                 @elseif ($visibleImages->isEmpty())
                     <div class="p-6">

@@ -3956,6 +3956,25 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     opacity: 1 !important;
 }
 
+/* View and Export menus sit after the search field and the Lines control. */
+.runtime-log-menus {
+    display: flex;
+    order: 3;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.runtime-log-menu-label {
+    padding: 0.5rem 0.5rem 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #737373;
+}
+
+.dark .runtime-log-menu-label {
+    color: var(--color-fg-faint);
+}
+
 .runtime-log-viewport {
     min-height: 12rem;
     border-radius: 0 0 8px 8px;
@@ -4138,6 +4157,43 @@ html[data-theme="custom"] .runtime-log-columns {
 .runtime-log-without-time [data-line-text] {
     grid-column: 2;
 }
+
+/* Text view: one compact, wrapped text line per log entry, like the old viewer. */
+.runtime-log-text-view {
+    padding-block: 0.5rem;
+}
+
+.runtime-log-viewport .runtime-log-text-view [data-log-line]:not(.hidden) {
+    display: flex;
+    gap: 0.75rem;
+    min-height: 0;
+    padding: 0 1rem;
+    border-bottom: 0;
+    cursor: text;
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+.runtime-log-viewport .runtime-log-text-view [data-log-line]::before,
+.runtime-log-viewport .runtime-log-text-view [data-log-line]::after {
+    display: none;
+}
+
+.runtime-log-viewport .runtime-log-text-view .logs-viewer-timestamp {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.runtime-log-viewport .runtime-log-text-view [data-line-text] {
+    flex: 1 1 auto;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.runtime-log-viewport .runtime-log-text-view .log-error [data-line-text] { color: #e55e73; }
+.runtime-log-viewport .runtime-log-text-view .log-warning [data-line-text] { color: #d79945; }
+.runtime-log-viewport .runtime-log-text-view .log-debug [data-line-text] { color: #929099; }
 
 @container runtime-log-explorer (max-width: 650px) {
     .runtime-log-columns,
