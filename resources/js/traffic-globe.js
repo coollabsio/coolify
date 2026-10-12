@@ -24,16 +24,26 @@ const THEMES = {
 };
 
 /**
- * Turn country-breakdown rows into cobe markers. Marker size scales with the
- * square root of request volume so a single dominant country doesn't dwarf the rest.
+ * Turn marker rows into cobe markers. A row is placed at its own `lat`/`lon`
+ * (a city) or at the centroid of its ISO-A2 `code` (a country). Marker size
+ * scales with the square root of request volume so one dominant place doesn't
+ * dwarf the rest. City markers are smaller, because cities are close together.
  *
- * @param {Array<{code: string, requests: number}>} data
+ * @param {Array<{code?: string, lat?: number, lon?: number, requests: number}>} data
  * @returns {Array<{location: [number, number], size: number}>}
  */
 function buildMarkers(data) {
     const rows = (data || [])
-        .map((r) => ({ code: String(r.code || '').toUpperCase(), requests: Number(r.requests || 0) }))
-        .filter((r) => r.requests > 0 && CENTROIDS[r.code]);
+        .map((r) => {
+            const city = Number.isFinite(r.lat) && Number.isFinite(r.lon);
+
+            return {
+                city,
+                location: city ? [r.lat, r.lon] : CENTROIDS[String(r.code || '').toUpperCase()],
+                requests: Number(r.requests || 0),
+            };
+        })
+        .filter((r) => r.requests > 0 && r.location);
 
     if (rows.length === 0) {
         return [];
@@ -41,10 +51,14 @@ function buildMarkers(data) {
 
     const max = Math.max(...rows.map((r) => r.requests));
 
-    return rows.map((r) => ({
-        location: CENTROIDS[r.code],
-        size: Math.max(0.03, Math.min(0.11, Math.sqrt(r.requests / max) * 0.11)),
-    }));
+    return rows.map((r) => {
+        const [min, cap] = r.city ? [0.02, 0.07] : [0.03, 0.11];
+
+        return {
+            location: r.location,
+            size: Math.max(min, Math.min(cap, Math.sqrt(r.requests / max) * cap)),
+        };
+    });
 }
 
 const TWO_PI = Math.PI * 2;
@@ -72,7 +86,7 @@ function lerpAngle(current, target, t) {
 
 /**
  * Mount an interactive, drag-to-rotate dotted globe onto a canvas. Returns a
- * controller with `update(data, dark)`, `focus(code)`, `resume()` and
+ * controller with `update(data, dark)`, `focus(target)`, `resume()` and
  * `destroy()`. The globe auto-rotates, pauses while grabbed or while a country
  * is hover-focused, and eases smoothly toward whatever it's pointed at.
  *
@@ -81,7 +95,7 @@ function lerpAngle(current, target, t) {
  * which draws only while something moves and stops when the canvas is off-screen.
  *
  * @param {HTMLCanvasElement} canvas
- * @param {Array<{code: string, requests: number}>} data
+ * @param {Array<{code?: string, lat?: number, lon?: number, requests: number}>} data
  * @param {boolean} dark
  */
 function mountTrafficGlobe(canvas, data, dark) {
@@ -250,9 +264,10 @@ function mountTrafficGlobe(canvas, data, dark) {
                 });
             }
         },
-        focus(code) {
-            const c = CENTROIDS[String(code || '').toUpperCase()];
-            if (!c) {
+        // `target` is an ISO-A2 code or a [lat, lon] pair.
+        focus(target) {
+            const c = Array.isArray(target) ? target : CENTROIDS[String(target || '').toUpperCase()];
+            if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) {
                 return;
             }
             const [phi, theta] = locationToAngles(c[0], c[1]);
