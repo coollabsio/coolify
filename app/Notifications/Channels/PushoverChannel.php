@@ -16,6 +16,6 @@ class PushoverChannel
             return;
         }
 
-        SendMessageToPushoverJob::dispatch($message, $pushoverSettings->pushover_api_token, $pushoverSettings->pushover_user_key);
+        SendMessageToPushoverJob::dispatch($message, $pushoverSettings->pushover_api_token, $pushoverSettings->pushover_user_key, data_get($notification, 'isTestNotification', false) ? null : $pushoverSettings);
     }
 }

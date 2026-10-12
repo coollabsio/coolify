@@ -181,9 +181,9 @@
     @if ($view === 'normal')
         @if (! $readyToLoad)
             <div id="environment-table-section"
-                class="application-settings-section-body mt-1 flex min-h-40 w-full scroll-mt-28 items-center justify-center"
-                wire:loading.class="opacity-100" wire:target="loadEnvironmentVariables">
-                <x-loading text="Loading environment variables..." />
+                class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28" role="status">
+                <span class="sr-only">Loading environment variables</span>
+                <x-skeleton.table flush :rows="6" />
             </div>
         @else
             @php

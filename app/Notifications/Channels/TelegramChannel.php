@@ -73,6 +73,6 @@ class TelegramChannel
             return;
         }
 
-        SendMessageToTelegramJob::dispatch($message, $buttons, $telegramToken, $chatId, $threadId);
+        SendMessageToTelegramJob::dispatch($message, $buttons, $telegramToken, $chatId, $threadId, data_get($notification, 'isTestNotification', false) ? null : $settings);
     }
 }

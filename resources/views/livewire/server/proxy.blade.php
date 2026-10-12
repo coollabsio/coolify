@@ -143,9 +143,11 @@
                             <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
-                        <div wire:loading.flex wire:target="loadProxyConfiguration"
-                            class="min-h-32 items-center justify-center">
-                            <x-loading text="Loading proxy configuration…" />
+                        <div wire:loading.flex wire:target="loadProxyConfiguration" role="status"
+                            class="mt-4 hidden flex-col gap-2">
+                            <span class="sr-only">Loading proxy configuration</span>
+                            <x-skeleton class="h-2.5 w-56 rounded-full" />
+                            <x-skeleton class="h-96 w-full rounded-lg" />
                         </div>
 
                         @if ($proxySettings)
