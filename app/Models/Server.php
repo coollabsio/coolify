@@ -358,7 +358,7 @@ class Server extends BaseModel
     public function setValidationLogsAttribute($value): void
     {
         $this->attributes['validation_logs'] = $value !== null
-            ? Purify::config('validation_logs')->clean($value)
+            ? Purify::config('validation_logs')->clean(remove_iip($value))
             : null;
     }
 

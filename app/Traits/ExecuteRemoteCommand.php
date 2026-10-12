@@ -22,31 +22,37 @@ trait ExecuteRemoteCommand
 
     public static int $batch_counter = 0;
 
+    /** @var array{known: array<int, string>, locked: array<int, string>}|null */
+    private ?array $logRedactionSecrets = null;
+
     private function redact_sensitive_info(string $text): string
     {
         try {
-            $redactAllValues = isset($this->application) ? $this->application->redactsAllEnvValuesInLogs() : true;
-            $knownSecrets = isset($this->application)
-                ? EnvironmentVariable::logRedactionValuesFor($this->application->environment_variables, $redactAllValues)
-                : [];
-            if (isset($this->application, $this->pull_request_id) && $this->pull_request_id !== 0) {
-                $knownSecrets = array_merge($knownSecrets, EnvironmentVariable::logRedactionValuesFor($this->application->environment_variables_preview, $redactAllValues));
-            }
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor(
+                $this->application ?? null,
+                isset($this->pull_request_id) && $this->pull_request_id !== 0,
+            );
         } catch (\Throwable) {
             return REDACTED;
         }
 
-        return app(SensitiveDataRedactor::class)->redactText($text, array_merge($knownSecrets, $this->remoteLogSecrets()));
+        $remoteSecrets = isset($this->remote_secrets_cache) ? EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache) : [];
+
+        return app(SensitiveDataRedactor::class)->redactText(
+            $text,
+            $this->logRedactionSecrets['known'],
+            array_merge($this->logRedactionSecrets['locked'], $remoteSecrets),
+        );
     }
 
     /**
-     * Remote secrets are never stored in Coolify, so the deployment log model cannot find them.
-     *
-     * @return array<array-key, mixed>
+     * Remote secrets are never stored in Coolify, so the deployment log model must get them from the job.
      */
-    private function remoteLogSecrets(): array
+    private function registerRemoteSecretsForLogs(): void
     {
-        return isset($this->remote_secrets_cache) ? EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache) : [];
+        if (isset($this->application_deployment_queue, $this->remote_secrets_cache)) {
+            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
+        }
     }
 
     public function execute_remote_command(...$commands)
@@ -60,9 +66,7 @@ trait ExecuteRemoteCommand
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
-        if (isset($this->application_deployment_queue, $this->remote_secrets_cache)) {
-            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
-        }
+        $this->registerRemoteSecretsForLogs();
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {
@@ -174,7 +178,6 @@ trait ExecuteRemoteCommand
                 hidden: $hidden,
                 command: $skip_command_log || $command_hidden ? null : $command,
                 batch: static::$batch_counter,
-                knownSecrets: $this->remoteLogSecrets(),
             );
 
             $this->saveCommandOutput($sanitized_output, $append);
@@ -276,10 +279,10 @@ trait ExecuteRemoteCommand
     {
         $retryMessage = "SSH connection failed. Retrying... (Attempt {$attempt}/{$maxRetries}, waiting {$delay}s)\nError: {$errorMessage}";
 
+        $this->registerRemoteSecretsForLogs();
         $this->application_deployment_queue->addLogEntry(
             message: $retryMessage,
             batch: static::$batch_counter,
-            knownSecrets: $this->remoteLogSecrets(),
         );
     }
 }

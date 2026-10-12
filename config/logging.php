@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\RedactSensitiveAuditData;
 use App\Logging\RedactSensitiveData;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
@@ -61,14 +62,14 @@ return [
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'info'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'tap' => [RedactSensitiveData::class],
         ],
 
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'info'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'days' => 14,
             'tap' => [RedactSensitiveData::class],
         ],
@@ -84,7 +85,7 @@ return [
 
         'papertrail' => [
             'driver' => 'monolog',
-            'level' => env('LOG_LEVEL', 'info'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'tap' => [RedactSensitiveData::class],
             'handler' => env('LOG_PAPERTRAIL_HANDLER', SyslogUdpHandler::class),
             'handler_with' => [
@@ -96,7 +97,7 @@ return [
 
         'stderr' => [
             'driver' => 'monolog',
-            'level' => env('LOG_LEVEL', 'info'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'tap' => [RedactSensitiveData::class],
             'handler' => StreamHandler::class,
             'formatter' => env('LOG_STDERR_FORMATTER'),
@@ -107,14 +108,14 @@ return [
 
         'syslog' => [
             'driver' => 'syslog',
-            'level' => env('LOG_LEVEL', 'info'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'tap' => [RedactSensitiveData::class],
             'facility' => LOG_USER,
         ],
 
         'errorlog' => [
             'driver' => 'errorlog',
-            'level' => env('LOG_LEVEL', 'info'),
+            'level' => env('LOG_LEVEL', 'debug'),
             'tap' => [RedactSensitiveData::class],
         ],
 
@@ -149,7 +150,7 @@ return [
             'level' => env('LOG_AUDIT_LEVEL', 'info'),
             'days' => env('LOG_AUDIT_DAYS', 90),
             'replace_placeholders' => true,
-            'tap' => [RedactSensitiveData::class],
+            'tap' => [RedactSensitiveAuditData::class],
         ],
 
     ],

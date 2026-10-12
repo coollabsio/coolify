@@ -6,17 +6,25 @@ use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\RemoteProcessCommand;
 use App\Support\ResourceStartActivity;
 use App\Traits\BroadcastsToTeam;
 use Illuminate\Contracts\Process\ProcessResult;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Models\Activity;
+use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyProcessTimedOutException;
+use Throwable;
 
 class RunRemoteProcess
 {
@@ -39,6 +47,14 @@ class RunRemoteProcess
     protected $throttle_interval_ms = 200;
 
     protected int $counter = 1;
+
+    /**
+     * Environment values of the activity's resource to hide in its output, resolved once.
+     * False when resolving them failed, so the output is fully redacted.
+     *
+     * @var array{known: list<string>, locked: list<string>}|false|null
+     */
+    private array|false|null $logSecrets = null;
 
     /**
      * Create a new job instance.
@@ -84,16 +100,21 @@ class RunRemoteProcess
 
         $status = ProcessStatus::IN_PROGRESS;
         $timeout = config('constants.ssh.command_timeout');
-        $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
-        // Start from the stored properties and save now, so later output writes only change the log and
-        // never write back an old copy over a status that Coolify set meanwhile (for example a stopped import).
-        $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties ?? $this->activity->properties;
-        $this->activity->properties = $stored->merge([
-            'process_id' => $process->id(),
-        ]);
-        $this->activity->save();
+        try {
+            $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
+            // Start from the stored properties and save now, so later output writes only change the log and
+            // never write back an old copy over a status that Coolify set meanwhile (for example a stopped import).
+            $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties ?? $this->activity->properties;
+            $this->activity->properties = $stored->merge([
+                'process_id' => $process->id(),
+            ]);
+            $this->activity->save();
 
-        $processResult = $process->wait();
+            $processResult = $process->wait();
+        } catch (ProcessTimedOutException|SymfonyProcessTimedOutException) {
+            // The timeout message contains the full SSH command, which can contain secrets.
+            throw new \RuntimeException("The command on the server timed out after {$timeout} seconds.", 124);
+        }
 
         // A database import whose SSH command ended without the restore result keeps blocking the
         // database until its restore is stopped. The stop event also cleans up, so the normal
@@ -104,13 +125,13 @@ class RunRemoteProcess
             && DatabaseImportCleanup::stopAfterTransportFailure($this->activity, $processResult->exitCode())) {
             $this->activity->properties = $this->activity->properties->merge([
                 'exitCode' => $processResult->exitCode(),
-                'stdout' => $processResult->output(),
-                'stderr' => $processResult->errorOutput(),
+                'stdout' => $this->redact($processResult->output()),
+                'stderr' => $this->redact($processResult->errorOutput()),
             ]);
             $this->activity->save();
 
             if (! $this->ignore_errors) {
-                throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
+                throw new \RuntimeException($this->redact($processResult->errorOutput()), $processResult->exitCode());
             }
 
             return $processResult;
@@ -149,7 +170,7 @@ class RunRemoteProcess
         if ($this->call_event_on_finish) {
             try {
                 self::dispatchFinishEvent($this->activity, $this->call_event_on_finish, $this->call_event_data);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('Error calling event: '.$e->getMessage());
             }
         }
@@ -237,7 +258,46 @@ class RunRemoteProcess
 
     private function redact(string $value): string
     {
-        return resolve(SensitiveDataRedactor::class)->redactText($value);
+        $this->logSecrets ??= $this->resolveLogSecrets();
+        if ($this->logSecrets === false) {
+            return REDACTED;
+        }
+
+        return resolve(SensitiveDataRedactor::class)->redactText($value, $this->logSecrets['known'], $this->logSecrets['locked']);
+    }
+
+    /**
+     * The environment values of the application or service this activity runs for, following
+     * the resource's log redaction setting.
+     *
+     * @return array{known: list<string>, locked: list<string>}|false
+     */
+    private function resolveLogSecrets(): array|false
+    {
+        try {
+            return EnvironmentVariable::logRedactionSecretsFor($this->logResource());
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function logResource(): Application|Service|null
+    {
+        $subject = $this->activity->subject_type !== null ? $this->activity->subject : null;
+        if ($subject instanceof ServiceApplication || $subject instanceof ServiceDatabase) {
+            return $subject->service;
+        }
+        if ($subject instanceof Application || $subject instanceof Service) {
+            return $subject;
+        }
+
+        $typeUuid = $this->activity->getExtraProperty('type_uuid');
+        if (! is_string($typeUuid) || $typeUuid === '') {
+            return null;
+        }
+
+        return Service::query()->where('uuid', $typeUuid)->first()
+            ?? Application::query()->where('uuid', $typeUuid)->first();
     }
 
     /**

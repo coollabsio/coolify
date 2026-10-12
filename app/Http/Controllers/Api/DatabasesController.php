@@ -18,6 +18,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -305,6 +306,11 @@ class DatabasesController extends Controller
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
             ->whereIn('database_id', $databaseIds)
             ->get()
+            ->each(function (ScheduledDatabaseBackup $backup): void {
+                if ($backup->latest_log) {
+                    $this->redactBackupExecutionMessage($backup->latest_log);
+                }
+            })
             ->groupBy(fn (ScheduledDatabaseBackup $backup) => $backup->database_type.':'.$backup->database_id);
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
@@ -377,6 +383,7 @@ class DatabasesController extends Controller
         $this->authorize('view', $database);
 
         $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('executions')->where('database_id', $database->id)->get();
+        $backupConfig->each(fn (ScheduledDatabaseBackup $backup) => $backup->executions->each(fn (ScheduledDatabaseBackupExecution $execution) => $this->redactBackupExecutionMessage($execution)));
 
         return response()->json($backupConfig);
     }
@@ -3098,7 +3105,7 @@ class DatabasesController extends Controller
 
     #[OA\Get(
         summary: 'List backup executions',
-        description: 'Get all executions for a specific backup configuration.',
+        description: 'Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/executions',
         operationId: 'list-backup-executions',
         security: [
@@ -3138,7 +3145,7 @@ class DatabasesController extends Controller
                                     new OA\Property(property: 'filename', type: 'string'),
                                     new OA\Property(property: 'size', type: 'integer'),
                                     new OA\Property(property: 'created_at', type: 'string'),
-                                    new OA\Property(property: 'message', type: 'string'),
+                                    new OA\Property(property: 'message', type: 'string', nullable: true, description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.'),
                                     new OA\Property(property: 'status', type: 'string'),
                                 ]
                             )
@@ -3183,6 +3190,8 @@ class DatabasesController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($execution) {
+                $this->redactBackupExecutionMessage($execution);
+
                 return [
                     'uuid' => $execution->uuid,
                     'filename' => $execution->filename,
@@ -5232,5 +5241,16 @@ class DatabasesController extends Controller
             'uuid' => $newDatabase->uuid,
             'message' => 'Database cloned.',
         ], 201);
+    }
+
+    /**
+     * Execution output can embed credentials: hide it unless the token can read sensitive data, and redact it when shown.
+     */
+    private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution): void
+    {
+        $message = $execution->message;
+        $execution->setAttribute('message', request()->attributes->get('can_read_sensitive', false) === true && is_string($message)
+            ? sanitizeLogsForExport($message)
+            : null);
     }
 }

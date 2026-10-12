@@ -65,11 +65,31 @@ it('normalizes invalid utf8 and removes unsafe control characters', function () 
         ->and($result)->toContain("\nnext");
 });
 
-it('limits oversized text', function () {
-    $result = (new SensitiveDataRedactor)->redactText(str_repeat('a', SensitiveDataRedactor::MAX_TEXT_BYTES + 100));
+it('redacts large text completely without truncating it', function () {
+    $line = str_repeat('a', 1000)."\n";
+    $text = str_repeat($line, 600).'password=coolify-canary-tail-secret'."\n".'last line';
 
-    expect($result)->toEndWith('[OUTPUT TRUNCATED]')
-        ->and(strlen($result))->toBeLessThan(SensitiveDataRedactor::MAX_TEXT_BYTES + 30);
+    $result = (new SensitiveDataRedactor)->redactText($text);
+
+    expect(strlen($result))->toBeGreaterThan(600000)
+        ->and($result)->not->toContain('coolify-canary-tail-secret')
+        ->and($result)->toEndWith('password='.REDACTED."\nlast line");
+});
+
+it('keeps a private key that crosses a chunk boundary redacted', function () {
+    $privateKey = "-----BEGIN PRIVATE KEY-----\n".str_repeat("secret-key-line\n", 20000).'-----END PRIVATE KEY-----';
+    $text = str_repeat(str_repeat('a', 1000)."\n", 250).$privateKey."\nafter";
+
+    $result = (new SensitiveDataRedactor)->redactText($text);
+
+    expect($result)->not->toContain('secret-key-line')
+        ->and($result)->toEndWith(REDACTED."\nafter");
+});
+
+it('always redacts short locked secrets but not short unlocked values', function () {
+    $result = (new SensitiveDataRedactor)->redactText('pin 4821 mode dev', ['dev'], ['4821']);
+
+    expect($result)->toBe('pin '.REDACTED.' mode dev');
 });
 
 it('redacts complete quoted assignment values that contain spaces', function () {

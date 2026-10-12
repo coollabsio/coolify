@@ -4,10 +4,22 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Models\SharedEnvironmentVariable;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Models\User;
 use App\Traits\ExecuteRemoteCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -95,18 +107,38 @@ it('keeps redacting all values for other applications in the same team', functio
         ->and(json_decode($deployment->refresh()->logs, true)[0]['output'])->toBe('env '.REDACTED);
 });
 
-it('redacts extra known secrets passed with a log entry', function () {
+it('redacts remote secrets registered on the deployment', function () {
     [, $deployment] = makeSafeDeploymentLogFixture();
+    $deployment->redactRemoteSecrets(['API_TOKEN' => 'coolify-canary-remote-secret', 'PIN' => '4821']);
 
     $deployment->addLogEntry(
-        message: 'output coolify-canary-remote-secret',
+        message: 'output coolify-canary-remote-secret pin 4821',
         command: 'echo coolify-canary-remote-secret',
-        knownSecrets: ['coolify-canary-remote-secret'],
     );
 
     expect($deployment->refresh()->getRawOriginal('logs'))
         ->not->toContain('coolify-canary-remote-secret')
+        ->not->toContain('4821')
         ->toContain(REDACTED);
+});
+
+it('always redacts short locked values and values of locked shared variables', function () {
+    [$application, $deployment] = makeSafeDeploymentLogFixture();
+    $application->settings->update(['redact_all_env_values_in_logs' => false]);
+    createSafeDeploymentLogVariable($application, 'PIN', '4821', locked: true);
+    SharedEnvironmentVariable::query()->create([
+        'key' => 'SHARED_DB_PASS',
+        'value' => 'coolify-canary-shared-locked',
+        'type' => 'team',
+        'team_id' => $application->team()->id,
+        'is_shown_once' => true,
+    ]);
+    createSafeDeploymentLogVariable($application, 'DB_PASS', '{{team.SHARED_DB_PASS}}', locked: false);
+
+    $deployment->addLogEntry('pin 4821 password coolify-canary-shared-locked');
+
+    expect(json_decode($deployment->refresh()->logs, true)[0]['output'])
+        ->toBe('pin '.REDACTED.' password '.REDACTED);
 });
 
 it('passes remote secrets from the deployment job into stored log entries', function () {
@@ -144,14 +176,104 @@ it('starts a new log list when stored logs are corrupted', function () {
         ->and($logs[0]['order'])->toBe(1);
 });
 
-it('routes each REST container log endpoint through the shared redactor', function (string $controller) {
-    $source = file_get_contents(app_path("Http/Controllers/Api/{$controller}.php"));
+/**
+ * A team with an API token, a functional server, and running containers whose logs print an environment value
+ * and a pattern secret. Returns the endpoint path for the requested resource.
+ */
+function makeRestLogRedactionEndpoint(string $resource, string $envSecret): array
+{
+    Server::flushIdentityMap();
+    config(['app.maintenance.store' => 'array', 'constants.ssh.mux_enabled' => false]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
-    expect($source)->toContain('sanitizeLogsForExport(getContainerLogs(');
-})->with([
-    'applications' => 'ApplicationsController',
-    'databases' => 'DatabasesController',
-    'services' => 'ServicesController',
-    'service applications' => 'ServiceApplicationsController',
-    'service databases' => 'ServiceDatabasesController',
-]);
+    $team = Team::factory()->create();
+    $user = User::factory()->create();
+    $team->members()->attach($user->id, ['role' => 'owner']);
+    $plainTextToken = Str::random(40);
+    $token = $user->tokens()->create([
+        'name' => 'logs',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['root'],
+        'team_id' => $team->id,
+    ]);
+
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+    ]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $destinationAttributes = ['destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()];
+
+    if ($resource === 'database') {
+        $owner = null;
+        $database = StandalonePostgresql::create([
+            'name' => 'logs-db',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'postgres',
+            'postgres_db' => 'app',
+            'image' => 'postgres:16-alpine',
+            'environment_id' => $environment->id,
+            ...$destinationAttributes,
+        ]);
+        $path = "/api/v1/databases/{$database->uuid}/logs";
+        $containerName = $database->uuid;
+    } elseif ($resource === 'application') {
+        $owner = Application::factory()->create(['environment_id' => $environment->id, ...$destinationAttributes]);
+        $path = "/api/v1/applications/{$owner->uuid}/logs";
+        $containerName = $owner->uuid;
+    } else {
+        $owner = Service::factory()->create(['environment_id' => $environment->id, 'server_id' => $server->id, ...$destinationAttributes]);
+        $child = $resource === 'service database'
+            ? ServiceDatabase::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'service_id' => $owner->id])
+            : ServiceApplication::create(['uuid' => (string) Str::uuid(), 'name' => 'web', 'service_id' => $owner->id]);
+        $containerName = "{$child->name}-{$owner->uuid}";
+        $path = match ($resource) {
+            'service' => "/api/v1/services/{$owner->uuid}/logs?sub_service_name=web",
+            'service application' => "/api/v1/services/{$owner->uuid}/applications/{$child->uuid}/logs",
+            'service database' => "/api/v1/services/{$owner->uuid}/databases/{$child->uuid}/logs",
+        };
+    }
+
+    if ($owner !== null) {
+        EnvironmentVariable::query()->create([
+            'key' => 'LOG_CANARY',
+            'value' => $envSecret,
+            'resourceable_type' => $owner->getMorphClass(),
+            'resourceable_id' => $owner->id,
+            'is_preview' => false,
+        ]);
+    }
+
+    Process::fake(function ($process) use ($containerName, $envSecret) {
+        return match (true) {
+            str_contains($process->command, 'docker ps') => Process::result(output: json_encode([
+                'ID' => 'abc123',
+                'Names' => $containerName,
+                'Labels' => "coolify.name={$containerName}",
+                'State' => 'running',
+            ])),
+            str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+            str_contains($process->command, 'docker logs') => Process::result(output: "booted with {$envSecret}\npassword=coolify-canary-pattern-secret"),
+            default => Process::result(output: ''),
+        };
+    });
+
+    return [$path, $token->getKey().'|'.$plainTextToken];
+}
+
+it('redacts environment values and secrets in each REST container log endpoint', function (string $resource) {
+    $envSecret = 'coolify-canary-env-value-in-logs';
+    [$path, $bearerToken] = makeRestLogRedactionEndpoint($resource, $envSecret);
+
+    $logs = $this->withToken($bearerToken)->getJson($path)->assertOk()->json('logs');
+
+    expect($logs)
+        ->not->toContain('coolify-canary-pattern-secret')
+        ->toContain('password='.REDACTED);
+    if ($resource !== 'database') {
+        expect($logs)->toContain('booted with '.REDACTED)->not->toContain($envSecret);
+    }
+})->with(['application', 'database', 'service', 'service application', 'service database']);

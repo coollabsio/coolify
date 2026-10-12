@@ -215,7 +215,7 @@
                                     </button>
                                     <button type="button" role="menuitem" class="listbox-option"
                                         x-on:click="downloadLogs(); open = false">
-                                        <span class="flex-1 text-left">Download displayed logs</span>
+                                        <span class="flex-1 text-left">Download logs</span>
                                     </button>
                                     <button type="button" role="menuitem" x-on:click="
                                         downloadingAllLogs = true;

@@ -34,6 +34,7 @@ use OpenApi\Attributes as OA;
         'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
         'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
+        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'is_container_label_readonly_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label readonly.'],
         'config_hash' => ['type' => 'string', 'description' => 'The hash of the service configuration.'],
         'service_type' => ['type' => 'string', 'description' => 'The type of the service.'],

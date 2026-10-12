@@ -403,17 +403,64 @@ class EnvironmentVariable extends BaseModel
     }
 
     /**
-     * Collect the values to hide in logs. A resource can limit this to locked variables.
+     * Collect the values to hide in a resource's logs.
      *
-     * @param  iterable<self>|null  $variables
-     * @return array<int, string>
+     * Locked values are always hidden, whatever their length. Other values are hidden
+     * unless the resource limits log redaction to locked values only.
+     *
+     * @return array{known: array<int, string>, locked: array<int, string>}
      */
-    public static function logRedactionValuesFor(?iterable $variables, bool $redactAllValues = true): array
+    public static function logRedactionSecretsFor(Application|Service|null $resource, bool $includePreview = false): array
     {
-        return collect($variables ?? [])
-            ->filter(fn (self $variable): bool => $redactAllValues || $variable->is_shown_once)
-            ->flatMap(fn (self $variable): array => $variable->logRedactionValues())
-            ->all();
+        if ($resource === null) {
+            return ['known' => [], 'locked' => []];
+        }
+
+        $variables = collect($resource->environment_variables ?? []);
+        if ($includePreview && $resource instanceof Application) {
+            $variables = $variables->merge($resource->environment_variables_preview ?? []);
+        }
+
+        $redactAllValues = $resource->redactsAllEnvValuesInLogs();
+        $secrets = ['known' => [], 'locked' => []];
+        foreach ($variables as $variable) {
+            if ($variable->isLockedForLogs()) {
+                $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues());
+            } elseif ($redactAllValues) {
+                $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues());
+            }
+        }
+
+        return $secrets;
+    }
+
+    /**
+     * A variable is locked when it is locked itself or references a locked shared variable.
+     */
+    public function isLockedForLogs(): bool
+    {
+        if ($this->is_shown_once) {
+            return true;
+        }
+
+        if (preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $this->value, $references, PREG_SET_ORDER) === 0) {
+            return false;
+        }
+
+        $teamId = $this->resourceable?->team()?->id;
+        if ($teamId === null) {
+            return true;
+        }
+
+        return SharedEnvironmentVariable::query()
+            ->where('team_id', $teamId)
+            ->where('is_shown_once', true)
+            ->where(function (Builder $query) use ($references): void {
+                foreach ($references as [, $type, $key]) {
+                    $query->orWhere(fn (Builder $reference) => $reference->where('type', $type)->where('key', $key));
+                }
+            })
+            ->exists();
     }
 
     public function resolveReferencedValue(): ?string

@@ -158,12 +158,14 @@ class ResourceStartActivity
     }
 
     /**
-     * Mark an activity as failed, append the reason to its log and stop log polling.
+     * Mark an activity as failed, append the redacted reason to its log and stop log polling.
      *
      * @param  array<string, mixed>  $extraProperties
      */
     public static function markFailed(Activity $activity, string $message, array $extraProperties = []): void
     {
+        // Callers can pass exception or command output text, which can contain secrets.
+        $message = remove_iip($message);
         $properties = [
             ...$extraProperties,
             'status' => ProcessStatus::ERROR->value,

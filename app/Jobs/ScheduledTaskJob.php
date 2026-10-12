@@ -69,7 +69,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $task_output = null;
 
-    /** @var array<int, string>|null */
+    /** @var array{known: array<int, string>, locked: array<int, string>}|null */
     private ?array $logRedactionSecrets = null;
 
     public array $containers = [];
@@ -253,15 +253,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     private function redact(string $value): string
     {
         try {
-            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionValuesFor(
-                $this->resource?->environment_variables()->get(),
-                $this->resource?->redactsAllEnvValuesInLogs() ?? true,
-            );
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor($this->resource);
         } catch (\Throwable) {
             return REDACTED;
         }
 
-        return resolve(SensitiveDataRedactor::class)->redactText($value, $this->logRedactionSecrets);
+        return resolve(SensitiveDataRedactor::class)->redactText($value, $this->logRedactionSecrets['known'], $this->logRedactionSecrets['locked']);
     }
 
     /**

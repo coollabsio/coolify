@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\RedactSensitiveAuditData;
 use App\Logging\RedactSensitiveData;
 use App\Services\Security\SensitiveDataRedactor;
 use Monolog\Handler\TestHandler;
@@ -52,6 +53,32 @@ it('wires redaction into all persistent and remote log channels', function () {
 
     expect($configuration)
         ->toContain("'channels' => ['single']")
-        ->toContain("env('LOG_LEVEL', 'info')")
-        ->and(substr_count($configuration, 'RedactSensitiveData::class'))->toBe(10);
+        ->toContain("env('LOG_LEVEL', 'debug')")
+        ->not->toContain("env('LOG_LEVEL', 'info')")
+        ->and(substr_count($configuration, 'RedactSensitiveData::class'))->toBe(9)
+        ->and($configuration)->toMatch("/'audit' => \\[[^\\]]*'tap' => \\[RedactSensitiveAuditData::class\\]/s");
+});
+
+it('keeps email addresses in the audit log while still redacting secrets', function () {
+    $secret = 'coolify-canary-secret-audit';
+    $handler = new TestHandler;
+    $logger = new Logger('audit', [$handler]);
+
+    (new RedactSensitiveAuditData(new SensitiveDataRedactor))($logger);
+
+    $logger->info("User changed password={$secret}", ['user_email' => 'admin@example.com', 'token' => $secret]);
+
+    $record = $handler->getRecords()[0];
+
+    expect($record->context['user_email'])->toBe('admin@example.com')
+        ->and($record->context['token'])->toBe(REDACTED)
+        ->and($record->message)->toBe('User changed password='.REDACTED);
+});
+
+it('redacts email addresses in the default channels', function () {
+    $redactor = new SensitiveDataRedactor;
+
+    expect($redactor->redactText('mail admin@example.com'))->toBe('mail '.REDACTED)
+        ->and($redactor->withoutEmailRedaction()->redactText('mail admin@example.com'))->toBe('mail admin@example.com')
+        ->and($redactor->redactText('mail admin@example.com'))->toBe('mail '.REDACTED);
 });

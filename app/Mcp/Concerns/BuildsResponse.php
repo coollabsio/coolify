@@ -109,11 +109,13 @@ trait BuildsResponse
 
     /**
      * Best-effort redaction for free-form log text shown to MCP clients.
-     * Uses remove_iip plus common KEY=value / JSON secret patterns; not a guarantee.
+     * Uses SensitiveDataRedactor patterns plus the given resource values; not a guarantee.
+     *
+     * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Values from EnvironmentVariable::logRedactionSecretsFor().
      */
-    protected function redactLogText(string $text): string
+    protected function redactLogText(string $text, array $secrets = []): string
     {
-        return app(SensitiveDataRedactor::class)->redactText($text);
+        return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
     }
 
     /**

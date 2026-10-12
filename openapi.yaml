@@ -572,6 +572,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -962,6 +965,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1352,6 +1358,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1683,6 +1692,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2000,6 +2012,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2471,6 +2486,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -5850,7 +5868,7 @@ paths:
       tags:
         - Databases
       summary: 'List backup executions'
-      description: 'Get all executions for a specific backup configuration.'
+      description: 'Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.'
       operationId: list-backup-executions
       parameters:
         -
@@ -5874,7 +5892,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { type: string }, status: { type: string } }, type: object } }
+                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }, type: object } }
                 type: object
         '404':
           description: 'Backup configuration not found.'
@@ -12178,6 +12196,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  default: true
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 tags:
                   type: array
                   items: { type: string }
@@ -12364,6 +12386,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  default: true
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
               type: object
       responses:
         '200':
@@ -15316,6 +15342,9 @@ components:
           type: boolean
         use_build_secrets:
           type: boolean
+        redact_all_env_values_in_logs:
+          type: boolean
+          description: 'Hide every environment variable value in logs. When false, only locked values are hidden.'
         inject_build_args_to_dockerfile:
           type: boolean
         include_source_commit_in_build:
@@ -15735,6 +15764,9 @@ components:
         is_container_label_escape_enabled:
           type: boolean
           description: 'The flag to enable the container label escape.'
+        redact_all_env_values_in_logs:
+          type: boolean
+          description: 'Hide every environment variable value in logs. When false, only locked values are hidden.'
         is_container_label_readonly_enabled:
           type: boolean
           description: 'The flag to enable the container label readonly.'

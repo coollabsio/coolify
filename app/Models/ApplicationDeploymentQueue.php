@@ -48,11 +48,14 @@ use OpenApi\Attributes as OA;
 class ApplicationDeploymentQueue extends Model
 {
     /**
-     * Kept in memory only, never saved.
+     * Log redaction variants of remote secrets. Kept in memory only, never saved.
      *
-     * @var array<array-key, mixed>
+     * @var array<int, string>
      */
     private array $remoteSecretsForRedaction = [];
+
+    /** @var array{known: array<int, string>, locked: array<int, string>}|null */
+    private ?array $logRedactionSecrets = null;
 
     protected static function booted(): void
     {
@@ -205,38 +208,33 @@ class ApplicationDeploymentQueue extends Model
      */
     public function redactRemoteSecrets(array $secrets): void
     {
-        $this->remoteSecretsForRedaction = $secrets;
+        $this->remoteSecretsForRedaction = EnvironmentVariable::remoteSecretLogRedactionValues($secrets);
     }
 
     /**
-     * @param  array<array-key, mixed>  $extraSecrets  Values that are not stored on the application, such as remote secrets.
+     * Redact a deployment log text. The application secrets are collected once per deployment.
      */
-    private function redactSensitiveInfo(string $text, array $extraSecrets = []): string
+    public function redactLogText(string $text): string
     {
         try {
-            $app = $this->application;
-            $redactAllValues = $app?->redactsAllEnvValuesInLogs() ?? true;
-            $knownSecrets = EnvironmentVariable::logRedactionValuesFor($app?->environment_variables, $redactAllValues);
-            if ($this->pull_request_id !== 0) {
-                $knownSecrets = array_merge($knownSecrets, EnvironmentVariable::logRedactionValuesFor($app?->environment_variables_preview, $redactAllValues));
-            }
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor($this->application, $this->pull_request_id !== 0);
         } catch (\Throwable) {
             return REDACTED;
         }
 
-        return app(SensitiveDataRedactor::class)->redactText($text, array_merge($knownSecrets, EnvironmentVariable::remoteSecretLogRedactionValues($this->remoteSecretsForRedaction), $extraSecrets));
+        return app(SensitiveDataRedactor::class)->redactText(
+            $text,
+            $this->logRedactionSecrets['known'],
+            array_merge($this->logRedactionSecrets['locked'], $this->remoteSecretsForRedaction),
+        );
     }
 
-    /**
-     * @param  array<array-key, mixed>  $knownSecrets  Extra values to hide, such as remote secrets fetched for this deployment.
-     */
     public function addLogEntry(
         string $message,
         string $type = 'stdout',
         bool $hidden = false,
         ?string $command = null,
         int $batch = 1,
-        array $knownSecrets = [],
     ): void {
         if ($type === 'error') {
             $type = 'stderr';
@@ -246,8 +244,8 @@ class ApplicationDeploymentQueue extends Model
             $message = "\n".$message;
         }
         $newLogEntry = [
-            'command' => $command === null ? null : $this->redactSensitiveInfo($command, $knownSecrets),
-            'output' => $this->redactSensitiveInfo($message, $knownSecrets),
+            'command' => $command === null ? null : $this->redactLogText($command),
+            'output' => $this->redactLogText($message),
             'type' => $type,
             'timestamp' => Carbon::now('UTC'),
             'hidden' => $hidden,

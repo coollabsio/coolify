@@ -150,8 +150,9 @@ class All extends Component
 
             if ($this->resource instanceof Application) {
                 $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
-                $this->resource->settings->save();
+                $this->saveApplicationSettingsWithAudit($this->resource);
             } elseif ($this->resource instanceof Service) {
+                // Service uses the Auditable trait, so saving records `ui.service.updated` with the changed field.
                 $this->resource->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
                 $this->resource->save();
             } else {

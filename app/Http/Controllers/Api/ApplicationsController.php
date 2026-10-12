@@ -49,6 +49,7 @@ class ApplicationsController extends Controller
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
         'is_env_sorting_enabled',
+        'redact_all_env_values_in_logs',
         'is_pr_deployments_public_enabled',
         'stop_grace_period',
         'docker_images_to_keep',
@@ -75,6 +76,7 @@ class ApplicationsController extends Controller
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
         'is_env_sorting_enabled',
+        'redact_all_env_values_in_logs',
         'is_pr_deployments_public_enabled',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
@@ -428,6 +430,7 @@ class ApplicationsController extends Controller
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
                             'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -624,6 +627,7 @@ class ApplicationsController extends Controller
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
                             'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -820,6 +824,7 @@ class ApplicationsController extends Controller
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
                             'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -987,6 +992,7 @@ class ApplicationsController extends Controller
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
                             'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -1150,6 +1156,7 @@ class ApplicationsController extends Controller
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
                             'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -2677,7 +2684,10 @@ class ApplicationsController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = sanitizeLogsForExport(getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps));
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps),
+            EnvironmentVariable::logRedactionSecretsFor($application, includePreview: $pullRequestId !== null),
+        );
 
         return response()->json([
             'logs' => $logs,
@@ -3145,6 +3155,7 @@ class ApplicationsController extends Controller
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
                             'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -3250,6 +3261,10 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+
+        if ($request->has('redact_all_env_values_in_logs')) {
+            $this->authorize('manageEnvironment', $application);
+        }
 
         if ($request->instant_deploy) {
             abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');

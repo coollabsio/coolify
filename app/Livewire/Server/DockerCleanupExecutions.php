@@ -4,12 +4,13 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use App\Traits\ListensToTeamChannel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class DockerCleanupExecutions extends Component
 {
-    use ListensToTeamChannel;
+    use AuthorizesRequests, ListensToTeamChannel;
 
     public Server $server;
 
@@ -34,6 +35,7 @@ class DockerCleanupExecutions extends Component
 
     public function mount(Server $server)
     {
+        $this->authorize('view', $server);
         $this->server = $server;
         $this->refreshExecutions();
     }
@@ -105,6 +107,8 @@ class DockerCleanupExecutions extends Component
 
     public function downloadLogs(int $executionId)
     {
+        $this->authorize('view', $this->server);
+
         $execution = $this->executions->firstWhere('id', $executionId);
         if (! $execution) {
             return;
