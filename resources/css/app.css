@@ -288,6 +288,8 @@ select,
 
     html {
         color-scheme: light;
+        /* Reserve the scrollbar space so the layout does not shift when a page starts or stops scrolling. */
+        scrollbar-gutter: stable;
     }
 
     html.dark {

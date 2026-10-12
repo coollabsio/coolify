@@ -1262,7 +1262,9 @@ export function initializeTerminalComponent() {
                     bodyOverscroll: document.body.style.getPropertyValue('overscroll-behavior'),
                 };
 
-                const scrollbarGap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+                // html keeps a stable scrollbar gutter, so only pad when the browser has no gutter.
+                const hasStableGutter = getComputedStyle(document.documentElement).scrollbarGutter.startsWith('stable');
+                const scrollbarGap = hasStableGutter ? 0 : Math.max(0, window.innerWidth - document.documentElement.clientWidth);
 
                 document.documentElement.style.setProperty('overflow', 'hidden', 'important');
                 document.documentElement.style.setProperty('overscroll-behavior', 'none', 'important');
