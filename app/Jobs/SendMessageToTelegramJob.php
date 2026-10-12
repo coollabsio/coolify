@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\TelegramNotificationSettings;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,7 +15,7 @@ use Illuminate\Support\Str;
 
 class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -38,6 +40,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         public string $token,
         public string $chatId,
         public ?string $threadId = null,
+        public ?TelegramNotificationSettings $settings = null,
     ) {
         $this->onQueue('high');
     }
@@ -76,8 +79,10 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
             $payload['message_thread_id'] = $this->threadId;
         }
         $response = Http::post($url, $payload);
-        if ($response->failed()) {
-            throw new \RuntimeException('Telegram notification failed with '.$response->status().' status code.'.$response->body());
-        }
+
+        // 401: invalid bot token, 403: the bot was blocked or removed from the chat, 400 "chat not found": wrong chat ID.
+        $isConfigurationError = in_array($response->status(), [401, 403], true)
+            || ($response->status() === 400 && Str::contains((string) $response->json('description'), 'chat not found', true));
+        $this->handleNotificationResponse($response, 'Telegram', $isConfigurationError);
     }
 }
