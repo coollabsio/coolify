@@ -913,6 +913,26 @@ test('import rejects shell-like file ownership and mode metadata', function (str
     'option mode' => ['chmod', '--reference=/etc/passwd'],
 ]);
 
+test('transfer keeps the legacy escaping flag and treats old exports as legacy', function () {
+    $secret = $this->application->environment_variables()->where('key', 'APP_SECRET')->firstOrFail();
+    $secret->uses_legacy_escaping = true;
+    $secret->save();
+
+    $bundle = $this->exporter->export($this->server);
+    $exported = collect($bundle['projects'][0]['environments'][0]['applications'][0]['environment_variables'])
+        ->firstWhere('key', 'APP_SECRET');
+
+    $importEnvVars = new ReflectionMethod($this->importer, 'importEnvVars');
+    $importEnvVars->invoke($this->importer, [
+        ['key' => 'EXACT_VAR', 'value' => 'a', 'uses_legacy_escaping' => false],
+        ['key' => 'OLD_EXPORT_VAR', 'value' => 'b'],
+    ], $this->application, false);
+
+    expect($exported['uses_legacy_escaping'])->toBeTrue()
+        ->and($this->application->environment_variables()->where('key', 'EXACT_VAR')->first()->uses_legacy_escaping)->toBeFalse()
+        ->and($this->application->environment_variables()->where('key', 'OLD_EXPORT_VAR')->first()->uses_legacy_escaping)->toBeTrue();
+});
+
 test('transfer keeps whether a volume ignores the Compose driver options', function (?bool $exported, bool $expected) {
     LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => (bool) $exported]);
     $bundle = $this->exporter->export($this->server);
