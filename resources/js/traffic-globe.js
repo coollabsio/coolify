@@ -49,6 +49,15 @@ function buildMarkers(data) {
 
 const TWO_PI = Math.PI * 2;
 
+const SPIN_SPEED = 0.15; // rad/s
+const SPIN_FRAME_MS = 1000 / 30; // ambient spin is drawn at 30fps
+const SETTLE_EPSILON = 0.0005;
+
+// Signed shortest angular distance from `current` to `target`.
+function angleDelta(current, target) {
+    return ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
+}
+
 // cobe orientation for a lat/lng so the point faces the viewer (cobe's own
 // focus example formula). Returns [phi, theta].
 function locationToAngles(lat, lng) {
@@ -58,9 +67,7 @@ function locationToAngles(lat, lng) {
 // Shortest-path angular interpolation, so easing across the 0/2π seam never
 // spins the long way around.
 function lerpAngle(current, target, t) {
-    let delta = ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
-
-    return current + delta * t;
+    return current + angleDelta(current, target) * t;
 }
 
 /**
@@ -71,7 +78,7 @@ function lerpAngle(current, target, t) {
  *
  * cobe v2 has no internal render loop or `onRender` callback: createGlobe draws
  * a single frame and returns `{ update, destroy }`. We drive our own rAF loop,
- * calling `globe.update({...})` each frame for rotation and to swap markers/theme.
+ * which draws only while something moves and stops when the canvas is off-screen.
  *
  * @param {HTMLCanvasElement} canvas
  * @param {Array<{code: string, requests: number}>} data
@@ -82,6 +89,9 @@ function mountTrafficGlobe(canvas, data, dark) {
     let width = 0;
     let destroyed = false;
     let rafId = 0;
+    let lastDraw = 0;
+    let dirty = true;
+    let visible = true;
     let markers = buildMarkers(data);
 
     // Ambient spin is decorative; honor reduced-motion by not auto-rotating
@@ -103,6 +113,7 @@ function mountTrafficGlobe(canvas, data, dark) {
         dragStartPhi = targetPhi;
         autoRotate = false;
         canvas.style.cursor = 'grabbing';
+        wake();
     };
     const onPointerUp = () => {
         if (dragging === null) {
@@ -111,10 +122,12 @@ function mountTrafficGlobe(canvas, data, dark) {
         dragging = null;
         autoRotate = ! prefersReduced;
         canvas.style.cursor = 'grab';
+        wake();
     };
     const onPointerMove = (e) => {
         if (dragging !== null) {
             targetPhi = dragStartPhi + (e.clientX - dragging) / 150;
+            wake();
         }
     };
 
@@ -127,7 +140,7 @@ function mountTrafficGlobe(canvas, data, dark) {
         const theme = isDark ? THEMES.dark : THEMES.light;
 
         globe = createGlobe(canvas, {
-            devicePixelRatio: 2,
+            devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
             width: width,
             height: width,
             phi: currentPhi,
@@ -144,20 +157,45 @@ function mountTrafficGlobe(canvas, data, dark) {
         });
     };
 
-    // Self-driven animation loop (cobe v2 draws only when we call update()).
-    const tick = () => {
-        if (destroyed) {
+    const schedule = () => {
+        if (! rafId && ! destroyed && globe && visible) {
+            rafId = requestAnimationFrame(tick);
+        }
+    };
+
+    // Request a draw; a no-op while one is already queued.
+    function wake() {
+        dirty = true;
+        schedule();
+    }
+
+    // Draws only while the globe spins or eases toward a target, then goes idle.
+    const tick = (now) => {
+        rafId = 0;
+        if (destroyed || ! globe || width === 0) {
             return;
         }
-        if (globe && width > 0) {
-            if (autoRotate && dragging === null) {
-                targetPhi += 0.0025;
-            }
-            currentPhi = lerpAngle(currentPhi, targetPhi, 0.12);
-            currentTheta += (targetTheta - currentTheta) * 0.12;
-            globe.update({ phi: currentPhi, theta: currentTheta, width: width, height: width, markers });
+        const spinning = autoRotate && dragging === null;
+        const elapsed = now - lastDraw;
+        if (spinning && ! dirty && elapsed < SPIN_FRAME_MS) {
+            schedule();
+
+            return;
         }
-        rafId = requestAnimationFrame(tick);
+        if (spinning) {
+            targetPhi += (SPIN_SPEED * Math.min(elapsed, 100)) / 1000;
+        }
+        currentPhi = lerpAngle(currentPhi, targetPhi, 0.12);
+        currentTheta += (targetTheta - currentTheta) * 0.12;
+        globe.update({ phi: currentPhi, theta: currentTheta, width: width, height: width, markers });
+        lastDraw = now;
+        dirty = false;
+
+        const settled = Math.abs(angleDelta(currentPhi, targetPhi)) < SETTLE_EPSILON
+            && Math.abs(targetTheta - currentTheta) < SETTLE_EPSILON;
+        if (spinning || ! settled) {
+            schedule();
+        }
     };
 
     // cobe needs a non-zero canvas width at creation; inside a freshly-rendered
@@ -170,17 +208,26 @@ function mountTrafficGlobe(canvas, data, dark) {
         }
         width = next;
         create(dark);
-        rafId = requestAnimationFrame(tick);
+        wake();
     };
 
     const resizeObserver = new ResizeObserver(() => {
         if (globe) {
             width = canvas.offsetWidth || width;
+            wake();
         } else {
             ensure();
         }
     });
     resizeObserver.observe(canvas);
+
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+        visible = entry.isIntersecting;
+        if (visible) {
+            wake();
+        }
+    });
+    intersectionObserver.observe(canvas);
     requestAnimationFrame(ensure);
 
     return {
@@ -212,10 +259,12 @@ function mountTrafficGlobe(canvas, data, dark) {
             targetPhi = phi;
             targetTheta = theta;
             autoRotate = false;
+            wake();
         },
         resume() {
             if (dragging === null) {
                 autoRotate = ! prefersReduced;
+                wake();
             }
         },
         destroy() {
@@ -225,6 +274,7 @@ function mountTrafficGlobe(canvas, data, dark) {
                 rafId = 0;
             }
             resizeObserver.disconnect();
+            intersectionObserver.disconnect();
             canvas.removeEventListener('pointerdown', onPointerDown);
             window.removeEventListener('pointerup', onPointerUp);
             window.removeEventListener('pointermove', onPointerMove);
