@@ -45,7 +45,7 @@ class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        $response = Http::post('https://api.pushover.net/1/messages.json', $this->message->toPayload($this->token, $this->user));
+        $response = $this->sendNotificationRequest('Pushover', 'https://api.pushover.net/1/messages.json', fn () => Http::post('https://api.pushover.net/1/messages.json', $this->message->toPayload($this->token, $this->user)));
 
         // Pushover marks the invalid field in the error body, for example {"token": "invalid"}.
         $isConfigurationError = $response->clientError()

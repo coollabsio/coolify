@@ -38,6 +38,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -1716,10 +1717,14 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
-function sanitizeLogsForExport(string $text): string
+/**
+ * Redact log text before it leaves Coolify (copy, download, API, MCP).
+ *
+ * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Resource values to hide, usually from EnvironmentVariable::logRedactionSecretsFor().
+ */
+function sanitizeLogsForExport(string $text, array $secrets = []): string
 {
-    // All sanitization is now handled by remove_iip()
-    return remove_iip($text);
+    return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
 }
 
 function getTopLevelNetworks(Service|Application $resource): Collection

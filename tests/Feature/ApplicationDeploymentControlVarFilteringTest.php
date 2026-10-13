@@ -155,7 +155,7 @@ it('keeps deployment logging available if value formatting fails', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
     $variable = new class extends EnvironmentVariable
     {
-        public function logRedactionValues(): array
+        public function logRedactionValues(?Collection $sharedVariables = null): array
         {
             throw new RuntimeException('Harmless formatting failure');
         }
