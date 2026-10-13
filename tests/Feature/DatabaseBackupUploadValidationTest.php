@@ -102,6 +102,12 @@ test('hasAllowedExtension accepts supported extensions', function (string $name)
     'archive.gz' => ['data.archive.gz'],
     'bz2' => ['data.bz2'],
     'xz' => ['data.xz'],
+    'sqlite db' => ['app.db'],
+    'sqlite' => ['app.sqlite'],
+    'sqlite3' => ['app.sqlite3'],
+    'gzip sqlite db' => ['app.db.gz'],
+    'gzip sqlite' => ['app.sqlite.gz'],
+    'gzip sqlite3' => ['app.sqlite3.gz'],
 ]);
 
 test('hasAllowedExtension rejects unsupported or empty stems', function (string $name) {
@@ -135,6 +141,23 @@ test('backup validator rejects content that does not match the backup extension'
 
     expect(DatabaseBackupFileValidator::isUploadAllowed($file, 10 * 1024 * 1024))->toBeFalse();
 });
+
+test('backup validator accepts SQLite database files and their gzip form', function (string $name, string $content) {
+    expect(DatabaseBackupFileValidator::isUploadAllowed(makeTemporaryUpload($name, $content), 10 * 1024 * 1024))->toBeTrue();
+})->with([
+    'db' => ['app.db', "SQLite format 3\0".str_repeat("\0", 84)],
+    'sqlite' => ['app.sqlite', "SQLite format 3\0".str_repeat("\0", 84)],
+    'sqlite3' => ['app.sqlite3', "SQLite format 3\0".str_repeat("\0", 84)],
+    'gzip sqlite' => ['app.sqlite.gz', gzencode("SQLite format 3\0".str_repeat("\0", 84))],
+]);
+
+test('backup validator rejects SQLite extensions with content that is not a SQLite database', function (string $name, string $content) {
+    expect(DatabaseBackupFileValidator::isUploadAllowed(makeTemporaryUpload($name, $content), 10 * 1024 * 1024))->toBeFalse();
+})->with([
+    'sql text as db' => ['app.db', "CREATE TABLE users (id integer);\n"],
+    'script as sqlite' => ['app.sqlite', "#!/bin/sh\nid\n"],
+    'plain sqlite as sqlite.gz' => ['app.sqlite.gz', "SQLite format 3\0".str_repeat("\0", 84)],
+]);
 
 test('backup validator accepts valid plain sql and gzip backup content', function () {
     $plainSql = makeTemporaryUpload('backup.sql', "CREATE TABLE users (id integer);\n");

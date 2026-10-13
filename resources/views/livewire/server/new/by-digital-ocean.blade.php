@@ -17,9 +17,7 @@
             @if ($loading_data)
                 <x-application.settings-section title="Loading DigitalOcean"
                     description="Fetching regions, sizes, images, and account resources.">
-                    <div class="flex min-h-40 items-center justify-center">
-                        <x-loading text="Loading DigitalOcean data..." />
-                    </div>
+                    <x-skeleton.form :fields="6" label="Loading DigitalOcean data" />
                 </x-application.settings-section>
             @elseif ($provider_data_error)
                 <x-application.settings-section title="Unable to load DigitalOcean"
@@ -133,16 +131,11 @@
                         @endif
 
                         <div class="flex flex-col gap-4">
-                            <x-forms.datalist label="Extra SSH keys" id="selectedDigitalOceanSshKeyIds"
-                                helper="Existing keys from the DigitalOcean account." :multiple="true"
-                                :disabled="count($digitalOceanSshKeys) === 0"
-                                :placeholder="count($digitalOceanSshKeys) ? 'Search SSH keys' : 'No account keys found'">
-                                @foreach ($digitalOceanSshKeys as $sshKey)
-                                    <option value="{{ $sshKey['id'] }}">
-                                        {{ $sshKey['name'] ?? $sshKey['fingerprint'] }}
-                                    </option>
-                                @endforeach
-                            </x-forms.datalist>
+                            <x-forms.listbox label="Extra SSH keys" id="selectedDigitalOceanSshKeyIds"
+                                helper="Existing keys from the DigitalOcean account." multiple searchable
+                                :disabled="count($digitalOceanSshKeys) === 0" searchPlaceholder="Search SSH keys…"
+                                :placeholder="count($digitalOceanSshKeys) ? 'Select SSH keys' : 'No account keys found'"
+                                :options="collect($digitalOceanSshKeys)->map(fn ($sshKey) => ['value' => $sshKey['id'], 'label' => $sshKey['name'] ?? $sshKey['fingerprint']])->values()->all()" />
 
                             <div class="grid gap-3 lg:grid-cols-2">
                                 <x-forms.checkbox id="enable_ipv6" label="Enable IPv6" fullWidth />

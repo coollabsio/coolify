@@ -62,3 +62,28 @@ test('enabling Resend disables SMTP in storage', function () {
     expect($this->settings->resend_enabled)->toBeTrue();
     expect($this->settings->smtp_enabled)->toBeFalse();
 });
+
+test('a user who is no longer an instance admin cannot toggle email providers', function (string $action, string $column) {
+    $this->settings->update([
+        'smtp_enabled' => $column === 'smtp_enabled',
+        'resend_enabled' => $column === 'resend_enabled',
+        'resend_api_key' => 're_test_key',
+        'smtp_host' => 'smtp.example.com',
+        'smtp_port' => '587',
+        'smtp_from_address' => 'from@example.com',
+        'smtp_from_name' => 'Coolify',
+    ]);
+
+    $component = Livewire::test(SettingsEmail::class);
+
+    $member = User::factory()->create();
+    $member->teams()->attach($this->rootTeam, ['role' => 'member']);
+    $this->actingAs($member);
+
+    $component->call($action)->assertDispatched('error');
+
+    expect($this->settings->refresh()->{$column})->toBeTrue();
+})->with([
+    'SMTP' => ['toggleSmtp', 'smtp_enabled'],
+    'Resend' => ['toggleResend', 'resend_enabled'],
+]);

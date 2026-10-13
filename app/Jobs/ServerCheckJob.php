@@ -52,7 +52,13 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            if ($this->server->serverStatus() === false) {
+            // ServerConnectionCheckJob owns reachability. Do not probe SSH again here: one failed
+            // probe would mark the server unreachable without UNREACHABLE_THRESHOLD.
+            if ($this->server->isFunctional() === false) {
+                if ($this->server->settings->is_reachable === false) {
+                    $this->server->markResourcesAsExited();
+                }
+
                 return 'Server is not reachable or not ready.';
             }
 
@@ -85,14 +91,13 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                             $shouldStart = CheckProxy::run($this->server);
                             if ($shouldStart) {
                                 StartProxy::run($this->server, async: false);
-                                $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                                $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server, restartedResource: $this->server));
                             }
                         } catch (\Throwable $e) {
                         }
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                         $this->server->save();
-                        ConnectProxyToNetworksJob::dispatchSync($this->server);
                     }
                 }
             }

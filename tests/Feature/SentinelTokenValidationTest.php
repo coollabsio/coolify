@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Server\Show;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
@@ -8,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -116,6 +118,20 @@ describe('ServerSetting::ensureValidSentinelToken', function () {
         expect($settings->fresh()->sentinel_token)->toBe($token);
     });
 
+    it('loads the server page when the stored token cannot be decrypted', function () {
+        $settings = $this->server->settings;
+        DB::table('server_settings')->where('id', $settings->id)->update(['sentinel_token' => 'not-encrypted-junk']);
+
+        $this->actingAs($this->team->members()->first());
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+            ->assertOk()
+            ->assertSet('sentinelToken', $settings->fresh()->sentinel_token);
+
+        expect(ServerSetting::isValidSentinelToken($settings->fresh()->sentinel_token))->toBeTrue();
+    });
+
     it('returns existing valid token without regenerating', function () {
         $settings = $this->server->settings;
         $original = $settings->sentinel_token;
@@ -151,6 +167,43 @@ describe('ServerSetting::ensureValidSentinelToken', function () {
 });
 
 describe('ServerSetting::ensureSentinelUrl', function () {
+    it('uses the internal Coolify endpoint for the local server', function () {
+        InstanceSettings::query()->whereKey(0)->update([
+            'fqdn' => 'https://coolify.example.com',
+        ]);
+        Once::flush();
+        $this->server->update(['ip' => 'host.docker.internal']);
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update(['sentinel_custom_url' => null]);
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('http://coolify:8080')
+            ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
+    });
+
+    it('replaces the legacy local endpoint that depends on published port 8000', function () {
+        $this->server->update(['ip' => 'host.docker.internal']);
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update([
+            'sentinel_custom_url' => 'http://host.docker.internal:8000',
+        ]);
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('http://coolify:8080')
+            ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
+    });
+
+    it('preserves an explicit custom URL for the local server', function () {
+        $this->server->update(['ip' => 'host.docker.internal']);
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update([
+            'sentinel_custom_url' => 'https://coolify.example.com',
+        ]);
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('https://coolify.example.com');
+    });
+
     it('uses the current private instance URL when no public address is configured', function () {
         InstanceSettings::query()->whereKey(0)->update([
             'fqdn' => null,

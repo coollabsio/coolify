@@ -64,6 +64,7 @@ class Environment extends BaseModel
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
+            $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0;
     }
 
@@ -117,6 +118,11 @@ class Environment extends BaseModel
         return $this->hasMany(StandaloneClickhouse::class);
     }
 
+    public function sqlites()
+    {
+        return $this->hasMany(StandaloneSqlite::class);
+    }
+
     public function databases()
     {
         $postgresqls = $this->postgresqls;
@@ -127,8 +133,9 @@ class Environment extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($sqlites);
     }
 
     public function project()

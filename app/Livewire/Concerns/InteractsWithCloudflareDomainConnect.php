@@ -33,6 +33,12 @@ trait InteractsWithCloudflareDomainConnect
             return;
         }
 
+        if ($this->publicServerIpForDomainConnect() === null) {
+            $this->dispatch('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
+
+            return;
+        }
+
         $this->showCloudflareAutoconfigureModal = true;
     }
 
@@ -62,6 +68,14 @@ trait InteractsWithCloudflareDomainConnect
                 'error',
                 'A resolvable server IP is required before autoconfiguring DNS. Set a public IP on the server (or instance settings for localhost).'
             );
+
+            return;
+        }
+
+        $ip = $this->publicServerIpForDomainConnect();
+        if ($ip === null) {
+            $this->showCloudflareAutoconfigureModal = false;
+            $this->dispatch('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
 
             return;
         }
@@ -243,6 +257,21 @@ trait InteractsWithCloudflareDomainConnect
         $hostname = explode(':', $hostname)[0] ?? $hostname;
 
         return rtrim($hostname, '.');
+    }
+
+    /**
+     * Address that Domain Connect may publish at Cloudflare: the first public server address (IPv4 first).
+     * Private, reserved, CGNAT, and link-local addresses are never sent to Cloudflare.
+     */
+    protected function publicServerIpForDomainConnect(): ?string
+    {
+        foreach ($this->serverIpsForDnsHints() as $address) {
+            if (is_string($address) && DnsRecordHints::isPublicAddress($address)) {
+                return $address;
+            }
+        }
+
+        return null;
     }
 
     protected function serverIpForDomainConnect(): ?string

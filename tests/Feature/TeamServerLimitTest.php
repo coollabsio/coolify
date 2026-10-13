@@ -51,3 +51,13 @@ it('returns true for serverLimitReached when team has servers at limit', functio
 
     expect($result)->toBeTrue();
 });
+
+it('checks the current server count even when the relation was loaded earlier', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    $team = Team::factory()->create(['custom_server_limit' => 1]);
+    $team->load('servers');
+    Server::factory()->create(['team_id' => $team->id]);
+
+    expect(Team::serverLimitReached($team))->toBeTrue();
+});

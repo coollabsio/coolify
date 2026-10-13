@@ -2,7 +2,7 @@
 
 function expectRockyInstallScriptToUseRhelRepo(string $path): void
 {
-    $installScript = file_get_contents(base_path($path));
+    $installScript = file_get_contents(dirname(__DIR__, 2).'/'.$path);
 
     expect($installScript)
         ->toContain('install_docker_from_rhel_repo() {')

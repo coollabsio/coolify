@@ -7,6 +7,57 @@ namespace App\Support;
  */
 class DnsRecordHints
 {
+    public const NO_PUBLIC_ADDRESS_MESSAGE = 'The server has no public IP address; add the DNS record manually.';
+
+    /**
+     * Whether an address may be published as a public A/AAAA record: private, reserved, loopback, link-local,
+     * unique local, CGNAT (100.64.0.0/10, used by Tailscale), and multicast addresses are rejected.
+     */
+    public static function isPublicAddress(string $address): bool
+    {
+        $binary = @inet_pton($address);
+        if ($binary === false) {
+            return false;
+        }
+
+        if (strlen($binary) === 16 && str_starts_with($binary, str_repeat("\0", 10)."\xff\xff")) {
+            $address = (string) inet_ntop(substr($binary, 12));
+            $binary = substr($binary, 12);
+        }
+
+        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return false;
+        }
+
+        if (strlen($binary) === 4) {
+            $firstOctet = ord($binary[0]);
+            $isCgnat = $firstOctet === 100 && (ord($binary[1]) & 0xC0) === 64;
+
+            return ! $isCgnat && ($firstOctet & 0xF0) !== 224;
+        }
+
+        return ord($binary[0]) !== 0xFF;
+    }
+
+    /**
+     * Whether two DNS record values name the same address. IP addresses are compared in binary form,
+     * so equivalent IPv6 notations (2001:db8::1 and 2001:0DB8:0:0::1) match; other values must be identical.
+     */
+    public static function sameAddress(?string $first, ?string $second): bool
+    {
+        if ($first === null || $second === null) {
+            return false;
+        }
+
+        $firstBinary = @inet_pton(trim($first));
+        $secondBinary = @inet_pton(trim($second));
+        if ($firstBinary !== false && $secondBinary !== false) {
+            return $firstBinary === $secondBinary;
+        }
+
+        return $first === $second;
+    }
+
     /**
      * Build A/AAAA entries for every hostname (deduped).
      *

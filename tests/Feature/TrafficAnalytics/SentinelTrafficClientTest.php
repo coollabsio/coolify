@@ -5,6 +5,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -130,17 +131,6 @@ it('builds the per-app series url and defaults an unknown range to 24h', functio
         ->toContain('range=24h');
 });
 
-it('returns an empty series when the endpoint is absent (older Sentinel 404)', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $client = new FakeTrafficClient($server);
-
-    // Empty body / unparseable / empty array all mean "no series" → donut fallback.
-    foreach (['', 'Not Found', '{}', '[]'] as $body) {
-        $client->response = $body;
-        expect($client->series(null, '24h'))->toBeEmpty();
-    }
-});
-
 it('rejects a malicious app key for the series endpoint', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $client = new FakeTrafficClient($server);
@@ -199,54 +189,12 @@ it('serves every endpoint from one aggregate dashboard fetch when Sentinel expos
     $client->breakdown(null, 'country', 'F', 'T');
 });
 
-it('warms every server-wide endpoint in a single batched exec and per-call methods hit cache', function () {
+it('probes the absent dashboard route only once per cache window and returns no leaderboard', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
 
-    // Batches responses; individual remoteFetch() must never run once the batch has warmed
-    // the cache, proving the round-trips collapsed into one exec.
-    $client = new class($server) extends SentinelTrafficClient
-    {
-        public array $batchedCalls = [];
-
-        protected function batchRemoteFetch(array $urls): string
-        {
-            $this->batchedCalls[] = $urls;
-
-            // One framed body per url, matched by endpoint so ordering stays irrelevant.
-            $bodies = array_map(fn ($url) => match (true) {
-                str_contains($url, '/traffic/apps') => json_encode(['app-a', 'app-b']),
-                str_contains($url, '/attribution') => '{"attribution":"demo"}',
-                str_contains($url, '/overview') => '{"requests":1}',
-                default => '[]', // paths, series, breakdowns
-            }, $urls);
-
-            return implode("\x1e", $bodies)."\x1e";
-        }
-
-        protected function remoteFetch(string $url): string
-        {
-            throw new RuntimeException("individual fetch should not run for: {$url}");
-        }
-    };
-
-    $apps = $client->prefetchServerWide(null, 'F', 'T', ['country', 'browser'], '24h');
-
-    expect($client->batchedCalls)->toHaveCount(1)
-        ->and($apps)->toBe(['app-a', 'app-b']);
-
-    // These now read from the warmed cache; remoteFetch() would throw if they didn't.
-    expect($client->overview(null, 'F', 'T')->requests)->toBe(1);
-    $client->breakdown(null, 'country', 'F', 'T');
-    $client->series(null, '24h');
-    $client->attribution();
-});
-
-it('probes the absent dashboard route only once per cache window, then reuses the batch fallback', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-
-    // Older Sentinel: the dashboard route 404s (unparseable body), so raw() throws and the
-    // client falls back to the batch. The absence must be remembered so a second prefetch in
-    // the same window doesn't re-probe the dashboard over SSH.
+    // Sentinel 0.0.x has no traffic routes: Gin answers 404 with a plain-text body, so raw()
+    // throws. The absence must be remembered so a second prefetch in the same window doesn't
+    // re-probe the dashboard over SSH, and nothing falls back to individual endpoints.
     $client = new class($server) extends SentinelTrafficClient
     {
         public int $dashboardProbes = 0;
@@ -258,7 +206,7 @@ it('probes the absent dashboard route only once per cache window, then reuses th
             if (str_contains($url, '/traffic/dashboard')) {
                 $this->dashboardProbes++;
 
-                return 'Not Found';
+                return '404 page not found';
             }
             throw new RuntimeException("unexpected individual fetch: {$url}");
         }
@@ -266,22 +214,15 @@ it('probes the absent dashboard route only once per cache window, then reuses th
         protected function batchRemoteFetch(array $urls): string
         {
             $this->batchCalls++;
-            $bodies = array_map(fn ($url) => match (true) {
-                str_contains($url, '/traffic/apps') => json_encode(['app-a']),
-                str_contains($url, '/attribution') => '{"attribution":"demo"}',
-                str_contains($url, '/overview') => '{"requests":1}',
-                default => '[]',
-            }, $urls);
 
-            return implode("\x1e", $bodies)."\x1e";
+            return '';
         }
     };
 
-    $client->prefetchServerWide(null, 'F', 'T', ['country'], '24h');
-    $client->prefetchServerWide(null, 'F', 'T', ['country'], '24h');
-
-    expect($client->dashboardProbes)->toBe(1)
-        ->and($client->batchCalls)->toBe(1);
+    expect($client->prefetchServerWide(null, 'F', 'T', ['country'], '24h'))->toBe([])
+        ->and($client->prefetchServerWide(null, 'F', 'T', ['country'], '24h'))->toBe([])
+        ->and($client->dashboardProbes)->toBe(1)
+        ->and($client->batchCalls)->toBe(0);
 });
 
 it('double-quotes the url in the remote curl command so & is not a shell background operator', function () {
@@ -301,4 +242,43 @@ it('double-quotes the url in the remote curl command so & is not a shell backgro
     // The URL must be wrapped in double quotes inside the inner `sh -c`, otherwise the
     // container shell backgrounds curl at the `&` and only `from=...` reaches Sentinel.
     expect($command)->toContain('"'.$url.'"');
+});
+
+it('skips an unsafe app key in the dashboard bundle and keeps the other apps', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    Log::spy();
+
+    $bundle = json_encode([
+        'overview' => ['requests' => 7],
+        'paths' => [],
+        'breakdowns' => [],
+        'series' => [],
+        'apps' => [
+            ['uuid' => 'app-a', 'overview' => ['requests' => 4]],
+            ['uuid' => 'bad key;rm -rf /', 'overview' => ['requests' => 2]],
+            ['uuid' => 'app-b', 'overview' => ['requests' => 1]],
+        ],
+    ]);
+
+    $client = new class($server, $bundle) extends SentinelTrafficClient
+    {
+        public function __construct($server, private string $bundle)
+        {
+            parent::__construct($server);
+        }
+
+        protected function remoteFetch(string $url): string
+        {
+            if (str_contains($url, '/traffic/dashboard')) {
+                return $this->bundle;
+            }
+            throw new RuntimeException("unexpected individual fetch: {$url}");
+        }
+    };
+
+    $apps = $client->prefetchServerWide(null, 'F', 'T', [], '24h');
+
+    expect($apps)->toBe(['app-a', 'app-b'])
+        ->and($client->overview('app-b', 'F', 'T')->requests)->toBe(1);
+    Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'unsafe'))->once();
 });

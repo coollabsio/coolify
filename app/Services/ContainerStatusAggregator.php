@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -35,6 +36,44 @@ use Illuminate\Support\Facades\Log;
  */
 class ContainerStatusAggregator
 {
+    use CalculatesExcludedStatus;
+
+    /**
+     * Status string of one container from `docker container inspect` output
+     * (e.g. "running:healthy", "restarting:unknown", "exited").
+     *
+     * Every status writer (the full server check and the targeted check after a start)
+     * uses this, so they store the same strings.
+     */
+    public static function containerStatus(array|object $container): string
+    {
+        $state = data_get($container, 'State.Status');
+        if ($state === 'exited') {
+            return $state;
+        }
+
+        return $state.':'.(data_get($container, 'State.Health.Status') ?? 'unknown');
+    }
+
+    /**
+     * Aggregate the container statuses of one Compose-based resource (application, service
+     * application or service database). Containers excluded from health checks in the Compose
+     * file are ignored; when every container is excluded, the result has the :excluded suffix.
+     *
+     * @param  Collection<string, string>  $containerStatuses  Status strings keyed by Compose service name
+     */
+    public function aggregateForCompose(Collection $containerStatuses, ?string $dockerComposeRaw, int $maxRestartCount = 0): string
+    {
+        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
+        $relevantStatuses = $containerStatuses->reject(fn ($status, $containerName) => $excludedContainers->contains($containerName));
+
+        if ($relevantStatuses->isEmpty()) {
+            return $this->calculateExcludedStatusFromStrings($containerStatuses);
+        }
+
+        return $this->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
+    }
+
     /**
      * Aggregate container statuses from status strings into a single status.
      *

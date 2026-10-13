@@ -92,7 +92,7 @@ class Add extends Component
     #[Computed]
     public function availableSharedVariables(): array
     {
-        $team = currentTeam();
+        $team = $this->resource ? $this->resource->team() : currentTeam();
         $result = [
             'team' => [],
             'project' => [],

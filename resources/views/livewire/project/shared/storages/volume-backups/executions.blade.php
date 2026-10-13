@@ -48,26 +48,38 @@
                                 'failed' => 'error',
                                 default => 'neutral',
                             };
+                            $s3Replicas = $execution->s3Replicas;
+                            $hasLiveS3Copies = $s3Replicas->isNotEmpty()
+                                ? $s3Replicas->contains(fn ($replica) => $replica->s3_uploaded === true && ! $replica->s3_storage_deleted)
+                                : $execution->s3_uploaded === true && ! $execution->s3_storage_deleted;
                             $executionCheckboxes = [];
                             $deleteActions = [];
                             if (! $execution->local_storage_deleted) {
                                 $deleteActions[] = 'This backup will be permanently deleted from local storage.';
                             }
-                            if ($execution->s3_uploaded === true && ! $execution->s3_storage_deleted) {
+                            if ($hasLiveS3Copies) {
                                 $executionCheckboxes[] = [
                                     'id' => 'delete_backup_s3',
-                                    'label' => 'Delete the selected backup permanently from S3 Storage',
+                                    'label' => 'Delete the selected backup permanently from every S3 storage',
                                 ];
                             }
                             if (empty($deleteActions)) {
                                 $deleteActions[] = 'This backup execution record will be deleted.';
                             }
+                            $recoveryPending = $execution->status !== 'running' && $execution->hasPendingRecovery();
+                            $recoveryErrorLabel = match ($execution->recovery_error) {
+                                's3_auth' => 'S3 credentials',
+                                's3_bucket' => 'S3 bucket missing',
+                                'server_unreachable' => 'server unreachable',
+                                'remote_command' => 'remote command failed',
+                                default => 'unknown error',
+                            };
                         @endphp
 
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
                             class="data-table-row volume-backup-executions-grid min-h-16 items-center gap-x-3 border-b border-neutral-200 text-[12px] last:border-b-0 dark:border-white/[0.07]">
                             <span>
-                                <x-status-badge :status="$statusLabel" :type="$statusType" />
+                                <x-status-badge :status="$statusLabel" :type="$statusType" :pulse="$execution->status === 'running'" />
                             </span>
 
                             <span class="min-w-0">
@@ -90,7 +102,22 @@
                             <span class="flex flex-wrap gap-1">
                                 <x-status-badge :status="$execution->local_storage_deleted ? 'Local deleted' : 'Local'"
                                     :type="$execution->local_storage_deleted ? 'neutral' : 'success'" />
-                                @if ($execution->s3_uploaded !== null)
+                                @foreach ($s3Replicas as $replica)
+                                    <x-status-badge wire:key="volume-backup-replica-{{ $replica->id }}"
+                                        :label="$replica->s3?->name ?? 'Removed S3 storage'"
+                                        :status="$replica->s3_storage_deleted
+                                            ? 'deleted'
+                                            : match ($replica->s3_uploaded) {
+                                                true => null,
+                                                false => 'failed',
+                                                default => $execution->status === 'running' ? 'pending' : 'not uploaded',
+                                            }"
+                                        :type="$replica->s3_storage_deleted || $replica->s3_uploaded === null
+                                            ? 'neutral'
+                                            : ($replica->s3_uploaded ? 'success' : 'error')"
+                                        :title="$replica->message" />
+                                @endforeach
+                                @if ($s3Replicas->isEmpty() && $execution->s3_uploaded !== null)
                                     <x-status-badge
                                         :status="$execution->s3_storage_deleted
                                             ? 'S3 deleted'
@@ -98,6 +125,14 @@
                                         :type="$execution->s3_storage_deleted
                                             ? 'neutral'
                                             : ($execution->s3_uploaded ? 'success' : 'error')" />
+                                @endif
+                                @if ($recoveryPending)
+                                    @if ($execution->recovery_needs_attention)
+                                        <x-status-badge :status="'Needs attention ('.$recoveryErrorLabel.')'" type="error" />
+                                    @else
+                                        <x-status-badge status="Recovery pending" type="warning"
+                                            :title="$execution->recovery_error ? 'Last attempt: '.$recoveryErrorLabel : null" />
+                                    @endif
                                 @endif
                             </span>
 
@@ -107,6 +142,14 @@
                                         x-on:click="download_volume_backup_file('{{ $execution->id }}')"
                                         title="Download backup" aria-label="Download backup">
                                         <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                    </button>
+                                @endif
+                                @if ($recoveryPending)
+                                    <button type="button" class="icon-button shrink-0"
+                                        wire:click="retryRecovery({{ $execution->id }})"
+                                        wire:loading.attr="disabled" wire:target="retryRecovery({{ $execution->id }})"
+                                        title="Retry recovery" aria-label="Retry recovery">
+                                        <x-reicon name="refresh" class="size-3.5" />
                                     </button>
                                 @endif
                                 @if ($execution->status !== 'running')
@@ -129,7 +172,7 @@
 
                             @if ($execution->message)
                                 <pre
-                                    class="volume-backup-execution-message col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">{{ $execution->message }}</pre>
+                                    class="volume-backup-execution-message col-span-6 min-w-0 max-w-full max-h-20 overflow-y-auto overflow-x-hidden bg-transparent py-2 text-[11px] break-words whitespace-pre-wrap text-neutral-600 dark:text-fg-dim">{{ $execution->message }}</pre>
                             @endif
                         </div>
                     @endforeach

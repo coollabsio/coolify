@@ -1,40 +1,56 @@
 <?php
 
+use App\Enums\ServerRole;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Jobs\ServerManagerJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Models\Team;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Queue::fake();
     Carbon::setTestNow('2025-01-15 12:00:00');
+    InstanceSettings::forceCreate(['id' => 0, 'instance_timezone' => 'UTC']);
+    $this->team = Team::factory()->create();
 });
 
 afterEach(function () {
-    Mockery::close();
     Carbon::setTestNow();
 });
 
+function createSentinelCheckServer(Team $team, Carbon $sentinelUpdatedAt, ServerRole $role = ServerRole::BOTH): Server
+{
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'sentinel_updated_at' => $sentinelUpdatedAt,
+    ]);
+    $server->settings->update([
+        'server_timezone' => 'UTC',
+        'server_role' => $role,
+        'is_build_server' => $role === ServerRole::BUILD,
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    return $server->refresh();
+}
+
 it('dispatches an hourly Sentinel version check for a healthy Sentinel', function () {
-    $settings = Mockery::mock(InstanceSettings::class);
-    $settings->instance_timezone = 'UTC';
-    $this->app->instance(InstanceSettings::class, $settings);
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Carbon::setTestNow(Carbon::now()->setMinute($server->id % 60));
+    $server->update(['sentinel_updated_at' => Carbon::now()]);
 
-    $server = Mockery::mock(Server::class)->makePartial();
-    $server->shouldReceive('isSentinelEnabled')->andReturn(true);
-    $server->shouldReceive('isSentinelLive')->andReturn(true);
-    $server->id = 1;
-    $server->name = 'test-server';
-    $server->ip = '192.168.1.100';
-    $server->sentinel_updated_at = Carbon::now();
-    $server->shouldReceive('getAttribute')->with('settings')->andReturn((object) ['server_timezone' => 'UTC']);
-    $server->shouldReceive('waitBeforeDoingSshCheck')->andReturn(120);
-
-    Server::shouldReceive('where')->with('ip', '!=', '1.2.3.4')->andReturnSelf();
-    Server::shouldReceive('get')->andReturn(collect([$server]));
+    expect($server->isSentinelEnabled())->toBeTrue()
+        ->and($server->isSentinelLive())->toBeTrue();
 
     $job = new ServerManagerJob;
     $job->handle();
@@ -42,6 +58,25 @@ it('dispatches an hourly Sentinel version check for a healthy Sentinel', functio
     Queue::assertPushed(CheckAndStartSentinelJob::class, function ($job) use ($server) {
         return $job->server->id === $server->id;
     });
+});
+
+it('skips the hourly Sentinel version check when the server is unreachable or unusable', function (string $flag) {
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Carbon::setTestNow(Carbon::now()->setMinute($server->id % 60));
+    $server->settings->update([$flag => false]);
+
+    (new ServerManagerJob)->handle();
+
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
+})->with(['is_reachable', 'is_usable']);
+
+it('skips the hourly SSH version check when Sentinel reports its version on push', function () {
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Cache::put(Server::sentinelReportedVersionCacheKey($server->id), '1.0.2', now()->addHours(2));
+
+    (new ServerManagerJob)->handle();
+
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
 });
 
 it('does not schedule periodic Sentinel restart checks', function () {
@@ -54,22 +89,10 @@ it('does not schedule periodic Sentinel restart checks', function () {
 });
 
 it('skips ServerConnectionCheckJob when sentinel is live', function () {
-    $settings = Mockery::mock(InstanceSettings::class);
-    $settings->instance_timezone = 'UTC';
-    $this->app->instance(InstanceSettings::class, $settings);
+    $server = createSentinelCheckServer($this->team, Carbon::now());
 
-    $server = Mockery::mock(Server::class)->makePartial();
-    $server->shouldReceive('isSentinelEnabled')->andReturn(true);
-    $server->shouldReceive('isSentinelLive')->andReturn(true);
-    $server->id = 1;
-    $server->name = 'test-server';
-    $server->ip = '192.168.1.100';
-    $server->sentinel_updated_at = Carbon::now();
-    $server->shouldReceive('getAttribute')->with('settings')->andReturn((object) ['server_timezone' => 'UTC']);
-    $server->shouldReceive('waitBeforeDoingSshCheck')->andReturn(120);
-
-    Server::shouldReceive('where')->with('ip', '!=', '1.2.3.4')->andReturnSelf();
-    Server::shouldReceive('get')->andReturn(collect([$server]));
+    expect($server->isSentinelEnabled())->toBeTrue()
+        ->and($server->isSentinelLive())->toBeTrue();
 
     $job = new ServerManagerJob;
     $job->handle();
@@ -78,23 +101,26 @@ it('skips ServerConnectionCheckJob when sentinel is live', function () {
     Queue::assertNotPushed(ServerConnectionCheckJob::class);
 });
 
+it('dispatches ServerConnectionCheckJob when sentinel is live but the server is marked unusable', function (string $flag) {
+    // A Sentinel heartbeat does not restore these flags, so only the SSH check can recover them
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    $server->settings->update([$flag => false]);
+
+    expect($server->isSentinelLive())->toBeTrue();
+
+    $job = new ServerManagerJob;
+    $job->handle();
+
+    Queue::assertPushed(ServerConnectionCheckJob::class, function ($job) use ($server) {
+        return $job->server->id === $server->id;
+    });
+})->with(['is_reachable', 'is_usable']);
+
 it('dispatches ServerConnectionCheckJob when sentinel is not live', function () {
-    $settings = Mockery::mock(InstanceSettings::class);
-    $settings->instance_timezone = 'UTC';
-    $this->app->instance(InstanceSettings::class, $settings);
+    $server = createSentinelCheckServer($this->team, Carbon::now()->subMinutes(10));
 
-    $server = Mockery::mock(Server::class)->makePartial();
-    $server->shouldReceive('isSentinelEnabled')->andReturn(true);
-    $server->shouldReceive('isSentinelLive')->andReturn(false);
-    $server->id = 1;
-    $server->name = 'test-server';
-    $server->ip = '192.168.1.100';
-    $server->sentinel_updated_at = Carbon::now()->subMinutes(10);
-    $server->shouldReceive('getAttribute')->with('settings')->andReturn((object) ['server_timezone' => 'UTC']);
-    $server->shouldReceive('waitBeforeDoingSshCheck')->andReturn(120);
-
-    Server::shouldReceive('where')->with('ip', '!=', '1.2.3.4')->andReturnSelf();
-    Server::shouldReceive('get')->andReturn(collect([$server]));
+    expect($server->isSentinelEnabled())->toBeTrue()
+        ->and($server->isSentinelLive())->toBeFalse();
 
     $job = new ServerManagerJob;
     $job->handle();
@@ -106,22 +132,10 @@ it('dispatches ServerConnectionCheckJob when sentinel is not live', function () 
 });
 
 it('dispatches ServerConnectionCheckJob when sentinel is not enabled', function () {
-    $settings = Mockery::mock(InstanceSettings::class);
-    $settings->instance_timezone = 'UTC';
-    $this->app->instance(InstanceSettings::class, $settings);
+    // Build servers cannot run Sentinel, so a fresh heartbeat timestamp must not skip the SSH check
+    $server = createSentinelCheckServer($this->team, Carbon::now(), ServerRole::BUILD);
 
-    $server = Mockery::mock(Server::class)->makePartial();
-    $server->shouldReceive('isSentinelEnabled')->andReturn(false);
-    $server->shouldReceive('isSentinelLive')->never();
-    $server->id = 2;
-    $server->name = 'test-server-no-sentinel';
-    $server->ip = '192.168.1.101';
-    $server->sentinel_updated_at = Carbon::now();
-    $server->shouldReceive('getAttribute')->with('settings')->andReturn((object) ['server_timezone' => 'UTC']);
-    $server->shouldReceive('waitBeforeDoingSshCheck')->andReturn(120);
-
-    Server::shouldReceive('where')->with('ip', '!=', '1.2.3.4')->andReturnSelf();
-    Server::shouldReceive('get')->andReturn(collect([$server]));
+    expect($server->isSentinelEnabled())->toBeFalse();
 
     $job = new ServerManagerJob;
     $job->handle();

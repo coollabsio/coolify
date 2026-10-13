@@ -1,46 +1,5 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
-        $servicePageItems = [
-            [
-                'label' => 'Settings',
-                'route' => 'project.service.configuration',
-                'active' => request()->routeIs('project.service.configuration')
-                    || request()->routeIs('project.service.domains')
-                    || request()->routeIs('project.service.environment-variables')
-                    || request()->routeIs('project.service.storages')
-                    || request()->routeIs('project.service.scheduled-tasks*')
-                    || request()->routeIs('project.service.webhooks')
-                    || request()->routeIs('project.service.resource-operations')
-                    || request()->routeIs('project.service.tags')
-                    || request()->routeIs('project.service.danger')
-                    || request()->routeIs('project.service.index*')
-                    || request()->routeIs('project.service.database.*'),
-            ],
-            [
-                'label' => 'Backups',
-                'route' => 'project.service.volume-backups.index',
-                'active' => request()->routeIs('project.service.volume-backups.*'),
-            ],
-            [
-                'label' => 'Runtime Logs',
-                'route' => 'project.service.logs',
-                'active' => request()->routeIs('project.service.logs'),
-                'navigate' => false,
-            ],
-            [
-                'label' => 'Terminal',
-                'route' => 'project.service.command',
-                'active' => request()->routeIs('project.service.command'),
-                'navigate' => false,
-                'visible' => auth()->user()?->can('canAccessTerminal'),
-            ],
-        ];
-
-        $servicePageItems = array_values(array_filter(
-            $servicePageItems,
-            fn (array $item): bool => $item['visible'] ?? true,
-        ));
-
         $serviceStatus = str($service->status ?? 'exited');
         $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');
         $selectedResource = $selectedResourceUuid
@@ -65,15 +24,20 @@
         </x-slot:content>
     </x-process-dialog>
 
-    <div x-data="{ deploying: false }" @service-deploy-finished.window="deploying = false">
+    <div x-data="{ deploying: false }" @service-restarting.window="deploying = true"
+        @service-deploy-finished.window="deploying = false">
         <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-col items-start gap-2">
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $service->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                    <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
+                        :container-name="$selectedResource ? 'Container' : 'Containers'" />
                     <x-services.links :service="$service" compact />
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator />
+                    @endif
                 </div>
                 <div class="flex w-full flex-wrap gap-1">
                     @if ($selectedResource)
@@ -95,8 +59,9 @@
                         @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                             <x-slot:main x-bind:disabled="deploying"
                                 @click="document.getElementById('service-restart-trigger')?.click()">
-                                <x-reicon name="restart" class="size-3.5" />
-                                Restart
+                                <x-loading-on-button x-show="deploying" x-cloak />
+                                <x-reicon name="restart" class="size-3.5" x-show="!deploying" />
+                                <span x-text="deploying ? 'Restarting…' : 'Restart'">Restart</span>
                             </x-slot:main>
                             @if ($serviceStatus->contains('running'))
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -171,6 +136,9 @@
             <div
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator class="mr-1" />
+                    @endif
                     @if ($service->isDeployable)
                         <div class="resource-heading-menus shrink-0">
                             <x-services.links :service="$service" />
@@ -185,14 +153,15 @@
                         @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                                     <x-slot:main x-bind:disabled="deploying"
                                         @click="document.getElementById('service-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5" />
-                                        Restart
+                                        <x-loading-on-button x-show="deploying" x-cloak />
+                                        <x-reicon name="restart" class="size-3.5" x-show="!deploying" />
+                                        <span x-text="deploying ? 'Restarting…' : 'Restart current version'">Restart current version</span>
                                     </x-slot:main>
                                     @if ($serviceStatus->contains('running'))
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="$wire.dispatch('pullAndRestartEvent'); open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            Restart (pull latest)
+                                            Pull latest and restart
                                         </button>
                                     @endif
                                     @if ($serviceStatus->contains('degraded'))
@@ -300,8 +269,8 @@
                     const isDeploymentProgress = await $wire.$call('checkDeployments');
 
                     if (isDeploymentProgress) {
-                        $wire.$dispatch('error',
-                            'There is a deployment in progress.<br><br>You can force deploy from the Actions menu.');
+                        // A deploy is already running: reopen its live log instead of erroring.
+                        $wire.$call('reopenDeployment');
                         return;
                     }
 
@@ -314,14 +283,19 @@
                 const isDeploymentProgress = await $wire.$call('checkDeployments');
 
                 if (isDeploymentProgress) {
-                    $wire.$dispatch('error',
-                        'There is a deployment in progress.<br><br>You can force deploy from the Actions menu.');
+                    // A deploy is already running: reopen its live log instead of erroring.
+                    $wire.$call('reopenDeployment');
                     return;
                 }
 
+                window.dispatchEvent(new CustomEvent('service-restarting'));
                 $wire.$dispatch('info',
                     'Gracefully stopping service.<br/><br/>It could take a while depending on the service.');
-                $wire.$call('restart');
+                try {
+                    await $wire.$call('restart');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('service-deploy-finished'));
+                }
             });
             $wire.$on('forceDeployEvent', () => $wire.$call('forceDeploy'));
             $wire.$on('pullAndRestartEvent', () => {

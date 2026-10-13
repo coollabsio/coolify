@@ -27,6 +27,7 @@ class Index extends Component
                 'mongodbs',
                 'mysqls',
                 'mariadbs',
+                'sqlites',
             ])
             ->get();
     }
@@ -47,6 +48,7 @@ class Index extends Component
                     $project->mongodbs_count,
                     $project->mysqls_count,
                     $project->mariadbs_count,
+                    $project->sqlites_count,
                 ])->sum();
 
                 return [
@@ -57,6 +59,7 @@ class Index extends Component
                     'href' => $project->navigateTo(),
                     'environmentCount' => $project->environments->count(),
                     'resourceCount' => $resourceCount,
+                    'createdAt' => $project->created_at?->format('M j, Y') ?? '-',
                     'settingsHref' => auth()->user()->can('update', $project)
                         ? route('project.edit', ['project_uuid' => $project->uuid])
                         : null,

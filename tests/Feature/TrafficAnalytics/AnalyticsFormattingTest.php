@@ -21,6 +21,17 @@ it('extracts a bare host from referer URLs and bare hosts, dropping www', functi
     expect(refererHost(null))->toBeNull();
 });
 
+it('groups referer breakdown rows by normalized host', function () {
+    expect(groupRefererBreakdownRows([
+        ['value' => 'https://www.example.com/first', 'requests' => 7, 'bytesOut' => 700],
+        ['value' => 'http://example.com/second', 'requests' => 3, 'bytesOut' => 300],
+        ['value' => 'https://other.example/path', 'requests' => 5, 'bytesOut' => 500],
+    ]))->toBe([
+        ['value' => 'example.com', 'requests' => 10, 'bytesOut' => 1000],
+        ['value' => 'other.example', 'requests' => 5, 'bytesOut' => 500],
+    ]);
+});
+
 it('builds a duckduckgo favicon url for a host', function () {
     expect(refererFaviconUrl('example.com'))->toBe('https://icons.duckduckgo.com/ip3/example.com.ico');
 });
@@ -44,3 +55,21 @@ it('renders ampersands in breakdown empty-state descriptions', function () {
         ->toContain('No ai agents &amp; bots data for the selected range.')
         ->not->toContain('No ai agents &amp;amp; bots data for the selected range.');
 });
+
+it('distinguishes a missing response status from numeric values in other dimensions', function (string $dimension, mixed $value, string $display) {
+    $html = view('livewire.traffic._breakdown-section', [
+        'dimension' => $dimension,
+        'label' => 'Breakdown',
+        'rows' => [['value' => $value, 'requests' => 2, 'bytesOut' => 0]],
+    ])->render();
+
+    expect($html)->toContain('title="'.$display.'"')
+        ->toContain('title="2 requests"');
+})->with([
+    'integer zero status' => ['status', 0, 'No response status (0)'],
+    'string zero status' => ['status', '0', 'No response status (0)'],
+    'valid status' => ['status', '200', '200'],
+    'missing status' => ['status', '', 'Unknown'],
+    'overflow status' => ['status', '__other__', 'Other'],
+    'zero in another dimension' => ['path', '0', '0'],
+]);

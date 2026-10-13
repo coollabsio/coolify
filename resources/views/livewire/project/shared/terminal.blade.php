@@ -3,7 +3,7 @@
 @endphp
 
 <div id="terminal-container" x-data="terminalData()" data-auto-start="{{ $autoStart ? 'true' : 'false' }}"
-    x-on:terminal-starting.window="starting = true; setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')"
+    x-on:terminal-starting.window="beginTerminalSessionStart(); setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')"
     x-on:terminal-theme-change.window="setTerminalTheme($event.detail.theme)"
     @class([
         'group/terminal relative h-full min-h-0 bg-transparent' => $isApplicationConsole,
@@ -48,7 +48,13 @@
         @if ($isApplicationConsole)
             <div x-show="!terminalActive" x-cloak
                 class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-transparent">
-                <div class="terminal-loading-label flex items-center gap-2">
+                <div x-show="connectionError" x-cloak data-terminal-connection-error role="alert"
+                    class="terminal-loading-label pointer-events-auto flex max-w-md flex-col items-center gap-3 px-4 text-center">
+                    <span x-text="connectionError"></span>
+                    <button type="button" x-on:click="reloadTerminalPage()"
+                        class="cursor-pointer rounded-md border border-current/30 px-3 py-1 text-xs font-medium transition-colors hover:bg-current/10">Reload page</button>
+                </div>
+                <div x-show="!connectionError" class="terminal-loading-label flex items-center gap-2">
                     <svg x-show="starting || connectionState === 'connecting' || connectionState === 'reconnecting'"
                         class="size-3 animate-spin" viewBox="0 0 24 24" fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor"
@@ -61,6 +67,11 @@
                 </div>
             </div>
         @else
+            <div x-show="!terminalActive && connectionError" x-cloak data-terminal-connection-error role="alert"
+                class="mb-2 flex shrink-0 items-center gap-3 rounded-sm border border-red-500/40 bg-red-950/80 px-3 py-2 text-sm text-red-200">
+                <span x-text="connectionError"></span>
+                <button type="button" class="underline" x-on:click="reloadTerminalPage()">Reload page</button>
+            </div>
             <div x-show="terminalActive" x-cloak class="mb-2 flex shrink-0 justify-start">
                 <div class="inline-flex rounded-sm border px-2 py-1 text-xs font-medium"
                     :class="terminalSessionTimerClass()" x-text="terminalSessionRemainingLabel()">

@@ -15,7 +15,7 @@ class SshMultiplexingHelper
 {
     public static function serverSshConfiguration(Server $server): array
     {
-        $privateKey = PrivateKey::findOrFail($server->private_key_id);
+        $privateKey = PrivateKey::where('team_id', $server->team_id)->findOrFail($server->private_key_id);
 
         return [
             'sshKeyLocation' => $privateKey->getKeyLocation(),
@@ -210,6 +210,30 @@ class SshMultiplexingHelper
 
     public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
     {
+        $sshCommand = self::sshCommandPrefix($server, $disableMultiplexing, $commandTimeout);
+
+        $delimiter = base64_encode(Hash::make($command));
+        $command = str_replace($delimiter, '', $command);
+        $remoteShellCommand = self::remoteShellCommand();
+
+        return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
+            .$command.PHP_EOL
+            .$delimiter;
+    }
+
+    /**
+     * Build an SSH command that runs one short remote command and leaves stdin free for data.
+     * Large content must go through stdin: Linux limits one exec argument to 128 KiB, and
+     * generateSshCommand() puts the whole script into one `sh -c` argument.
+     */
+    public static function generateSshStdinCommand(Server $server, string $remoteCommand, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
+    {
+        return self::sshCommandPrefix($server, $disableMultiplexing, $commandTimeout)
+            .self::escapedUserAtHost($server).' '.escapeshellarg($remoteCommand);
+    }
+
+    private static function sshCommandPrefix(Server $server, bool $disableMultiplexing, ?int $commandTimeout): string
+    {
         if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
         }
@@ -239,20 +263,16 @@ class SshMultiplexingHelper
             $sshCommand .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
 
-        $sshCommand .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
-
-        $delimiter = base64_encode(Hash::make($command));
-        $command = str_replace($delimiter, '', $command);
-        $remoteShellCommand = self::remoteShellCommand();
-
-        return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
-            .$command.PHP_EOL
-            .$delimiter;
+        return $sshCommand.self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
     }
 
+    /**
+     * sshd runs this with the SSH user's login shell, which can be fish or csh/tcsh. They cannot
+     * parse POSIX `if ... fi`, so the logic runs in `sh`; bash is preferred, Alpine may lack it.
+     */
     private static function remoteShellCommand(): string
     {
-        return 'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi';
+        return 'sh -c "if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi"';
     }
 
     public static function getConnectionTimeout(Server $server): int

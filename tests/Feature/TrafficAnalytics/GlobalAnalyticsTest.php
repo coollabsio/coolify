@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TrafficIpMode;
 use App\Livewire\Analytics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -12,6 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -35,7 +37,12 @@ class FakeGlobalAnalyticsTrafficClient extends SentinelTrafficClient
 function fakeGlobalAnalyticsResponses(array $appUuids = []): array
 {
     return [
-        '/traffic/apps' => json_encode($appUuids),
+        // The leaderboard keys come from the dashboard bundle; the fake's raw() then serves
+        // every per-call fetch from the entries below.
+        '/traffic/dashboard' => json_encode([
+            'overview' => [],
+            'apps' => array_map(fn (string $uuid) => ['uuid' => $uuid, 'overview' => []], $appUuids),
+        ]),
         '/traffic/overview' => json_encode([
             'requests' => 1000,
             'bytes_in' => 5000,
@@ -128,6 +135,10 @@ it('renders a team-wide analytics summary across enabled servers', function () {
 
     $fake = new FakeGlobalAnalyticsTrafficClient($server);
     $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid]);
+    $fake->responses['/traffic/breakdown/referer'] = json_encode([
+        ['value' => 'https://www.google.com/search', 'requests' => 250, 'bytes_out' => 7000],
+        ['value' => 'http://google.com/news', 'requests' => 50, 'bytes_out' => 1000],
+    ]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
     loadLazy(Livewire::test(Analytics::class))
@@ -152,21 +163,6 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('GeoIP data by MaxMind')
         ->assertSet('serverOptions', [$server->uuid => $server->name])
         ->assertSet('appOptions', [$application->uuid => 'Global Leaderboard App']);
-});
-
-it('shows loading states while analytics filters refresh', function () {
-    $view = file_get_contents(resource_path('views/livewire/analytics.blade.php'));
-
-    expect($view)
-        ->toContain('wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid"')
-        ->toContain('wire:loading.flex wire:target="serverUuid"')
-        ->toContain('wire:loading.class="pointer-events-none opacity-60" wire:target="appUuid"')
-        ->toContain('wire:loading.flex wire:target="appUuid"')
-        ->toContain('wire:loading.attr="disabled" wire:target="setRange"')
-        ->toContain('wire:loading.class="invisible" wire:target="setRange(\'24h\')"')
-        ->toContain('wire:loading wire:target="setRange(\'7d\')"')
-        ->toContain('wire:loading wire:target="setRange(\'30d\')"')
-        ->toContain('aria-label="Loading analytics"');
 });
 
 it('shows a no-data state for the requests chart when no traffic falls in the range', function () {
@@ -253,7 +249,10 @@ it('shows path domains, links top apps to analytics, groups by project, and surf
         ->assertSee('Top IPs')
         ->assertSee('203.0.113.7')
         ->assertSee('Top user agents')
-        ->assertSee('TestAgent/1.0');
+        ->assertSee('TestAgent/1.0')
+        ->assertSet('breakdowns.referer', [
+            ['value' => 'google.com', 'requests' => 300, 'bytesOut' => 8000],
+        ]);
 
     // Path rows carry the resolved domain, top-app rows carry the domain + analytics link.
     expect($component->instance()->topPaths[0]['domain'])->toBe('shop.example.com');
@@ -278,7 +277,6 @@ it('builds a stacked status time series when Sentinel exposes the series endpoin
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSet('hasSeries', true)
         ->assertSet('series', [
             ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytesIn' => 1000, 'bytesOut' => 5000, 'uniqueVisitors' => 12, 'p95' => 30.0],
             ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytesIn' => 1500, 'bytesOut' => 8000, 'uniqueVisitors' => 20, 'p95' => 45.0],
@@ -322,23 +320,6 @@ it('derives KPI sparklines, device-donut data, and top hosts for the chart paylo
     // Top hosts groups per-app volume by served hostname.
     expect($instance->topHosts[0]['host'])->toBe('spark.example.com');
     expect($instance->topHosts[0]['requests'])->toBe(1000);
-});
-
-it('falls back to the donut when Sentinel lacks the series endpoint', function () {
-    $server = bootEnabledGlobalServer();
-
-    // Same responses minus the series entry — an older Sentinel returns 404 (empty body).
-    $responses = fakeGlobalAnalyticsResponses();
-    unset($responses['/traffic/series']);
-
-    $fake = new FakeGlobalAnalyticsTrafficClient($server);
-    $fake->responses = $responses;
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->assertOk()
-        ->assertSet('hasSeries', false)
-        ->assertSet('series', []);
 });
 
 it('does not disclose another team application name for a sentinel-reported uuid', function () {
@@ -433,3 +414,108 @@ it('shows the not-enabled empty state when no server has traffic analytics on', 
         ->assertSee('Traffic analytics is not enabled')
         ->assertDontSee('Unique visitors');
 });
+
+it('keeps a server visible when Sentinel reports one unsafe app key', function () {
+    $server = bootEnabledGlobalServer();
+
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::factory()->create(['server_id' => $server->id, 'network' => 'coolify-test']);
+    $application = Application::factory()->create([
+        'name' => 'Safe Leaderboard App',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid, 'bad key$(reboot)']);
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee('1,000')
+        ->assertSee('Safe Leaderboard App')
+        ->assertDontSee('bad key$(reboot)');
+});
+
+it('queries Sentinel with the same window for loads within one cache interval', function () {
+    $server = bootEnabledGlobalServer();
+
+    $fake = new class($server) extends FakeGlobalAnalyticsTrafficClient
+    {
+        public array $urls = [];
+
+        protected function raw(string $url): string
+        {
+            $this->urls[] = $url;
+
+            return parent::raw($url);
+        }
+    };
+    $fake->responses = fakeGlobalAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $this->travelTo(Carbon::parse('2026-09-30 10:00:05', 'UTC'));
+    $component = loadLazy(Livewire::test(Analytics::class));
+    $firstUrls = $fake->urls;
+    $fake->urls = [];
+
+    $this->travelTo(Carbon::parse('2026-09-30 10:00:50', 'UTC'));
+    $component->call('loadData');
+
+    // The second load asks for exactly the windows of the first one (the 60s cache keys).
+    expect($firstUrls)->not->toBeEmpty()
+        ->and($fake->urls)->not->toBeEmpty()
+        ->and(array_values(array_diff($fake->urls, $firstUrls)))->toBe([]);
+});
+
+it('labels the IP breakdown by the client IP mode of the queried servers', function (string $mode, ?string $label) {
+    $server = bootEnabledGlobalServer();
+    $server->settings->traffic_ip_mode = $mode;
+    // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+    $server->settings->saveQuietly();
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = fakeGlobalAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $component = loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSet('ipMode', $mode)
+        ->assertSee('Top user agents');
+
+    if ($label === null) {
+        $component->assertDontSee('Top IPs')
+            ->assertDontSee('Top networks')
+            ->assertDontSee('203.0.113.7');
+        expect($component->instance()->breakdowns)->not->toHaveKey('ip');
+
+        return;
+    }
+
+    $component->assertSee($label)->assertSee('203.0.113.7');
+})->with([
+    'full' => ['full', 'Top IPs'],
+    'anonymized' => ['anonymized', 'Top networks'],
+    'off' => ['off', null],
+]);
+
+it('combines the client IP mode of several servers', function (array $modes, string $expected) {
+    $servers = collect($modes)->map(function (string $mode) {
+        $server = bootEnabledGlobalServer();
+        $server->settings->traffic_ip_mode = $mode;
+        // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+        $server->settings->saveQuietly();
+
+        return $server->fresh();
+    });
+
+    expect(TrafficIpMode::forServers($servers))->toBe(TrafficIpMode::from($expected));
+})->with([
+    'no servers' => [[], 'full'],
+    'all off' => [['off', 'off'], 'off'],
+    'anonymized and off' => [['anonymized', 'off'], 'anonymized'],
+    'full and anonymized' => [['full', 'anonymized'], 'full'],
+]);

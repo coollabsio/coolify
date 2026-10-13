@@ -138,6 +138,25 @@
                             ['value' => true, 'label' => 'Strip prefixes'],
                             ['value' => false, 'label' => 'Keep paths as-is'],
                         ]" :disabled="! $canUpdate" />
+                    @if ($isTraefikProxy)
+                        <x-forms.listbox id="certificateResolverMode" label="Certificate resolver"
+                            onChange="saveCertificateResolverMode"
+                            helper="Traefik certificate resolver for this application's HTTPS routes. Choose <span class='font-bold'>None</span> for domains that use certificates from Traefik's dynamic configuration (for example Cloudflare Origin CA certificates). Redeploy the application to apply the change."
+                            :options="[
+                                ['value' => 'server', 'label' => 'Server setting ('.$serverCertificateResolver.')'],
+                                ['value' => 'none', 'label' => 'None (use your own certificates)'],
+                                ['value' => 'custom', 'label' => 'Custom resolver'],
+                            ]" :disabled="! $canUpdate" />
+                        @if ($certificateResolverMode === 'custom')
+                            <form wire:submit="saveCertificateResolver" class="w-full">
+                                <x-unsaved-bar action="saveCertificateResolver" targets="certificateResolverName" />
+                                <x-forms.input id="certificateResolverName" label="Resolver name" placeholder="cloudflare"
+                                    required
+                                    helper="Name of a certificate resolver defined in your Traefik configuration. Letters, numbers, hyphens, and underscores only."
+                                    canGate="update" :canResource="$application" />
+                            </form>
+                        @endif
+                    @endif
                 </div>
             @else
                 <x-empty size="sm" title="Proxy behavior is managed through labels"
@@ -164,7 +183,7 @@
                     canGate="update" :canResource="$application" />
                 <x-forms.input type="number" min="0" id="maxRestartCount" label="Max restart count"
                     wire:change="saveMaxRestartCount"
-                    helper="Maximum number of crash restarts before Coolify automatically stops the application and sends a notification. Saved automatically. Set to 0 to disable the limit."
+                    helper="Maximum number of restarts before Coolify automatically stops the application and sends a notification. Saved automatically. Set to 0 to disable the limit."
                     canGate="update" :canResource="$application" />
             </div>
         </x-application.settings-section>

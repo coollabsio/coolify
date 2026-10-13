@@ -3,8 +3,8 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
-use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 
@@ -66,6 +66,7 @@ class CheckDomainDns
         }
 
         $type = dnsRecordTypeForIp($expectedIp) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
+        $receivedAddressRecord = false;
 
         foreach ($dnsServers as $dnsServer) {
             $remainingNanoseconds = $deadline - hrtime(true);
@@ -74,14 +75,9 @@ class CheckDomainDns
             }
 
             try {
-                $query = app()->make(DNSQuery::class, [
-                    'server' => $dnsServer,
-                    'port' => 53,
-                    'timeout' => min(5, (int) floor($remainingNanoseconds / 1_000_000_000)),
-                ]);
-                $records = $query->query($host, $type);
+                $records = queryDnsServer($dnsServer, $host, $type, min(5, (int) floor($remainingNanoseconds / 1_000_000_000)));
 
-                if ($records === false || $query->hasError()) {
+                if ($records === false) {
                     continue;
                 }
 
@@ -90,7 +86,8 @@ class CheckDomainDns
                         continue;
                     }
 
-                    if (isCloudflareIp($record->getData()) || ($expectedIp && $record->getData() === $expectedIp)) {
+                    $receivedAddressRecord = true;
+                    if (isCloudflareIp($record->getData()) || ($expectedIp && DnsRecordHints::sameAddress($record->getData(), $expectedIp))) {
                         return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
                     }
                 }
@@ -99,7 +96,40 @@ class CheckDomainDns
             }
         }
 
+        if (! $receivedAddressRecord && hrtime(true) < $deadline) {
+            foreach ($this->resolveWithSystemDns($host, $type) as $resolvedIp) {
+                if (isCloudflareIp($resolvedIp) || ($expectedIp && DnsRecordHints::sameAddress($resolvedIp, $expectedIp))) {
+                    return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
+                }
+            }
+        }
+
         return $this->result('failed', dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveWithSystemDns(string $host, string $type): array
+    {
+        $recordType = $type === DNSTypes::NAME_AAAA ? DNS_AAAA : DNS_A;
+        $addressKey = $type === DNSTypes::NAME_AAAA ? 'ipv6' : 'ip';
+
+        try {
+            $records = @dns_get_record($host, $recordType);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        if (! is_array($records)) {
+            return [];
+        }
+
+        return collect($records)
+            ->pluck($addressKey)
+            ->filter(fn ($address) => is_string($address) && filter_var($address, FILTER_VALIDATE_IP) !== false)
+            ->values()
+            ->all();
     }
 
     private function successMessage(Server $server, ?string $expectedIp): string

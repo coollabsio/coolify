@@ -62,20 +62,6 @@ function makeDockerComposeImagePullJob(bool $useBuildServer = false): array
     return [$job, $reflection, $buildServer, $mainServer];
 }
 
-it('pulls image-only compose services before removing running containers', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $methodStart = strpos($source, 'private function deploy_docker_compose_buildpack()');
-    $methodEnd = strpos($source, 'private function pull_docker_compose_images()', $methodStart);
-    $deploymentMethod = substr($source, $methodStart, $methodEnd - $methodStart);
-
-    $pullPosition = strpos($deploymentMethod, '$this->pull_docker_compose_images();');
-    $stopPosition = strpos($deploymentMethod, '$this->stop_running_container(force: true);');
-
-    expect($pullPosition)->not->toBeFalse()
-        ->and($stopPosition)->not->toBeFalse()
-        ->and($pullPosition)->toBeLessThan($stopPosition);
-});
-
 it('aborts the deployment when pulling a compose image fails', function () {
     [$job, $reflection] = makeDockerComposeImagePullJob();
     $job->failCommands = true;

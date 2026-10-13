@@ -6,10 +6,17 @@ use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
+use App\Models\Server;
+use App\Rules\SafeExternalUrl;
+use App\Support\AtomicFilesystem;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Console\ConfigCacheCommand;
+use Illuminate\Foundation\Console\RouteCacheCommand;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Once;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
@@ -21,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
+
+        // Requests must never read a partly written cache file. See AtomicFilesystem.
+        $this->app->extend(ConfigCacheCommand::class, fn () => new ConfigCacheCommand(new AtomicFilesystem));
+        $this->app->extend(RouteCacheCommand::class, fn () => new RouteCacheCommand(new AtomicFilesystem));
     }
 
     public function boot(): void
@@ -30,7 +41,22 @@ class AppServiceProvider extends ServiceProvider
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
+        $this->configureGitLabHttp();
         $this->configureOidcSocialite();
+        $this->configureQueue();
+    }
+
+    /**
+     * Queue workers are long-running processes, so once() values (e.g. instanceSettings())
+     * and the Server identity map would stay stale across jobs. Flush them before each job,
+     * like a fresh web request.
+     */
+    private function configureQueue(): void
+    {
+        Queue::before(function (): void {
+            Once::flush();
+            Server::flushIdentityMap();
+        });
     }
 
     private function configureCommands(): void
@@ -85,18 +111,39 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureGitHubHttp(): void
     {
+        Http::macro('GitSource', function (string $url) {
+            return Http::withOptions([
+                ...SafeExternalUrl::httpClientOptions(
+                    $url,
+                    allowPrivateNetworks: SafeExternalUrl::gitSourcesMayUsePrivateNetworks(),
+                ),
+                'allow_redirects' => SafeExternalUrl::sameOriginRedirectOptions(),
+            ]);
+        });
+
         Http::macro('GitHub', function (string $api_url, ?string $github_access_token = null) {
             if ($github_access_token) {
-                return Http::withHeaders([
+                return Http::GitSource($api_url)->withHeaders([
                     'X-GitHub-Api-Version' => '2022-11-28',
                     'Accept' => 'application/vnd.github.v3+json',
                     'Authorization' => "Bearer $github_access_token",
                 ])->baseUrl($api_url);
             } else {
-                return Http::withHeaders([
+                return Http::GitSource($api_url)->withHeaders([
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->baseUrl($api_url);
             }
+        });
+    }
+
+    private function configureGitLabHttp(): void
+    {
+        Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
+            $client = Http::GitSource($api_url)->withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+
+            return $access_token ? $client->withToken($access_token) : $client;
         });
     }
 }

@@ -346,9 +346,10 @@ class StandalonePostgresql extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->postgres_user);
                     $encodedPass = rawurlencode($this->postgres_password);
-                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->postgres_db}";
+                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$this->postgres_db}";
                     if ($this->enable_ssl) {
                         $url .= "?sslmode={$this->ssl_mode}";
                         if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {

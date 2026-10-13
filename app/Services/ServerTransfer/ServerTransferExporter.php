@@ -16,6 +16,7 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
@@ -106,6 +107,9 @@ class ServerTransferExporter
 
         $sourceInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
         $warnings = $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl);
+        if ($secretManagerWarning = $this->secretManagerWarning($applications->concat($databases)->concat($services))) {
+            $warnings[] = $secretManagerWarning;
+        }
 
         $payload = ServerTransferBundle::wrap([
             'source_instance' => [
@@ -199,22 +203,22 @@ class ServerTransferExporter
             }
         }
 
-        $collectVolumeS3 = function ($resource) use (&$s3Ids): void {
+        $collectBackupS3 = function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup) use (&$s3Ids): void {
+            $s3Ids->push($backup->s3_storage_id, ...$backup->s3Storages()->pluck('s3_storages.id')->all());
+        };
+
+        $collectVolumeS3 = function ($resource) use ($collectBackupS3): void {
             if (method_exists($resource, 'persistentStorages')) {
                 foreach ($resource->persistentStorages as $volume) {
                     foreach ($volume->scheduledBackups as $vb) {
-                        if ($vb->s3_storage_id) {
-                            $s3Ids->push($vb->s3_storage_id);
-                        }
+                        $collectBackupS3($vb);
                     }
                 }
             }
             if (method_exists($resource, 'fileStorages')) {
                 foreach ($resource->fileStorages as $file) {
                     foreach ($file->scheduledBackups as $vb) {
-                        if ($vb->s3_storage_id) {
-                            $s3Ids->push($vb->s3_storage_id);
-                        }
+                        $collectBackupS3($vb);
                     }
                 }
             }
@@ -223,9 +227,7 @@ class ServerTransferExporter
         foreach ($databases as $database) {
             if (method_exists($database, 'scheduledBackups')) {
                 foreach ($database->scheduledBackups as $backup) {
-                    if ($backup->s3_storage_id) {
-                        $s3Ids->push($backup->s3_storage_id);
-                    }
+                    $collectBackupS3($backup);
                 }
             }
             $database->loadMissing(['persistentStorages.scheduledBackups', 'fileStorages.scheduledBackups']);
@@ -254,9 +256,7 @@ class ServerTransferExporter
             }
             foreach ($service->databases as $serviceDb) {
                 foreach ($serviceDb->scheduledBackups as $backup) {
-                    if ($backup->s3_storage_id) {
-                        $s3Ids->push($backup->s3_storage_id);
-                    }
+                    $collectBackupS3($backup);
                 }
                 $collectVolumeS3($serviceDb);
             }
@@ -332,6 +332,27 @@ class ServerTransferExporter
     }
 
     /**
+     * Secret manager links point to integration tokens of this instance, which are not exported.
+     *
+     * @param  Collection<int, Model>  $resources
+     */
+    private function secretManagerWarning(Collection $resources): ?string
+    {
+        $linkedNames = $resources
+            ->filter(fn (Model $resource) => method_exists($resource, 'secretManagerLink') && $resource->secretManagerLink()->exists())
+            ->pluck('name')
+            ->unique()
+            ->values();
+
+        if ($linkedNames->isEmpty()) {
+            return null;
+        }
+
+        return 'Some resources load environment variables from a secret manager: '.$linkedNames->implode(', ').'. '
+            .'Secret manager tokens and links are not exported. After import, add the integration token on the target instance and link the secret manager source again, or deployments of these resources fail.';
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function exportPrivateKey(PrivateKey $key): array
@@ -384,7 +405,8 @@ class ServerTransferExporter
             'port' => (int) $server->port,
             'user' => (string) $server->user,
             'proxy' => $server->proxy?->toArray() ?? [],
-            'is_build_server' => (bool) $server->is_build_server,
+            'server_role' => $server->settings->effectiveServerRole()->value,
+            'is_build_server' => $server->isBuildServer(),
             'cloud_provider_token_uuid' => $server->cloudProviderToken?->uuid,
             'settings' => $settingsPayload,
         ];
@@ -708,6 +730,7 @@ class ServerTransferExporter
             'is_include_timestamps' => (bool) ($app->is_include_timestamps ?? false),
             'is_gzip_enabled' => (bool) ($app->is_gzip_enabled ?? true),
             'is_stripprefix_enabled' => (bool) ($app->is_stripprefix_enabled ?? true),
+            'traefik_certificate_resolver' => $app->traefik_certificate_resolver ?? null,
             'environment_variables' => method_exists($app, 'environment_variables')
                 ? $this->exportEnvVars($app->environment_variables()->get())
                 : [],
@@ -837,6 +860,7 @@ class ServerTransferExporter
                 'is_shown_once' => (bool) $variable->is_shown_once,
                 'is_shared' => (bool) $variable->is_shared,
                 'is_required' => (bool) ($variable->is_required ?? false),
+                'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
                 'comment' => $variable->comment,
                 'order' => $variable->order,
             ];
@@ -859,6 +883,8 @@ class ServerTransferExporter
                 'mount_path' => $volume->mount_path,
                 'host_path' => $volume->host_path,
                 'is_preview_suffix_enabled' => (bool) ($volume->is_preview_suffix_enabled ?? false),
+                'ignores_compose_driver_options' => (bool) $volume->ignores_compose_driver_options,
+                'standalone_sqlite_uuid' => $volume->standaloneSqlite?->uuid,
             ];
         }
 
@@ -954,6 +980,7 @@ class ServerTransferExporter
                 'timeout' => $backup->timeout,
                 'disable_local_backup' => (bool) ($backup->disable_local_backup ?? false),
                 's3_storage_uuid' => $backup->s3?->uuid,
+                's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                 'had_s3_storage' => filled($backup->s3_storage_id),
             ];
         }
@@ -1166,6 +1193,7 @@ class ServerTransferExporter
                         'retention_max_storage_s3' => $backup->retention_max_storage_s3,
                         'timeout' => $backup->timeout,
                         's3_storage_uuid' => $backup->s3?->uuid,
+                        's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                         'had_s3_storage' => filled($backup->s3_storage_id),
                     ];
                 }

@@ -88,7 +88,6 @@ test('server transfer API is unavailable outside development mode', function (st
     ['POST', '/api/v1/servers/import'],
     ['GET', '/api/v1/servers/{uuid}/export'],
     ['POST', '/api/v1/servers/{uuid}/export/mailbox'],
-    ['POST', '/api/v1/servers/{uuid}/claim'],
     ['POST', '/api/v1/servers/{uuid}/transfer/complete'],
     ['POST', '/api/v1/servers/{uuid}/migrate'],
 ]);
@@ -233,10 +232,33 @@ describe('POST /api/v1/servers/import', function () {
             ->assertStatus(422)
             ->assertJsonPath('message', fn ($m) => str_contains($m, 'already exists') || str_contains(json_encode($m), 'already exists') || true);
     });
+
+    test('rejects import when the destination team is at its cloud server limit', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        $this->team->update(['custom_server_limit' => 1]);
+
+        $export = $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->getJson("/api/v1/servers/{$this->server->uuid}/export")
+            ->json();
+
+        $this->server->forceDelete();
+        Server::factory()->create([
+            'team_id' => $this->team->id,
+            'private_key_id' => $this->privateKey->id,
+            'ip' => '10.66.0.21',
+        ]);
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.server.0', 'Server limit reached for your subscription.');
+
+        expect(Server::where('team_id', $this->team->id)->count())->toBe(1);
+    });
 });
 
-describe('POST /api/v1/servers/{uuid}/claim', function () {
-    test('claims imported server without remote write', function () {
+describe('POST /api/v1/servers/import claim', function () {
+    test('import takes management of the server and rebinds Sentinel', function () {
         $export = $this->withHeaders(transferHeaders($this->sensitiveToken))
             ->getJson("/api/v1/servers/{$this->server->uuid}/export")
             ->json();
@@ -245,26 +267,30 @@ describe('POST /api/v1/servers/{uuid}/claim', function () {
         $this->server->forceDelete();
         $this->privateKey->delete();
 
-        $importedUuid = $this->withHeaders(transferHeaders($this->sensitiveToken))
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
             ->postJson('/api/v1/servers/import', ['bundle' => $export])
-            ->json('server_uuid');
+            ->assertCreated()
+            ->assertJsonPath('claimed', true)
+            ->assertJsonPath('claim.claim.instance_url', 'https://coolify-a.test');
 
-        $response = $this->withHeaders(transferHeaders($this->sensitiveToken))
-            ->postJson("/api/v1/servers/{$importedUuid}/claim", [
-                'write_remote' => false,
-                'rebind_sentinel' => true,
-            ]);
-
-        $response->assertOk()
-            ->assertJsonPath('server_uuid', $importedUuid)
-            ->assertJsonPath('claim_written', false)
-            ->assertJsonPath('sentinel_rebound', true)
-            ->assertJsonPath('claim.instance_url', 'https://coolify-a.test');
-
-        $server = Server::where('uuid', $importedUuid)->first();
+        $server = Server::where('uuid', $export['server']['uuid'])->first();
         expect(data_get($server->server_metadata, 'transfer.status'))->toBe('claimed')
+            ->and((bool) $server->settings->is_sentinel_enabled)->toBeTrue()
             ->and($server->settings->sentinel_custom_url)->toBe('https://coolify-a.test')
             ->and($server->settings->sentinel_token)->not->toBeEmpty();
+    });
+
+    test('claim endpoint is removed', function () {
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/claim")
+            ->assertNotFound();
+    });
+
+    test('import rejects the removed claim options', function () {
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => [], 'write_remote' => true])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['write_remote']);
     });
 });
 
@@ -288,7 +314,7 @@ describe('POST /api/v1/servers/{uuid}/transfer/complete', function () {
 });
 
 describe('full transfer flow A to B on same process', function () {
-    test('export complete import claim sequence', function () {
+    test('export complete import sequence', function () {
         $export = $this->withHeaders(transferHeaders($this->sensitiveToken))
             ->getJson("/api/v1/servers/{$this->server->uuid}/export")
             ->assertOk()
@@ -315,22 +341,14 @@ describe('full transfer flow A to B on same process', function () {
             Once::flush();
         }
 
-        $import = $this->withHeaders(transferHeaders($this->sensitiveToken))
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
             ->postJson('/api/v1/servers/import', [
                 'bundle' => $export,
                 'preserve_uuids' => true,
                 'adopt_mode' => true,
             ])
             ->assertCreated()
-            ->json();
-
-        $this->withHeaders(transferHeaders($this->sensitiveToken))
-            ->postJson("/api/v1/servers/{$import['server_uuid']}/claim", [
-                'write_remote' => false,
-                'rebind_sentinel' => true,
-            ])
-            ->assertOk()
-            ->assertJsonPath('claim.instance_url', 'https://coolify-b.test');
+            ->assertJsonPath('claimed', true);
 
         $server = Server::where('uuid', $export['server']['uuid'])->first();
         expect($server)->not->toBeNull()

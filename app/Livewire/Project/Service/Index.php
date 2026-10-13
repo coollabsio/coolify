@@ -4,10 +4,15 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Service\DeleteService;
+use App\Enums\ProxyTypes;
+use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -84,6 +89,13 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
+    /**
+     * How the Traefik certificate resolver is chosen: `server`, `none`, or `custom`.
+     */
+    public string $certificateResolverMode = 'server';
+
+    public ?string $certificateResolverName = null;
+
     public mixed $maxRestartCount = 0;
 
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
@@ -102,6 +114,13 @@ class Index extends Component
         'fqdn' => 'nullable',
         'isGzipEnabled' => 'nullable|boolean',
         'isStripprefixEnabled' => 'nullable|boolean',
+        'certificateResolverMode' => 'required|in:server,none,custom',
+        'certificateResolverName' => ['exclude_unless:certificateResolverMode,custom', 'required', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN, 'not_in:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE],
+    ];
+
+    protected $validationAttributes = [
+        'certificateResolverMode' => 'certificate resolver',
+        'certificateResolverName' => 'certificate resolver name',
     ];
 
     public function mount(
@@ -126,7 +145,7 @@ class Index extends Component
                 $this->serviceApplication = null;
                 $this->resourceType = 'database';
                 $this->initializeDatabaseProperties();
-                $this->s3s = currentTeam()->s3s;
+                $this->s3s = $this->serviceTeamS3Storages();
 
                 return;
             }
@@ -144,7 +163,7 @@ class Index extends Component
                 $this->serviceApplication = $serviceApplication;
                 $this->resourceType = 'application';
                 $this->initializeApplicationProperties();
-                $this->s3s = currentTeam()->s3s;
+                $this->s3s = $this->serviceTeamS3Storages();
 
                 return;
             }
@@ -187,10 +206,18 @@ class Index extends Component
                 $this->serviceDatabase->getFilesFromServer();
                 $this->initializeDatabaseProperties();
             }
-            $this->s3s = currentTeam()->s3s;
+            $this->s3s = $this->serviceTeamS3Storages();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function serviceTeamS3Storages(): Collection
+    {
+        return S3Storage::query()
+            ->where('team_id', $this->service->team()->id)
+            ->where('is_usable', true)
+            ->get();
     }
 
     private function initializeDatabaseProperties(): void
@@ -254,8 +281,12 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
+            $containerRemoved = app(DeleteService::class)->removeSubresourceContainer($this->serviceDatabase);
             $this->serviceDatabase->delete();
-            $this->dispatch('success', 'Database deleted.');
+            $this->auditServiceSubResource('deleted', $this->serviceDatabase, ['container_removed' => $containerRemoved]);
+            $containerRemoved
+                ? $this->dispatch('success', 'Database deleted.')
+                : $this->dispatch('warning', 'Database deleted from Coolify. The server does not respond, so its container is removed when the service starts again.');
 
             return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
@@ -307,8 +338,8 @@ class Index extends Component
                 ->except('database_uuid')
                 ->all();
 
-            DB::transaction(function () use ($service, $serviceDatabase) {
-                $service->applications()->create([
+            $serviceApplication = DB::transaction(function () use ($service, $serviceDatabase) {
+                $serviceApplication = $service->applications()->create([
                     'name' => $serviceDatabase->name,
                     'human_name' => $serviceDatabase->human_name,
                     'description' => $serviceDatabase->description,
@@ -319,7 +350,12 @@ class Index extends Component
                     'is_migrated' => true,
                 ]);
                 $serviceDatabase->delete();
+
+                return $serviceApplication;
             });
+            $this->auditServiceSubResource('converted_to_application', $serviceDatabase, [
+                'service_application_uuid' => $serviceApplication->uuid,
+            ]);
 
             return redirectRoute($this, 'project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
@@ -376,10 +412,16 @@ class Index extends Component
 
     private function persistPublicAccess(): void
     {
-        $this->serviceDatabase->update([
+        $this->serviceDatabase->fill([
             'is_public' => $this->isPublic,
             'public_port' => $this->publicPort ?: null,
             'public_port_timeout' => $this->publicPortTimeout ?: null,
+        ]);
+        $changedFields = auditChangedFields($this->serviceDatabase);
+        $this->serviceDatabase->save();
+        $this->auditServiceSubResourceUpdate($this->serviceDatabase, $changedFields, [
+            'is_public' => (bool) $this->serviceDatabase->is_public,
+            'public_port' => $this->serviceDatabase->public_port,
         ]);
     }
 
@@ -389,7 +431,9 @@ class Index extends Component
             $this->authorize('update', $this->serviceDatabase);
             $this->validate();
             $this->syncDatabaseData(true);
+            $changedFields = auditChangedFields($this->serviceDatabase);
             $this->serviceDatabase->save();
+            $this->auditServiceSubResourceUpdate($this->serviceDatabase, $changedFields);
             $this->serviceDatabase->refresh();
             $this->syncDatabaseData(false);
             updateCompose($this->serviceDatabase);
@@ -419,6 +463,11 @@ class Index extends Component
             $this->serviceApplication->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->serviceApplication->is_gzip_enabled = $this->isGzipEnabled;
             $this->serviceApplication->is_stripprefix_enabled = $this->isStripprefixEnabled;
+            $this->serviceApplication->traefik_certificate_resolver = match ($this->certificateResolverMode) {
+                'none' => ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+                'custom' => $this->certificateResolverName,
+                default => null,
+            };
             if ($this->serviceApplication->max_restart_count !== (int) $this->maxRestartCount) {
                 $this->serviceApplication->restart_limit_reached = false;
             }
@@ -432,8 +481,23 @@ class Index extends Component
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
+            $resolver = $this->serviceApplication->traefik_certificate_resolver;
+            $this->certificateResolverMode = match (true) {
+                blank($resolver) => 'server',
+                $resolver === ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE => 'none',
+                default => 'custom',
+            };
+            $this->certificateResolverName = $this->certificateResolverMode === 'custom' ? $resolver : null;
             $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
+    }
+
+    private function validateCertificateResolver(): void
+    {
+        $this->validate([
+            'certificateResolverMode' => $this->rules['certificateResolverMode'],
+            'certificateResolverName' => $this->rules['certificateResolverName'],
+        ]);
     }
 
     public function saveMaxRestartCount(): void
@@ -443,10 +507,13 @@ class Index extends Component
             'maxRestartCount' => 'integer|min:0',
         ]);
 
-        $this->serviceApplication->update([
+        $this->serviceApplication->fill([
             'max_restart_count' => $validated['maxRestartCount'],
             'restart_limit_reached' => false,
         ]);
+        $changedFields = auditChangedFields($this->serviceApplication);
+        $this->serviceApplication->save();
+        $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
         $this->dispatch('success', 'Max restart count saved.');
     }
 
@@ -467,7 +534,9 @@ class Index extends Component
             $this->serviceApplication->is_gzip_enabled = $this->isGzipEnabled;
             $this->serviceApplication->is_stripprefix_enabled = $this->isStripprefixEnabled;
             $this->serviceApplication->exclude_from_status = $this->excludeFromStatus;
+            $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
+            $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -484,8 +553,11 @@ class Index extends Component
 
                 return;
             }
+            $this->validateCertificateResolver();
             $this->syncApplicationData(true);
+            $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
+            $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -501,8 +573,12 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
+            $containerRemoved = app(DeleteService::class)->removeSubresourceContainer($this->serviceApplication);
             $this->serviceApplication->delete();
-            $this->dispatch('success', 'Application deleted.');
+            $this->auditServiceSubResource('deleted', $this->serviceApplication, ['container_removed' => $containerRemoved]);
+            $containerRemoved
+                ? $this->dispatch('success', 'Application deleted.')
+                : $this->dispatch('warning', 'Application deleted from Coolify. The server does not respond, so its container is removed when the service starts again.');
 
             return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
@@ -524,8 +600,8 @@ class Index extends Component
             $redirectParams = collect($this->parameters)
                 ->except('database_uuid')
                 ->all();
-            DB::transaction(function () use ($service, $serviceApplication) {
-                $service->databases()->create([
+            $serviceDatabase = DB::transaction(function () use ($service, $serviceApplication) {
+                $serviceDatabase = $service->databases()->create([
                     'name' => $serviceApplication->name,
                     'human_name' => $serviceApplication->human_name,
                     'description' => $serviceApplication->description,
@@ -536,7 +612,12 @@ class Index extends Component
                     'is_migrated' => true,
                 ]);
                 $serviceApplication->delete();
+
+                return $serviceDatabase;
             });
+            $this->auditServiceSubResource('converted_to_database', $serviceApplication, [
+                'service_database_uuid' => $serviceDatabase->uuid,
+            ]);
 
             return redirectRoute($this, 'project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
@@ -568,6 +649,7 @@ class Index extends Component
     {
         try {
             $persistedApplication = $this->serviceApplication->fresh();
+            $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
             $previousEditableUrls = $persistedApplication->url;
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
@@ -575,6 +657,7 @@ class Index extends Component
             $this->validate([
                 'fqdn' => ValidationPatterns::applicationDomainRules(),
             ]);
+            $this->validateCertificateResolver();
 
             $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
@@ -621,8 +704,11 @@ class Index extends Component
             }
 
             $this->validate();
+            $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
+            $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->serviceApplication->refresh();
+            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, $this->service->team()->id);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {
@@ -644,6 +730,46 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.project.service.index');
+        $server = $this->resourceType === 'application' ? $this->service?->destination?->server : null;
+
+        return view('livewire.project.service.index', [
+            'showCertificateResolver' => $server?->proxyType() === ProxyTypes::TRAEFIK->value,
+            'serverCertificateResolver' => $server?->traefikCertificateResolver() ?? ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+        ]);
+    }
+
+    /**
+     * Records `ui.service_{application|database}.updated` with the attributes that the save changed.
+     *
+     * @param  array<int, string>  $changedFields  Fields changed by the save, captured before it.
+     * @param  array<string, mixed>  $extra
+     */
+    private function auditServiceSubResourceUpdate(ServiceApplication|ServiceDatabase $resource, array $changedFields, array $extra = []): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        $this->auditServiceSubResource('updated', $resource, ['changed_fields' => $changedFields, ...$extra]);
+    }
+
+    /**
+     * Mirrors the context of `api.service_database.updated` for service applications and databases.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function auditServiceSubResource(string $action, ServiceApplication|ServiceDatabase $resource, array $extra = []): void
+    {
+        $resourceKey = $resource instanceof ServiceApplication ? 'service_application' : 'service_database';
+        $service = $resource->service ?? $this->service;
+
+        auditLog("ui.{$resourceKey}.{$action}", [
+            'team_id' => $service?->team()?->id,
+            'service_uuid' => $service?->uuid,
+            'service_name' => $service?->name,
+            "{$resourceKey}_uuid" => $resource->uuid,
+            "{$resourceKey}_name" => $resource->name,
+            ...$extra,
+        ]);
     }
 }

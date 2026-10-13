@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +24,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -72,10 +73,12 @@ class EnvironmentVariable extends BaseModel
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',
+        'preserve_compose_null' => 'boolean',
         'is_multiline' => 'boolean',
         'is_preview' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
+        'uses_legacy_escaping' => 'boolean',
         'version' => 'string',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
@@ -91,6 +94,8 @@ class EnvironmentVariable extends BaseModel
     protected $hidden = [
         'value',
         'real_value',
+        // Internal: decides the escaping of variables saved before exact escaping.
+        'uses_legacy_escaping',
     ];
 
     protected static function booted()
@@ -113,6 +118,7 @@ class EnvironmentVariable extends BaseModel
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
                             'is_buildtime' => $environment_variable->is_buildtime ?? false,
+                            'is_required' => $environment_variable->is_required ?? false,
                             'comment' => $environment_variable->comment,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,
@@ -127,8 +133,16 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
+                $environmentVariable->preserve_compose_null = false;
+            }
             $environmentVariable->updateIsShared();
         });
+    }
+
+    public function preservesLegacyComposeNull(): bool
+    {
+        return $this->preserve_compose_null && $this->value === null;
     }
 
     public function service()
@@ -181,45 +195,65 @@ class EnvironmentVariable extends BaseModel
         return $this->resourceable;
     }
 
+    /**
+     * The value that the container gets: the old escaped form for variables saved before exact
+     * escaping, otherwise the resolved value without escaping.
+     */
     public function realValue(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                if (! $this->relationLoaded('resourceable')) {
-                    $this->load('resourceable');
-                }
-                $resource = $this->resourceable;
-                if (! $resource) {
-                    return null;
-                }
-
-                // Load relationships needed for shared variable resolution
-                if (! $resource->relationLoaded('environment')) {
-                    $resource->load('environment');
-                }
-                if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
-                    $resource->load('server');
-                }
-                if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
-                    $resource->load('destination.server');
-                }
-
-                $real_value = $this->get_real_environment_variables($this->value, $resource);
-
-                // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
-                if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
-                    return $real_value;
-                }
-
-                if ($this->is_literal || $this->is_multiline) {
-                    $real_value = '\''.$real_value.'\'';
-                } else {
-                    $real_value = escapeEnvVariables($real_value);
-                }
-
-                return $real_value;
-            }
+            get: fn () => $this->resolveRealValue(),
         );
+    }
+
+    /**
+     * Resolved value for display and copy. References to locked shared variables keep their
+     * reference text, so the UI never reveals a value that is only shown once.
+     */
+    public function displayRealValue(): ?string
+    {
+        return $this->resolveRealValue(revealLockedSharedVariables: false);
+    }
+
+    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true): ?string
+    {
+        if (! $this->relationLoaded('resourceable')) {
+            $this->load('resourceable');
+        }
+        $resource = $this->resourceable;
+        if (! $resource) {
+            return null;
+        }
+
+        // Load relationships needed for shared variable resolution
+        if (! $resource->relationLoaded('environment')) {
+            $resource->load('environment');
+        }
+        if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
+            $resource->load('server');
+        }
+        if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
+            $resource->load('destination.server');
+        }
+
+        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+
+        return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
+    }
+
+    /**
+     * The escaping used before exact escaping.
+     */
+    private function legacyEscapedValue(string $value): string
+    {
+        // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return $value;
+        }
+
+        return $this->is_literal || $this->is_multiline
+            ? '\''.$value.'\''
+            : escapeEnvVariables($value);
     }
 
     protected function isReallyRequired(): Attribute
@@ -267,9 +301,9 @@ class EnvironmentVariable extends BaseModel
         return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
     }
 
-    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
+    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null, bool $revealLockedSharedVariables = true)
     {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server);
+        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server, $revealLockedSharedVariables);
     }
 
     public function getResolvedValueWithServer($server = null)
@@ -309,6 +343,65 @@ class EnvironmentVariable extends BaseModel
         return $real_value;
     }
 
+    /** @return array<int, string> */
+    public function logRedactionValues(): array
+    {
+        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false);
+        if (! is_string($resolvedValue) || $resolvedValue === '') {
+            return [];
+        }
+
+        // Build-time paths still write the old escaped form, so redact both forms.
+        $value = $this->legacyEscapedValue($resolvedValue);
+        $values = [$value, $resolvedValue];
+        if ($this->is_multiline || $this->is_literal) {
+            $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
+                ? substr($value, 1, -1)
+                : $value;
+            $values = array_merge($values, self::logRedactionVariants($unquoted, (bool) $this->is_multiline));
+        }
+
+        return array_values(array_unique(array_filter($values, static fn (string $item): bool => $item !== '')));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $secrets
+     * @return array<int, string>
+     */
+    public static function remoteSecretLogRedactionValues(array $secrets): array
+    {
+        return collect($secrets)
+            ->filter(static fn (mixed $secret): bool => is_string($secret) && $secret !== '')
+            ->flatMap(static fn (string $secret): array => [
+                ...self::logRedactionVariants($secret, preg_match('/\r|\n/', $secret) === 1),
+                RemoteSecretValueFormatter::composeFile($secret),
+            ])
+            ->filter(static fn (string $item): bool => $item !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Also covers the value inside a quoted argument such as 'KEY=value'.
+     *
+     * @return array<int, string>
+     */
+    private static function logRedactionVariants(string $value, bool $splitLines): array
+    {
+        $values = [
+            $value,
+            escapeBashEnvValue($value),
+            str_replace("'", "'\\''", $value),
+            str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $value),
+        ];
+        if ($splitLines) {
+            $values = array_merge($values, preg_split('/\r\n|\r|\n/', $value) ?: []);
+        }
+
+        return $values;
+    }
+
     public function resolveReferencedValue(): ?string
     {
         $value = $this->value;
@@ -322,16 +415,12 @@ class EnvironmentVariable extends BaseModel
         return static::where('resourceable_type', $this->resourceable_type)
             ->where('resourceable_id', $this->resourceable_id)
             ->where('is_preview', (bool) $this->is_preview)
+            ->where('is_shown_once', false)
             ->where('key', $referencedKey)
             ->first()?->value ?? $value;
     }
 
-    private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
-    {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource);
-    }
-
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null)
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
@@ -371,7 +460,7 @@ class EnvironmentVariable extends BaseModel
                 ->where('team_id', $resource->team()->id)
                 ->where("{$type}_id", $id)
                 ->first();
-            if ($found) {
+            if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }
         }

@@ -33,8 +33,8 @@ test('shared variable preserves spacing in reference', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TEST_VAR',
         'value' => '{{ project.aaa }}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();
@@ -45,8 +45,8 @@ test('shared variable preserves no-space format', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TEST_VAR',
         'value' => '{{project.aaa}}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();
@@ -67,8 +67,8 @@ test('shared variable with spaces resolves correctly', function () {
     $env = EnvironmentVariable::create([
         'key' => 'MY_VAR',
         'value' => '{{ project.TEST_KEY }}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     // Verify it resolves correctly
@@ -90,8 +90,8 @@ test('shared variable without spaces resolves correctly', function () {
     $env = EnvironmentVariable::create([
         'key' => 'MY_VAR',
         'value' => '{{project.TEST_KEY}}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     // Verify it resolves correctly
@@ -113,8 +113,8 @@ test('shared variable with extra internal spaces resolves correctly', function (
     $env = EnvironmentVariable::create([
         'key' => 'MY_VAR',
         'value' => '{{  project.TEST_KEY  }}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     // Verify it resolves correctly (parser trims when extracting)
@@ -126,8 +126,8 @@ test('is_shared attribute detects variable with spaces', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TEST',
         'value' => '{{ project.aaa }}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     expect($env->is_shared)->toBeTrue();
@@ -137,8 +137,8 @@ test('is_shared attribute detects variable without spaces', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TEST',
         'value' => '{{project.aaa}}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     expect($env->is_shared)->toBeTrue();
@@ -148,8 +148,8 @@ test('is_shared persisted value rejects unsupported reference types', function (
     $env = EnvironmentVariable::create([
         'key' => 'TEST',
         'value' => '{{vault.KEY}}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();
@@ -165,8 +165,8 @@ test('non-shared variable preserves spaces', function () {
     $env = EnvironmentVariable::create([
         'key' => 'REGULAR',
         'value' => 'regular value with spaces',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();
@@ -177,8 +177,8 @@ test('mixed content with shared variable preserves all spacing', function () {
     $env = EnvironmentVariable::create([
         'key' => 'MIXED',
         'value' => 'prefix {{ project.aaa }} suffix',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();
@@ -189,8 +189,8 @@ test('multiple shared variables preserve individual spacing', function () {
     $env = EnvironmentVariable::create([
         'key' => 'MULTI',
         'value' => '{{ project.a }} and {{team.b}}',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();
@@ -201,8 +201,8 @@ test('leading and trailing spaces are trimmed', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TRIMMED',
         'value' => '   {{ project.aaa }}   ',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
     ]);
 
     $env->refresh();

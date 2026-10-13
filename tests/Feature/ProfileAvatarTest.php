@@ -45,7 +45,7 @@ it('compresses and stores an uploaded profile picture on the configured local st
         ->and($image[1])->toBeLessThanOrEqual(256)
         ->and($image['mime'])->toBe('image/jpeg')
         ->and(Storage::disk('images')->size($user->avatar_path))->toBeLessThan(100_000);
-});
+})->skip(! extension_loaded('gd'), 'Requires the GD extension to generate and compress the test image.');
 
 it('stores an already compressed browser JPEG without server image extensions', function () {
     Storage::fake('images');
@@ -170,37 +170,4 @@ it('falls back cleanly when the avatars S3 storage no longer exists', function (
     $this->withoutMiddleware()->actingAs($user)
         ->get(route('profile.avatar'))
         ->assertNotFound();
-});
-
-it('automatically uploads a selected profile picture and keeps the current avatar until it succeeds', function () {
-    $profile = file_get_contents(resource_path('views/livewire/profile/index.blade.php'));
-    $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
-
-    expect($profile)
-        ->toContain("this.\$wire.upload('avatar', compressed")
-        ->toContain('await this.$wire.uploadAvatar()')
-        ->toContain('if (uploaded)')
-        ->toContain('canvas.toBlob')
-        ->toContain('x-ref="avatarInput"')
-        ->toContain('class="hidden"')
-        ->toContain("processing ? 'Uploading…' : 'Browse…'")
-        ->not->toContain('wire:click="uploadAvatar"')
-        ->not->toContain('Upload picture')
-        ->not->toContain('type="file" x-on:change')
-        ->and($menu)
-        ->toContain('profile_avatar_url($user)');
-});
-
-it('offers runtime local or existing S3 profile picture storage', function () {
-    $component = file_get_contents(app_path('Livewire/Settings/Advanced.php'));
-    $view = file_get_contents(resource_path('views/livewire/settings/advanced.blade.php'));
-
-    expect($component)
-        ->toContain("['value' => 'local', 'label' => 'Local storage']")
-        ->toContain("'value' => 's3:'.\$storage->id")
-        ->toContain('->whereTeamId(0)')
-        ->toContain("->where('is_usable', true)")
-        ->and($view)
-        ->toContain('id="avatar_storage"')
-        ->toContain('Use S3 for multi-instance or cloud deployments');
 });

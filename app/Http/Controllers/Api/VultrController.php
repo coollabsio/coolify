@@ -16,6 +16,7 @@ use App\Services\VultrService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 class VultrController extends Controller
@@ -326,7 +327,7 @@ class VultrController extends Controller
             $ipAddress = $vultrService->getPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
             $server = DB::transaction(function () use ($normalizedServerName, $ipAddress, $teamId, $privateKey, $token, $vultrInstanceId, $vultrInstance): Server {
-                $server = Server::create([
+                $server = Team::createServerWithinLimit($teamId, [
                     'name' => $normalizedServerName,
                     'ip' => $ipAddress,
                     'user' => 'root',
@@ -375,6 +376,13 @@ class VultrController extends Controller
                 'vultr_instance_id' => $vultrInstanceId,
                 'ip' => $server->ip,
             ])->setStatusCode(201);
+        } catch (ValidationException $e) {
+            if (! isset($e->errors()['server'])) {
+                throw $e;
+            }
+            $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
+
+            return response()->json(['message' => 'Server limit reached for your subscription.'], 400);
         } catch (RateLimitException $e) {
             $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
 

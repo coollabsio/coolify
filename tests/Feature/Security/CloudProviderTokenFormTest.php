@@ -60,22 +60,35 @@ test('security cloud token form lets users choose every supported provider', fun
         ->assertSee('Provider')
         ->assertSee('Hetzner')
         ->assertSee('DigitalOcean')
-        ->assertSee('Vultr');
+        ->assertSee('Vultr')
+        ->assertSee('Hostinger');
 });
 
-test('cloud provider help link reacts to provider selection without a live request', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/cloud-provider-token-form.blade.php'));
+test('adding a hostinger token from a modal validates and refreshes hostinger token selectors', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([], 200),
+    ]);
 
-    expect($view)
-        ->toContain("selectedProvider: \$wire.entangle('provider')")
-        ->toContain(':wire="false"')
-        ->toContain('x-model="selectedProvider"')
-        ->toContain(':href="providerConsoleUrl"')
-        ->toContain('x-text="providerName + \' console\'"')
-        ->not->toContain('wire:model.live="provider"');
+    $component = Livewire::test(CloudProviderTokenForm::class, [
+        'modal_mode' => true,
+        'provider' => 'hostinger',
+    ])
+        ->set('name', 'Production Hostinger')
+        ->set('token', 'hostinger-token')
+        ->call('addToken')
+        ->assertHasNoErrors()
+        ->assertDispatched('close-modal');
 
-    expect(strpos($view, ':href="providerConsoleUrl"'))
-        ->toBeLessThan(strpos($view, '<div class="grid gap-4 lg:grid-cols-2">'));
+    $dispatches = collect(data_get($component->effects, 'dispatches', []));
+
+    expect($dispatches->contains(fn (array $dispatch) => $dispatch['name'] === 'tokenAdded.hostinger'
+        && data_get($dispatch, 'to') === 'server.new.by-hostinger'))->toBeTrue();
+
+    $this->assertDatabaseHas('cloud_provider_tokens', [
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
+        'name' => 'Production Hostinger',
+    ]);
 });
 
 test('adding a cloud provider token stores an optional description', function () {

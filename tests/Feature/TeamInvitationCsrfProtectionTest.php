@@ -1,14 +1,28 @@
 <?php
 
+use App\Http\Middleware\VerifyCsrfToken;
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Providers\RouteServiceProvider;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 
 uses(RefreshDatabase::class);
 
+/**
+ * Personal teams start in onboarding, which redirects every page except onboarding itself.
+ */
+function finishInvitationTestOnboarding(): void
+{
+    Team::query()->update(['show_boarding' => false]);
+}
+
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create(['email' => 'invited@example.com']);
 
@@ -20,6 +34,8 @@ beforeEach(function () {
         'link' => url('/invitations/test-invitation-uuid'),
         'via' => 'link',
     ]);
+
+    finishInvitationTestOnboarding();
 });
 
 test('GET invitation shows landing page without accepting', function () {
@@ -76,6 +92,14 @@ test('POST invitation accepts and adds user to team', function () {
 });
 
 test('POST invitation without CSRF token is rejected', function () {
+    // Laravel skips CSRF verification while running unit tests, so enforce it explicitly
+    $this->app->bind(VerifyCsrfToken::class, fn ($app) => new class($app, $app['encrypter']) extends VerifyCsrfToken
+    {
+        protected function runningUnitTests(): bool
+        {
+            return false;
+        }
+    });
     $this->actingAs($this->user);
 
     $response = $this->withoutMiddleware(EncryptCookies::class)
@@ -100,6 +124,7 @@ test('unauthenticated user cannot view invitation', function () {
 
 test('wrong user cannot view invitation', function () {
     $otherUser = User::factory()->create(['email' => 'other@example.com']);
+    finishInvitationTestOnboarding();
     $this->actingAs($otherUser);
 
     $response = $this->get('/invitations/test-invitation-uuid');
@@ -109,6 +134,7 @@ test('wrong user cannot view invitation', function () {
 
 test('wrong user cannot accept invitation via POST', function () {
     $otherUser = User::factory()->create(['email' => 'other@example.com']);
+    finishInvitationTestOnboarding();
     $this->actingAs($otherUser);
 
     $response = $this->post('/invitations/test-invitation-uuid');
@@ -126,12 +152,21 @@ test('GET revoke route no longer exists', function () {
 
     $response = $this->get('/invitations/test-invitation-uuid/revoke');
 
-    $response->assertStatus(404);
+    // Unknown paths fall through to the catch-all route, which redirects home
+    expect(Route::has('team.invitation.revoke'))->toBeFalse();
+    $response->assertRedirect(RouteServiceProvider::HOME);
+
+    // The invitation must not be revoked by a GET request
+    $this->assertDatabaseHas('team_invitations', [
+        'uuid' => 'test-invitation-uuid',
+    ]);
 });
 
 test('POST invitation for already-member user deletes invitation without duplicating', function () {
     $this->user->teams()->attach($this->team->id, ['role' => 'member']);
     $this->actingAs($this->user);
+    // With two teams, an active team must be selected or every page redirects to team selection
+    session(['currentTeam' => $this->user->teams()->where('personal_team', true)->first()]);
 
     $response = $this->post('/invitations/test-invitation-uuid');
 

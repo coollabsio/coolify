@@ -161,10 +161,14 @@ it('deletes the droplet when local server persistence fails', function () {
         && $request->url() === 'https://api.digitalocean.com/v2/droplets/555');
 });
 
-it('renders only the full width buy button at the bottom of the DigitalOcean form', function () {
-    Livewire::test(ByDigitalOcean::class)
+it('renders only a single buy button as the DigitalOcean form action', function () {
+    $html = Livewire::test(ByDigitalOcean::class)
         ->set('current_step', 2)
         ->assertDontSee('wire:click="previousStep"', false)
-        ->assertSeeHtml('class="button w-full"')
-        ->assertSee('Buy & Create Server', false);
+        ->assertSeeHtml('class="button button-highlighted"')
+        ->assertSee('Buy and create')
+        ->html();
+
+    expect(substr_count($html, 'type="submit"'))->toBe(1)
+        ->and(substr_count($html, 'Buy and create'))->toBe(1);
 });

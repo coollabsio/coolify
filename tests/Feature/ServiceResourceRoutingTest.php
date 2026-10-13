@@ -24,6 +24,8 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
@@ -132,15 +134,27 @@ test('does not open service import backup route from another team', function () 
 });
 
 test('does not resolve service database import component from another team', function () {
-    $component = app(DatabaseImport::class);
-    $component->parameters = [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->otherService->uuid,
-        'stack_service_uuid' => $this->otherServiceDatabase->uuid,
-    ];
+    // The component resolves its resource from the current route parameters on mount.
+    // Register a full-page route for it ahead of the application's catch-all route.
+    $importRoute = new RoutingRoute(
+        ['GET', 'HEAD'],
+        '_tests/service-database-import/{project_uuid}/{environment_uuid}/{service_uuid}/{stack_service_uuid}',
+        ['uses' => DatabaseImport::class],
+    );
+    $routes = new RouteCollection;
+    $routes->add($importRoute);
+    foreach (app('router')->getRoutes() as $route) {
+        $routes->add($route);
+    }
+    app('router')->setRoutes($routes);
 
-    $component->getContainers();
+    $this->withoutExceptionHandling()->get(implode('/', [
+        '/_tests/service-database-import',
+        $this->projectA->uuid,
+        $this->environmentA->uuid,
+        $this->otherService->uuid,
+        $this->otherServiceDatabase->uuid,
+    ]));
 })->throws(ModelNotFoundException::class);
 
 test('service heading does not hydrate with another team service', function () {
@@ -507,7 +521,7 @@ test('service backups have explicit settings actions for database and storage sc
     $dom = new DOMDocument;
     @$dom->loadHTML($html);
     $xpath = new DOMXPath($dom);
-    $buttons = $xpath->query('//button[contains(., "Settings")]');
+    $buttons = $xpath->query('//button[@aria-label="Edit backup schedule"]');
     $actions = [];
     foreach ($buttons as $button) {
         $actions[] = $button->getAttribute('wire:click.stop');

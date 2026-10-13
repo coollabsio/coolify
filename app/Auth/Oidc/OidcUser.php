@@ -25,8 +25,19 @@ class OidcUser extends SocialiteUser
         $this->idTokenClaims = $claims;
         $this->issuer = is_string($claims['iss'] ?? null) ? $claims['iss'] : null;
         $this->subject = is_string($claims['sub'] ?? null) ? $claims['sub'] : null;
-        $this->emailVerified = ($claims['email_verified'] ?? false) === true;
+        $this->emailVerified = self::claimsVerifyEmail($claims);
 
         return $this;
+    }
+
+    /**
+     * Microsoft Entra ID never sends email_verified. Its optional xms_edov
+     * claim ("email domain owner verified") is the documented replacement.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    public static function claimsVerifyEmail(array $claims): bool
+    {
+        return ($claims['email_verified'] ?? null) === true || ($claims['xms_edov'] ?? null) === true;
     }
 }

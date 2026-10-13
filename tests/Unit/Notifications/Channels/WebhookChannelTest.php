@@ -66,7 +66,7 @@ function deliverOverWebhook(Team $team, Notification $notification): array
 it('delivers ssl certificate renewal notifications over the webhook channel', function () {
     $payload = deliverOverWebhook(
         $this->team,
-        new SslExpirationNotification([(object) ['name' => 'my-application']])
+        new SslExpirationNotification([(object) ['name' => 'my-application', 'uuid' => 'my-database-uuid']])
     );
 
     expect($payload['event'])->toBe('ssl_certificate_renewal')

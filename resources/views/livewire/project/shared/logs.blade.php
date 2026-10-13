@@ -36,17 +36,14 @@
                 <div class="min-w-0">
     @endif
 
-    <div wire:loading.flex wire:target="loadAllContainers"
-        class="loading-state-card mt-4 hidden min-h-40 w-full items-center justify-center lg:mt-3">
-        <x-loading text="Loading containers" />
+    <div wire:loading.block wire:target="loadAllContainers" class="hidden w-full">
+        <x-skeleton.logs />
     </div>
 
-    <div class="mt-4 w-full lg:mt-3" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
+    <div class="w-full" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
         wire:loading.remove wire:target="loadAllContainers">
         @if (! $containersLoaded)
-            <div class="loading-state-card flex min-h-40 w-full items-center justify-center">
-                <x-loading text="Loading containers" />
-            </div>
+            <x-skeleton.logs />
         @elseif ($logsUnavailable)
             @if ($servers->isEmpty())
                 <x-empty size="lg" title="Runtime logs unavailable"
@@ -55,6 +52,10 @@
             @elseif ($functionalServers->isEmpty())
                 <x-empty size="lg" title="Runtime logs unavailable"
                     description="No functional servers are available, so container logs cannot be loaded."
+                    icon-name="file-content" />
+            @elseif (count($serverErrors) > 0)
+                <x-empty size="lg" title="Runtime logs unavailable"
+                    description="Could not load containers: {{ collect($serverErrors)->first() }}"
                     icon-name="file-content" />
             @else
                 <x-empty size="lg" title="Runtime logs unavailable"
@@ -67,6 +68,10 @@
                     @if (! $server->isFunctional())
                         <x-callout type="warning" title="Server unavailable">
                             {{ $server->name }} is not functional, so its container logs cannot be loaded.
+                        </x-callout>
+                    @elseif (isset($serverErrors[$server->id]))
+                        <x-callout type="warning" title="Could not load containers">
+                            {{ $server->name }}: {{ $serverErrors[$server->id] }}
                         </x-callout>
                     @elseif (isset($serverContainers[$server->id]) && count($serverContainers[$server->id]) > 0)
                         @if ($servers->count() > 1)

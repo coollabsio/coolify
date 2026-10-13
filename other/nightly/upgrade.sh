@@ -151,6 +151,11 @@ set_env_var "REGISTRY_URL" "$REGISTRY_URL"
 update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
+update_env_var "PUSHER_BACKEND_PORT" "6001"
+# The realtime container no longer exists; point older installs at the bundled Reverb server
+if grep -q '^PUSHER_BACKEND_HOST=coolify-realtime$' "$ENV_FILE"; then
+    set_env_var "PUSHER_BACKEND_HOST" "127.0.0.1"
+fi
 log "Environment variables check complete"
 echo "     Done."
 
@@ -168,6 +173,19 @@ if ! docker network inspect coolify >/dev/null 2>&1; then
     fi
 else
     log "Network 'coolify' already exists"
+fi
+
+mkdir -p /data/coolify/images/{avatars,project-icons}
+chown -R 9999:root /data/coolify/images
+chmod -R 700 /data/coolify/images
+
+# Fix SSH directory ownership if not owned by container user UID 9999 (fixes #6621)
+# Only changes owner — preserves existing group to respect custom setups
+SSH_OWNER=$(stat -c '%u' /data/coolify/ssh 2>/dev/null || echo "unknown")
+if [ "$SSH_OWNER" != "9999" ]; then
+    log "Fixing SSH directory ownership (was owned by UID $SSH_OWNER)"
+    chown -R 9999 /data/coolify/ssh
+    chmod -R 700 /data/coolify/ssh
 fi
 
 # Check if Docker config file exists
@@ -248,6 +266,7 @@ nohup bash -c "
     }
 
     # Stop and remove containers
+    # coolify-realtime is kept for upgrades from versions that still ran the separate realtime container
     for container in coolify coolify-db coolify-redis coolify-realtime; do
         if docker ps -a --format '{{.Names}}' | grep -q \"^\${container}\$\"; then
             log \"Stopping container: \${container}\"

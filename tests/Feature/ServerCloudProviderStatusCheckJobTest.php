@@ -60,6 +60,36 @@ it('syncs provider state for a placeholder server without scheduling SSH', funct
     Queue::assertNotPushed(ServerConnectionCheckJob::class);
 });
 
+it('schedules Hostinger provider state checks', function () {
+    $server = createCloudServerForStatusCheckJobTest('hostinger', [
+        'hostinger_virtual_machine_id' => 17923,
+        'hostinger_virtual_machine_status' => 'creating',
+    ]);
+
+    Queue::fake();
+    (new ServerManagerJob)->handle();
+    Queue::assertPushed(ServerCloudProviderStatusCheckJob::class, fn (ServerCloudProviderStatusCheckJob $job) => $job->server->is($server));
+});
+
+it('runs Hostinger provider state checks', function () {
+    $server = createCloudServerForStatusCheckJobTest('hostinger', [
+        'hostinger_virtual_machine_id' => 17923,
+        'hostinger_virtual_machine_status' => 'creating',
+    ]);
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/17923' => Http::response([
+            'id' => 17923,
+            'state' => 'running',
+            'ipv4' => [['address' => '203.0.113.23']],
+        ]),
+    ]);
+
+    (new ServerCloudProviderStatusCheckJob($server))->handle();
+
+    expect($server->fresh()->ip)->toBe('203.0.113.23')
+        ->and($server->fresh()->hostinger_virtual_machine_status)->toBe('running');
+});
+
 it('backfills a DigitalOcean placeholder without changing reachability', function () {
     $server = createCloudServerForStatusCheckJobTest('digitalocean', [
         'digitalocean_droplet_id' => 987,

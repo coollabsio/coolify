@@ -31,7 +31,7 @@ trait EnvironmentVariableProtection
         }
 
         try {
-            $dockerComposeData = Yaml::parse($dockerCompose);
+            $dockerComposeData = parseDockerComposeYaml($dockerCompose);
             $dockerEnvVars = data_get($dockerComposeData, 'services.*.environment');
 
             foreach ($dockerEnvVars as $serviceEnvs) {

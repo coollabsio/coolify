@@ -11,6 +11,8 @@ use Exception;
  */
 class DeploymentException extends Exception
 {
+    private bool $messageAlreadyLogged = false;
+
     /**
      * Create a new deployment exception instance.
      *
@@ -28,5 +30,22 @@ class DeploymentException extends Exception
     public static function fromException(\Throwable $exception): static
     {
         return new static($exception->getMessage(), $exception->getCode(), $exception);
+    }
+
+    /**
+     * Create an exception for a message that is already a visible line in the deployment log,
+     * so the failure handler does not show the same explanation again.
+     */
+    public static function alreadyLogged(string $message, int $code = 0, ?\Throwable $previous = null): static
+    {
+        $exception = new static($message, $code, $previous);
+        $exception->messageAlreadyLogged = true;
+
+        return $exception;
+    }
+
+    public function isMessageAlreadyLogged(): bool
+    {
+        return $this->messageAlreadyLogged;
     }
 }

@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
@@ -41,9 +43,9 @@ use OpenApi\Attributes as OA;
         'marketing_emails' => ['type' => 'boolean', 'description' => 'The flag to receive marketing emails.'],
     ],
 )]
-class User extends Authenticatable implements SendsEmail
+class User extends Authenticatable implements PasskeyUser, SendsEmail
 {
-    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
@@ -65,9 +67,11 @@ class User extends Authenticatable implements SendsEmail
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
+        'created_before_oauth_identities',
     ];
 
     protected $casts = [
+        'created_before_oauth_identities' => 'boolean',
         'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
@@ -207,14 +211,38 @@ class User extends Authenticatable implements SendsEmail
     }
 
     /**
-     * Delete the user if they are not verified and have a force password reset.
+     * Delete the user if they are a provisional invitee that never joined any team.
      * This is used to clean up users that have been invited, did not accept the invitation (and did not verify their email and have a force password reset).
+     * Users that already belong to a team other than their own personal team, or still have pending invitations, are kept.
      */
-    public function deleteIfNotVerifiedAndForcePasswordReset()
+    public function deleteIfNotVerifiedAndForcePasswordReset(): void
     {
-        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
-            $this->delete();
+        if ($this->hasVerifiedEmail() || $this->force_password_reset !== true) {
+            return;
         }
+
+        if (TeamInvitation::whereEmail($this->email)->exists()) {
+            return;
+        }
+
+        if ($this->belongsToNonPersonalTeam()) {
+            return;
+        }
+
+        $this->delete();
+    }
+
+    /**
+     * Whether the user is a member of any team other than a personal team where they are the only member.
+     */
+    private function belongsToNonPersonalTeam(): bool
+    {
+        return $this->teams()
+            ->where(function ($query) {
+                $query->where('personal_team', false)
+                    ->orWhereHas('members', fn ($members) => $members->where('users.id', '!=', $this->id));
+            })
+            ->exists();
     }
 
     public function recreate_personal_team()
@@ -235,7 +263,7 @@ class User extends Authenticatable implements SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
@@ -278,7 +306,12 @@ class User extends Authenticatable implements SendsEmail
     public function sendVerificationEmail()
     {
         $mail = new MailMessage;
-        $url = URL::temporarySignedRoute(
+        // Sign the link for the configured instance URL instead of the request Host header.
+        $urlGenerator = clone URL::getFacadeRoot();
+        $instanceUrl = rtrim(base_url(), '/');
+        $urlGenerator->forceRootUrl($instanceUrl);
+        $urlGenerator->forceScheme(parse_url($instanceUrl, PHP_URL_SCHEME) ?: 'http');
+        $url = $urlGenerator->temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
@@ -569,6 +602,18 @@ class User extends Authenticatable implements SendsEmail
     }
 
     /**
+     * Hex handle: iOS Safari corrupts raw binary handles (laravel/passkeys-server#41).
+     */
+    public function getPasskeyUserHandle(): string
+    {
+        return hash_hmac(
+            'sha256',
+            $this->getTable().'|'.$this->getKey(),
+            Config::string('passkeys.user_handle_secret'),
+        );
+    }
+
+    /**
      * Check if the user has a password set.
      */
     public function hasPassword(): bool
@@ -576,6 +621,11 @@ class User extends Authenticatable implements SendsEmail
         return ! empty($this->password);
     }
 
+    /**
+     * Whether destructive actions must be confirmed with the account password.
+     * Users with a linked OAuth identity only confirm with the dialog's typed
+     * confirmation, and users without a password have no way to confirm.
+     */
     public function requiresPasswordConfirmation(): bool
     {
         return $this->hasPassword() && ! $this->hasSsoIdentity();

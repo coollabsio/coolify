@@ -11,9 +11,16 @@
                 helper="Search, filter, follow, copy, or download recent output from the Sentinel container."
                 flush class="logs-settings-section">
                 @if ($server->isSentinelEnabled())
+                    @php
+                        $sentinelStatus = $server->sentinelStatus();
+                        [$sentinelStatusLabel, $sentinelStatusType] = match ($sentinelStatus) {
+                            'waiting' => ['Waiting for first report', 'neutral'],
+                            'in_sync' => ['In sync', 'success'],
+                            default => ['Out of sync', 'warning'],
+                        };
+                    @endphp
                     <x-slot:actions>
-                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                            :type="$server->isSentinelLive() ? 'success' : 'warning'"
+                        <x-status-badge :status="$sentinelStatusLabel" :type="$sentinelStatusType"
                             class="logs-section-status-badge" />
                     </x-slot:actions>
                     <div class="settings-log-panel">

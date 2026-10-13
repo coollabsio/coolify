@@ -43,6 +43,8 @@
                                     ]);
                                 }
                             }
+                        } elseif ($database instanceof \App\Models\StandalonePostgresql && $database->id === 0) {
+                            $resourceLink = route('settings.backup');
                         } elseif ($database) {
                             $environment = $database->environment;
                             $project = $environment?->project;
@@ -102,11 +104,16 @@
                                     portal />
                                 <button type="button" class="button shrink-0"
                                     wire:click="moveBackup({{ $backup->id }})">Move</button>
-                                <button type="button" class="button shrink-0 text-error"
-                                    wire:click="disableS3({{ $backup->id }})"
-                                    wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
-                                    Disable
-                                </button>
+                                <div wire:key="disableS3-{{ $backup->id }}">
+                                    <x-modal-confirmation title="Remove this storage from the backup schedule?"
+                                        submitAction="disableS3({{ $backup->id }})" :confirmWithText="false"
+                                        :confirmWithPassword="false" step2ButtonText="Remove storage"
+                                        :actions="['Backups from this schedule will no longer be uploaded to this storage. S3 backup turns off when no other storage remains.']">
+                                        <x-slot:trigger>
+                                            <button type="button" class="button shrink-0 text-error">Disable</button>
+                                        </x-slot:trigger>
+                                    </x-modal-confirmation>
+                                </div>
                             </div>
                         </div>
                     @endforeach
@@ -142,11 +149,16 @@
                                 portal />
                             <button type="button" class="button shrink-0"
                                 wire:click="moveVolumeBackup({{ $backup->id }})">Move</button>
-                            <button type="button" class="button shrink-0 text-error"
-                                wire:click="disableVolumeS3({{ $backup->id }})"
-                                wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
-                                Disable
-                            </button>
+                            <div wire:key="disableVolumeS3-{{ $backup->id }}">
+                                <x-modal-confirmation title="Remove this storage from the backup schedule?"
+                                    submitAction="disableVolumeS3({{ $backup->id }})" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Remove storage"
+                                    :actions="['Backups from this schedule will no longer be uploaded to this storage. S3 backup turns off when no other storage remains.']">
+                                    <x-slot:trigger>
+                                        <button type="button" class="button shrink-0 text-error">Disable</button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
+                            </div>
                         </div>
                     </div>
                 @endforeach

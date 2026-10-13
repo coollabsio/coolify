@@ -10,16 +10,15 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
-use App\Models\StandaloneMariadb;
-use App\Models\StandaloneMysql;
-use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -162,19 +161,33 @@ class ImportForm extends Component
 
     public bool $replaceExisting = false;
 
+    /**
+     * PostgreSQL archives: restore owners and privileges instead of skipping them.
+     */
+    public bool $keepOwners = false;
+
+    /**
+     * MySQL and MariaDB all-databases backups: also restore the system databases (users, passwords and privileges).
+     */
+    public bool $restoreMysqlUsers = false;
+
+    /**
+     * SQLite: the database file to restore into. Always one of the database's own files.
+     */
+    public ?string $sqliteDatabase = null;
+
     public string $restoreCommandText = '';
 
     public string $customLocation = '';
 
+    /**
+     * The file source the user selected: 'upload' after a completed upload, 'server' after a checked server path.
+     * Only the server sets it, so an import never falls back to an older upload.
+     */
+    #[Locked]
+    public ?string $fileSource = null;
+
     public ?int $activityId = null;
-
-    public string $postgresqlRestoreCommand = 'pg_restore --exit-on-error -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
-
-    public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
-
-    public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
-
-    public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
 
     // S3 Restore properties
     public array $availableS3Storages = [];
@@ -195,6 +208,15 @@ class ImportForm extends Component
         return $this->resourceType::find($this->resourceId);
     }
 
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function sqliteDatabaseFiles(): array
+    {
+        return $this->resource instanceof StandaloneSqlite ? $this->resource->databaseFiles() : [];
+    }
+
     #[Computed]
     public function server()
     {
@@ -202,7 +224,16 @@ class ImportForm extends Component
             return null;
         }
 
-        return Server::ownedByCurrentTeam()->find($this->serverId);
+        return Server::query()->where('team_id', $this->resourceTeamId())->find($this->serverId);
+    }
+
+    /**
+     * Team of the loaded database. The session team can differ: a user can switch teams in
+     * another tab while this form stays open.
+     */
+    private function resourceTeamId(): ?int
+    {
+        return $this->resource?->team()?->id;
     }
 
     protected $listeners = [
@@ -219,83 +250,69 @@ class ImportForm extends Component
         $this->parameters = get_route_parameters();
         $this->getContainers();
         $this->loadAvailableS3Storages();
+        $this->initializeRestoreOptions();
     }
 
-    public function updatedDumpAll($value)
+    protected function initializeRestoreOptions(): void
     {
-        $morphClass = $this->resource->getMorphClass();
+        $this->sqliteDatabase = $this->sqliteDatabaseFiles[0] ?? null;
+        $this->refreshRestoreCommandText();
+    }
 
-        // Handle ServiceDatabase by checking the database type
-        if ($morphClass === ServiceDatabase::class) {
-            $dbType = $this->resource->databaseType();
-            if (str_contains($dbType, 'mysql')) {
-                $morphClass = 'mysql';
-            } elseif (str_contains($dbType, 'mariadb')) {
-                $morphClass = 'mariadb';
-            } elseif (str_contains($dbType, 'postgres')) {
-                $morphClass = 'postgresql';
-            }
-        }
-
-        switch ($morphClass) {
-            case StandaloneMariadb::class:
-            case 'mariadb':
-                if ($value === true) {
-                    $this->mariadbRestoreCommand = <<<'EOD'
-for pid in $(mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
-  mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "KILL $pid" 2>/dev/null || true
-done && \
-mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \`',schema_name,'\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | mariadb -u root -p$MARIADB_ROOT_PASSWORD && \
-mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`${MARIADB_DATABASE:-default}\`;" && \
-(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | sed -e '/^CREATE DATABASE/d' -e '/^USE \`mysql\`/d' | mariadb -u root -p$MARIADB_ROOT_PASSWORD ${MARIADB_DATABASE:-default}
-EOD;
-                    $this->restoreCommandText = $this->mariadbRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mariadb -u root -p$MARIADB_ROOT_PASSWORD ${MARIADB_DATABASE:-default}';
-                } else {
-                    $this->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
-                }
-                break;
-            case StandaloneMysql::class:
-            case 'mysql':
-                if ($value === true) {
-                    $this->mysqlRestoreCommand = <<<'EOD'
-for pid in $(mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
-  mysql -u root -p$MYSQL_ROOT_PASSWORD -e "KILL $pid" 2>/dev/null || true
-done && \
-mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \`',schema_name,'\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | mysql -u root -p$MYSQL_ROOT_PASSWORD && \
-mysql -u root -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE:-default}\`;" && \
-(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | sed -e '/^CREATE DATABASE/d' -e '/^USE \`mysql\`/d' | mysql -u root -p$MYSQL_ROOT_PASSWORD ${MYSQL_DATABASE:-default}
-EOD;
-                    $this->restoreCommandText = $this->mysqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mysql -u root -p$MYSQL_ROOT_PASSWORD ${MYSQL_DATABASE:-default}';
-                } else {
-                    $this->mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
-                }
-                break;
-            case StandalonePostgresql::class:
-            case 'postgresql':
-                if ($value === true) {
-                    $this->postgresqlRestoreCommand = <<<'EOD'
-psql -U ${POSTGRES_USER} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && \
-psql -U ${POSTGRES_USER} -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U ${POSTGRES_USER} --if-exists {} && \
-createdb -U ${POSTGRES_USER} ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}
-EOD;
-                    $this->restoreCommandText = $this->postgresqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
-                } else {
-                    $this->syncPostgresqlRestoreCommand();
-                }
-                break;
-        }
-
+    public function updatedDumpAll(): void
+    {
+        $this->refreshRestoreCommandText();
     }
 
     public function updatedReplaceExisting(): void
     {
-        $this->syncPostgresqlRestoreCommand();
+        $this->refreshRestoreCommandText();
     }
 
-    private function syncPostgresqlRestoreCommand(): void
+    public function updatedKeepOwners(): void
     {
-        $replaceExisting = $this->replaceExisting ? ' --clean --if-exists' : '';
-        $this->postgresqlRestoreCommand = 'pg_restore --exit-on-error'.$replaceExisting.' -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedRestoreMysqlUsers(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedSqliteDatabase(): void
+    {
+        if (! in_array($this->sqliteDatabase, $this->sqliteDatabaseFiles, true)) {
+            $this->sqliteDatabase = $this->sqliteDatabaseFiles[0] ?? null;
+        }
+        $this->refreshRestoreCommandText();
+    }
+
+    /**
+     * Preselects the SQLite file whose name matches the chosen backup, else the first file.
+     */
+    public function selectSqliteDatabaseFor(?string $backupName = null): void
+    {
+        if (! $this->resource instanceof StandaloneSqlite) {
+            return;
+        }
+        $this->sqliteDatabase = $this->resource->defaultRestoreFile($backupName);
+        $this->refreshRestoreCommandText();
+    }
+
+    /**
+     * Shows the exact script the import runs, so the confirmation matches the restore.
+     */
+    private function refreshRestoreCommandText(): void
+    {
+        $commands = app(DatabaseImportCommandBuilder::class);
+
+        try {
+            $this->restoreCommandText = $this->resource && $commands->supports($this->resource)
+                ? $commands->buildRestoreCommand($this->resource, '<temp_backup_file>', $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase, $this->restoreMysqlUsers)
+                : '';
+        } catch (\InvalidArgumentException) {
+            $this->restoreCommandText = '';
+        }
     }
 
     public function getContainers()
@@ -403,6 +420,8 @@ EOD;
 
     public function checkFile()
     {
+        $this->authorize('update', $this->resource);
+
         if (filled($this->customLocation)) {
             // Validate the custom location to prevent command injection
             if (! $this->validateServerPath($this->customLocation)) {
@@ -418,19 +437,76 @@ EOD;
             }
 
             try {
-                $escapedPath = escapeshellarg($this->customLocation);
-                $result = instant_remote_process(["ls -l {$escapedPath}"], $this->server, throwError: false);
-                if (blank($result)) {
+                if (! $this->serverFileExists($this->customLocation)) {
                     $this->dispatch('error', 'The file does not exist or has been deleted.');
 
                     return;
                 }
                 $this->filename = $this->customLocation;
+                $this->fileSource = 'server';
+                $this->discardStagedUpload();
+                $this->selectSqliteDatabaseFor($this->customLocation);
                 $this->dispatch('success', 'The file exists.');
             } catch (\Throwable $e) {
                 return handleError($e, $this);
             }
         }
+    }
+
+    public function updatedCustomLocation(): void
+    {
+        if ($this->fileSource === 'server') {
+            $this->fileSource = null;
+        }
+    }
+
+    /**
+     * Called by the upload form after an upload is complete.
+     */
+    public function selectUploadedFile(string $name): void
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! Storage::exists($this->stagedUploadPath())) {
+            $this->fileSource = null;
+            $this->dispatch('error', 'The uploaded file was not found. Please upload it again.');
+
+            return;
+        }
+
+        $this->fileSource = 'upload';
+        $this->customLocation = '';
+        $this->selectSqliteDatabaseFor($name);
+    }
+
+    private function stagedUploadPath(): string
+    {
+        return "upload/{$this->resource->uuid}/restore";
+    }
+
+    /**
+     * Delete an upload that was not imported when the user selects another source. Skipped while
+     * an import of this database runs, because that import can still copy the upload.
+     */
+    private function discardStagedUpload(): void
+    {
+        $lock = Cache::lock(StartDatabaseImport::lockKey($this->resource->uuid), 60);
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            Storage::delete($this->stagedUploadPath());
+        } finally {
+            $lock->release();
+        }
+    }
+
+    protected function serverFileExists(string $path): bool
+    {
+        $escapedPath = escapeshellarg($path);
+
+        return filled(instant_remote_process(["ls -l {$escapedPath}"], $this->server, throwError: false));
     }
 
     public function runImport(string $password = ''): bool|string
@@ -447,7 +523,7 @@ EOD;
             return true;
         }
 
-        if ($this->filename === '') {
+        if (! in_array($this->fileSource, ['upload', 'server'], true)) {
             $this->dispatch('error', 'Please select a file to import.');
 
             return true;
@@ -461,10 +537,13 @@ EOD;
 
         try {
             $this->importRunning = true;
-            $source = Storage::exists("upload/{$this->resourceUuid}/restore")
-                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting)
-                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
-            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            if ($this->fileSource === 'server') {
+                $this->discardStagedUpload();
+            }
+            $source = $this->fileSource === 'upload'
+                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers)
+                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
@@ -485,6 +564,7 @@ EOD;
             return true;
         } finally {
             $this->filename = null;
+            $this->fileSource = null;
             $this->importCommands = [];
         }
 
@@ -494,7 +574,7 @@ EOD;
     public function loadAvailableS3Storages()
     {
         try {
-            $this->availableS3Storages = S3Storage::ownedByCurrentTeam(['id', 'name', 'description'])
+            $this->availableS3Storages = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId(), ['id', 'name', 'description'])
                 ->where('is_usable', true)
                 ->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description])
@@ -523,6 +603,8 @@ EOD;
 
     public function checkS3File()
     {
+        $this->authorize('update', $this->resource);
+
         if (! $this->s3StorageId) {
             $this->dispatch('error', 'Please select an S3 storage.');
 
@@ -546,7 +628,7 @@ EOD;
         }
 
         try {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
+            $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
 
             // Validate bucket name early
             if (! $this->validateBucketName($s3Storage->bucket)) {
@@ -579,6 +661,7 @@ EOD;
 
             // Get file size
             $this->s3FileSize = $disk->size($cleanPath);
+            $this->selectSqliteDatabaseFor($cleanPath);
 
             $this->dispatch('success', 'File found in S3. Size: '.formatBytes($this->s3FileSize));
         } catch (\Throwable $e) {
@@ -622,8 +705,9 @@ EOD;
 
         try {
             $this->importRunning = true;
-            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
-            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            $this->discardStagedUpload();
+            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
@@ -651,6 +735,6 @@ EOD;
 
     public function buildRestoreCommand(string $tmpPath): string
     {
-        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting);
+        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase, $this->restoreMysqlUsers);
     }
 }

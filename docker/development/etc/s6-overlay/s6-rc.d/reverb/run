@@ -1,0 +1,22 @@
+#!/bin/sh
+
+cd /var/www/html
+
+# Every WebSocket connection uses a file descriptor. Raise the soft open-file limit (often 1024)
+# up to the hard limit, at most 65536. Never lower it, and start Reverb even when this fails.
+# Only with an event loop extension (uv, ev, event): the default stream_select() loop fails for
+# every connection once one descriptor is 1024 or higher (FD_SETSIZE), so it keeps the limit.
+if php -r 'exit(function_exists("uv_loop_new") || class_exists("EvLoop", false) || class_exists("EventBase", false) ? 0 : 1);'; then
+    target=65536
+    hard=$(ulimit -Hn)
+    if [ "$hard" != "unlimited" ] && [ "$hard" -lt "$target" ] 2>/dev/null; then
+        target=$hard
+    fi
+    soft=$(ulimit -Sn)
+    if [ "$soft" != "unlimited" ] && [ "$soft" -lt "$target" ] 2>/dev/null; then
+        ulimit -Sn "$target" 2>/dev/null || echo "   WARN  Could not raise the open-file limit of Reverb from $soft to $target."
+    fi
+fi
+
+echo "   INFO  Reverb is starting..."
+exec php artisan reverb:start --host=0.0.0.0 --port=${PUSHER_BACKEND_PORT:-6001}

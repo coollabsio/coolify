@@ -48,24 +48,22 @@ it('hides the breadcrumb trail on mobile while keeping the current status visibl
     ]));
 
     $response->assertSuccessful();
-    $response->assertSee('flex min-w-0 flex-col gap-1 md:hidden', false);
-    $response->assertSee('flex min-w-0 items-center text-xs text-neutral-400', false);
-    $response->assertSee('hidden flex-wrap items-center gap-y-1 md:flex', false);
-    $response->assertSee('flex flex-wrap items-center gap-1', false);
-    $response->assertSee(
-        'scrollbar flex min-h-10 w-full flex-nowrap items-center gap-6 overflow-x-scroll overflow-y-hidden pb-1 whitespace-nowrap md:w-auto md:overflow-visible',
-        false,
-    );
-    $response->assertSee('shrink-0', false);
-    $response->assertSee('Actions');
-    $response->assertSee('dropdown-item-touch', false);
-    $response->assertSee('hidden flex-wrap items-center gap-2 md:flex', false);
-    $response->assertSee('window.innerWidth >= 768', false);
-    $response->assertSee(':style="panelStyles"', false);
-    $response->assertSee('absolute top-full z-50 mt-1 min-w-max max-w-[calc(100vw-1rem)] md:top-0 md:mt-6', false);
-    $response->assertSee('Pure Dockerfile Example');
+
+    // The resource breadcrumb lives in the top bar (project / environment / resource switchers).
+    $response->assertSee('title="Switch project"', false);
+    $response->assertSee('title="Switch environment"', false);
+    $response->assertSee('title="Switch resource"', false);
+
+    // Desktop resource actions dock into the top bar; the slot is hidden below xl.
+    $response->assertSee('<div id="resource-action-hud-slot" class="hidden shrink-0 items-center xl:flex"></div>', false);
+
+    // Below xl, the heading keeps the resource name, current status, and a split action visible.
+    expect(preg_match(
+        '/<div class="mb-3 w-full xl:hidden">.*?<h1[^>]*>\s*Pure Dockerfile Example\s*<\/h1>.*?Application status/s',
+        $response->getContent()
+    ))->toBe(1);
+    $response->assertSee('id="application-mobile-actions"', false);
     $response->assertSee('Running');
-    $response->assertSee('pt-2 pb-4 md:pb-10', false);
 
     expect($response->getContent())->not->toContain('hidden pt-2 pb-10 md:flex');
 });

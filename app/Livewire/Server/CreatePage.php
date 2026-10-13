@@ -28,12 +28,14 @@ class CreatePage extends Component
             'hetzner' => 'hetzner',
             'vultr' => 'vultr',
             'digital-ocean' => 'digitalocean',
+            'hostinger' => 'hostinger',
             default => null,
         };
         $this->tokenProviderName = match ($type) {
             'hetzner' => 'Hetzner',
             'vultr' => 'Vultr',
             'digital-ocean' => 'DigitalOcean',
+            'hostinger' => 'Hostinger',
             default => null,
         };
         $this->hasProviderTokens = $this->tokenProvider
@@ -43,6 +45,7 @@ class CreatePage extends Component
             'hetzner' => 'Hetzner',
             'vultr' => 'Vultr',
             'digital-ocean' => 'DigitalOcean',
+            'hostinger' => 'Hostinger',
             'manual' => 'Manual',
             default => 'New Server',
         };

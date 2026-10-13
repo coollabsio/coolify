@@ -5,14 +5,15 @@ namespace App\Livewire\Project\Service;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class ResourceCard extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Service $service;
 
@@ -22,19 +23,9 @@ class ResourceCard extends Component
 
     public function getListeners(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return [];
-        }
-
-        $team = $user->currentTeam();
-        if (! $team) {
-            return [];
-        }
-
-        return [
-            "echo-private:team.{$team->id},ServiceChecked" => 'refreshResource',
-        ];
+        return $this->teamChannelListeners([
+            'ServiceChecked' => 'refreshResource',
+        ]);
     }
 
     public function refreshResource(): void

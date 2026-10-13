@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -11,6 +12,7 @@ use Livewire\Component;
 class BackupExecutions extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?ScheduledDatabaseBackup $backup = null;
 
@@ -38,11 +40,9 @@ class BackupExecutions extends Component
 
     public function getListeners(): array
     {
-        $teamId = currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},BackupCreated" => 'refreshBackupExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'BackupCreated' => 'refreshBackupExecutions',
+        ]);
     }
 
     public function cleanupFailed()
@@ -109,12 +109,8 @@ class BackupExecutions extends Component
                 deleteBackupsLocally($execution->filename, $server, throwError: true);
             }
 
-            if ($deleteFromS3 && $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
-                if (! $execution->scheduledDatabaseBackup->s3) {
-                    throw new \RuntimeException('The S3 storage is unavailable.');
-                }
-
-                deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+            if ($deleteFromS3) {
+                $execution->deleteS3Copies();
             }
 
             $execution->delete();

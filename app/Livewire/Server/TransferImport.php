@@ -24,9 +24,6 @@ class TransferImport extends Component
 
     public bool $adoptMode = true;
 
-    /** Write ownership file on the host via SSH when claiming after import. */
-    public bool $writeRemote = false;
-
     /** @var TemporaryUploadedFile|null */
     public $bundleFile = null;
 
@@ -114,9 +111,6 @@ class TransferImport extends Component
                 dryRun: $dryRun,
                 preserveUuids: $this->preserveUuids,
                 adoptMode: $this->adoptMode,
-                claim: ! $dryRun,
-                writeRemote: $this->writeRemote,
-                rebindSentinel: true,
             );
 
             $this->lastResult = $result;
@@ -135,9 +129,9 @@ class TransferImport extends Component
             if ($dryRun) {
                 $this->dispatch('success', 'Dry run completed — nothing was written.');
             } elseif (data_get($result, 'claimed')) {
-                $this->dispatch('success', 'Server imported and claimed for this instance.');
+                $this->dispatch('success', 'Server imported. This instance now manages it.');
             } else {
-                $this->dispatch('success', 'Server imported. Claim did not complete — check warnings or re-claim from the server Transfer page.');
+                $this->dispatch('success', 'Server imported, but management could not be enabled. Check the warnings, then click Enable management on the server page.');
             }
         } catch (Throwable $e) {
             handleError($e, $this);
