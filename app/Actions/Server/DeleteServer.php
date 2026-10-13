@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Notifications\Server\HetznerDeletionFailed;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\HostingerService;
 use App\Services\VultrService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -15,7 +16,7 @@ class DeleteServer
 {
     use AsAction;
 
-    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromVultr = false, ?string $vultrInstanceId = null, bool $deleteFromDigitalOcean = false, ?int $digitalOceanDropletId = null)
+    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromVultr = false, ?string $vultrInstanceId = null, bool $deleteFromDigitalOcean = false, ?int $digitalOceanDropletId = null, bool $deleteFromHostinger = false, ?int $hostingerVirtualMachineId = null)
     {
         $server = Server::withTrashed()->find($serverId);
 
@@ -39,6 +40,14 @@ class DeleteServer
         if ($deleteFromDigitalOcean && ($digitalOceanDropletId || ($server && $server->digitalocean_droplet_id))) {
             $this->deleteFromDigitalOceanById(
                 $digitalOceanDropletId ?? $server->digitalocean_droplet_id,
+                $cloudProviderTokenId ?? $server->cloud_provider_token_id,
+                $teamId ?? $server->team_id
+            );
+        }
+
+        if ($deleteFromHostinger && ($hostingerVirtualMachineId || ($server && $server->hostinger_virtual_machine_id))) {
+            $this->deleteFromHostingerById(
+                $hostingerVirtualMachineId ?? $server->hostinger_virtual_machine_id,
                 $cloudProviderTokenId ?? $server->cloud_provider_token_id,
                 $teamId ?? $server->team_id
             );
@@ -176,6 +185,52 @@ class DeleteServer
             logger()->error('Failed to delete droplet from DigitalOcean', [
                 'error' => $e->getMessage(),
                 'digitalocean_droplet_id' => $digitalOceanDropletId,
+                'team_id' => $teamId,
+            ]);
+
+            throw $e;
+        }
+    }
+
+    private function deleteFromHostingerById(int $hostingerVirtualMachineId, ?int $cloudProviderTokenId, int $teamId): void
+    {
+        try {
+            $token = null;
+
+            if ($cloudProviderTokenId) {
+                $token = CloudProviderToken::where('id', $cloudProviderTokenId)
+                    ->where('team_id', $teamId)
+                    ->where('provider', 'hostinger')
+                    ->first();
+            }
+
+            if (! $token) {
+                $token = CloudProviderToken::where('team_id', $teamId)
+                    ->where('provider', 'hostinger')
+                    ->first();
+            }
+
+            if (! $token) {
+                throw new \RuntimeException('No Hostinger token found for the server team.');
+            }
+
+            $hostingerService = new HostingerService($token->token);
+            $subscriptionId = $hostingerService->getVirtualMachine($hostingerVirtualMachineId)['subscription_id'] ?? null;
+
+            if (! $subscriptionId) {
+                throw new \RuntimeException('The Hostinger VPS has no subscription.');
+            }
+
+            $hostingerService->disableAutoRenewal($subscriptionId);
+
+            logger()->debug('Disabled Hostinger auto-renewal, so Hostinger deletes the VPS at the end of the paid period', [
+                'hostinger_virtual_machine_id' => $hostingerVirtualMachineId,
+                'team_id' => $teamId,
+            ]);
+        } catch (\Throwable $e) {
+            logger()->error('Failed to delete VPS from Hostinger', [
+                'error' => $e->getMessage(),
+                'hostinger_virtual_machine_id' => $hostingerVirtualMachineId,
                 'team_id' => $teamId,
             ]);
 
