@@ -41,7 +41,8 @@ beforeEach(function () {
 
 function environmentCanvasActingAs(User $user, Team $team): mixed
 {
-    return test()->actingAs($user)->withSession(['currentTeam' => $team]);
+    return test()->actingAs($user)->withSession(['currentTeam' => $team])
+        ->withHeader('X-Canvas-Team', (string) $team->id);
 }
 
 function environmentCanvasUrl(Project $project, Environment $environment, string $suffix = ''): string
@@ -134,6 +135,7 @@ describe('GET canvas', function () {
                 'children' => [],
                 'volumes' => ['web-data'],
                 'link' => $application->link(),
+                'logo' => ['src' => asset('svgs/resources/public-repo.svg'), 'dark' => null, 'fallback' => null, 'padded' => false],
             ])
             ->and($nodes[$service->uuid])->toEqual([
                 'id' => $service->uuid,
@@ -151,6 +153,7 @@ describe('GET canvas', function () {
                 ],
                 'volumes' => [],
                 'link' => $service->link(),
+                'logo' => null,
             ])
             ->and($nodes[$database->uuid])->toMatchArray([
                 'type' => 'database',
@@ -160,6 +163,7 @@ describe('GET canvas', function () {
                 'kind' => 'postgresql',
                 'subtitle' => 'PostgreSQL · postgres:17-alpine',
                 'volumes' => ["postgres-data-{$database->uuid}"],
+                'logo' => ['src' => asset('svgs/resources/postgres.svg'), 'dark' => null, 'fallback' => null, 'padded' => false],
             ])
             ->and($response->getContent())->not->toContain('canvas-secret-password');
     });

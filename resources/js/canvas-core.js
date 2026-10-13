@@ -73,6 +73,11 @@ export function icon(template, name, paths = [], cls = '') {
 
 // ── API (Coolify's API controllers at /canvas/api, browser session) ───
 
+/** The team of the open canvas page (data-team), fixed when the page was opened. */
+function canvasTeam() {
+  return document.querySelector('[data-environment-canvas], [data-deploy-canvas]')?.dataset.team || '';
+}
+
 export class ApiError extends Error {
   constructor(status, body) {
     const errors = body?.errors ? Object.values(body.errors).flat().map(String) : [];
@@ -91,6 +96,7 @@ export async function api(method, path, body, options = {}) {
       Accept: 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
       'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+      'X-Canvas-Team': canvasTeam(),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

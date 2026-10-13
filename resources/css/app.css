@@ -5487,7 +5487,8 @@ html.dark .canvas-zoom-max {
 
     html[data-nav-style="floating"] .app-main {
         margin-left: calc(var(--sidebar-w, 14rem) + var(--floating-gap));
-        padding-top: calc(var(--floating-top) + 1.75rem);
+        /* The content top lines up with the sidebar and settings rail panels. */
+        padding-top: var(--floating-top);
     }
 
     /* Full-bleed pages (canvases): no top padding gap, and the same gap as the panels. */
@@ -5525,6 +5526,13 @@ html.dark .canvas-zoom-max {
         background-image: none;
     }
 
+    /* Full page width: the content is one gap from the sidebar and the screen edge. */
+    html[data-nav-style="floating"] .app-main.app-main-wide {
+        padding-right: var(--floating-gap);
+        padding-left: var(--floating-gap);
+        padding-bottom: var(--floating-gap);
+    }
+
     html[data-nav-style="floating"] .app-tabbar {
         top: var(--floating-top);
         left: calc(var(--sidebar-w, 14rem) + var(--floating-gap) * 2);
@@ -5541,6 +5549,12 @@ html.dark .canvas-zoom-max {
         max-height: calc(100dvh - var(--floating-top) - var(--floating-gap));
         border: 1px solid var(--floating-line);
         border-radius: var(--floating-radius);
+    }
+
+    /* Full page width: the content starts one gap after the settings rail. */
+    html[data-nav-style="floating"] .app-main-wide :has(> .application-settings-navigation) {
+        grid-template-columns: calc(210px + 2.5rem) minmax(0, 1fr);
+        column-gap: var(--floating-gap);
     }
 
     /* The canvas fills the screen behind the rail too; the canvas JS keeps cards clear of it. */

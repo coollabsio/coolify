@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Project;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
@@ -14,6 +15,15 @@ use Livewire\Component;
  */
 class DeployCanvas extends Component
 {
+    /** The team that owned the page at mount; the canvas API calls use it, not the session team. */
+    #[Locked]
+    public int $teamId;
+
+    public function mount(): void
+    {
+        $this->teamId = currentTeam()->id;
+    }
+
     public function render(): View
     {
         return view('livewire.deploy-canvas', [

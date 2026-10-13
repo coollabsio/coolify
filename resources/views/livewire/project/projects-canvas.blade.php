@@ -5,7 +5,7 @@
     <div data-environment-canvas data-title="Projects canvas" data-endpoint="/projects/canvas"
         data-empty="No resources in your projects yet"
         data-view-only="Only team admins can move cards and edit links."
-        data-team="{{ currentTeam()->id }}" data-user="{{ auth()->id() }}"
+        data-team="{{ $teamId }}" data-user="{{ auth()->id() }}"
         class="relative h-full" wire:ignore>
         {{-- The canvas moves this group into its toolbar (page actions last, at the right end),
              which can be outside this component,

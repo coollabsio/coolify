@@ -30,10 +30,67 @@ use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+
+/**
+ * The logo of a resource, the same one shown on the "New resource" page: the database engine,
+ * the service template, or how the application is built. Null when there is no specific logo.
+ *
+ * @return array{src: string, dark: ?string, fallback: ?string, padded: bool}|null
+ */
+function resource_logo(Model $resource): ?array
+{
+    $resourceLogo = function (string $name, bool $hasDarkVariant = false): array {
+        return [
+            'src' => asset("svgs/resources/{$name}.svg"),
+            'dark' => $hasDarkVariant ? asset("svgs/resources/{$name}-dark.svg") : null,
+            'fallback' => null,
+            'padded' => false,
+        ];
+    };
+
+    if ($resource instanceof Service) {
+        $templates = once(fn () => get_service_templates());
+        $type = filled($resource->service_type) ? $resource->service_type : str($resource->name)->beforeLast('-')->value();
+        $logo = data_get($templates->get(resolve_service_template_key($type, $templates)), 'logo');
+        if (! is_string($logo) || $logo === '' || basename($logo) === 'default.webp') {
+            return null;
+        }
+        $urls = service_logo_urls($logo);
+
+        return ['src' => $urls['logo'], 'dark' => null, 'fallback' => $urls['logo_cdn_url'], 'padded' => true];
+    }
+
+    if ($resource instanceof Application) {
+        return $resourceLogo(match ($resource->build_pack) {
+            'dockerimage' => 'docker-image',
+            'dockerfile' => 'dockerfile',
+            'dockercompose' => 'docker-compose',
+            default => 'public-repo',
+        });
+    }
+
+    if (! method_exists($resource, 'type')) {
+        return null;
+    }
+
+    return match (str($resource->type())->after('standalone-')->value()) {
+        'postgresql' => $resourceLogo('postgres'),
+        'mysql' => $resourceLogo('mysql'),
+        'mariadb' => $resourceLogo('mariadb'),
+        'mongodb' => $resourceLogo('mongodb'),
+        'redis' => $resourceLogo('redis'),
+        'keydb' => $resourceLogo('keydb', true),
+        'dragonfly' => $resourceLogo('dragonfly', true),
+        'clickhouse' => $resourceLogo('clickhouse'),
+        'sqlite' => $resourceLogo('sqlite'),
+        default => null,
+    };
+}
 
 function replaceRegex(?string $name = null)
 {

@@ -175,16 +175,8 @@
                             {{ wireNavigate() }} class="absolute inset-0" :aria-label="`Open ${item.name}`"></a>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                <template x-if="item.type === 'application'">
-                                    <x-reicon name="browser-code" class="size-4" />
-                                </template>
-                                <template x-if="item.type === 'database'">
-                                    <x-reicon name="database" class="size-4" />
-                                </template>
-                                <template x-if="item.type === 'service'">
-                                    <x-reicon name="layers" class="size-4" />
-                                </template>
+                                class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <span class="contents" x-html="item.logoHtml"></span>
                             </div>
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-1.5">
@@ -269,16 +261,8 @@
 
                             <div class="flex items-start gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <template x-if="item.type === 'application'">
-                                        <x-reicon name="browser-code" class="size-4" />
-                                    </template>
-                                    <template x-if="item.type === 'database'">
-                                        <x-reicon name="database" class="size-4" />
-                                    </template>
-                                    <template x-if="item.type === 'service'">
-                                        <x-reicon name="layers" class="size-4" />
-                                    </template>
+                                    class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <span class="contents" x-html="item.logoHtml"></span>
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex min-w-0 items-center gap-1.5">

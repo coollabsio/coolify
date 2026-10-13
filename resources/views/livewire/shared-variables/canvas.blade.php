@@ -5,7 +5,7 @@
     {{-- Fixed rail on xl, hidden below xl (see .app-main-full .application-settings-navigation in app.css). --}}
     <x-shared-variables.sidebar />
     <div data-environment-canvas data-title="Variables canvas" data-mode="variables" data-endpoint="{{ $endpoint }}"
-        data-team="{{ currentTeam()->id }}" data-user="{{ auth()->id() }}"
+        data-team="{{ $teamId }}" data-user="{{ auth()->id() }}"
         class="relative min-h-0 flex-1" wire:ignore>
         {{-- The canvas moves this group into its toolbar (page actions last, at the right end),
              which can be outside this component,

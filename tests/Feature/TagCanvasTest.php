@@ -45,7 +45,8 @@ beforeEach(function () {
 
 function tagCanvasAs(object $test, User $user, Team $team): object
 {
-    return $test->actingAs($user)->withSession(['currentTeam' => $team]);
+    return $test->actingAs($user)->withSession(['currentTeam' => $team])
+        ->withHeader('X-Canvas-Team', (string) $team->id);
 }
 
 test('the tags canvas shows every tag, also without resources, and which resources have them', function () {

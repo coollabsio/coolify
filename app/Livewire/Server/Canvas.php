@@ -22,13 +22,19 @@ class Canvas extends Component
     #[Locked]
     public ?Server $server = null;
 
+    /** The team that owned the page at mount; the canvas API calls use it, not the session team. */
+    #[Locked]
+    public int $teamId;
+
     public function mount(?string $server_uuid = null): void
     {
         if ($server_uuid !== null) {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->authorize('view', $this->server);
+            $this->teamId = $this->server->team_id;
             $this->rememberView('server_resources', 'canvas');
         } else {
+            $this->teamId = currentTeam()->id;
             $this->rememberView('servers', 'canvas');
         }
     }

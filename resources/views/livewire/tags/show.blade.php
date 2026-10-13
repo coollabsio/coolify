@@ -323,8 +323,8 @@
                                 class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
-                                        class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                        <x-reicon name="browser-code" class="size-3.5" />
+                                        class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-resource-logo :resource="$application" icon-class="size-3.5" />
                                     </div>
                                     <div class="min-w-0">
                                         <h3
@@ -347,8 +347,8 @@
                                 class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
-                                        class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                        <x-reicon name="layers" class="size-3.5" />
+                                        class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-resource-logo :resource="$service" icon-class="size-3.5" />
                                     </div>
                                     <div class="min-w-0">
                                         <h3

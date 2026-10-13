@@ -43,6 +43,17 @@ document.addEventListener('alpine:init', initializeSettingsSidebarAccordionCompo
  *
  * @param {string|HTMLElement} target Section id or element
  */
+/** A resource logo failed to load: try its fallback URL, then show the resource type icon instead. */
+window.resourceLogoError = function resourceLogoError(img) {
+  if (img.dataset.fallback && img.src !== img.dataset.fallback) {
+    img.src = img.dataset.fallback;
+    return;
+  }
+  const wrapper = img.closest('[data-resource-logo]');
+  wrapper?.querySelector('[data-resource-logo-image]')?.setAttribute('hidden', '');
+  wrapper?.querySelector('[data-resource-logo-icon]')?.removeAttribute('hidden');
+};
+
 window.scrollToSettingsSection = function scrollToSettingsSection(target) {
     const el = typeof target === 'string' ? document.getElementById(target) : target;
     if (!el) {

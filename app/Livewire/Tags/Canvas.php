@@ -7,6 +7,7 @@ use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Tag;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
@@ -20,9 +21,14 @@ class Canvas extends Component
     use CreatesTags;
     use RemembersCanvasView;
 
+    /** The team that owned the page at mount; the canvas API calls use it, not the session team. */
+    #[Locked]
+    public int $teamId;
+
     public function mount(): void
     {
         $this->authorize('viewAny', Tag::class);
+        $this->teamId = currentTeam()->id;
         $this->rememberView('tags', 'canvas');
     }
 

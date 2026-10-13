@@ -10,7 +10,7 @@
     </template>
     {{-- One-click service templates for the Service step: [key, name]. --}}
     <script type="application/json" data-deploy-canvas-services>@json($serviceTemplates)</script>
-    <div data-deploy-canvas class="relative h-full" data-can-add="{{ $canAddProjects ? '1' : '0' }}" wire:ignore></div>
+    <div data-deploy-canvas class="relative h-full" data-team="{{ $teamId }}" data-can-add="{{ $canAddProjects ? '1' : '0' }}" wire:ignore></div>
     {{-- Opened by the canvas Reset button in resources/js/deploy-canvas.js. --}}
     <x-modal-confirmation title="Reset the canvas?" submitAction="deploy-canvas-reset" dispatchAction
         :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Reset"

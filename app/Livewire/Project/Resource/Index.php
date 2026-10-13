@@ -6,6 +6,7 @@ use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
 
 class Index extends Component
@@ -210,6 +211,7 @@ class Index extends Component
             'maxRestartCount' => $item->max_restart_count ?? 0,
             'server_status' => $item->server_status ?? null,
             'hrefLink' => $item->hrefLink ?? '',
+            'logoHtml' => Blade::render('<x-resource-logo :resource="$resource" />', ['resource' => $item]),
             'destination' => [
                 'server' => [
                     'name' => $item->destination?->server?->name ?? 'Unknown',

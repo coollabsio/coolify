@@ -51,7 +51,8 @@ function serverCanvasApp(Environment $environment, Server $server, string $name)
 
 function serverCanvasSession(object $test, User $user, Team $team): object
 {
-    return $test->actingAs($user)->withSession(['currentTeam' => $team]);
+    return $test->actingAs($user)->withSession(['currentTeam' => $team])
+        ->withHeader('X-Canvas-Team', (string) $team->id);
 }
 
 test('the servers canvas shows every server of the team with its resources and links', function () {

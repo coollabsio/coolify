@@ -49,7 +49,8 @@ function projectCanvasApp(Environment $environment, Server $server, string $name
 
 function projectCanvasSession(object $test, User $user, Team $team): object
 {
-    return $test->actingAs($user)->withSession(['currentTeam' => $team]);
+    return $test->actingAs($user)->withSession(['currentTeam' => $team])
+        ->withHeader('X-Canvas-Team', (string) $team->id);
 }
 
 test('the project canvas shows the resources of every environment, grouped by environment', function () {

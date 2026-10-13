@@ -10,7 +10,7 @@
     @endif
     <div data-environment-canvas data-title="{{ $server ? 'Server canvas' : 'Servers canvas' }}"
         data-endpoint="{{ $server ? '/servers/'.$server->uuid.'/canvas' : '/servers/canvas' }}"
-        data-team="{{ currentTeam()->id }}" data-user="{{ auth()->id() }}" @if ($server) data-toolbar-inline @endif
+        data-team="{{ $teamId }}" data-user="{{ auth()->id() }}" @if ($server) data-toolbar-inline @endif
         class="relative min-h-0 flex-1" wire:ignore>
         @if ($server)
             <x-canvas-view-toggle data-ec-views on-canvas :views="['list' => ['List view', 'unordered-list']]"

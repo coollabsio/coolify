@@ -19,7 +19,8 @@ beforeEach(function () {
 
 function actingInCanvasTeam(object $test, Team $team): object
 {
-    return $test->actingAs($test->user)->withSession(['currentTeam' => $team]);
+    return $test->actingAs($test->user)->withSession(['currentTeam' => $team])
+        ->withHeader('X-Canvas-Team', (string) $team->id);
 }
 
 test('guests are sent to the login page', function () {
@@ -48,6 +49,44 @@ test('the canvas api works with the session and only shows the session team', fu
         ->assertOk()
         ->assertJsonFragment(['name' => 'canvas-team-project'])
         ->assertJsonMissing(['name' => 'canvas-other-project']);
+});
+
+test('the canvas api uses the team of the open page, not the session team', function () {
+    // Member of the page's team, owner of the team the session switched to in another tab.
+    $this->team->members()->attach($this->user->id, ['role' => 'member']);
+    $this->otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    $page = fn () => $this->actingAs($this->user)->withSession(['currentTeam' => $this->otherTeam])
+        ->withHeader('X-Canvas-Team', (string) $this->team->id);
+
+    $page()->getJson('/canvas/api/projects')
+        ->assertOk()
+        ->assertJsonFragment(['name' => 'canvas-team-project'])
+        ->assertJsonMissing(['name' => 'canvas-other-project']);
+    // The role in the page's team applies: no owner rights from the session team.
+    $page()->postJson('/canvas/api/applications/dockerimage', ['docker_registry_image_name' => 'nginx'])
+        ->assertForbidden();
+});
+
+test('the canvas api refuses a missing team or a team the user is not a member of', function () {
+    $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+
+    $this->actingAs($this->user)->withSession(['currentTeam' => $this->team])
+        ->getJson('/canvas/api/projects')
+        ->assertStatus(400);
+    $this->actingAs($this->user)->withSession(['currentTeam' => $this->team])
+        ->withHeader('X-Canvas-Team', (string) $this->otherTeam->id)
+        ->getJson('/canvas/api/projects')
+        ->assertUnauthorized();
+});
+
+test('the deploy canvas page keeps the team it was opened with', function () {
+    $this->team->members()->attach($this->user->id, ['role' => 'member']);
+
+    actingInCanvasTeam($this, $this->team)
+        ->withoutVite()
+        ->get('/canvas')
+        ->assertOk()
+        ->assertSee('data-team="'.$this->team->id.'"', false);
 });
 
 test('admins can create resources through the canvas api', function () {

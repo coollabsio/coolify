@@ -253,6 +253,7 @@ class EnvironmentCanvas
             'children' => [],
             'volumes' => $application->persistentStorages->pluck('name')->filter()->values()->all(),
             'link' => $application->link(),
+            'logo' => resource_logo($application),
             'servers' => collect([$server])->concat($extraServers)->filter()->all(),
         ];
     }
@@ -291,6 +292,7 @@ class EnvironmentCanvas
                 ->values()
                 ->all(),
             'link' => $service->link(),
+            'logo' => resource_logo($service),
             'servers' => collect([$server])->filter()->all(),
         ];
     }
@@ -316,6 +318,7 @@ class EnvironmentCanvas
             'children' => [],
             'volumes' => $database->persistentStorages->pluck('name')->filter()->values()->all(),
             'link' => $database->link(),
+            'logo' => resource_logo($database),
             'servers' => collect([$server])->filter()->all(),
         ];
     }

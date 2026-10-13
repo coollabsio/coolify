@@ -68,7 +68,8 @@ function sharedVariableCanvasEnvs(Application $application)
 
 function sharedVariableCanvasAs(object $test, User $user, Team $team): object
 {
-    return $test->actingAs($user)->withSession(['currentTeam' => $team]);
+    return $test->actingAs($user)->withSession(['currentTeam' => $team])
+        ->withHeader('X-Canvas-Team', (string) $team->id);
 }
 
 test('the team canvas shows the variables, the resources and which resources use them, without values', function () {

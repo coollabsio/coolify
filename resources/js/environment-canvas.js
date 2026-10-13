@@ -625,6 +625,29 @@ function icon(name, cls = 'size-3.5') {
   return canvasIcon('[data-environment-canvas-icons]', REICONS[name] || name, LOCAL_ICONS[name], `${cls} shrink-0`);
 }
 
+/**
+ * The logo of a resource card (database engine, service template, build source), or its type icon
+ * when it has no logo or the logo fails to load.
+ */
+function nodeIcon(node, cls = 'size-4') {
+  const logo = node.logo;
+  if (!logo?.src) return icon(node.type, cls);
+  const wrap = h('span', 'flex size-full items-center justify-center');
+  const image = (src, extra) => {
+    const img = h('img', `size-full object-contain ${logo.padded ? 'p-1' : ''} ${extra}`);
+    img.alt = '';
+    img.addEventListener('error', () => {
+      if (logo.fallback && img.src !== logo.fallback) img.src = logo.fallback;
+      else wrap.replaceChildren(icon(node.type, cls));
+    });
+    img.src = src;
+    return img;
+  };
+  wrap.append(image(logo.src, logo.dark ? 'dark:hidden' : ''));
+  if (logo.dark) wrap.append(image(logo.dark, 'hidden dark:block'));
+  return wrap;
+}
+
 /** Marks an element whose page opens on double-click (see the pointerdown listener in mountEnvironmentCanvas). */
 function openable(el, href) {
   if (href) {
@@ -1072,10 +1095,10 @@ export function mountEnvironmentCanvas(container) {
     openable(card, node.link);
 
     const head = h('div', 'flex items-start gap-2.5');
-    const tile = h('div', `flex size-8 shrink-0 items-center justify-center rounded-lg border ${node.missing
+    const tile = h('div', `flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border ${node.missing
       ? 'border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400'
       : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim'}`);
-    tile.append(icon(node.type, 'size-4'));
+    tile.append(nodeIcon(node));
     const text = h('div', 'min-w-0 flex-1');
     text.append(
       h('div', `truncate text-[13px] leading-4 font-semibold text-black dark:text-fg ${node.type === 'variable' ? 'font-mono' : ''} ${node.link ? 'underline-offset-2 group-hover:underline' : ''}`, node.name),
@@ -1353,11 +1376,12 @@ export function mountEnvironmentCanvas(container) {
     return section;
   }
 
-  function panelShell(title, iconName) {
+  /** `iconSource` is an icon name, or a node to show its logo. */
+  function panelShell(title, iconSource) {
     ui.panel.replaceChildren();
     const head = h('div', 'flex items-center gap-2.5 px-4 py-3');
-    const tile = h('div', 'flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim');
-    tile.append(icon(iconName, 'size-4'));
+    const tile = h('div', 'flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim');
+    tile.append(typeof iconSource === 'string' ? icon(iconSource, 'size-4') : nodeIcon(iconSource));
     const name = h('h2', 'min-w-0 flex-1 truncate text-[14px]! leading-5! font-semibold! text-black dark:text-fg', title);
     const close = h('button', 'flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg');
     close.type = 'button';
@@ -1392,7 +1416,7 @@ export function mountEnvironmentCanvas(container) {
   }
 
   function renderNodePanel(node) {
-    const scroll = panelShell(node.name, node.type);
+    const scroll = panelShell(node.name, node);
     const meta = h('div', 'flex flex-wrap items-center gap-2 px-4 pb-3');
     const status = h('span', 'inline-flex h-6 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white');
     status.append(statusDot(node.status, 'size-1.5'), statusLabel(node.status));
@@ -1603,7 +1627,7 @@ export function mountEnvironmentCanvas(container) {
   }
 
   function renderSourcePanel(node) {
-    const scroll = panelShell(node.name, node.type);
+    const scroll = panelShell(node.name, node);
     const meta = h('div', 'flex flex-wrap items-center gap-2 px-4 pb-3');
     if (node.reference) meta.append(h('code', 'rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-fg-dim', node.reference));
     if (node.missing) meta.append(h('span', 'rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400', 'Deleted'));
@@ -1655,7 +1679,7 @@ export function mountEnvironmentCanvas(container) {
   }
 
   function renderResourceSourcesPanel(node) {
-    const scroll = panelShell(node.name, node.type);
+    const scroll = panelShell(node.name, node);
     const meta = h('div', 'flex flex-wrap items-center gap-2 px-4 pb-3');
     const status = h('span', 'inline-flex h-6 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white');
     status.append(statusDot(node.status, 'size-1.5'), statusLabel(node.status));
