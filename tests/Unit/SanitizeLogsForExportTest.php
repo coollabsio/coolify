@@ -15,7 +15,7 @@ it('removes JWT/Bearer tokens', function () {
     $result = sanitizeLogsForExport($input);
 
     expect($result)->not->toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
-    expect($result)->toContain('Bearer '.REDACTED);
+    expect($result)->toBe('Authorization: '.REDACTED);
 });
 
 it('removes API keys with common patterns', function () {

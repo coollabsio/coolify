@@ -348,9 +348,9 @@ export function initializeRuntimeLogsComponent() {
                 });
             },
 
-            visibleText() {
+            visibleText(source = filtered) {
                 const withTime = this.$wire.showTimeStamps;
-                return filtered
+                return source
                     .map((line) => (withTime && line.ts ? `${formatTimestamp(line.ts)} ${line.text}` : line.text))
                     .join('\n');
             },
@@ -406,9 +406,21 @@ export function initializeRuntimeLogsComponent() {
                 });
             },
 
-            downloadLogs() {
+            // The browser holds unredacted lines, so fetch the redacted copy from the server
+            // and apply the same level and search filters before downloading it.
+            async downloadLogs() {
+                let logs;
+                try {
+                    logs = await this.$wire.copyLogs();
+                } catch {
+                    window.Livewire.dispatch('error', ['Failed to prepare logs for download.']);
+                    return;
+                }
+                if (!logs) return;
+                let id = 0;
+                const exported = filterLogLines(parseLogLines(logs, () => ++id), this.logFilters, this.searchQuery);
                 const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-                downloadText(this.visibleText() + '\n', `${this.containerName}-logs-${timestamp}.txt`);
+                downloadText(this.visibleText(exported) + '\n', `${this.containerName}-logs-${timestamp}.txt`);
             },
 
             makeFullscreen() {

@@ -6,6 +6,7 @@ use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesResource;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -65,14 +66,17 @@ class GetLogs extends Tool
             return $this->mcpSuccess($request, $this->respond($failure), ['resource_uuid' => $uuid, 'outcome' => 'unavailable']);
         }
 
+        $secrets = $this->logRedactionSecrets($resource);
+
         try {
             $logs = $this->redactLogText(
-                $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps)
+                $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps),
+                $secrets,
             );
         } catch (MultipleContainersException $e) {
             $payload = $this->failurePayload(
                 reason: 'multiple_containers',
-                message: $e->getMessage(),
+                message: $this->redactLogText($e->getMessage(), $secrets),
                 resourceType: $resourceType,
                 uuid: $uuid,
                 status: $resource->status ?? null,
@@ -85,7 +89,7 @@ class GetLogs extends Tool
             return $this->mcpSuccess($request, $this->respond(
                 $this->failurePayload(
                     reason: 'log_fetch_failed',
-                    message: $e->getMessage(),
+                    message: $this->redactLogText($e->getMessage(), $secrets),
                     resourceType: $resourceType,
                     uuid: $uuid,
                     status: $resource->status ?? null,
@@ -102,6 +106,20 @@ class GetLogs extends Tool
             'logs' => $logs,
             'redacted' => true,
         ]), ['resource_uuid' => $uuid]);
+    }
+
+    /**
+     * Environment values and database credentials of the resource that owns the log output.
+     *
+     * @return array{known: array<int, string>, locked: array<int, string>}
+     */
+    private function logRedactionSecrets(mixed $resource): array
+    {
+        if ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
+            $resource = $resource->service;
+        }
+
+        return EnvironmentVariable::logRedactionSecretsFor($resource);
     }
 
     /**

@@ -115,7 +115,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $server = data_get($this->resource, 'destination.server');
             if ($server) {
                 $this->resource->team()?->notify(new GeneralNotification(
-                    "'{$this->resource->name}' was removed from Coolify, but its Docker resources could not be removed from server '{$server->name}' and may still exist there. Error: {$e->getMessage()}",
+                    "'{$this->resource->name}' was removed from Coolify, but its Docker resources could not be removed from server '{$server->name}' and may still exist there. Error: ".remove_iip($e->getMessage()),
                     success: false,
                 ));
             }

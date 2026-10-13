@@ -35,6 +35,7 @@ use OpenApi\Attributes as OA;
         'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
         'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
+        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'is_container_label_readonly_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label readonly.'],
         'config_hash' => ['type' => 'string', 'description' => 'The hash of the service configuration.'],
         'service_type' => ['type' => 'string', 'description' => 'The type of the service.'],
@@ -60,6 +61,7 @@ class Service extends BaseModel
         'config_hash',
         'compose_parsing_version',
         'is_container_label_escape_enabled',
+        'redact_all_env_values_in_logs',
         'environment_id',
         'server_id',
         'destination_id',
@@ -67,6 +69,10 @@ class Service extends BaseModel
     ];
 
     protected $appends = ['server_status', 'status'];
+
+    protected $casts = [
+        'redact_all_env_values_in_logs' => 'boolean',
+    ];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
@@ -1606,6 +1612,14 @@ class Service extends BaseModel
     public function scheduled_tasks(): HasMany
     {
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
+    }
+
+    /**
+     * Whether logs hide every environment value, or only locked values.
+     */
+    public function redactsAllEnvValuesInLogs(): bool
+    {
+        return $this->redact_all_env_values_in_logs ?? true;
     }
 
     public function environment_variables()

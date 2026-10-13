@@ -13,6 +13,7 @@ use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesResource;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Support\ResourceStartActivity;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -70,7 +71,9 @@ class Control extends Tool
                 'service' => $this->controlService($resource, $action),
             };
         } catch (\Throwable $e) {
-            return $this->mcpError($request, $e->getMessage(), ['resource_uuid' => $uuid]);
+            $secrets = EnvironmentVariable::logRedactionSecretsFor($resource);
+
+            return $this->mcpError($request, $this->redactLogText($e->getMessage(), $secrets), ['resource_uuid' => $uuid]);
         }
 
         auditLog('mcp.control', [
