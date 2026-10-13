@@ -1,11 +1,10 @@
-// Shared canvas core: API calls, DOM helpers, icons, pan/zoom and page
-// mounting for the deploy canvas and the environment canvas.
+// Shared canvas core: API calls, pan/zoom and page mounting for the deploy
+// canvas and the environment canvas (Svelte components in resources/js/canvas/).
 //
 // The top level stays DOM-free: `node --test` imports the canvases.
 
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 2;
-export const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ── Collisions ────────────────────────────────────────────────────────
 
@@ -38,37 +37,6 @@ export function freeSpot(box, others, gap = BOX_GAP, fits = () => true) {
     }
   }
   return best;
-}
-
-// ── DOM helpers ───────────────────────────────────────────────────────
-
-export function h(tag, cls, text) {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text !== undefined && text !== null) node.textContent = text;
-  return node;
-}
-
-export function svg(tag, attrs = {}) {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-  return node;
-}
-
-/** An app reicon glyph cloned from the page's icon template, or an outline icon drawn from local paths. */
-export function icon(template, name, paths = [], cls = '') {
-  const glyph = document.querySelector(template)?.content?.querySelector(`[data-icon="${name}"]`);
-  let node;
-  if (glyph) {
-    node = glyph.cloneNode(true);
-  } else {
-    node = svg('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-    for (const d of paths) node.append(svg('path', { d }));
-  }
-  if (cls) node.setAttribute('class', cls);
-  else node.removeAttribute('class');
-  node.setAttribute('aria-hidden', 'true');
-  return node;
 }
 
 // ── API (Coolify's API controllers at /canvas/api, browser session) ───

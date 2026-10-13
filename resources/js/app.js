@@ -1,6 +1,4 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
-import { initializeDeployCanvas } from './deploy-canvas.js';
-import { initializeEnvironmentCanvas } from './environment-canvas.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
@@ -9,8 +7,25 @@ import { registerLivewireRequestFailureHandler } from './livewire-request-failur
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
 
-initializeDeployCanvas();
-initializeEnvironmentCanvas();
+// The canvases (Svelte, Svelte Flow) load only on pages that have one. After the
+// import, each canvas mounts itself, also after later Livewire SPA navigation.
+const canvases = [
+    { selector: '[data-deploy-canvas]', load: () => import('./canvas/deploy/index.js').then((m) => m.initializeDeployCanvas()) },
+    { selector: '[data-environment-canvas]', load: () => import('./canvas/environment/index.js').then((m) => m.initializeEnvironmentCanvas()) },
+];
+const loadCanvases = () => {
+    for (const canvas of canvases) {
+        if (!canvas.loading && document.querySelector(canvas.selector)) {
+            canvas.loading = canvas.load();
+        }
+    }
+};
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadCanvases);
+} else {
+    loadCanvases();
+}
+document.addEventListener('livewire:navigated', loadCanvases);
 
 // Used by the modal-confirmation Blade component to call its submitAction.
 window.parseModalSubmitAction = parseSubmitAction;
