@@ -149,8 +149,8 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('Global Leaderboard App')
         ->assertSee('Top hosts')
         ->assertSee('Top paths')
-        ->assertSee('3 4xx')
-        ->assertSee('1 5xx')
+        // Error counts of the path row, as the sort values the table reads.
+        ->assertSeeHtml('&quot;s4xx&quot;:3,&quot;s5xx&quot;:1')
         ->assertSee('Status codes')
         ->assertSee('Countries')
         ->assertSee('United States')
