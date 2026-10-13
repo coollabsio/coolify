@@ -2278,7 +2278,7 @@ services:
     command: >
       sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
   supabase-rustfs:
-    image: rustfs/rustfs:1.0.0
+    image: rustfs/rustfs:1.0.1
     environment:
       - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}
       - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_RUSTFS}
