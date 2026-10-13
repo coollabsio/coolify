@@ -40,16 +40,16 @@ describe('trafficCityRows', function () {
     it('merges the remainder and malformed values into one Other row', function () {
         $rows = trafficCityRows([
             ['value' => 'DE|BE|Berlin', 'requests' => 9, 'bytesOut' => 900],
-            ['value' => '__other__', 'requests' => 4, 'bytesOut' => 40],
+            ['value' => '__other__', 'requests' => 40, 'bytesOut' => 40],
             ['value' => 'Berlin', 'requests' => 1, 'bytesOut' => 10],
             ['value' => 'DE|Berlin', 'requests' => 1, 'bytesOut' => 10],
             ['value' => '', 'requests' => 1, 'bytesOut' => 10],
-            ['value' => 'deu|BE|Berlin', 'requests' => 1, 'bytesOut' => 10],
         ]);
 
+        // "Other" has the most requests here and still stays last.
         expect($rows)->toHaveCount(2)
             ->and($rows[1])->toBe([
-                'key' => '__other__', 'country' => '', 'label' => 'Other', 'name' => 'Other', 'detail' => '', 'requests' => 8, 'bytesOut' => 80, 'lat' => null, 'lon' => null,
+                'key' => '__other__', 'country' => '', 'label' => 'Other', 'name' => 'Other', 'detail' => '', 'requests' => 43, 'bytesOut' => 70, 'lat' => null, 'lon' => null,
             ]);
     });
 
@@ -60,6 +60,15 @@ describe('trafficCityRows', function () {
 
         expect($rows[0]['name'])->toBe("O'Fallon <b>")
             ->and($rows[0]['label'])->toBe("O'Fallon <b>, MO, US");
+    });
+
+    it('accepts a lower-case country code', function () {
+        $rows = trafficCityRows([
+            ['value' => 'de|BE|Berlin', 'requests' => 1, 'bytesOut' => 1],
+        ]);
+
+        expect($rows[0]['country'])->toBe('DE')
+            ->and($rows[0]['label'])->toBe('Berlin, BE, DE');
     });
 
     it('skips rows with no requests', function () {

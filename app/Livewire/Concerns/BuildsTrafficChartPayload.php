@@ -83,7 +83,7 @@ trait BuildsTrafficChartPayload
      */
     protected function geoMarkers(): array
     {
-        return trafficGeoMarkers($this->breakdowns['country'] ?? [], $this->breakdowns['city'] ?? []);
+        return trafficGeoMarkers($this->breakdowns['country'] ?? [], trafficCityRows($this->breakdowns['city'] ?? []));
     }
 
     /**

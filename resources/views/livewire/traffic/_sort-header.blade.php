@@ -4,18 +4,22 @@
 
     @param string  $column  key in the rows' `data-row` JSON
     @param string  $label   header text
-    @param ?string $class   width and responsive classes of the column
+    @param ?string $class   width and responsive classes of the column; a column that
+                            hides on small screens passes `hidden <breakpoint>:inline-flex`
     @param ?string $title   tooltip
     @param ?bool   $text    true for a text column: left-aligned, first sort ascending
 --}}
 @php
     $text = $text ?? false;
     $firstDir = $text ? 'asc' : 'desc';
+    $class = $class ?? '';
+    // `hidden` and `inline-flex` on one element conflict, so add the display only when the caller sets none.
+    $display = str_contains($class, 'hidden') ? '' : 'inline-flex';
 @endphp
 <button type="button" @click="sortBy('{{ $column }}', '{{ $firstDir }}')"
     title="{{ $title ?? 'Sort by '.strtolower($label) }}"
     :aria-label="'Sort by {{ strtolower($label) }}' + (sorted('{{ $column }}') ? ', sorted ' + (sorted('{{ $column }}') === 'asc' ? 'ascending' : 'descending') : '')"
-    class="group inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-black dark:hover:text-fg {{ $text ? 'justify-start text-left' : 'flex-row-reverse justify-start text-right' }} {{ $class ?? '' }}"
+    class="group {{ $display }} items-center gap-1 whitespace-nowrap rounded-sm transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:hover:text-fg {{ $text ? 'justify-start text-left' : 'flex-row-reverse justify-start text-right' }} {{ $class }}"
     :class="sorted('{{ $column }}') ? 'text-black dark:text-fg' : ''">
     <span>{{ $label }}</span>
     <svg class="size-3 shrink-0 transition-[opacity,transform]" viewBox="0 0 24 24" fill="none" stroke="currentColor"

@@ -45,7 +45,7 @@
                     $p95 = (float) ($path['p95'] ?? 0);
                     $errorRate = $requests > 0 ? round((($s4xx + $s5xx) / $requests) * 100, 1) : 0;
                     $width = min(100, round(($requests / $maxRequests) * 100, 1));
-                    $sort = ['name' => $pathStr, 'requests' => $requests, 's4xx' => $s4xx, 's5xx' => $s5xx, 'errorRate' => $errorRate, 'bytesOut' => $bytesOut, 'p95' => $p95];
+                    $sort = ['name' => $pathStr.' '.$domain, 'requests' => $requests, 's4xx' => $s4xx, 's5xx' => $s5xx, 'errorRate' => $errorRate, 'bytesOut' => $bytesOut, 'p95' => $p95];
                 @endphp
                 <div wire:key="{{ $keyPrefix }}-{{ md5($domain."\n".$pathStr) }}"
                     data-row="{{ json_encode($sort) }}" @if ($isOther) data-pinned @endif

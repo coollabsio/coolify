@@ -50,6 +50,18 @@ beforeEach(function () {
     app()->bind(SentinelTrafficClient::class, fn () => new FakeBrowserSortTrafficClient($server));
 });
 
+/** The first visible path rows, in the order they show on screen. */
+function visiblePathNames(mixed $page): array
+{
+    return $page->script(<<<'JS'
+        [...document.querySelectorAll('#analytics-paths-section [data-row]')]
+            .filter((row) => getComputedStyle(row).display !== 'none')
+            .sort((a, b) => a.getBoundingClientRect().y - b.getBoundingClientRect().y)
+            .slice(0, 3)
+            .map((row) => JSON.parse(row.dataset.row).name.trim())
+    JS);
+}
+
 it('sorts the top paths table when a column header is selected', function () {
     loginAndSkipBoarding();
 
@@ -57,13 +69,23 @@ it('sorts the top paths table when a column header is selected', function () {
 
     // Default: requests, largest first. The two smallest are on page 2.
     $page->assertSee('/p12')
-        ->assertDontSee('/p01')
-        ->click('#analytics-paths-section button[title="Sort by path"]')
-        // Path A to Z: the two last names are on page 2.
+        ->assertDontSee('/p01');
+    expect(visiblePathNames($page))->toBe(['/p12', '/p11', '/p10']);
+
+    // Path A to Z: the two last names are on page 2.
+    $page->click('#analytics-paths-section button[title="Sort by path"]')
         ->assertSee('/p01')
-        ->assertDontSee('/p12')
-        ->click('#analytics-paths-section button[title="Sort by path"]')
-        // Second click reverses the direction.
+        ->assertDontSee('/p12');
+    expect(visiblePathNames($page))->toBe(['/p01', '/p02', '/p03']);
+
+    // A data refresh keeps the sort.
+    $page->click('button:visible:has-text("7 days")')
+        ->assertQueryStringHas('range', '7d')
+        ->assertSee('/p01');
+    expect(visiblePathNames($page))->toBe(['/p01', '/p02', '/p03']);
+
+    // A second click reverses the direction, and the pager follows the sort.
+    $page->click('#analytics-paths-section button[title="Sort by path"]')
         ->assertSee('/p12')
         ->assertDontSee('/p01')
         ->click('#analytics-paths-section button:has-text("Next")')

@@ -18,7 +18,8 @@ class TrafficBreakdownData extends Data
     {
         $lat = data_get($row, 'lat');
         $lon = data_get($row, 'lon');
-        $hasCoordinates = is_numeric($lat) && is_numeric($lon);
+        $hasCoordinates = is_numeric($lat) && is_numeric($lon)
+            && abs((float) $lat) <= 90 && abs((float) $lon) <= 180;
 
         return new self(
             value: (string) data_get($row, 'value', ''),

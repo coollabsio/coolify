@@ -67,6 +67,7 @@
         },
     }">
     <x-slot:actions>
+        @if ($hasData)
         <div wire:key="geo-view-{{ $globeId }}"
             class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]"
             role="group" aria-label="Location detail">
@@ -77,6 +78,7 @@
                     :class="view === '{{ $viewKey }}' ? '{{ $viewButtonActive }}' : '{{ $viewButtonInactive }}'">{{ $viewLabel }}</button>
             @endforeach
         </div>
+        @endif
     </x-slot:actions>
 
     <div class="flex flex-col">
@@ -89,11 +91,9 @@
             <div wire:key="geo-body-{{ $globeId }}"
                 class="grid grid-cols-1 items-start gap-4 border-b border-neutral-200 p-4 lg:grid-cols-[2fr_3fr] dark:border-white/[0.07]">
                 {{-- Interactive dotted globe (40%). wire:ignore so live-poll morphs never tear
-                     down the WebGL canvas. Mounted via Alpine, not Livewire's script directive:
-                     it ran before the lazy-loaded canvas was in the DOM, and only once per
-                     component, so a globe inserted by a later render (no data -> data after a
-                     range change or live poll) never mounted either. Alpine's
-                     init()/destroy() run each time this element enters or leaves the DOM. --}}
+                     down the WebGL canvas. Mounted via Alpine init()/destroy(), which run each
+                     time this element enters or leaves the DOM (a Livewire script directive
+                     runs one time only, before the lazy-loaded canvas exists). --}}
                 <div wire:ignore class="flex items-center justify-center"
                     x-data="{
                         controller: null,

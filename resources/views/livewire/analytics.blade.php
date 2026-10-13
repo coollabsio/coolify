@@ -312,7 +312,7 @@ $appListboxOptions = array_merge(
             @include('livewire.traffic._paths-list', ['paths' => $topPaths])
         </x-application.settings-section>
 
-        {{-- Countries --}}
+        {{-- Locations (countries and cities) --}}
         @include('livewire.traffic._geo', [
             'countries' => data_get($breakdowns, 'country', []),
             'cities' => trafficCityRows(data_get($breakdowns, 'city', [])),

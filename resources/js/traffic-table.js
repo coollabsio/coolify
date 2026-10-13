@@ -1,7 +1,7 @@
 // Client-side sort and paging for the traffic analytics lists. Each row carries
-// its sort values as JSON in `data-row`, so a Livewire refresh needs no re-init:
-// a MutationObserver ranks the rows again. Rows keep their DOM order; the rank is
-// applied with CSS `order`, so Livewire can still morph them.
+// its sort values as JSON in `data-row`. Rows keep their DOM order; the rank is
+// applied with CSS `order`, so Livewire can still morph them. A morph resets the
+// inline styles and can add or remove rows, so the rows are ranked again after it.
 function compareValues(a, b) {
     if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
@@ -13,6 +13,7 @@ function compareValues(a, b) {
 function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
     const ranks = new WeakMap();
     let observer = null;
+    let removeMorphHook = null;
 
     return {
         page: 0,
@@ -31,12 +32,23 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
                 attributes: true,
                 attributeFilter: ['data-row'],
             });
+            if (window.Livewire) {
+                removeMorphHook = window.Livewire.hook('morphed', ({ el }) => {
+                    if (el.contains(this.$root)) {
+                        this.resort();
+                    }
+                });
+            }
         },
 
         destroy() {
             if (observer) {
                 observer.disconnect();
                 observer = null;
+            }
+            if (removeMorphHook) {
+                removeMorphHook();
+                removeMorphHook = null;
             }
         },
 

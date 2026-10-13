@@ -64,7 +64,9 @@ function buildMarkers(data) {
 const TWO_PI = Math.PI * 2;
 
 const SPIN_SPEED = 0.15; // rad/s
-const SPIN_FRAME_MS = 1000 / 30; // ambient spin is drawn at 30fps
+// Ambient spin is drawn at 30fps. A little under two 60Hz frames, so timestamp
+// jitter does not skip to the third frame.
+const SPIN_FRAME_MS = 1000 / 30 - 4;
 const SETTLE_EPSILON = 0.0005;
 
 // Signed shortest angular distance from `current` to `target`.

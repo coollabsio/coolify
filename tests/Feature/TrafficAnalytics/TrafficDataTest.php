@@ -56,4 +56,7 @@ it('leaves coordinates null when sentinel sends none or sends only one', functio
     'none' => [[]],
     'only lat' => [['lat' => 52.52]],
     'not numeric' => [['lat' => 'x', 'lon' => 'y']],
+    'not finite' => [['lat' => INF, 'lon' => 13.4]],
+    'latitude out of range' => [['lat' => 91, 'lon' => 13.4]],
+    'longitude out of range' => [['lat' => 52.5, 'lon' => -181]],
 ]);

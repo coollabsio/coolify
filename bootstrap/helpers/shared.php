@@ -5701,14 +5701,13 @@ function deviceLabel(?string $device): string
 }
 
 /**
- * Prepare Sentinel `city` breakdown rows (`CC|subdivision|City`) for display.
- *
- * `CC||` is an unknown city of that country. `__other__` and malformed values
- * are merged into one "Other" row. Returns [] when no row has a real city
- * (an old Sentinel, or a country-only GeoIP database).
+ * Prepare Sentinel `city` breakdown rows (`CC|subdivision|City`) for display,
+ * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
+ * "BE, Germany"). `CC||` (sent by older Sentinel builds) is an unknown city of
+ * that country. `__other__` and malformed values are merged into one "Other"
+ * row, which stays last. Returns [] when no row has a real city.
  *
  * @param  iterable<int, mixed>  $rows
- *                                      `name` and `detail` are the two parts of `label` ("Berlin" and "BE, Germany").
  * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
  */
 function trafficCityRows(iterable $rows): array
@@ -5724,6 +5723,7 @@ function trafficCityRows(iterable $rows): array
 
         $value = (string) data_get($row, 'value', '');
         $parts = explode('|', $value, 3);
+        $parts[0] = strtoupper($parts[0]);
         $isCityKey = count($parts) === 3 && preg_match('/^[A-Z]{2}$/', $parts[0]) === 1;
 
         $key = '__other__';
@@ -5767,10 +5767,12 @@ function trafficCityRows(iterable $rows): array
         return [];
     }
 
+    $other = $out['__other__'] ?? null;
+    unset($out['__other__']);
     $out = array_values($out);
     usort($out, fn (array $a, array $b): int => $b['requests'] <=> $a['requests']);
 
-    return $out;
+    return $other === null ? $out : [...$out, $other];
 }
 
 /**
