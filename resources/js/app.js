@@ -58,15 +58,27 @@ document.addEventListener('alpine:init', initializeSettingsSidebarAccordionCompo
  *
  * @param {string|HTMLElement} target Section id or element
  */
-/** A resource logo failed to load: try its fallback URL, then show the resource type icon instead. */
+/** A resource favicon loaded: show it in place of the logo. */
+window.resourceLogoLoaded = function resourceLogoLoaded(img) {
+  img.closest('[data-resource-logo]')?.querySelector('[data-resource-logo-image]')?.setAttribute('hidden', '');
+  img.removeAttribute('hidden');
+};
+
+/** A resource logo failed to load: drop a favicon, try the fallback URL of a logo, then show the resource type icon instead. */
 window.resourceLogoError = function resourceLogoError(img) {
+  if (img.hasAttribute('data-resource-logo-favicon')) {
+    img.remove();
+    return;
+  }
   if (img.dataset.fallback && img.src !== img.dataset.fallback) {
     img.src = img.dataset.fallback;
     return;
   }
   const wrapper = img.closest('[data-resource-logo]');
   wrapper?.querySelector('[data-resource-logo-image]')?.setAttribute('hidden', '');
-  wrapper?.querySelector('[data-resource-logo-icon]')?.removeAttribute('hidden');
+  if (!wrapper?.querySelector('[data-resource-logo-favicon]:not([hidden])')) {
+    wrapper?.querySelector('[data-resource-logo-icon]')?.removeAttribute('hidden');
+  }
 };
 
 window.scrollToSettingsSection = function scrollToSettingsSection(target) {

@@ -13,9 +13,9 @@ beforeEach(function () {
 
 test('databases get the logo of their engine', function () {
     expect(resource_logo(new StandalonePostgresql))
-        ->toBe(['src' => asset('svgs/resources/postgres.svg'), 'dark' => null, 'fallback' => null, 'padded' => false])
+        ->toBe(['src' => asset('svgs/resources/postgres.svg'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null])
         ->and(resource_logo(new StandaloneKeydb))
-        ->toBe(['src' => asset('svgs/resources/keydb.svg'), 'dark' => asset('svgs/resources/keydb-dark.svg'), 'fallback' => null, 'padded' => false]);
+        ->toBe(['src' => asset('svgs/resources/keydb.svg'), 'dark' => asset('svgs/resources/keydb-dark.svg'), 'fallback' => null, 'padded' => false, 'favicon' => null]);
 });
 
 test('applications get the logo of how they are built', function (string $buildPack, ?string $sourceType, string $logo) {
@@ -39,6 +39,7 @@ test('services get the logo of their template, with the CDN as fallback', functi
         'dark' => null,
         'fallback' => service_logo_urls($template->logo)['logo_cdn_url'],
         'padded' => true,
+        'favicon' => null,
     ]);
 });
 
@@ -49,3 +50,15 @@ test('services created before the service type was stored use the template in th
 test('services without a template logo have no logo', function () {
     expect(resource_logo(new Service(['name' => 'custom-compose'])))->toBeNull();
 });
+
+test('applications with a domain get the favicon of their first domain', function (?string $fqdn, ?string $favicon) {
+    $application = (new Application)->forceFill(['build_pack' => 'nixpacks', 'fqdn' => $fqdn]);
+
+    expect(resource_logo($application)['favicon'])->toBe($favicon);
+})->with([
+    ['https://app.example.com/dashboard,https://www.example.com', 'https://app.example.com/favicon.ico'],
+    [' http://app.example.com:8080 ', 'http://app.example.com:8080/favicon.ico'],
+    [null, null],
+    ['app.example.com', null],
+    ['https://*.example.com', null],
+]);

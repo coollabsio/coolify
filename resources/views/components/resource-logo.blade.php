@@ -1,6 +1,6 @@
 @props(['resource', 'iconClass' => 'size-4'])
 
-{{-- The resource logo (see resource_logo()). Shows the resource type icon when there is no logo or it fails to load. --}}
+{{-- The resource logo (see resource_logo()). Shows the favicon once it loads, and the resource type icon when there is no logo or it fails to load. --}}
 @php
     $logo = resource_logo($resource);
     $icon = match (true) {
@@ -21,6 +21,11 @@
                     class="hidden size-full object-contain dark:block" />
             @endif
         </span>
+        @if ($logo['favicon'])
+            <img src="{{ $logo['favicon'] }}" alt="" hidden data-resource-logo-favicon
+                onload="resourceLogoLoaded(this)" onerror="resourceLogoError(this)"
+                class="size-full object-contain p-1" />
+        @endif
     @endif
     <x-reicon :name="$icon" :class="$iconClass" data-resource-logo-icon :hidden="(bool) $logo" />
 </span>

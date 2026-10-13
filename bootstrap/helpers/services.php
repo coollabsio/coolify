@@ -42,7 +42,10 @@ use Symfony\Component\Yaml\Yaml;
  * The logo of a resource, the same one shown on the "New resource" page: the database engine,
  * the service template, or how the application is built. Null when there is no specific logo.
  *
- * @return array{src: string, dark: ?string, fallback: ?string, padded: bool}|null
+ * Applications with a domain also get the favicon URL of their first domain. The browser loads it
+ * and shows it in place of the logo when it loads. Coolify itself never requests it.
+ *
+ * @return array{src: string, dark: ?string, fallback: ?string, padded: bool, favicon: ?string}|null
  */
 function resource_logo(Model $resource): ?array
 {
@@ -52,6 +55,7 @@ function resource_logo(Model $resource): ?array
             'dark' => $hasDarkVariant ? asset("svgs/resources/{$name}-dark.svg") : null,
             'fallback' => null,
             'padded' => false,
+            'favicon' => null,
         ];
     };
 
@@ -64,11 +68,11 @@ function resource_logo(Model $resource): ?array
         }
         $urls = service_logo_urls($logo);
 
-        return ['src' => $urls['logo'], 'dark' => null, 'fallback' => $urls['logo_cdn_url'], 'padded' => true];
+        return ['src' => $urls['logo'], 'dark' => null, 'fallback' => $urls['logo_cdn_url'], 'padded' => true, 'favicon' => null];
     }
 
     if ($resource instanceof Application) {
-        return match (true) {
+        $logo = match (true) {
             $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
             $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
             $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
@@ -76,6 +80,8 @@ function resource_logo(Model $resource): ?array
             $resource->source_type === GitlabApp::class => $resourceLogo('gitlab-app'),
             default => $resourceLogo('public-repo'),
         };
+
+        return [...$logo, 'favicon' => resource_favicon_url($resource->fqdn)];
     }
 
     if (! method_exists($resource, 'type')) {
@@ -94,6 +100,23 @@ function resource_logo(Model $resource): ?array
         'sqlite' => $resourceLogo('sqlite'),
         default => null,
     };
+}
+
+/**
+ * The favicon URL of the first domain in a comma-separated domain list, or null when there is no usable domain.
+ */
+function resource_favicon_url(?string $fqdn): ?string
+{
+    $domain = str((string) $fqdn)->explode(',')->map(fn (string $url) => trim($url))->first(fn (string $url) => $url !== '');
+    $parts = parse_url((string) $domain);
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = (string) ($parts['host'] ?? '');
+    if (! in_array($scheme, ['http', 'https'], true) || $host === '' || str_contains($host, '*')) {
+        return null;
+    }
+    $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+    return "{$scheme}://{$host}{$port}/favicon.ico";
 }
 
 function replaceRegex(?string $name = null)
