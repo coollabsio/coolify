@@ -4,12 +4,15 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class DockerImages extends Component
 {
     use AuthorizesRequests;
+    use WithPagination;
 
     public Server $server;
 
@@ -26,6 +29,19 @@ class DockerImages extends Component
     public string $search = '';
 
     public bool $loaded = false;
+
+    public int $perPage = 10;
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+        $this->resetPage();
+    }
 
     public function mount(string $server_uuid)
     {
@@ -159,10 +175,22 @@ class DockerImages extends Component
                 ->contains($search, ignoreCase: true));
         }
 
+        $this->perPage = max(1, min(100, $this->perPage));
+        $lastPage = max(1, (int) ceil($images->count() / $this->perPage));
+        $page = max(1, min((int) $this->getPage(), $lastPage));
+        if ($page !== $this->getPage()) {
+            $this->setPage($page);
+        }
+
         return view('livewire.server.docker-images', [
             // Not "images": Livewire shares public properties with the view, so that name is
             // already taken by the unfiltered array.
-            'visibleImages' => $images->values(),
+            'visibleImages' => new LengthAwarePaginator(
+                $images->forPage($page, $this->perPage)->values(),
+                $images->count(),
+                $this->perPage,
+                $page,
+            ),
         ]);
     }
 }
