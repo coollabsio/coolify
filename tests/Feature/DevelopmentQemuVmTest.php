@@ -235,22 +235,31 @@ it('replaces the seeded qemu server with the selected non-root equivalent', func
 
 it('reuses an existing vm without touching other managed vms', function () {
     $storagePath = sys_get_temp_dir().'/coolify-qemu-reuse-test-'.uniqid();
-    config(['development-qemu.storage_path' => $storagePath]);
+    config(['development-qemu.storage_path' => $storagePath, 'development-qemu.memory' => 1024]);
     File::ensureDirectoryExists($storagePath);
     File::put("{$storagePath}/coolify-dev-ubuntu-root.qcow2", 'other vm data');
     File::put("{$storagePath}/coolify-dev-ubuntu-non-root.qcow2", 'vm data');
 
-    Process::fake([
-        '* net-dumpxml *' => Process::result(output: '<network></network>'),
-        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
-        '* dominfo *' => Process::result(output: 'exists'),
-        '* domstate *' => Process::result(output: "shut off\n"),
-        '*' => Process::result(),
-    ]);
+    $ran = [];
+    Process::fake(function ($process) use (&$ran) {
+        $ran[] = $process->command;
+
+        return match (true) {
+            str_contains($process->command, ' net-dumpxml ') => Process::result(output: '<network></network>'),
+            str_contains($process->command, ' network inspect ') => Process::result(output: "172.18.0.0/16\n"),
+            str_contains($process->command, ' dominfo ') => Process::result(output: 'exists'),
+            str_contains($process->command, ' domstate ') => Process::result(output: "shut off\n"),
+            default => Process::result(),
+        };
+    });
 
     StartDevelopmentQemuVm::run('ubuntu-non-root');
 
-    Process::assertRan(fn ($process) => $process->command === "virsh start 'coolify-dev-ubuntu-non-root'");
+    $commands = collect($ran);
+    $resize = $commands->search("virsh setmaxmem 'coolify-dev-ubuntu-non-root' 1024M --config");
+    expect($resize)->not->toBeFalse()
+        ->and($commands->search("virsh setmem 'coolify-dev-ubuntu-non-root' 1024M --config"))->toBeGreaterThan($resize)
+        ->and($commands->search("virsh start 'coolify-dev-ubuntu-non-root'"))->toBeGreaterThan($resize);
     Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install '));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh destroy'));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh undefine'));
@@ -274,6 +283,7 @@ it('does not restart an already running vm', function () {
     StartDevelopmentQemuVm::run('ubuntu-root');
 
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh start'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh setmem'));
     Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install '));
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec') && str_contains($process->command, 'fsockopen'));
 });
