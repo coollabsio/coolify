@@ -101,3 +101,32 @@ it('filters images by the search term', function () use ($fakeDocker, $nginxId, 
         ->assertSee('1.27')
         ->assertDontSee(str_repeat('b', 12));
 });
+
+it('paginates images and returns to the first page when the search changes', function () {
+    Process::fake([
+        '*docker image ls*' => Process::result(output: collect(range(1, 12))
+            ->map(fn (int $i) => json_encode([
+                'Repository' => sprintf('app-%02d', $i), 'Tag' => 'latest', 'ID' => 'sha256:'.str_repeat(dechex($i), 64),
+                'Size' => '1MB', 'CreatedSince' => '1 day ago',
+            ]))
+            ->implode("\n")),
+        '*docker ps -a*' => Process::result(output: ''),
+        '*docker system df*' => Process::result(output: ''),
+    ]);
+
+    Livewire::test(DockerImages::class, ['server_uuid' => $this->server->uuid])
+        ->call('load')
+        ->assertSee('app-10')
+        ->assertDontSee('app-11')
+        ->assertSee('1–10 of 12')
+        ->call('nextPage')
+        ->assertSee('app-12')
+        ->assertDontSee('app-01')
+        ->assertSee('11–12 of 12')
+        ->set('search', 'app-0')
+        ->assertSee('app-01')
+        ->assertSee('1–9 of 9')
+        ->set('perPage', 5)
+        ->assertSee('1–5 of 9')
+        ->assertDontSee('app-06');
+});
