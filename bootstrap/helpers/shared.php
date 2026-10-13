@@ -5416,7 +5416,8 @@ function deviceLabel(?string $device): string
  * (an old Sentinel, or a country-only GeoIP database).
  *
  * @param  iterable<int, mixed>  $rows
- * @return array<int, array{key: string, country: string, label: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
+ *                                      `name` and `detail` are the two parts of `label` ("Berlin" and "BE, Germany").
+ * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
  */
 function trafficCityRows(iterable $rows): array
 {
@@ -5436,6 +5437,8 @@ function trafficCityRows(iterable $rows): array
         $key = '__other__';
         $country = '';
         $label = 'Other';
+        $name = 'Other';
+        $detail = '';
         $lat = null;
         $lon = null;
 
@@ -5445,10 +5448,14 @@ function trafficCityRows(iterable $rows): array
 
             if ($city === '') {
                 $label = 'Unknown, '.$country;
+                $name = 'Unknown';
+                $detail = countryName($country);
             } else {
                 $hasCity = true;
                 $region = preg_match('/^[A-Z]{2,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
                 $label = $city.', '.$region.$country;
+                $name = $city;
+                $detail = $region.countryName($country);
 
                 $rawLat = data_get($row, 'lat');
                 $rawLon = data_get($row, 'lon');
@@ -5459,7 +5466,7 @@ function trafficCityRows(iterable $rows): array
             }
         }
 
-        $out[$key] ??= ['key' => $key, 'country' => $country, 'label' => $label, 'requests' => 0, 'bytesOut' => 0, 'lat' => $lat, 'lon' => $lon];
+        $out[$key] ??= ['key' => $key, 'country' => $country, 'label' => $label, 'name' => $name, 'detail' => $detail, 'requests' => 0, 'bytesOut' => 0, 'lat' => $lat, 'lon' => $lon];
         $out[$key]['requests'] += $requests;
         $out[$key]['bytesOut'] += (int) data_get($row, 'bytesOut', 0);
     }
@@ -5475,37 +5482,36 @@ function trafficCityRows(iterable $rows): array
 }
 
 /**
- * Marker data for the analytics globe: one marker per city that has
- * coordinates, else one per country with a valid ISO-A2 code.
+ * Marker data for the analytics globe, one set for each view of the Locations
+ * card: a marker per country with a valid ISO-A2 code, and a marker per city
+ * that has coordinates.
  *
  * @param  iterable<int, mixed>  $countryRows
  * @param  iterable<int, mixed>  $cityRows
- * @return array<int, array{lat: float, lon: float, requests: int}>|array<int, array{code: string, requests: int}>
+ * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
  */
 function trafficGeoMarkers(iterable $countryRows, iterable $cityRows): array
 {
-    $markers = [];
+    $countries = [];
+    foreach ($countryRows as $row) {
+        $code = strtoupper((string) data_get($row, 'value', ''));
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests > 0 && preg_match('/^[A-Z]{2}$/', $code) === 1) {
+            $countries[] = ['code' => $code, 'requests' => $requests];
+        }
+    }
+
+    $cities = [];
     foreach ($cityRows as $row) {
         $requests = (int) data_get($row, 'requests', 0);
         $lat = data_get($row, 'lat');
         $lon = data_get($row, 'lon');
         if ($requests > 0 && is_numeric($lat) && is_numeric($lon)) {
-            $markers[] = ['lat' => (float) $lat, 'lon' => (float) $lon, 'requests' => $requests];
-        }
-    }
-    if ($markers !== []) {
-        return $markers;
-    }
-
-    foreach ($countryRows as $row) {
-        $code = strtoupper((string) data_get($row, 'value', ''));
-        $requests = (int) data_get($row, 'requests', 0);
-        if ($requests > 0 && preg_match('/^[A-Z]{2}$/', $code) === 1) {
-            $markers[] = ['code' => $code, 'requests' => $requests];
+            $cities[] = ['lat' => (float) $lat, 'lon' => (float) $lon, 'requests' => $requests];
         }
     }
 
-    return $markers;
+    return ['countries' => $countries, 'cities' => $cities];
 }
 
 /**

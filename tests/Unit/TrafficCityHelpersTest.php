@@ -8,21 +8,22 @@ describe('trafficCityRows', function () {
         ]);
 
         expect($rows)->toBe([
-            ['key' => 'DE|BE|Berlin', 'country' => 'DE', 'label' => 'Berlin, BE, DE', 'requests' => 9, 'bytesOut' => 900, 'lat' => 52.52, 'lon' => 13.405],
-            ['key' => 'SG||Singapore', 'country' => 'SG', 'label' => 'Singapore, SG', 'requests' => 3, 'bytesOut' => 30, 'lat' => 1.29, 'lon' => 103.85],
+            ['key' => 'DE|BE|Berlin', 'country' => 'DE', 'label' => 'Berlin, BE, DE', 'name' => 'Berlin', 'detail' => 'BE, Germany', 'requests' => 9, 'bytesOut' => 900, 'lat' => 52.52, 'lon' => 13.405],
+            ['key' => 'SG||Singapore', 'country' => 'SG', 'label' => 'Singapore, SG', 'name' => 'Singapore', 'detail' => 'Singapore', 'requests' => 3, 'bytesOut' => 30, 'lat' => 1.29, 'lon' => 103.85],
         ]);
     });
 
-    it('omits a subdivision that is not a letter code', function (string $value, string $label) {
+    it('omits a subdivision that is not a letter code', function (string $value, string $label, string $detail) {
         $rows = trafficCityRows([
             ['value' => $value, 'requests' => 1, 'bytesOut' => 1],
         ]);
 
-        expect($rows[0]['label'])->toBe($label);
+        expect($rows[0]['label'])->toBe($label)
+            ->and($rows[0]['detail'])->toBe($detail);
     })->with([
-        'a name' => ['DE|Land Berlin|Berlin', 'Berlin, DE'],
-        'a number' => ['AT|3|Neunkirchen', 'Neunkirchen, AT'],
-        'one letter' => ['SE|O|Lidköping', 'Lidköping, SE'],
+        'a name' => ['DE|Land Berlin|Berlin', 'Berlin, DE', 'Germany'],
+        'a number' => ['AT|3|Neunkirchen', 'Neunkirchen, AT', 'Austria'],
+        'one letter' => ['SE|O|Lidköping', 'Lidköping, SE', 'Sweden'],
     ]);
 
     it('labels an unknown city with its country and gives it no coordinates', function () {
@@ -32,7 +33,7 @@ describe('trafficCityRows', function () {
         ]);
 
         expect($rows[1])->toBe([
-            'key' => 'DE||', 'country' => 'DE', 'label' => 'Unknown, DE', 'requests' => 2, 'bytesOut' => 20, 'lat' => null, 'lon' => null,
+            'key' => 'DE||', 'country' => 'DE', 'label' => 'Unknown, DE', 'name' => 'Unknown', 'detail' => 'Germany', 'requests' => 2, 'bytesOut' => 20, 'lat' => null, 'lon' => null,
         ]);
     });
 
@@ -48,16 +49,17 @@ describe('trafficCityRows', function () {
 
         expect($rows)->toHaveCount(2)
             ->and($rows[1])->toBe([
-                'key' => '__other__', 'country' => '', 'label' => 'Other', 'requests' => 8, 'bytesOut' => 80, 'lat' => null, 'lon' => null,
+                'key' => '__other__', 'country' => '', 'label' => 'Other', 'name' => 'Other', 'detail' => '', 'requests' => 8, 'bytesOut' => 80, 'lat' => null, 'lon' => null,
             ]);
     });
 
-    it('keeps a pipe-free city name that contains quotes or HTML unchanged', function () {
+    it('keeps a city name that contains quotes or HTML unchanged', function () {
         $rows = trafficCityRows([
             ['value' => "US|MO|O'Fallon <b>", 'requests' => 1, 'bytesOut' => 1],
         ]);
 
-        expect($rows[0]['label'])->toBe("O'Fallon <b>, MO, US");
+        expect($rows[0]['name'])->toBe("O'Fallon <b>")
+            ->and($rows[0]['label'])->toBe("O'Fallon <b>, MO, US");
     });
 
     it('skips rows with no requests', function () {
@@ -84,41 +86,42 @@ describe('trafficCityRows', function () {
 });
 
 describe('trafficGeoMarkers', function () {
-    $countries = [
-        ['value' => 'DE', 'requests' => 12],
-        ['value' => 'us', 'requests' => 7],
-        ['value' => '', 'requests' => 3],
-        ['value' => 'FR', 'requests' => 0],
-    ];
-
-    it('uses city markers when a city row has coordinates', function () use ($countries) {
-        $markers = trafficGeoMarkers($countries, [
-            ['value' => 'DE|BE|Berlin', 'requests' => 9, 'lat' => 52.52, 'lon' => 13.405],
-            ['value' => 'DE||', 'requests' => 3],
-            ['value' => 'FR|IDF|Paris', 'requests' => 0, 'lat' => 48.85, 'lon' => 2.35],
-        ]);
+    it('returns country markers and city markers as two sets', function () {
+        $markers = trafficGeoMarkers(
+            [
+                ['value' => 'DE', 'requests' => 12],
+                ['value' => 'us', 'requests' => 7],
+                ['value' => '', 'requests' => 3],
+                ['value' => 'FR', 'requests' => 0],
+            ],
+            [
+                ['value' => 'DE|BE|Berlin', 'requests' => 9, 'lat' => 52.52, 'lon' => 13.405],
+                ['value' => 'DE||', 'requests' => 3],
+                ['value' => 'FR|IDF|Paris', 'requests' => 0, 'lat' => 48.85, 'lon' => 2.35],
+            ],
+        );
 
         expect($markers)->toBe([
-            ['lat' => 52.52, 'lon' => 13.405, 'requests' => 9],
+            'countries' => [
+                ['code' => 'DE', 'requests' => 12],
+                ['code' => 'US', 'requests' => 7],
+            ],
+            'cities' => [
+                ['lat' => 52.52, 'lon' => 13.405, 'requests' => 9],
+            ],
         ]);
     });
 
-    it('uses country markers when no city row has coordinates', function (array $cities) use ($countries) {
-        expect(trafficGeoMarkers($countries, $cities))->toBe([
-            ['code' => 'DE', 'requests' => 12],
-            ['code' => 'US', 'requests' => 7],
-        ]);
-    })->with([
-        'old sentinel' => [[]],
-        'country-only database' => [[['value' => 'DE||', 'requests' => 12]]],
-    ]);
+    it('has no city markers when Sentinel sends no city data', function () {
+        expect(trafficGeoMarkers([['value' => 'DE', 'requests' => 12]], [])['cities'])->toBe([]);
+    });
 
     it('accepts the rows that trafficCityRows returns', function () {
         $rows = trafficCityRows([
             ['value' => 'DE|BE|Berlin', 'requests' => 9, 'bytesOut' => 900, 'lat' => 52.52, 'lon' => 13.405],
         ]);
 
-        expect(trafficGeoMarkers([], $rows))->toBe([
+        expect(trafficGeoMarkers([], $rows)['cities'])->toBe([
             ['lat' => 52.52, 'lon' => 13.405, 'requests' => 9],
         ]);
     });

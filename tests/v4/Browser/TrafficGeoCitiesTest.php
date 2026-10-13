@@ -48,16 +48,20 @@ beforeEach(function () {
     app()->bind(SentinelTrafficClient::class, fn () => new FakeBrowserCityTrafficClient($server));
 });
 
-it('shows the top cities card with the country card', function () {
+it('switches the Locations card between countries and cities and remembers the selection', function () {
     loginAndSkipBoarding();
 
     $page = visit('/analytics');
 
-    $page->assertSee('Countries')
+    $page->assertSee('Locations')
         ->assertSee('Germany')
-        ->assertSee('Top cities')
-        ->assertSee('Berlin, BE, DE')
-        ->assertSee('Paris, IDF, FR')
+        ->assertDontSee('BE, Germany')
+        ->click('button:visible:has-text("Cities")')
+        ->assertSee('BE, Germany')
+        ->assertSee('IDF, France')
+        ->assertDontSee('United States')
+        ->refresh()
+        ->assertSee('BE, Germany')
         ->assertNoJavaScriptErrors()
-        ->screenshot(filename: 'analytics-top-cities');
+        ->screenshot(filename: 'analytics-locations-cities');
 });

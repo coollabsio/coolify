@@ -52,19 +52,16 @@
         <x-skeleton.table :rows="6" flush />
     </x-application.settings-section>
 
-    <x-application.settings-section id="analytics-country-section" title="Countries" flush>
-        <x-skeleton class="h-64 w-full" />
-    </x-application.settings-section>
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <x-application.settings-section id="analytics-city-section" title="Top cities" flush>
-            <x-skeleton.table :rows="6" flush />
-        </x-application.settings-section>
-        <x-application.settings-section id="analytics-device-section" title="Requests by device type">
-            <div class="flex items-center justify-center py-4">
-                <x-skeleton class="size-40 rounded-full" />
+    <x-application.settings-section id="analytics-country-section" title="Locations" flush>
+        <x-slot:actions>
+            <x-skeleton class="h-9 w-36 rounded-lg" />
+        </x-slot:actions>
+        <div class="grid grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[2fr_3fr]">
+            <div class="flex items-center justify-center">
+                <x-skeleton class="aspect-square w-full max-w-[320px] rounded-full" />
             </div>
-        </x-application.settings-section>
-    </div>
+            <x-skeleton.table :rows="7" flush />
+        </div>
+    </x-application.settings-section>
     @endif
 </div>

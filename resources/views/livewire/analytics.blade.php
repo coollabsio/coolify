@@ -313,20 +313,14 @@ $appListboxOptions = array_merge(
         </x-application.settings-section>
 
         {{-- Countries --}}
-        @php $cityRows = trafficCityRows(data_get($breakdowns, 'city', [])); @endphp
-        <x-application.settings-section id="analytics-country-section" title="Countries"
-            helper="Request volume by visitor country for the selected range." flush>
-            @include('livewire.traffic._geo', [
-                'countries' => data_get($breakdowns, 'country', []),
-                'cities' => $cityRows,
-                'attribution' => $attribution,
-            ])
-        </x-application.settings-section>
+        @include('livewire.traffic._geo', [
+            'countries' => data_get($breakdowns, 'country', []),
+            'cities' => trafficCityRows(data_get($breakdowns, 'city', [])),
+            'attribution' => $attribution,
+        ])
 
-        {{-- Top cities + requests by device type (donut). --}}
+        {{-- Requests by device type (donut) + HTTP versions / cache / status. --}}
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            @include('livewire.traffic._cities', ['cities' => $cityRows])
-
             <x-application.settings-section id="analytics-device-section" title="Requests by device type"
                 helper="Share of requests by client device class for the selected range.">
                 @php $deviceChart = $this->deviceChartData(); @endphp
@@ -335,32 +329,32 @@ $appListboxOptions = array_merge(
                     'series' => $deviceChart['series'],
                 ])
             </x-application.settings-section>
-        </div>
 
-        {{-- HTTP versions + cache statuses. --}}
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             @include('livewire.traffic._breakdown-section', [
                 'dimension' => 'protocol',
                 'label' => 'Top HTTP versions',
                 'rows' => data_get($breakdowns, 'protocol', []),
                 'helper' => 'Request volume by negotiated HTTP protocol version.',
             ])
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             @include('livewire.traffic._breakdown-section', [
                 'dimension' => 'cache',
                 'label' => 'Top cache statuses',
                 'rows' => data_get($breakdowns, 'cache', []),
                 'helper' => 'Reverse-proxy cache outcome (hit, miss, bypass, …) by request count.',
             ])
-        </div>
-
-        {{-- Status codes / referrers / browsers / OS / AI agents / IPs, two per row. --}}
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             @include('livewire.traffic._breakdown-section', [
                 'dimension' => 'status',
                 'label' => 'Top status codes',
                 'rows' => data_get($breakdowns, 'status', []),
                 'helper' => 'Most frequent HTTP response status codes for the selected range.',
             ])
+        </div>
+
+        {{-- Referrers / browsers / OS / AI agents / IPs, two per row. --}}
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             @foreach ($dimensionLabels as $dimension => $label)
                 @include('livewire.traffic._breakdown-section', [
                     'dimension' => $dimension,

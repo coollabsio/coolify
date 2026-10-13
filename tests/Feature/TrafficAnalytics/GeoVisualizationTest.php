@@ -137,7 +137,7 @@ it('mounts the globe from the element itself when country data arrives after the
         ->assertSeeHtml('window.mountTrafficGlobe(canvas');
 });
 
-it('renders the top cities card and city markers when Sentinel returns city data', function () {
+it('renders the city list, the switch, and both marker sets when Sentinel returns city data', function () {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
@@ -153,17 +153,18 @@ it('renders the top cities card and city markers when Sentinel returns city data
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSeeHtml('id="analytics-city-section"')
+        ->assertSeeHtml('aria-label="Location detail"')
         ->assertSee('Germany')
-        ->assertSee('Berlin, BE, DE')
-        ->assertSee('Unknown, DE')
-        // City markers, not the country centroid, go to the globe.
+        ->assertSee('Berlin')
+        ->assertSee('BE, Germany')
+        // The globe gets a marker set for each view.
+        ->assertSeeHtml('code\u0022:\u0022DE')
         ->assertSeeHtml('lat\u0022:52.52')
         // Only the row with coordinates turns the globe on hover.
         ->assertSeeHtml('focus([52.52, 13.405])');
 });
 
-it('shows an empty top cities card and country markers when Sentinel returns no city data', function (array $cityRows) {
+it('shows an empty city list and no city markers when Sentinel returns no city data', function (array $cityRows) {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
@@ -176,8 +177,9 @@ it('shows an empty top cities card and country markers when Sentinel returns no 
         ->assertOk()
         ->assertSee('Germany')
         ->assertSee('No city data for the selected range.')
-        ->assertDontSee('Unknown, DE')
-        ->assertSeeHtml('code\u0022:\u0022DE');
+        ->assertSeeHtml('code\u0022:\u0022DE')
+        ->assertSeeHtml('cities\u0022:[]')
+        ->assertDontSeeHtml('focus([');
 })->with([
     'old sentinel' => [[]],
     'country-only database' => [[['value' => 'DE||', 'requests' => 600, 'bytes_out' => 15000]]],
@@ -195,7 +197,7 @@ it('escapes a city name that contains quotes or HTML', function () {
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSee("O'Fallon <b>x</b>, MO, US")
-        ->assertDontSeeHtml('<b>x</b>, MO, US')
+        ->assertSee("O'Fallon <b>x</b>")
+        ->assertDontSeeHtml('<b>x</b></span>')
         ->assertSeeHtml('focus([38.81, -90.7])');
 });

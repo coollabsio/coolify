@@ -77,9 +77,9 @@ trait BuildsTrafficChartPayload
     }
 
     /**
-     * Marker data for the globe: city markers when Sentinel has city data, else country markers.
+     * Marker data for the globe: country markers and city markers, one set for each view.
      *
-     * @return array<int, array{lat: float, lon: float, requests: int}>|array<int, array{code: string, requests: int}>
+     * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
      */
     protected function geoMarkers(): array
     {
