@@ -10,8 +10,6 @@ class ServerTransferBundle
 {
     public const SCHEMA_VERSION = 1;
 
-    public const CLAIM_PATH = '/data/coolify/instance-claim.json';
-
     public const MAILBOX_DIR = '/data/coolify/exports';
 
     /**

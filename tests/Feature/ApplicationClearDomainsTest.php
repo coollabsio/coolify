@@ -102,3 +102,31 @@ test('can clear application domains via empty string and save successfully', fun
     $application->refresh();
     expect($application->fqdn)->toBeNull();
 });
+
+test('can update general settings when the application has a wildcard domain', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'nixpacks',
+        'static_image' => 'nginx:alpine',
+        'base_directory' => '/',
+        'ports_exposes' => '3000',
+        'is_http_basic_auth_enabled' => false,
+        'redirect' => 'no',
+    ]);
+    // Legacy wildcard domains can no longer be entered (the model normalizes them away on save),
+    // so seed the stored value directly, as it exists on older installs.
+    Application::query()->whereKey($application->id)->update(['fqdn' => 'https://example.com,https://*.example.com']);
+    $application->refresh();
+
+    Livewire::test(General::class, ['application' => $application])
+        ->assertSuccessful()
+        ->set('startCommand', 'node scripts/serve-prod.mjs')
+        ->call('submit', false)
+        ->assertHasNoErrors();
+
+    $application->refresh();
+    expect($application->fqdn)->toBe('https://example.com,https://*.example.com')
+        ->and($application->start_command)->toBe('node scripts/serve-prod.mjs');
+});

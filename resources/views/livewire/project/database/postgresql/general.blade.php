@@ -138,7 +138,7 @@
         <div class="divide-y divide-neutral-200 dark:divide-border-subtle">
             @forelse($initScripts ?? [] as $script)
                 <livewire:project.database.init-script :database="$database" :script="$script"
-                    :wire:key="$script['index']" />
+                    :wire:key="'init-script-'.md5($script['filename'])" />
             @empty
                 <x-empty title="No initialization scripts"
                     description="Add a SQL file to run during the first PostgreSQL initialization." />

@@ -333,6 +333,7 @@ it('detects environment variable value changes without exposing secret values', 
     $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
     $change = collect($diff->changes())->firstWhere('label', 'API_TOKEN');
 
+    // Locked (is_shown_once) variables are always redacted in the diff
     expect($change)->not->toBeNull()
         ->and($change['display_summary'])->toBe('Changed')
         ->and($change['old_display_value'])->toBe('••••••••')
@@ -340,7 +341,32 @@ it('detects environment variable value changes without exposing secret values', 
         ->and(json_encode($diff->toArray()))->not->toContain('old-secret')->not->toContain('new-secret');
 });
 
-it('describes added environment variables as set without exposing secret values', function () {
+it('detects environment variable value changes for unlocked variables', function () {
+    $application = snapshotTestApplication();
+    EnvironmentVariable::create([
+        'key' => 'API_TOKEN',
+        'value' => 'old-secret',
+        'is_buildtime' => false,
+        'is_runtime' => true,
+        'is_preview' => false,
+        'is_shown_once' => false,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+    markSnapshotTestApplicationDeployed($application->refresh());
+
+    $application->environment_variables()->where('key', 'API_TOKEN')->first()->update(['value' => 'new-secret']);
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('label', 'API_TOKEN');
+
+    expect($change)->not->toBeNull()
+        ->and($change['display_summary'])->toBeNull()
+        ->and($change['old_display_value'])->toBe('old-secret')
+        ->and($change['new_display_value'])->toBe('new-secret')
+        ->and(json_encode($diff->toArray()))->toContain('old-secret')->toContain('new-secret');
+});
+
+it('describes added unlocked environment variables with their value', function () {
     $application = snapshotTestApplication();
     markSnapshotTestApplicationDeployed($application);
 
@@ -350,7 +376,7 @@ it('describes added environment variables as set without exposing secret values'
         'is_buildtime' => false,
         'is_runtime' => true,
         'is_preview' => false,
-        'is_shown_once' => true,
+        'is_shown_once' => false,
         'resourceable_type' => Application::class,
         'resourceable_id' => $application->id,
     ]);
@@ -361,6 +387,6 @@ it('describes added environment variables as set without exposing secret values'
     expect($change)->not->toBeNull()
         ->and($change['display_summary'])->toBeNull()
         ->and($change['old_display_value'])->toBe('-')
-        ->and($change['new_display_value'])->toBe('••••••••')
-        ->and(json_encode($diff->toArray()))->not->toContain('new-secret');
+        ->and($change['new_display_value'])->toBe('new-secret')
+        ->and(json_encode($diff->toArray()))->toContain('new-secret');
 });

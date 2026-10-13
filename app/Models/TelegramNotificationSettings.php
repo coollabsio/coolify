@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class TelegramNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -21,6 +22,7 @@ class TelegramNotificationSettings extends Model
         'deployment_success_telegram_notifications',
         'deployment_failure_telegram_notifications',
         'status_change_telegram_notifications',
+        'restart_limit_reached_telegram_notifications',
         'backup_success_telegram_notifications',
         'backup_failure_telegram_notifications',
         'scheduled_task_success_telegram_notifications',
@@ -36,6 +38,7 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_deployment_success_thread_id',
         'telegram_notifications_deployment_failure_thread_id',
         'telegram_notifications_status_change_thread_id',
+        'telegram_notifications_restart_limit_reached_thread_id',
         'telegram_notifications_backup_success_thread_id',
         'telegram_notifications_backup_failure_thread_id',
         'telegram_notifications_scheduled_task_success_thread_id',
@@ -55,6 +58,7 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_deployment_success_thread_id',
         'telegram_notifications_deployment_failure_thread_id',
         'telegram_notifications_status_change_thread_id',
+        'telegram_notifications_restart_limit_reached_thread_id',
         'telegram_notifications_backup_success_thread_id',
         'telegram_notifications_backup_failure_thread_id',
         'telegram_notifications_scheduled_task_success_thread_id',
@@ -76,6 +80,7 @@ class TelegramNotificationSettings extends Model
         'deployment_success_telegram_notifications' => 'boolean',
         'deployment_failure_telegram_notifications' => 'boolean',
         'status_change_telegram_notifications' => 'boolean',
+        'restart_limit_reached_telegram_notifications' => 'boolean',
         'backup_success_telegram_notifications' => 'boolean',
         'backup_failure_telegram_notifications' => 'boolean',
         'scheduled_task_success_telegram_notifications' => 'boolean',
@@ -90,6 +95,7 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_deployment_success_thread_id' => 'encrypted',
         'telegram_notifications_deployment_failure_thread_id' => 'encrypted',
         'telegram_notifications_status_change_thread_id' => 'encrypted',
+        'telegram_notifications_restart_limit_reached_thread_id' => 'encrypted',
         'telegram_notifications_backup_success_thread_id' => 'encrypted',
         'telegram_notifications_backup_failure_thread_id' => 'encrypted',
         'telegram_notifications_scheduled_task_success_thread_id' => 'encrypted',
@@ -111,5 +117,15 @@ class TelegramNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->telegram_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Telegram';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->telegram_enabled = false;
     }
 }

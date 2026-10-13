@@ -33,7 +33,7 @@ class Controller extends BaseController
         if (auth()->user()?->currentTeam()->id !== 0) {
             return redirect(RouteServiceProvider::HOME);
         }
-        TestEvent::dispatch();
+        TestEvent::dispatch(currentTeam()->id);
 
         return 'Look at your other tab.';
     }
@@ -132,7 +132,8 @@ class Controller extends BaseController
 
             [$user, $invitation] = $credentials;
             $team = $invitation->team;
-            if (! $user->teams()->where('team_id', $team->id)->exists()) {
+            $alreadyMember = $user->teams()->where('team_id', $team->id)->exists();
+            if (! $alreadyMember) {
                 $user->teams()->attach($team->id, ['role' => $invitation->role]);
             }
 
@@ -141,17 +142,18 @@ class Controller extends BaseController
             ])->save();
             $invitation->delete();
 
-            return [$user, $team];
+            return [$user, $team, $invitation, $alreadyMember];
         });
 
         if (! $acceptedInvitation) {
             return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
         }
 
-        [$user, $team] = $acceptedInvitation;
+        [$user, $team, $invitation, $alreadyMember] = $acceptedInvitation;
 
         Auth::login($user);
         session(['currentTeam' => $team]);
+        $this->auditInvitationAccepted($user, $invitation, $alreadyMember);
 
         return redirect()->route('dashboard');
     }
@@ -253,14 +255,34 @@ class Controller extends BaseController
 
         if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
             $invitation->delete();
+            $this->auditInvitationAccepted($user, $invitation, alreadyMember: true);
 
             return redirect()->route('team.index');
         }
         $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
         $invitation->delete();
+        $this->auditInvitationAccepted($user, $invitation, alreadyMember: false);
 
         refreshSession($invitation->team);
 
         return redirect()->route('team.index');
+    }
+
+    private function auditInvitationAccepted(User $user, TeamInvitation $invitation, bool $alreadyMember): void
+    {
+        auditLog('ui.team_invitation.accepted', [
+            'team_id' => $invitation->team_id,
+            'invitation_uuid' => $invitation->uuid,
+            'invitation_email' => $invitation->email,
+            'role' => $invitation->role,
+            'via' => $invitation->via,
+            'already_member' => $alreadyMember,
+            'member_id' => $user->id,
+            'member_name' => $user->name,
+            'member_email' => $user->email,
+            'actor_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_email' => $user->email,
+        ]);
     }
 }

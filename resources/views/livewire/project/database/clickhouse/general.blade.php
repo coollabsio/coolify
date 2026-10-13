@@ -2,6 +2,29 @@
     <form wire:submit="submit" class="flex flex-col gap-6">
         <x-unsaved-bar action="submit" />
 
+        @if ($anonymousDataVolume)
+            <x-callout type="danger" title="Current data is not in the data volume">
+                <p>Because of a bug in older Coolify versions, a file mount removed the data volume. This database
+                    keeps its current data in the unnamed Docker volume <code>{{ $anonymousDataVolume }}</code>.
+                    Starting or restarting it is blocked, because it would use the data volume and the current data
+                    would seem lost.</p>
+                <p class="mt-2">An admin can click "Keep current data" to use this volume as the data volume. The previous data
+                    volume is not used anymore, but stays on the server. It can contain data from before the file
+                    mount was added.</p>
+                @can('update', $database)
+                    <div class="mt-3">
+                        <x-modal-confirmation title="Keep current data?" buttonTitle="Keep current data"
+                            submitAction="keepCurrentDataVolume" :actions="[
+                                'Use the unnamed volume ' . $anonymousDataVolume . ' as the data volume of this database.',
+                                'Starts and restarts are allowed again and keep the current data.',
+                                'The previous data volume stays on the server and is not used anymore.',
+                            ]" :confirmWithText="false" :confirmWithPassword="false"
+                            step2ButtonText="Keep current data" />
+                    </div>
+                @endcan
+            </x-callout>
+        @endif
+
         <x-application.settings-section title="Database details"
             description="Manage the identity and container image for this ClickHouse database.">
             <x-slot:actions>

@@ -32,6 +32,7 @@ function remoteOutputTestServer(): Server
 it('bounds dynamic proxy configuration files and their combined Livewire payload', function () {
     $server = Mockery::mock(remoteOutputTestServer())->makePartial();
     $server->shouldReceive('proxyPath')->andReturn('/data/proxy');
+    $this->actingAs(User::query()->latest('id')->firstOrFail());
     $files = collect(range(1, 101))->map(fn (int $number) => sprintf('file%03d.yml', $number))->implode("\n");
 
     Process::fake(function ($process) use ($files) {

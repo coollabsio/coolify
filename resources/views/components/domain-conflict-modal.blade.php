@@ -47,7 +47,7 @@
                                                     {{ $conflict['resource_name'] }}
                                                 </a>
                                             @endif
-                                            ({{ $conflict['resource_type'] }})
+                                            ({{ $conflict['resource_type'] }}@if (filled($conflict['service_name'] ?? null)): {{ $conflict['service_name'] }}@endif)
                                         </div>
                                     </li>
                                 @endforeach

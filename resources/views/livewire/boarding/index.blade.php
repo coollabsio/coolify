@@ -40,7 +40,7 @@
                             Continue
                         </x-forms.button>
                         <div
-                            class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                            class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
                             <button type="button" wire:click="skipBoarding"
                                 class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
                                 <x-reicon name="arrow-right" class="size-3.5 shrink-0" />
@@ -101,7 +101,7 @@
                                 <p class="mb-3 text-sm text-neutral-500 dark:text-neutral-400">Use this machine or connect a server you already manage.</p>
                                 <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
                             <button
-                                class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                                class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                                 wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">
                                 <span role="button" tabindex="0" aria-label="About this machine"
                                     data-tooltip="The machine running Coolify. Not recommended for production workloads due to resource contention."
@@ -125,7 +125,7 @@
 
 
                             <button
-                                class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                                class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                                 wire:target="setServerType('remote')" wire:click="setServerType('remote')">
                                 <span role="button" tabindex="0" aria-label="About remote servers"
                                     data-tooltip="Any SSH-accessible server, including cloud VPS, bare metal, and self-hosted infrastructure."
@@ -157,7 +157,7 @@
                                     <x-modal-input title="Connect a Hetzner Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
                                                     <img src="{{ asset('svgs/hetzner.svg') }}" alt="Hetzner"
                                                         class="size-10 shrink-0">
@@ -175,7 +175,7 @@
                                     <x-modal-input title="Connect a Vultr Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
                                                     <img src="https://www.vultr.com/media/logo_ondark.svg" alt="Vultr"
                                                         class="h-10 w-28 shrink-0 object-contain object-left">
@@ -193,7 +193,7 @@
                                     <x-modal-input title="Connect a DigitalOcean Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
                                                     <x-digital-ocean-icon class="size-10 shrink-0" />
                                                     <div class="min-h-0 flex-1">
@@ -279,7 +279,7 @@
                             @endphp
                             <div class="w-full space-y-4">
                                 <div
-                                    class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                                    class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                                     <form wire:submit="selectExistingPrivateKey"
                                         class="flex flex-col gap-3 sm:flex-row sm:items-end">
                                         <div class="min-w-0 flex-1">
@@ -304,7 +304,7 @@
                         @endif
                         <div class="grid w-full grid-cols-1 gap-3 lg:grid-cols-2">
                             <button type="button"
-                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                                 wire:target="setPrivateKey('own')" wire:click="setPrivateKey('own')">
                                 <span
                                     class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -318,7 +318,7 @@
                                 </span>
                             </button>
                             <button type="button"
-                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                                 wire:target="setPrivateKey('create')" wire:click="setPrivateKey('create')">
                                 <span
                                     class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -597,7 +597,7 @@
                             Deploy your first resource
                         </x-forms.button>
                         <div
-                            class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                            class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
                             <button type="button" wire:click="skipBoarding"
                                 class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
                                 <x-reicon name="arrow-right" class="size-3.5 shrink-0" />
@@ -622,7 +622,7 @@
         @if ($currentState !== 'welcome' && $currentState !== 'create-resource')
             <div class="mx-auto mt-6 flex w-full max-w-3xl flex-col items-center gap-3">
                 <div
-                    class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <button type="button" wire:click="skipBoarding"
                         class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
                         <x-reicon name="arrow-right" class="size-3.5 shrink-0" />

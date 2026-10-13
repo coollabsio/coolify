@@ -2,15 +2,19 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMariadb;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartMariadb
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneMariadb $database;
 
@@ -20,7 +24,7 @@ class StartMariadb
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneMariadb $database)
+    public function handle(StandaloneMariadb $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -57,18 +61,8 @@ class StartMariadb
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -89,6 +83,7 @@ class StartMariadb
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mysql();
@@ -205,8 +200,8 @@ class StartMariadb
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mysql:mysql /etc/mysql/certs/server.key /etc/mysql/certs/server.crt < /dev/null";
@@ -216,7 +211,7 @@ class StartMariadb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -255,21 +250,21 @@ class StartMariadb
     {
         $environment_variables = collect();
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_ROOT_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_ROOT_PASSWORD')) {
             $environment_variables->push("MARIADB_ROOT_PASSWORD={$this->database->mariadb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_DATABASE'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_DATABASE')) {
             $environment_variables->push("MARIADB_DATABASE={$this->database->mariadb_database}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_USER'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_USER')) {
             $environment_variables->push("MARIADB_USER={$this->database->mariadb_user}");
         }
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_PASSWORD')) {
             $environment_variables->push("MARIADB_PASSWORD={$this->database->mariadb_password}");
         }
 

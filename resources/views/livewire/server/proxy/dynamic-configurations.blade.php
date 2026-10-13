@@ -34,10 +34,8 @@
                 </div>
 
                 <div x-init="$wire.initLoadDynamicConfigurations" class="contents">
-                    <div wire:loading wire:target="initLoadDynamicConfigurations"
-                        class="rounded-lg border border-neutral-200 p-6 dark:border-white/[0.08]">
-                        <x-loading text="Loading dynamic configurations…" />
-                    </div>
+                    <x-skeleton.settings-sections wire:loading.flex wire:target="initLoadDynamicConfigurations"
+                        label="Loading dynamic configurations" />
 
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)
@@ -60,11 +58,17 @@
                                         <livewire:server.proxy.dynamic-configuration-navbar
                                             :server_id="$server->id" :server="$server" :fileName="$fileName"
                                             :value="$value ?? ''" :newFile="false"
-                                            wire:key="{{ $fileName }}-{{ $loop->index }}" />
+                                            wire:key="proxy-navbar-{{ $fileName }}" />
                                     @endif
                                 </x-slot:actions>
-                                <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
-                                    rows="8" />
+                                @can('update', $server)
+                                    <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
+                                        rows="8" />
+                                @else
+                                    <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                        You do not have permission to view the contents of this configuration.
+                                    </p>
+                                @endcan
                             </x-application.settings-section>
                         @endforeach
                     @else

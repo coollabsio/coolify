@@ -3,6 +3,7 @@
 # category: cms
 # tags: cms, blog, content, management, postgresql
 # logo: svgs/drupal.svg
+# port: 80
 
 services:
   drupal:

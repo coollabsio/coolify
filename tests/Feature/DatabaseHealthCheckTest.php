@@ -1,8 +1,19 @@
 <?php
 
 use App\Livewire\Project\Database\Health;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
 
 it('defaults to an enabled healthcheck when nothing is configured', function () {
     $database = new StandalonePostgresql;
@@ -113,63 +124,38 @@ it('does not mark configuration changed when health update authorization fails',
 });
 
 it('toggles database healthcheck and marks configuration changed', function () {
-    $database = new class
-    {
-        public ?string $config_hash = 'existing';
+    InstanceSettings::forceCreate(['id' => 0]);
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+    $user->teams()->attach($team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
 
-        public bool $health_check_enabled = false;
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandalonePostgresql::create([
+        'name' => 'db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'db',
+        'image' => 'postgres:17',
+        'health_check_enabled' => false,
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $database->config_hash = 'existing';
+    $database->saveQuietly();
+    $database->refresh();
 
-        public int $health_check_interval = 15;
+    Livewire::test(Health::class, ['database' => $database])
+        ->assertSet('healthCheckEnabled', false)
+        ->call('toggleHealthcheck')
+        ->assertSet('healthCheckEnabled', true)
+        ->assertDispatched('success')
+        ->assertDispatched('configurationChanged');
 
-        public int $health_check_timeout = 5;
-
-        public int $health_check_retries = 5;
-
-        public int $health_check_start_period = 5;
-
-        public int $saveCalls = 0;
-
-        public function save(): void
-        {
-            $this->saveCalls++;
-        }
-    };
-
-    $component = new class extends Health
-    {
-        public array $dispatchedEvents = [];
-
-        public function authorize($ability, $arguments = [])
-        {
-            return true;
-        }
-
-        public function dispatch($event, ...$params)
-        {
-            $this->dispatchedEvents[] = $event;
-
-            return null;
-        }
-
-        public function syncData(bool $toModel = false): void
-        {
-            if ($toModel) {
-                $this->database->health_check_enabled = $this->healthCheckEnabled;
-                $this->database->save();
-            }
-        }
-    };
-
-    $component->database = $database;
-    $component->healthCheckEnabled = false;
-    $component->healthCheckInterval = 15;
-    $component->healthCheckTimeout = 5;
-    $component->healthCheckRetries = 5;
-    $component->healthCheckStartPeriod = 5;
-
-    $component->toggleHealthcheck();
-
-    expect($database->health_check_enabled)->toBeTrue()
-        ->and($database->saveCalls)->toBe(1)
-        ->and($component->dispatchedEvents)->toBe(['success', 'configurationChanged']);
+    expect($database->fresh()->health_check_enabled)->toBeTrue();
 });

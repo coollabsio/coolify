@@ -1,4 +1,4 @@
-<div x-data="{
+<div x-on:migrate-resource-confirmed.window="$wire.migrateTo(selectedMigrateDestination)" x-data="{
     selectedCloneServer: null,
     selectedCloneDestination: null,
     selectedCloneProject: null,
@@ -217,11 +217,17 @@
                         The resource keeps the same UUID and configuration. Only the hosting server and network
                         destination change.
                     </p>
-                    <x-forms.button
-                        wire:confirm="Migrate this resource? It will be stopped on the source server. Redeploy after migration completes."
-                        @click="$wire.migrateTo(selectedMigrateDestination)">
-                        Migrate resource
-                    </x-forms.button>
+                    <x-modal-confirmation title="Migrate this resource?" submitAction="migrate-resource-confirmed"
+                        dispatchAction :confirmWithText="false" :confirmWithPassword="false"
+                        step2ButtonText="Migrate resource"
+                        :actions="[
+                            'The resource will be stopped on the source server.',
+                            'Redeploy the resource after the migration completes.',
+                        ]">
+                        <x-slot:trigger>
+                            <x-forms.button>Migrate resource</x-forms.button>
+                        </x-slot:trigger>
+                    </x-modal-confirmation>
                 </div>
             </x-application.settings-section>
         @endif

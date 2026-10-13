@@ -1,13 +1,15 @@
 <?php
 
-it('uses the current listbox design for environment variable suggestions', function () {
-    $view = file_get_contents(resource_path('views/components/forms/env-var-input.blade.php'));
+it('authorizes secret-enabled environment variable inputs at the component boundary', function () {
+    $addView = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/add.blade.php'));
+    $showView = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
 
-    expect($view)
-        ->toContain('class="listbox-panel')
-        ->toContain('class="listbox-option justify-start! gap-2.5!"')
-        ->toContain("'bg-neutral-100 dark:bg-white/[0.08]': index === selectedIndex")
-        ->toContain('border-warning/25 bg-warning/10')
-        ->toContain('border-emerald-500/25 bg-emerald-500/10')
-        ->not->toContain('dark:bg-coolgray-100');
+    // Show resolves the resource through its computed `resource` property.
+    foreach ([[$addView, '$resource'], [$showView, '$this->resource']] as [$view, $resourceExpression]) {
+        preg_match('/<x-forms\.env-var-input[\s\S]*?\/>/', $view, $matches);
+
+        expect($matches[0] ?? '')
+            ->toContain('canGate="manageEnvironment"')
+            ->toContain(':canResource="'.$resourceExpression.'"');
+    }
 });

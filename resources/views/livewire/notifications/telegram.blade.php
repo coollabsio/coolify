@@ -11,7 +11,8 @@
                 description="Deliver team notifications through a Telegram bot and chat.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$telegramEnabled" enabledProperty="telegramEnabled"
-                        toggleMethod="instantSaveTelegramEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveTelegramEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

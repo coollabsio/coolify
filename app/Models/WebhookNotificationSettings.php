@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class WebhookNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -20,6 +21,7 @@ class WebhookNotificationSettings extends Model
         'deployment_success_webhook_notifications',
         'deployment_failure_webhook_notifications',
         'status_change_webhook_notifications',
+        'restart_limit_reached_webhook_notifications',
         'backup_success_webhook_notifications',
         'backup_failure_webhook_notifications',
         'scheduled_task_success_webhook_notifications',
@@ -46,6 +48,7 @@ class WebhookNotificationSettings extends Model
             'deployment_success_webhook_notifications' => 'boolean',
             'deployment_failure_webhook_notifications' => 'boolean',
             'status_change_webhook_notifications' => 'boolean',
+            'restart_limit_reached_webhook_notifications' => 'boolean',
             'backup_success_webhook_notifications' => 'boolean',
             'backup_failure_webhook_notifications' => 'boolean',
             'scheduled_task_success_webhook_notifications' => 'boolean',
@@ -68,5 +71,15 @@ class WebhookNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->webhook_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Webhook';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->webhook_enabled = false;
     }
 }

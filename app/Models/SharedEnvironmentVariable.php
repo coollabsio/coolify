@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class SharedEnvironmentVariable extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         // Core identification
         'key',

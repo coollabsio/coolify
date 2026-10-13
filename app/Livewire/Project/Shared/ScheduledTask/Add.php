@@ -102,7 +102,7 @@ class Add extends Component
         }
     }
 
-    public function saveScheduledTask()
+    private function saveScheduledTask(): void
     {
         try {
             $task = new ScheduledTask;
@@ -111,7 +111,7 @@ class Add extends Component
             $task->frequency = $this->frequency;
             $task->container = $this->container;
             $task->timeout = $this->timeout;
-            $task->team_id = currentTeam()->id;
+            $task->team_id = $this->resource->team()->id;
 
             switch ($this->type) {
                 case 'application':
@@ -125,10 +125,18 @@ class Add extends Component
                     break;
             }
             $task->save();
+            auditLog('ui.scheduled_task.created', [
+                'team_id' => $task->team_id,
+                'scheduled_task_uuid' => $task->uuid,
+                'scheduled_task_name' => $task->name,
+                'resource_type' => $this->type,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+            ]);
             $this->dispatch('refreshTasks');
             $this->dispatch('success', 'Scheduled task added.');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 

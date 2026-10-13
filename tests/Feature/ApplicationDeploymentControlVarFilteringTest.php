@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -9,14 +10,211 @@ use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\Process\Process;
 
 uses(RefreshDatabase::class);
+
+it('does not persist environment write commands or generated Dockerfiles in deployment logs', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_SECRET',
+        'value' => 'sensitive-value',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'configuration_dir' => '/data/coolify/applications/test-app',
+        'remote_secrets_cache' => [],
+        'saved_outputs' => [
+            'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
+        ],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'save_runtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    $writeCommands = collect($job->recordedCommands)
+        ->flatMap(fn (array $commands): array => $commands)
+        ->filter(function (mixed $command): bool {
+            if (! is_array($command)) {
+                return false;
+            }
+
+            $commandString = $command['command'] ?? $command[0] ?? null;
+
+            return is_string($commandString) && str_contains($commandString, 'base64 -d | tee');
+        })
+        ->values();
+
+    expect($writeCommands)->toHaveCount(4)
+        ->each->toHaveKey('skip_command_log', true);
+});
+
+it('redacts resolved remote secrets from command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['API_TOKEN' => 'remote-secret-value'],
+    ]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'token=remote-secret-value'))
+        ->toBe('token='.REDACTED);
+});
+
+it('does not retain locked values from generated build-time debug logs', function () {
+    config()->set('app.env', 'local');
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SINGLE_MARKER',
+        'value' => 'harmless-single-marker',
+        'is_shown_once' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'MULTILINE_MARKER',
+        'value' => "harmless-first-marker\nharmless-second-marker",
+        'is_multiline' => true,
+        'is_shown_once' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    $deployment = ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'harmless-debug-log-deployment',
+        'application_id' => $application->id,
+        'server_id' => $server->id,
+    ]);
+    foreach ($job->recordedLogEntries as $entry) {
+        $deployment->addLogEntry($entry);
+    }
+
+    $retainedLogs = $deployment->fresh()->logs;
+    expect($retainedLogs)
+        ->not->toContain('harmless-single-marker')
+        ->not->toContain('harmless-first-marker')
+        ->not->toContain('harmless-second-marker');
+
+    $member = User::factory()->create();
+    $application->team()->members()->attach($member->id, ['role' => 'member']);
+    $application->settings->update(['is_debug_enabled' => true]);
+    $this->actingAs($member);
+
+    $visibleLines = decode_remote_command_output($deployment->fresh())->pluck('line')->implode("\n");
+    expect($visibleLines)
+        ->toContain('[DEBUG]')
+        ->not->toContain('harmless-first-marker')
+        ->not->toContain('harmless-second-marker');
+});
+
+it('does not print build-time values in the development debug lines', function () {
+    config()->set('app.env', 'local');
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'normal-secret-marker']);
+    createApplicationEnvironmentVariable($application, ['key' => 'LITERAL_TOKEN', 'value' => 'literal-secret-marker', 'is_literal' => true]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    $debugLines = collect($job->recordedLogEntries)->filter(fn (string $line) => str_contains($line, '[DEBUG]'))->implode("\n");
+    expect($debugLines)
+        ->toContain('[DEBUG] Build-time env: DB_PASSWORD')
+        ->toContain('[DEBUG] Build-time env: LITERAL_TOKEN')
+        ->not->toContain('normal-secret-marker')
+        ->not->toContain('literal-secret-marker');
+});
+
+it('redacts generated multiline forms in remote command and output logging', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'MULTILINE_MARKER',
+        'value' => "harmless-first-marker\nharmless-second-marker",
+        'is_multiline' => true,
+        'is_shown_once' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    $generated = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables')
+        ->first(fn (string $line): bool => str_starts_with($line, 'MULTILINE_MARKER='));
+
+    foreach ([$generated, str_replace("\n", '\\n', $generated), 'harmless-second-marker'] as $loggedForm) {
+        $redacted = invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'output: '.$loggedForm);
+        expect($redacted)
+            ->not->toContain('harmless-first-marker')
+            ->not->toContain('harmless-second-marker')
+            ->toContain('output: ');
+    }
+});
+
+it('keeps deployment logging available if value formatting fails', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $variable = new class extends EnvironmentVariable
+    {
+        public function logRedactionValues(): array
+        {
+            throw new RuntimeException('Harmless formatting failure');
+        }
+    };
+    $variable->is_shown_once = true;
+
+    $application->setRelation('environment_variables', collect([$variable]));
+    $deployment = ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'harmless-formatting-failure',
+        'application_id' => $application->id,
+        'server_id' => $server->id,
+    ]);
+    $deployment->setRelation('application', $application);
+    $deployment->addLogEntry('Harmless log text');
+
+    expect(json_decode($deployment->fresh()->logs, true)[0]['output'])->toBe(REDACTED);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    readDeploymentJobProperty($job, $reflection, 'application')
+        ->setRelation('environment_variables', collect([$variable]));
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'Harmless command text'))
+        ->toBe(REDACTED);
+});
+
+it('redacts shell-escaped remote secrets from command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['DB_PASS' => "s3cr'et-value"],
+    ]);
+
+    $redacted = invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', "docker build --build-arg DB_PASS='s3cr'\\''et-value' --env 'DB_PASS=s3cr'\\''et-value' .");
+
+    expect($redacted)->not->toContain('s3cr')
+        ->toContain('--build-arg DB_PASS='.REDACTED);
+});
+
+it('ignores empty and non-string remote secrets when redacting command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => [
+            'EMPTY_SECRET' => '',
+            'NULL_SECRET' => null,
+            'NUMERIC_SECRET' => 123,
+            'API_TOKEN' => 'remote-secret-value',
+        ],
+    ]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'id=123 token=remote-secret-value'))
+        ->toBe('id=123 token='.REDACTED);
+});
 
 class TestableControlVarFilteringDeploymentJob extends ApplicationDeploymentJob
 {
     public array $recordedCommands = [];
+
+    public array $recordedLogEntries = [];
+
+    public array $writtenArtifacts = [];
 
     public ?string $writtenDockerfile = null;
 
@@ -35,6 +233,10 @@ class TestableControlVarFilteringDeploymentJob extends ApplicationDeploymentJob
 
             if (preg_match('/echo .*?([A-Za-z0-9+\\/=]{16,}).*?\\| base64 -d \\| tee \\/artifacts\\/test-app\\/Dockerfile > \\/dev\\/null/', $commandString, $matches) === 1) {
                 $this->writtenDockerfile = base64_decode($matches[1]) ?: null;
+            }
+
+            if (preg_match('~echo .*?([A-Za-z0-9+/=]{8,}).*?\\| base64 -d \\| tee (/artifacts/[^ ]+) > /dev/null~', $commandString, $matches) === 1) {
+                $this->writtenArtifacts[$matches[2]] = base64_decode($matches[1]);
             }
         }
     }
@@ -92,7 +294,11 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
     $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
 
     $queue = Mockery::mock(ApplicationDeploymentQueue::class);
-    $queue->shouldReceive('addLogEntry')->andReturnNull();
+    $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout', bool $hidden = false) use ($job) {
+        $job->recordedLogEntries[] = $message;
+
+        return null;
+    });
 
     $properties = [
         'application' => $application->fresh(),
@@ -101,6 +307,7 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
         'mainServer' => $server,
         'pull_request_id' => 0,
         'commit' => 'HEAD',
+        'basedir' => '/artifacts/test-app',
         'workdir' => '/artifacts/test-app',
         'deployment_uuid' => 'deployment-uuid',
         'dockerfile_location' => '/Dockerfile',
@@ -130,12 +337,12 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
     return [$job, $reflection];
 }
 
-function invokeDeploymentJobMethod(object $job, ReflectionClass $reflection, string $method): mixed
+function invokeDeploymentJobMethod(object $job, ReflectionClass $reflection, string $method, mixed ...$arguments): mixed
 {
     $reflectionMethod = $reflection->getMethod($method);
     $reflectionMethod->setAccessible(true);
 
-    return $reflectionMethod->invoke($job);
+    return $reflectionMethod->invoke($job, ...$arguments);
 }
 
 function readDeploymentJobProperty(object $job, ReflectionClass $reflection, string $property): mixed
@@ -203,6 +410,370 @@ it('filters buildpack control vars from preview build-time env files', function 
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_ENV=')))->toBeTrue();
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('NIXPACKS_NODE_VERSION=')))->toBeFalse();
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
+});
+
+it('rejects unsafe Nixpacks plan variable keys before writing the build-time env file', function (string $key) {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'value',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class);
+})->with([
+    'command substitution' => 'X$(id)',
+    'backticks' => 'X`id`',
+    'newline' => "X\nid",
+    'shell assignment' => 'X=value',
+    'semicolon' => 'X;id',
+    'pipe' => 'X|id',
+    'ampersand' => 'X&id',
+    'leading dollar' => '$(id)',
+    'command substitution with arguments' => 'X$(docker run --rm -v /:/mnt alpine true)',
+]);
+
+it('keeps persisted dotted user build-time variable keys', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'X.VALUE',
+        'value' => 'unsafe',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    expect($buildtimeEnvs)->toContain('X.VALUE="unsafe"');
+});
+
+it('loads shell variables and passes dotted variables through the build-time environment launcher', function () {
+    $temporaryDirectory = sys_get_temp_dir().'/coolify-build-env-'.str()->random(8);
+    expect(mkdir($temporaryDirectory))->toBeTrue();
+    $shellEnvironmentPath = $temporaryDirectory.'/build-time-shell.env';
+    $launcherPath = $temporaryDirectory.'/run-with-build-time-env';
+    $injectionMarkerPath = $temporaryDirectory.'/injection-marker';
+
+    try {
+        [$application, $server] = makeDeploymentControlVarFixture();
+
+        createApplicationEnvironmentVariable($application, [
+            'key' => 'BASE_VALUE',
+            'value' => 'expanded',
+        ]);
+        createApplicationEnvironmentVariable($application, [
+            'key' => 'X.VALUE',
+            'value' => '$BASE_VALUE',
+        ]);
+        createApplicationEnvironmentVariable($application, [
+            'key' => 'DOTTED.VALUE',
+            'value' => "$(touch {$injectionMarkerPath})",
+        ]);
+
+        [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+        invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
+
+        expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_PATH])
+            ->toContain('BASE_VALUE="expanded"')
+            ->toContain('X.VALUE="$BASE_VALUE"');
+        expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH])
+            ->toContain('BASE_VALUE="expanded"')
+            ->not->toContain('X.VALUE');
+        expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH])
+            ->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH)
+            ->toContain('X.VALUE="$BASE_VALUE"')
+            ->toContain('exec env');
+
+        $wrappedCommand = invokeDeploymentJobMethod($job, $reflection, 'wrap_build_command_with_env_export', 'printenv X.VALUE');
+
+        expect($wrappedCommand)
+            ->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH)
+            ->toContain("/bin/bash -c 'printenv X.VALUE'")
+            ->not->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH);
+
+        file_put_contents($shellEnvironmentPath, $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH]);
+        file_put_contents(
+            $launcherPath,
+            str_replace(
+                'source '.ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH,
+                'source '.$shellEnvironmentPath,
+                $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH],
+            ),
+        );
+        chmod($launcherPath, 0700);
+
+        $process = new Process(['/bin/bash', $launcherPath, '/bin/bash', '-c', 'printenv X.VALUE; printenv DOTTED.VALUE']);
+        $process->mustRun();
+
+        expect($process->getOutput())
+            ->toContain("expanded\n")
+            ->toContain("$(touch {$injectionMarkerPath})");
+        expect(file_exists($injectionMarkerPath))->toBeFalse();
+    } finally {
+        @unlink($launcherPath);
+        @unlink($shellEnvironmentPath);
+        @unlink($injectionMarkerPath);
+        @rmdir($temporaryDirectory);
+    }
+});
+
+it('keeps the original sourced environment path when build-time keys are shell safe', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_VALUE',
+        'value' => 'safe',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
+
+    expect($job->writtenArtifacts)
+        ->toHaveKey(ApplicationDeploymentJob::BUILD_TIME_ENV_PATH)
+        ->not->toHaveKey(ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH)
+        ->not->toHaveKey(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH);
+
+    $wrappedCommand = invokeDeploymentJobMethod($job, $reflection, 'wrap_build_command_with_env_export', 'docker build .');
+
+    expect($wrappedCommand)
+        ->toContain('set -a && source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH.' && set +a && docker build .')
+        ->not->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH);
+});
+
+it('skips dotted keys from the Nixpacks plan without failing the deployment', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'spring.profiles.active',
+        'value' => 'prod',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'saved_outputs' => collect([
+            'nixpacks_plan' => json_encode([
+                'variables' => [
+                    'X.VALUE' => 'dotted-from-toml',
+                    'SAFE_FROM_TOML' => 'ok-from-toml',
+                    'NIXPACKS_NODE_VERSION' => '22',
+                ],
+            ]),
+            'nixpacks_type' => 'node',
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_nixpacks_confs');
+
+    $variables = collect(readDeploymentJobProperty($job, $reflection, 'nixpacks_plan_json')->get('variables'));
+
+    expect($variables->has('SAFE_FROM_TOML'))->toBeTrue();
+    expect($variables->has('X.VALUE'))->toBeFalse();
+    expect($variables->has('spring.profiles.active'))->toBeFalse();
+
+    $logs = implode("\n", $job->recordedLogEntries);
+
+    expect($logs)
+        ->toContain('Build-time variable X.VALUE has a dot in its name, which Nixpacks cannot pass to the build')
+        ->toContain('Build-time variable spring.profiles.active has a dot in its name')
+        ->toContain('Suggested name: X_VALUE')
+        ->toContain('Available at Buildtime')
+        ->not->toContain('dotted-from-toml')
+        ->not->toContain('prod');
+});
+
+it('still allows underscore Nixpacks plan keys through generate_build_env_variables', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'SAFE_FROM_TOML' => 'ok-from-toml',
+                'NIXPACKS_NODE_VERSION' => '22',
+            ],
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables');
+
+    expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeFalse();
+});
+
+it('mounts underscore nixpacks secrets on RUN lines when build secrets are enabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'env_args' => collect(['SAFE_FROM_TOML' => 'ok-from-toml']),
+        'nixpacks_plan_json' => collect([
+            'variables' => ['SAFE_FROM_TOML' => 'ok-from-toml'],
+        ]),
+        'build_secrets' => '--secret id=SAFE_FROM_TOML,env=SAFE_FROM_TOML',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "FROM alpine\nARG SAFE_FROM_TOML\nRUN printenv SAFE_FROM_TOML",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/.nixpacks/Dockerfile');
+
+    expect($job->writtenArtifacts['/artifacts/test-app/.nixpacks/Dockerfile'])
+        ->toContain('RUN --mount=type=secret,id=SAFE_FROM_TOML,env=SAFE_FROM_TOML')
+        ->toContain('printenv SAFE_FROM_TOML');
+});
+
+it('skips unsafe reserved Nixpacks plan variable keys before validation', function (string $key) {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'value',
+            ],
+        ]),
+    ]);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith($key.'=')))->toBeFalse();
+})->with([
+    'Coolify key' => 'COOLIFY_$(id)',
+    'service key' => 'SERVICE_$(id)',
+]);
+
+it('explains invalid Nixpacks plan variable keys in deployment logs', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'XPACK;SECURITY;ENABLED' => 'true',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the Nixpacks plan: XPACK;SECURITY;ENABLED');
+
+    $logs = implode("\n", $job->recordedLogEntries);
+
+    expect($logs)
+        ->toContain('Invalid environment variable name from the Nixpacks plan: XPACK;SECURITY;ENABLED')
+        ->toContain('must start with a letter or underscore')
+        ->toContain('How to fix')
+        ->toContain('nixpacks.toml')
+        ->toContain('https://nixpacks.com/docs/configuration/file');
+});
+
+it('marks an invalid variable name failure as already explained in the deployment log', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'XPACK;SECURITY;ENABLED' => 'true',
+            ],
+        ]),
+    ]);
+
+    try {
+        invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        expect($exception->isMessageAlreadyLogged())->toBeTrue();
+    }
+});
+
+it('truncates long Nixpacks plan variable keys in deployment logs', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $key = 'X$(docker run --rm alpine sh -c "'.str_repeat('a', 200).'TAIL_SHOULD_BE_TRUNCATED")';
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'x',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class);
+
+    $logs = implode("\n", $job->recordedLogEntries);
+
+    expect($logs)
+        ->toContain('Invalid environment variable name from the Nixpacks plan: X$(docker run --rm')
+        ->toContain('...')
+        ->not->toContain('TAIL_SHOULD_BE_TRUNCATED')
+        ->toContain('nixpacks.toml');
+});
+
+it('bounds every deployment log entry for long invalid Nixpacks variable keys', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $key = 'X'.str_repeat('$', 10_000);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'x',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class);
+
+    $longestLogEntryLength = max(array_map(strlen(...), $job->recordedLogEntries));
+
+    expect($longestLogEntryLength)->toBeLessThanOrEqual(200);
+});
+
+it('keeps shell-safe Nixpacks plan variables in the build-time env file', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'APP_NAME' => 'coolify',
+                '_PRIVATE_VALUE' => 'secret',
+                'X.VALUE' => 'dotted',
+            ],
+        ]),
+    ]);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    expect($buildtimeEnvs)->toContain("APP_NAME='coolify'")
+        ->toContain("_PRIVATE_VALUE='secret'")
+        ->toContain("X.VALUE='dotted'");
 });
 
 it('does not let preview docker compose service names override generated build-time service names', function () {
@@ -395,6 +966,7 @@ it('filters buildpack control vars from dockerfile arg injection', function () {
     ]);
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => [],
         'saved_outputs' => [
             'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
         ],
@@ -402,10 +974,447 @@ it('filters buildpack control vars from dockerfile arg injection', function () {
 
     invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
 
-    expect($job->writtenDockerfile)->toContain('ARG APP_ENV=production');
+    expect($job->writtenDockerfile)->toContain('ARG APP_ENV');
+    expect($job->writtenDockerfile)->toContain('ARG COOLIFY_BUILD_SECRETS_HASH=');
     expect($job->writtenDockerfile)->not->toContain('ARG NIXPACKS_NODE_VERSION=');
     expect($job->writtenDockerfile)->not->toContain('ARG RAILPACK_NODE_VERSION=');
 });
+
+it('passes dotted keys as Docker build secrets for Dockerfile builds', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockerfile',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect([
+        'DOTTED.USER' => 'df-dotted',
+        'SAFE' => 'ok',
+    ]));
+
+    expect(readDeploymentJobProperty($job, $reflection, 'build_secrets'))
+        ->toContain('id=DOTTED.USER,env=DOTTED.USER')
+        ->toContain('id=SAFE,env=SAFE');
+});
+
+it('keeps dotted dockerfile build args when secrets are not used', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'DOTTED.USER',
+        'value' => 'df-dotted',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+
+    /** @var Collection $envArgs */
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+
+    expect($envArgs->get('DOTTED.USER'))->toBe('df-dotted');
+});
+
+it('does not write environment values into generated Dockerfile ARG declarations', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => "value\nRUN touch /tmp/injected",
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => [],
+        'saved_outputs' => ['dockerfile' => 'FROM alpine'],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    expect($job->writtenDockerfile)
+        ->toContain('ARG SAFE_KEY')
+        ->not->toContain('RUN touch /tmp/injected')
+        ->not->toContain('value');
+});
+
+it('rejects unsafe keys before generating Railpack secret flags', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    expect(fn () => invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'railpack_build_secret_flags',
+        collect(['BAD$(id)' => 'x']),
+    ))->toThrow(DeploymentException::class, 'Invalid environment variable name from the Railpack environment');
+
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects unsafe legacy keys before generating BuildKit secret flags', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    expect(fn () => invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'generate_build_secrets',
+        collect(['BAD$(id)' => 'secret']),
+    ))->toThrow(DeploymentException::class, 'Invalid environment variable name from the build secret environment');
+
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects an unsafe stored build-time key before running a build command', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'BAD$(id)']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys', true))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('keeps deploying existing runtime-only variables whose names new variables cannot use', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => false,
+    ]);
+    // Names like my-var were accepted before the current rules; the model no longer allows them.
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('my-var')
+        ->toContain('Suggested name: my_var');
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects existing variable names that would break the .env file or build commands', function (string $key, bool $isBuildtime, bool $buildsImage) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => $isBuildtime,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => $key]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys', $buildsImage))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+})->with([
+    'runtime-only name with =' => ['A=B', false, false],
+    'runtime-only name with a newline' => ["A\nB", false, false],
+    'build-time name with shell characters' => ['my;var', true, true],
+]);
+
+it('does not fail restarts or deployments that reuse an image on invalid build-time names', function (string $buildPack) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => $buildPack]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'MY-VAR']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => $buildPack]);
+    // handle() runs this check before it is known whether the deployment builds an image.
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('MY-VAR')
+        ->toContain('Suggested name: MY_VAR')
+        ->not->toContain('Invalid environment variable name');
+    expect($job->recordedCommands)->toBeEmpty();
+})->with(['dockerfile', 'nixpacks', 'static', 'railpack', 'dockercompose']);
+
+it('keeps invalid build-time names out of the helper container so restarts with build secrets work', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'nixpacks']);
+    $application->settings()->update(['use_build_secrets' => true]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'safe-build-value',
+        'is_buildtime' => true,
+    ]);
+    $invalidVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'OTHER_KEY',
+        'value' => 'invalid-build-value',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $invalidVariable->id)->update(['key' => 'MY-VAR']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => 'nixpacks']);
+
+    $envFlags = invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets');
+
+    expect($envFlags)
+        ->toContain("-e 'SAFE_KEY=safe-build-value'")
+        ->toContain('COOLIFY_BUILD_SECRETS_HASH=')
+        ->not->toContain('MY-VAR')
+        ->not->toContain('invalid-build-value');
+});
+
+it('warns instead of failing for invalid build-time names when the deployment does not build an image', function (bool $isRuntime) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+        'is_runtime' => $isRuntime,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('my-var')
+        ->toContain('Suggested name: my_var')
+        ->not->toContain('Invalid environment variable name');
+    expect($job->recordedCommands)->toBeEmpty();
+})->with([
+    'build-time only' => [false],
+    'build-time and runtime' => [true],
+]);
+
+it('warns instead of failing for invalid build-time preview names of Docker image deployments', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+        'is_preview' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['pull_request_id' => 7]);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('Suggested name: my_var')
+        ->not->toContain('Invalid environment variable name');
+});
+
+it('still rejects Docker image variable names that would break the .env file', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'A=B']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+});
+
+it('skips existing build-time variables whose names new variables cannot use', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockerfile',
+    ]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'legacy-value',
+        'is_buildtime' => true,
+        'is_runtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'VALID_KEY',
+        'value' => 'valid-value',
+        'is_buildtime' => true,
+        'is_runtime' => true,
+    ]);
+    // Names like my-var were accepted before the current rules; the model no longer allows them.
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('Build-time variable my-var uses a name that new variables cannot use. It is skipped during the build, but is still passed to the container.')
+        ->toContain('Suggested name: my_var')
+        ->not->toContain('legacy-value');
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    expect($buildtimeEnvs->contains(fn (string $env) => str_starts_with($env, 'my-var=')))->toBeFalse();
+    expect($buildtimeEnvs->contains(fn (string $env) => str_starts_with($env, 'VALID_KEY=')))->toBeTrue();
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+    expect($envArgs->has('my-var'))->toBeFalse();
+    expect($envArgs->get('VALID_KEY'))->not->toBeNull();
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    expect($runtimeEnvs->contains(fn (string $env) => str_starts_with($env, 'my-var=')))->toBeTrue();
+});
+
+it('skips existing build-time variables whose names new variables cannot use from Railpack builds', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'railpack',
+    ]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'legacy-value',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'build_pack' => 'railpack',
+        'branch' => 'main',
+    ]);
+
+    /** @var Collection $variables */
+    $variables = invokeDeploymentJobMethod($job, $reflection, 'railpack_build_variables');
+
+    expect($variables->has('my-var'))->toBeFalse();
+});
+
+it('does not pass build-time variables to the helper container of Docker image deployments', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerimage']);
+    $application->settings()->update(['use_build_secrets' => true]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'harmless-build-value',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets'))->toBe('');
+});
+
+it('injects raw escaped remote secrets into Dockerfile args and hashes the same values', function (int $pullRequestId, bool $isPreview) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SECRET_TOKEN',
+        'value' => '{{vault.API_TOKEN}}',
+        'is_preview' => $isPreview,
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+
+    $secret = "secret\$value'quoted";
+    $escapedSecret = escapeBashEnvValue($secret);
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => $pullRequestId,
+        'remote_secrets_cache' => ['API_TOKEN' => $secret],
+        'saved_outputs' => [
+            'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
+        ],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    $expectedHash = invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'generate_secrets_hash',
+        collect(['SECRET_TOKEN' => $escapedSecret]),
+    );
+
+    expect($job->writtenDockerfile)
+        ->toContain('ARG SECRET_TOKEN')
+        ->not->toContain($secret)
+        ->toContain("ARG COOLIFY_BUILD_SECRETS_HASH={$expectedHash}")
+        ->not->toContain('$$');
+})->with([
+    'production' => [0, false],
+    'preview' => [99, true],
+]);
+
+it('injects Dockerfile args for plain build-time variables without a secret manager source', function (int $pullRequestId, bool $isPreview) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_ENV',
+        'value' => 'production',
+        'is_preview' => $isPreview,
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => $pullRequestId,
+        'saved_outputs' => [
+            'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
+        ],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    $expectedHash = invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'generate_secrets_hash',
+        collect(['APP_ENV' => escapeBashEnvValue('production')]),
+    );
+
+    expect($job->writtenDockerfile)
+        ->toContain('ARG APP_ENV')
+        ->toContain("ARG COOLIFY_BUILD_SECRETS_HASH={$expectedHash}");
+    expect(readDeploymentJobProperty($job, $reflection, 'remote_secrets_cache'))->toBeNull();
+})->with([
+    'production' => [0, false],
+    'preview' => [99, true],
+]);
+
+it('checks compose Dockerfiles with a portable command that skips missing files', function (bool $dockerfileExists) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
+    $workdir = sys_get_temp_dir().'/coolify-compose-dockerfile-'.str()->random(8);
+    expect(mkdir($workdir))->toBeTrue();
+
+    if ($dockerfileExists) {
+        file_put_contents($workdir.'/Dockerfile', "FROM alpine\n");
+    }
+
+    try {
+        [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+            'basedir' => $workdir,
+            'workdir' => $workdir,
+            'env_args' => collect(['APP_ENV' => 'production']),
+        ]);
+
+        invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfiles_for_compose', [
+            'services' => ['api' => ['build' => ['context' => '.', 'dockerfile' => 'Dockerfile']]],
+        ]);
+
+        $checkCommand = collect($job->recordedCommands)->flatten(1)->firstWhere('save', 'dockerfile_check_api')[0];
+
+        // The helper image ships BusyBox realpath, which accepts no options.
+        expect($checkCommand)->not->toContain('realpath -');
+
+        $process = Process::fromShellCommandline(str($checkCommand)->after('docker exec deployment-uuid ')->toString());
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+        expect($process->getOutput())->toBe($dockerfileExists ? realpath($workdir.'/Dockerfile') : '');
+    } finally {
+        @unlink($workdir.'/Dockerfile');
+        @rmdir($workdir);
+    }
+})->with([
+    'existing Dockerfile' => [true],
+    'missing Dockerfile' => [false],
+]);
 
 it('builds railpack variables from generic buildtime vars railpack vars and coolify vars only', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
@@ -454,6 +1463,39 @@ it('builds railpack variables from generic buildtime vars railpack vars and cool
     expect($variables->get('COOLIFY_RESOURCE_UUID'))->toBe($application->uuid);
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('RUNTIME_ONLY'))->toBeFalse();
+});
+
+it('skips dotted keys from Railpack build variables without failing the deployment', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'railpack',
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_ENV',
+        'value' => 'production',
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'spring.profiles.active',
+        'value' => 'prod',
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'build_pack' => 'railpack',
+        'branch' => 'main',
+    ]);
+
+    /** @var Collection $variables */
+    $variables = invokeDeploymentJobMethod($job, $reflection, 'railpack_build_variables');
+
+    expect($variables->get('APP_ENV'))->toBe('production');
+    expect($variables->has('spring.profiles.active'))->toBeFalse();
+    expect(implode("\n", $job->recordedLogEntries))
+        ->toContain('Build-time variable spring.profiles.active has a dot in its name, which Railpack cannot pass to the build')
+        ->toContain('Suggested name: spring_profiles_active');
 });
 
 it('builds preview railpack variables without leaking stale nixpacks vars', function () {
@@ -507,3 +1549,268 @@ it('builds preview railpack variables without leaking stale nixpacks vars', func
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('PREVIEW_RUNTIME_ONLY'))->toBeFalse();
 });
+
+it('writes compose-safe runtime env files for user values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'QUOTED_VALUE',
+        'value' => 'hello world; quotes" \'$`',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'EXPAND_ME',
+        'value' => '$BOTH_PHASES',
+        'is_literal' => false,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'BOTH_PHASES',
+        'value' => 'both-phases-value',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'INJECT_CMD',
+        'value' => '$(touch /tmp/coolify-value-injection)',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'EDGE_QUOTES',
+        'value' => "'keep these quotes'",
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'MULTILINE_VALUE',
+        'value' => "\$BOTH_PHASES\nsecond line",
+        'is_literal' => false,
+        'is_multiline' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('QUOTED_VALUE='.escapeComposeEnvFileValue('hello world; quotes" \'$`'))
+        ->toContain('INJECT_CMD='.escapeComposeEnvFileValue('$(touch /tmp/coolify-value-injection)'))
+        ->toContain('EXPAND_ME='.escapeComposeEnvFileValue('$BOTH_PHASES', allowInterpolation: true))
+        ->toContain('EDGE_QUOTES='.escapeComposeEnvFileValue("'keep these quotes'"))
+        ->toContain('MULTILINE_VALUE='.escapeComposeEnvFileValue("\$BOTH_PHASES\nsecond line"));
+});
+
+it('writes compose-safe preview runtime env files for user values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'PREVIEW_QUOTED_VALUE',
+        'value' => 'preview quotes" \'$`',
+        'is_preview' => true,
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 42,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('PREVIEW_QUOTED_VALUE='.escapeComposeEnvFileValue('preview quotes" \'$`'));
+});
+
+it('writes compose-safe production fallbacks to preview runtime env files', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'PREVIEW_TRIGGER',
+        'value' => 'preview-value',
+        'is_preview' => true,
+        'is_literal' => false,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'FALLBACK_QUOTED_VALUE',
+        'value' => 'fallback quotes" \'$`',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    $application->environment_variables_preview()
+        ->where('key', 'FALLBACK_QUOTED_VALUE')
+        ->delete();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 42,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('FALLBACK_QUOTED_VALUE='.escapeComposeEnvFileValue('fallback quotes" \'$`'));
+});
+
+it('writes compose-safe runtime env values for remote secret references', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SECRET_TOKEN',
+        'value' => '{{vault.API_TOKEN}}',
+        'is_literal' => false,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    $secret = "secret\$value'quoted\"";
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['API_TOKEN' => $secret],
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain('SECRET_TOKEN='.escapeComposeEnvFileValue($secret));
+});
+
+it('keeps the old runtime env format for variables saved before exact escaping', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    foreach ([
+        ['key' => 'LEGACY_PLAIN', 'value' => 'a\'b"c\\d', 'is_literal' => false],
+        ['key' => 'LEGACY_LITERAL', 'value' => 'x$y', 'is_literal' => true],
+    ] as $attributes) {
+        $variable = createApplicationEnvironmentVariable($application, [...$attributes, 'is_runtime' => true, 'is_buildtime' => false]);
+        $variable->uses_legacy_escaping = true;
+        $variable->save();
+    }
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'EXACT_PLAIN',
+        'value' => 'a\'b"c\\d',
+        'is_literal' => false,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('LEGACY_PLAIN=a\\\'b\\"c\\\\d')
+        ->toContain("LEGACY_LITERAL='x\$y'")
+        ->toContain('EXACT_PLAIN='.escapeComposeEnvFileValue('a\'b"c\\d', allowInterpolation: true));
+});
+
+it('keeps the old runtime env format for preview variables saved before exact escaping', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    $variable = createApplicationEnvironmentVariable($application, [
+        'key' => 'LEGACY_PREVIEW',
+        'value' => "array:'self'",
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    $variable->uses_legacy_escaping = true;
+    $variable->save();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['pull_request_id' => 42]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain("LEGACY_PREVIEW=array:\\'self\\'");
+});
+
+it('resolves exact runtime env values without loading each variable resource', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    foreach (['FIRST_EXACT', 'SECOND_EXACT'] as $key) {
+        createApplicationEnvironmentVariable($application, [
+            'key' => $key,
+            'value' => "array:'self'",
+            'is_runtime' => true,
+            'is_buildtime' => false,
+        ]);
+    }
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    DB::enableQueryLog();
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    $applicationLookups = collect(DB::getQueryLog())
+        ->filter(fn (array $query) => str($query['query'])->contains('from "applications"'));
+    DB::disableQueryLog();
+
+    expect($runtimeEnvs)->toContain('FIRST_EXACT='.escapeComposeEnvFileValue("array:'self'", allowInterpolation: true))
+        ->and($applicationLookups)->toBeEmpty();
+});
+
+it('keeps dollars literal in runtime JSON values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'JSON_CONFIG',
+        'value' => '{"price":"$5"}',
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain('JSON_CONFIG='.escapeComposeEnvFileValue('{"price":"$5"}'));
+});
+it('omits only unset Compose overrides from production and preview runtime files', function (int $pullRequestId) {
+    Server::flushIdentityMap();
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      INHERITED: \${INHERITED:-info}\n      EMPTY: \${EMPTY-default}\n",
+    ]);
+    $application->update(['docker_compose' => $application->docker_compose_raw]);
+    foreach (['INHERITED' => null, 'EMPTY' => ''] as $key => $value) {
+        createApplicationEnvironmentVariable($application, ['key' => $key, 'value' => $value]);
+        $application->environment_variables_preview()->where('key', $key)->firstOrFail()->update(['value' => $value]);
+    }
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['pull_request_id' => $pullRequestId]);
+    $variables = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($variables->contains(fn (string $line) => str_starts_with($line, 'INHERITED=')))->toBeFalse()
+        ->and($variables->contains('EMPTY='.escapeComposeEnvFileValue('')))->toBeTrue();
+})->with([0, 42]);
+
+it('includes migrated null Compose overrides in production and preview runtime files', function (int $pullRequestId) {
+    Server::flushIdentityMap();
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      LEGACY: \${LEGACY:-info}\n",
+    ]);
+    $application->update(['docker_compose' => $application->docker_compose_raw]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LEGACY', 'value' => null]);
+    foreach ([$application->environment_variables(), $application->environment_variables_preview()] as $relation) {
+        $relation->where('key', 'LEGACY')->firstOrFail()->forceFill(['preserve_compose_null' => true])->save();
+    }
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['pull_request_id' => $pullRequestId]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables')->contains('LEGACY='.escapeComposeEnvFileValue('')))->toBeTrue();
+})->with([0, 42]);

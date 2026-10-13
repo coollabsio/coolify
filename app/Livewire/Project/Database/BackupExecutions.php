@@ -4,14 +4,15 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?ScheduledDatabaseBackup $backup = null;
 
@@ -37,13 +38,11 @@ class BackupExecutions extends Component
 
     public $delete_backup_sftp = false;
 
-    public function getListeners()
+    public function getListeners(): array
     {
-        $userId = Auth::id();
-
-        return [
-            "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'BackupCreated' => 'refreshBackupExecutions',
+        ]);
     }
 
     public function cleanupFailed()

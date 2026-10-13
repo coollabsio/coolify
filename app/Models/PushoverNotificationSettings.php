@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class PushoverNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -21,6 +22,7 @@ class PushoverNotificationSettings extends Model
         'deployment_success_pushover_notifications',
         'deployment_failure_pushover_notifications',
         'status_change_pushover_notifications',
+        'restart_limit_reached_pushover_notifications',
         'backup_success_pushover_notifications',
         'backup_failure_pushover_notifications',
         'scheduled_task_success_pushover_notifications',
@@ -47,6 +49,7 @@ class PushoverNotificationSettings extends Model
         'deployment_success_pushover_notifications' => 'boolean',
         'deployment_failure_pushover_notifications' => 'boolean',
         'status_change_pushover_notifications' => 'boolean',
+        'restart_limit_reached_pushover_notifications' => 'boolean',
         'backup_success_pushover_notifications' => 'boolean',
         'backup_failure_pushover_notifications' => 'boolean',
         'scheduled_task_success_pushover_notifications' => 'boolean',
@@ -67,5 +70,15 @@ class PushoverNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->pushover_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Pushover';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->pushover_enabled = false;
     }
 }

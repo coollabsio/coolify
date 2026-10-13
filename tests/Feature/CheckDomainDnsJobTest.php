@@ -3,6 +3,7 @@
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -55,6 +56,34 @@ it('persists a skipped result when dns validation is disabled', function () {
     expect($status['status'])->toBe('skipped')
         ->and($status['message'])->toBe('DNS validation is disabled in instance settings.')
         ->and($status['checked_at'])->not->toBeNull();
+});
+
+it('persists dns results for application previews', function () {
+    $statusKey = hash('sha256', 'https://preview.example.com|');
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 41,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/41',
+        'fqdn' => 'https://preview.example.com',
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'check_id' => 'preview-check',
+            ],
+        ],
+    ]);
+
+    (new CheckDomainDnsJob(
+        $preview,
+        $statusKey,
+        'https://preview.example.com',
+        null,
+        null,
+        'preview-check',
+    ))->handle();
+
+    expect($preview->fresh()->domain_dns_statuses[$statusKey]['status'])->toBe('skipped');
 });
 
 it('does not restore a dns status removed before the job finishes', function () {

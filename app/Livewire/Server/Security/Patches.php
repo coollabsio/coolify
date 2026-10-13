@@ -7,12 +7,14 @@ use App\Actions\Server\UpdatePackage;
 use App\Events\ServerPackageUpdated;
 use App\Models\Server;
 use App\Notifications\Server\ServerPatchCheck;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Patches extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public array $parameters;
 
@@ -30,11 +32,9 @@ class Patches extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServerPackageUpdated" => 'checkForUpdatesDispatch',
-        ];
+        return $this->teamChannelListeners([
+            'ServerPackageUpdated' => 'checkForUpdatesDispatch',
+        ]);
     }
 
     public function mount()

@@ -144,12 +144,9 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->postgresPassword = '';
-        }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -174,7 +171,8 @@ class General extends Component
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->postgresUser = $this->database->postgres_user;
-            $this->postgresPassword = $this->database->postgres_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->postgresPassword = $canSeeCredentials ? $this->database->postgres_password : '';
             $this->postgresDb = $this->database->postgres_db;
             $this->postgresInitdbArgs = $this->database->postgres_initdb_args;
             $this->postgresHostAuthMethod = $this->database->postgres_host_auth_method;
@@ -240,6 +238,7 @@ class General extends Component
             }
             $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 
@@ -247,16 +246,16 @@ class General extends Component
         }
     }
 
-    public function save_init_script($script)
+    public function save_init_script($script, string $originalFilename)
     {
         $this->authorize('update', $this->database);
 
         $initScripts = collect($this->initScripts ?? []);
 
         $existingScript = $initScripts->firstWhere('filename', $script['filename']);
-        $oldScript = $initScripts->firstWhere('index', $script['index']);
+        $oldScript = $initScripts->firstWhere('filename', $originalFilename);
 
-        if ($existingScript && $existingScript['index'] !== $script['index']) {
+        if ($existingScript && $script['filename'] !== $originalFilename) {
             $this->dispatch('error', 'A script with this filename already exists.');
 
             return;
@@ -285,11 +284,10 @@ class General extends Component
             }
         }
 
-        $index = $initScripts->search(function ($item) use ($script) {
-            return $item['index'] === $script['index'];
-        });
+        $index = $initScripts->search(fn ($item) => $item['filename'] === $originalFilename);
 
         if ($index !== false) {
+            $script['index'] = $oldScript['index'];
             $initScripts[$index] = $script;
         } else {
             $initScripts->push($script);

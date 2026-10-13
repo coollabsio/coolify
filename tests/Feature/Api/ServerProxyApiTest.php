@@ -152,6 +152,37 @@ test('PATCH /api/v1/servers/{uuid}/proxy updates redirect and label settings wit
         ->and((bool) $server->settings->generate_exact_labels)->toBeTrue();
 });
 
+test('PATCH /api/v1/servers/{uuid}/proxy updates the Traefik certificate resolver', function (?string $input, ?string $expected) {
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/servers/{$this->server->uuid}/proxy")
+        ->assertOk()
+        ->assertJsonPath('traefik_certificate_resolver', 'letsencrypt');
+
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
+            'traefik_certificate_resolver' => $input,
+        ])
+        ->assertOk()
+        ->assertJsonPath('traefik_certificate_resolver', $expected);
+
+    expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBe($expected);
+})->with([
+    'custom resolver' => ['cloudflare', 'cloudflare'],
+    'no resolver' => [null, null],
+    'empty resolver' => ['', null],
+]);
+
+test('PATCH /api/v1/servers/{uuid}/proxy rejects unsafe certificate resolver names', function () {
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
+            'traefik_certificate_resolver' => 'letsencrypt.acme=x',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBe('letsencrypt');
+});
+
 test('PATCH /api/v1/servers/{uuid}/proxy rejects unknown fields', function () {
     $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
@@ -207,6 +238,34 @@ test('PUT /api/v1/servers/{uuid}/proxy/configuration rejects missing configurati
             'foo' => 'bar',
         ])
         ->assertUnprocessable();
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration rejects command injection without mutation', function () {
+    $originalProxy = $this->server->proxy->toArray();
+    $configuration = "services:\n  traefik:\n    ports:\n      - '`id>/tmp/pwned`:443'\n";
+
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode($configuration),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.configuration.0', 'Proxy ports must use Docker Compose port syntax with ports from 1 through 65535.');
+
+    expect($this->server->fresh()->proxy->toArray())->toBe($originalProxy);
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration forbids normal members', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $memberToken = serverProxyApiToken($member, $this->team, ['*']);
+
+    SaveProxyConfiguration::shouldNotRun();
+
+    $this->withHeaders(serverProxyApiHeaders($memberToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode("services:\n  traefik:\n    ports: ['80:80']\n"),
+        ])
+        ->assertForbidden();
 });
 
 test('POST /api/v1/servers/{uuid}/proxy/restart queues RestartProxyJob', function () {

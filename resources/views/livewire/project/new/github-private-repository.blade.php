@@ -72,7 +72,7 @@
             <div class="application-settings-section-body">
                 @if ($repositories->isNotEmpty())
                     <div class="flex items-end gap-2">
-                        <x-forms.searchable-listbox id="selected_repository_id" label="Repository" required live
+                        <x-forms.listbox searchable id="selected_repository_id" label="Repository" required live
                             searchPlaceholder="Search repositories…"
                             :options="$repositories->map(fn ($repository) => [
                                 'value' => data_get($repository, 'id'),
@@ -105,7 +105,7 @@
                     </div>
                     <div class="application-settings-section-body space-y-5">
                         <div class="grid gap-4 sm:grid-cols-2">
-                            <x-forms.searchable-listbox id="selected_branch_name" label="Branch" required
+                            <x-forms.listbox searchable id="selected_branch_name" label="Branch" required
                                 searchPlaceholder="Search branches…"
                                 :options="$branches->map(fn ($branch) => [
                                     'value' => data_get($branch, 'name'),
@@ -113,7 +113,7 @@
                                 ])->values()->all()" />
                             <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
                                 ['value' => 'railpack', 'label' => 'Railpack'],
-                                ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                                ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                                 ['value' => 'static', 'label' => 'Static'],
                                 ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                                 ['value' => 'dockercompose', 'label' => 'Docker Compose'],
@@ -133,6 +133,10 @@
                                     helper="Directory containing the generated static assets." />
                             @endif
                         </div>
+
+                        @if ($build_pack === 'nixpacks')
+                            <x-nixpacks-deprecated-callout />
+                        @endif
 
                         @if ($build_pack === 'dockercompose')
                             <div x-data="{

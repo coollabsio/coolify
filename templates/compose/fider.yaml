@@ -10,7 +10,7 @@ services:
     image: getfider/fider:stable
     environment:
       - SERVICE_URL_FIDER_3000
-      - BASE_URL=$SERVICE_URL_FIDER_3000
+      - BASE_URL=$SERVICE_URL_FIDER
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@database:5432/fider?sslmode=disable
       - JWT_SECRET=$SERVICE_PASSWORD_64_FIDER
       - EMAIL_NOREPLY=${EMAIL_NOREPLY:-noreply@example.com}

@@ -15,7 +15,7 @@
     <h3 class="mb-4 text-sm font-semibold text-black dark:text-fg">Internal access</h3>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @if ($currentInternalHostname)
-            <x-forms.copy-button label="Internal hostname" :text="$currentInternalHostname" />
+            <x-forms.copy-input label="Internal hostname" :text="$currentInternalHostname" />
         @else
             <div class="w-full">
                 <label class="mb-1 flex items-center gap-1 text-sm font-medium text-black dark:text-white">Internal hostname</label>
@@ -25,9 +25,9 @@
                     readonly aria-live="polite">
             </div>
         @endif
-        <x-forms.copy-button label="Docker network" :text="$application->destination->network" />
-        <x-forms.copy-button label="Exposed ports" :text="$exposedPorts ?: 'None'" />
-        <x-forms.copy-button label="Network aliases" :text="$networkAliases->implode(', ') ?: 'None'" />
+        <x-forms.copy-input label="Docker network" :text="$application->destination->network" />
+        <x-forms.copy-input label="Exposed ports" :text="$exposedPorts ?: 'None'" />
+        <x-forms.copy-input label="Network aliases" :text="$networkAliases->implode(', ') ?: 'None'" />
     </div>
     <div class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
         <p class="text-sm text-neutral-500 dark:text-fg-dim">

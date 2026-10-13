@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,7 +15,7 @@ use Livewire\Component;
 
 class All extends Component
 {
-    use AuthorizesRequests, EnvironmentVariableProtection;
+    use AuditsApplicationSettings, AuthorizesRequests, EnvironmentVariableProtection;
 
     public $resource;
 
@@ -62,6 +63,8 @@ class All extends Component
      */
     public bool $readyToLoad = false;
 
+    private ?Collection $composeEnvironmentAssignments = null;
+
     protected $listeners = [
         'saveKey' => 'submit',
         'refreshEnvs',
@@ -70,6 +73,20 @@ class All extends Component
 
     public function updatedSearch(): void
     {
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function focusComposeEnvironmentVariable(string $key): void
+    {
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) !== 1) {
+            return;
+        }
+
+        $this->search = $key;
+        $this->variableFilters = [];
+        $this->serviceFilters = [];
+        $this->environmentFilter = 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
@@ -128,7 +145,11 @@ class All extends Component
             $this->page = 1;
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
             $this->resource->settings->use_build_secrets = $this->use_build_secrets;
-            $this->resource->settings->save();
+            if ($this->resource instanceof Application) {
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } else {
+                $this->resource->settings->save();
+            }
             $this->clearEnvironmentVariableCaches();
             if ($this->readyToLoad && $this->view === 'dev') {
                 $this->getDevView();
@@ -214,12 +235,17 @@ class All extends Component
         return $this->environmentVariableRowCount > 0;
     }
 
+    private function canViewEnvironmentValues(): bool
+    {
+        return auth()->user()?->can('manageEnvironment', $this->resource) ?? false;
+    }
+
     private function nullLockedValues($envs)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
-        $envs->each(function ($env) use ($isMember) {
-            if ($env->is_shown_once || $isMember) {
+        $envs->each(function ($env) use ($hideValues) {
+            if ($env->is_shown_once || $hideValues) {
                 $env->value = null;
                 $env->real_value = null;
             }
@@ -674,12 +700,16 @@ class All extends Component
             'kind' => 'managed',
             'scope' => $environmentVariable->is_preview ? 'preview' : 'production',
             'environmentVariable' => $environmentVariable,
+            'composeInfo' => $this->composeInfoFor($environmentVariable->key),
         ];
     }
 
     private function hardcodedEnvironmentVariableRow(array $environmentVariable, bool $isPreview, int $index): array
     {
         $scope = $isPreview ? 'preview' : 'production';
+        $references = $this->composeReferences($environmentVariable['value'] ?? null);
+        $environmentVariable['compose_type'] = $references === [] ? 'literal' : 'derived';
+        $environmentVariable['references'] = $references;
 
         return [
             'id' => 'hardcoded-'.$scope.'-'.$environmentVariable['key'].'-'.($environmentVariable['service_name'] ?? 'default').'-'.$index,
@@ -753,7 +783,14 @@ class All extends Component
         }
         // Otherwise keep order from docker-compose file
 
-        return $hardcodedVars;
+        // Compose content is visible only to users who can edit the resource.
+        $canViewValues = auth()->user()?->can('update', $this->resource) ?? false;
+
+        return $hardcodedVars->map(fn (array $variable): array => [
+            ...$variable,
+            'value' => $canViewValues ? $variable['value'] : null,
+            'is_value_hidden' => ! $canViewValues,
+        ]);
     }
 
     /** @return list<string> */
@@ -786,24 +823,79 @@ class All extends Component
 
     private function isSelfReferencingComposeVariable(array $variable): bool
     {
-        $value = $variable['value'] ?? null;
-        if (! is_string($value)) {
-            return false;
-        }
-
-        if ($value === '$'.$variable['key']) {
+        if ($variable['is_passthrough'] ?? false) {
             return true;
         }
 
-        $reference = extractBalancedBraceContent($value);
-        if ($reference === null || $reference['start'] !== 1 || $reference['end'] !== strlen($value) - 1) {
-            return false;
+        $reference = $this->directComposeReference($variable['value'] ?? null);
+
+        return $reference !== null && $reference['key'] === $variable['key'];
+    }
+
+    /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    private function composeInfoFor(string $key): ?array
+    {
+        return dockerComposeEnvironmentVariableInfo(
+            $this->resource->docker_compose_raw ?? $this->resource->docker_compose,
+            $key
+        );
+    }
+
+    private function composeEnvironmentAssignments(): Collection
+    {
+        if ($this->composeEnvironmentAssignments !== null) {
+            return $this->composeEnvironmentAssignments;
         }
 
-        $splitReference = splitOnOperatorOutsideNested($reference['content']);
-        $referencedKey = $splitReference['variable'] ?? $reference['content'];
+        $dockerCompose = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
 
-        return $referencedKey === $variable['key'];
+        return $this->composeEnvironmentAssignments = blank($dockerCompose)
+            ? collect()
+            : extractHardcodedEnvironmentVariables($dockerCompose);
+    }
+
+    /** @return list<string> */
+    private function composeReferences(mixed $value): array
+    {
+        if (! is_string($value) || ! str_contains($value, '$')) {
+            return [];
+        }
+
+        return extractDockerComposeEnvironmentVariableReferences($value)->all();
+    }
+
+    /** @return array{key: string, default: ?string, operator: ?string, required: bool}|null */
+    private function directComposeReference(mixed $value): ?array
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        if (preg_match('/^\$([A-Za-z_][A-Za-z0-9_]*)$/', $value, $bareMatch) === 1) {
+            return ['key' => $bareMatch[1], 'default' => null, 'operator' => null, 'required' => false];
+        }
+
+        $balancedReference = extractBalancedBraceContent($value);
+        if ($balancedReference === null || $balancedReference['start'] !== 1 || $balancedReference['end'] !== strlen($value) - 1) {
+            return null;
+        }
+
+        $splitReference = splitOnOperatorOutsideNested($balancedReference['content']);
+        if ($splitReference === null) {
+            return [
+                'key' => $balancedReference['content'],
+                'default' => null,
+                'operator' => null,
+                'required' => false,
+            ];
+        }
+
+        return [
+            'key' => $splitReference['variable'],
+            'default' => str_contains($splitReference['operator'], '-') ? $splitReference['default'] : null,
+            'operator' => $splitReference['operator'],
+            'required' => str_contains($splitReference['operator'], '?'),
+        ];
     }
 
     public function getDevView()
@@ -816,25 +908,28 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
+        return $variables
+            ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
+            ->map(function ($item) use ($hideValues) {
+                if ($hideValues) {
+                    return "$item->key=(Hidden, only admins can view)";
+                }
+                if ($item->is_shown_once) {
+                    return "$item->key=(Locked Secret, delete and add again to change)";
+                }
+                if ($item->is_multiline) {
+                    return "$item->key=(Multiline environment variable, edit in normal view)";
+                }
 
-            return "$item->key=$item->value";
-        })->join("\n");
+                return "$item->key=$item->value";
+            })->join("\n");
     }
 
     public function switch()
     {
+        $this->authorize('view', $this->resource);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         if ($this->view === 'dev') {
             $this->ensureEnvironmentVariablesLoaded();
@@ -908,8 +1003,7 @@ class All extends Component
         $deletedCount = $this->deleteRemovedVariables(false, $variables);
         if ($deletedCount > 0) {
             $changesMade = true;
-        } elseif ($deletedCount === 0 && $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->exists()) {
-            // If we tried to delete but couldn't (due to Docker Compose), mark as error
+        } elseif ($deletedCount < 0) {
             $errorOccurred = true;
         }
 
@@ -926,8 +1020,7 @@ class All extends Component
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
             if ($deletedPreviewCount > 0) {
                 $changesMade = true;
-            } elseif ($deletedPreviewCount === 0 && $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($previewVariables))->exists()) {
-                // If we tried to delete but couldn't (due to Docker Compose), mark as error
+            } elseif ($deletedPreviewCount < 0) {
                 $errorOccurred = true;
             }
 
@@ -988,6 +1081,12 @@ class All extends Component
         // Get all environment variables that will be deleted
         $variablesToDelete = $this->resource->$method()->whereNotIn('key', array_keys($variables))->get();
 
+        // Generated Compose variables are managed by Coolify and must survive a bulk
+        // replacement even when they are omitted from the pasted environment file.
+        $variablesToDelete = $variablesToDelete->reject(
+            fn (EnvironmentVariable $environmentVariable): bool => $this->isProtectedEnvironmentVariable($environmentVariable->key)
+        );
+
         // If there are no variables to delete, return 0
         if ($variablesToDelete->isEmpty()) {
             return 0;
@@ -1001,13 +1100,13 @@ class All extends Component
                 if ($isUsed) {
                     $this->dispatch('error', "Cannot delete environment variable '{$envVar->key}' <br><br>Please remove it from the Docker Compose file first.");
 
-                    return 0;
+                    return -1;
                 }
             }
         }
 
         // If we get here, no variables are used in Docker Compose, so we can delete them
-        $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
+        $this->resource->$method()->whereKey($variablesToDelete->modelKeys())->delete();
 
         return $variablesToDelete->count();
     }

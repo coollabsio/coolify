@@ -39,7 +39,9 @@ class ConfigurationDiffer
             $previous = $previousItems[$key] ?? null;
             $current = $currentItems[$key] ?? null;
 
-            if ($previous === null && ! in_array(data_get($current, 'section'), self::DYNAMIC_SECTIONS, true)) {
+            // Static settings missing from an older snapshot were newly tracked, not changed.
+            // Without any previous snapshot (legacy fallback), every setting is reported.
+            if ($previous === null && $previousItems !== [] && ! in_array(data_get($current, 'section'), self::DYNAMIC_SECTIONS, true)) {
                 continue;
             }
 

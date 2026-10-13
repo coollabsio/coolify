@@ -150,7 +150,7 @@ function encodeGithubPathSegment(string $segment): string
 
 function assertGithubClockInSync(string $apiUrl): void
 {
-    $response = Http::get("{$apiUrl}/zen");
+    $response = Http::GitSource($apiUrl)->get("{$apiUrl}/zen");
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
@@ -166,11 +166,20 @@ function assertGithubClockInSync(string $apiUrl): void
     }
 }
 
+function githubAppPrivateKey(GithubApp $source): ?PrivateKey
+{
+    $privateKey = $source->privateKey;
+
+    return $privateKey?->team_id === $source->team_id ? $privateKey : null;
+}
+
 function generateGithubToken(GithubApp $source, string $type)
 {
+    $privateKey = githubAppPrivateKey($source) ?? throw new RuntimeException('Private key not found for this GitHub App.');
+
     assertGithubClockInSync($source->api_url);
 
-    $signingKey = InMemory::plainText($source->privateKey->private_key);
+    $signingKey = InMemory::plainText($privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
     $now = CarbonImmutable::now()->setTimezone('UTC');
@@ -186,7 +195,7 @@ function generateGithubToken(GithubApp $source, string $type)
     return match ($type) {
         'jwt' => $jwt,
         'installation' => (function () use ($source, $jwt) {
-            $response = Http::withHeaders([
+            $response = Http::GitSource($source->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
             ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
@@ -279,7 +288,7 @@ function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
             return null;
         }
 
-        $privateKey = $source->privateKey ?: PrivateKey::find($source->private_key_id);
+        $privateKey = githubAppPrivateKey($source);
 
         if (! $privateKey) {
             return null;
@@ -289,7 +298,7 @@ function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
 
         $jwt = generateGithubAppJwt($privateKey->private_key, $source->app_id);
 
-        $response = Http::withHeaders([
+        $response = Http::GitSource($source->api_url)->withHeaders([
             'Accept' => 'application/vnd.github+json',
             'X-GitHub-Api-Version' => '2022-11-28',
             'Authorization' => "Bearer {$jwt}",

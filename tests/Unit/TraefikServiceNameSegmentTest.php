@@ -107,3 +107,49 @@ test('application labels keep redirect capture groups single escaped before comp
     expect($labels)
         ->toContain('traefik.http.middlewares.0-application-uuid-to-www.redirectregex.replacement=${1}://www.${2}');
 });
+
+test('fqdnLabelsForTraefik routes each portless domain to its override port', function () {
+    $labels = fqdnLabelsForTraefik(
+        uuid: 'appuuid',
+        domains: collect(['https://one.example.com', 'https://two.example.com']),
+        onlyPort: 80,
+        domainPortOverrides: [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+    );
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-appuuid.rule=Host(`one.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-appuuid.loadbalancer.server.port=3000')
+        ->toContain('traefik.http.routers.https-1-appuuid.rule=Host(`two.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-1-appuuid.loadbalancer.server.port=8080')
+        ->not->toContain('Host(`one.example.com:3000`)')
+        ->not->toContain('Host(`two.example.com:8080`)');
+});
+
+test('fqdnLabelsForTraefik uses onlyPort when a portless domain has no override', function () {
+    $labels = fqdnLabelsForTraefik(
+        uuid: 'appuuid',
+        domains: collect(['https://plain.example.com']),
+        onlyPort: 4000,
+        domainPortOverrides: [],
+    );
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-appuuid.rule=Host(`plain.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-appuuid.loadbalancer.server.port=4000');
+});
+
+test('fqdnLabelsForTraefik keeps routing a legacy port-bearing FQDN without an override map', function () {
+    $labels = fqdnLabelsForTraefik(
+        uuid: 'appuuid',
+        domains: collect(['https://legacy.example.com:9090']),
+        onlyPort: 80,
+        domainPortOverrides: [],
+    );
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-appuuid.rule=Host(`legacy.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-appuuid.loadbalancer.server.port=9090');
+});

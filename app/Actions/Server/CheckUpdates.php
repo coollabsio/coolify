@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class CheckUpdates
@@ -103,6 +104,15 @@ class CheckUpdates
                     instant_remote_process(['pacman -Sy'], $server);
                     $output = instant_remote_process(['pacman -Qu 2>/dev/null'], $server);
                     $out = $this->parsePacmanOutput($output);
+                    $out['osId'] = $osId;
+                    $out['package_manager'] = $packageManager;
+
+                    return $out;
+                case 'apk':
+                    instant_remote_process(['apk update -q'], $server);
+                    $output = instant_remote_process(['LANG=C apk list --upgradable 2>/dev/null'], $server);
+
+                    $out = $this->parseApkOutput($output);
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
 
@@ -266,11 +276,39 @@ class CheckUpdates
         // Include unparsed lines in the result for debugging if any exist
         if (! empty($unparsedLines)) {
             $result['unparsed_lines'] = $unparsedLines;
-            \Illuminate\Support\Facades\Log::debug('Pacman output contained unparsed lines', [
+            Log::debug('Pacman output contained unparsed lines', [
                 'unparsed_lines' => $unparsedLines,
             ]);
         }
 
         return $result;
+    }
+
+    private function parseApkOutput(string $output): array
+    {
+        $updates = [];
+        $lines = explode("\n", $output);
+
+        foreach ($lines as $line) {
+            // Skip empty lines
+            if (empty($line)) {
+                continue;
+            }
+
+            // Example line: docker-cli-compose-2.31.0-r5 x86_64 {docker-cli-compose} (Apache-2.0) [upgradable from: docker-cli-compose-2.31.0-r4]
+            if (preg_match('/^(.+)-([0-9]\S*) (\S+) \{\S+\} \([^)]+\) \[upgradable from: .+?-([0-9][^\]]+)\]$/', $line, $matches)) {
+                $updates[] = [
+                    'package' => $matches[1],
+                    'new_version' => $matches[2],
+                    'architecture' => $matches[3],
+                    'current_version' => $matches[4],
+                ];
+            }
+        }
+
+        return [
+            'total_updates' => count($updates),
+            'updates' => $updates,
+        ];
     }
 }

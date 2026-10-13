@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
@@ -12,8 +13,11 @@ use App\Models\SharedEnvironmentVariable;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
+use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -21,7 +25,15 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
-    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
+    /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    public ?array $composeInfo = null;
+
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
+
+    protected function secretManagerResource(): ?Model
+    {
+        return $this->isSharedVariable ? null : $this->env->resourceable;
+    }
 
     public $parameters;
 
@@ -83,8 +95,12 @@ class Show extends Component
 
     public array $problematicVariables = [];
 
+    /**
+     * The variable was saved before exact escaping, and the container gets a different value.
+     */
+    public bool $legacyEscapingChangesValue = false;
+
     protected $listeners = [
-        'refreshEnvs' => 'refresh',
         'refresh',
         'compose_loaded' => '$refresh',
     ];
@@ -144,6 +160,8 @@ class Show extends Component
      */
     public function loadValues(): void
     {
+        $this->authorize('update', $this->env);
+
         if ($this->valuesLoaded) {
             return;
         }
@@ -158,10 +176,31 @@ class Show extends Component
         }
 
         $this->hydrateValueFields();
+        $this->legacyEscapingChangesValue = $this->env instanceof ModelsEnvironmentVariable
+            && is_object($this->env->resourceable)
+            && method_exists($this->env->resourceable, 'legacyEscapingChangesValue')
+            && $this->env->resourceable->legacyEscapingChangesValue($this->env);
         $this->valuesLoaded = true;
     }
 
-    public function syncData(bool $toModel = false)
+    public function copyValue(): ?string
+    {
+        if ($this->env->is_shown_once || $this->valuesHiddenForUser()) {
+            return null;
+        }
+
+        if (! $this->env instanceof ModelsEnvironmentVariable) {
+            return $this->env->value;
+        }
+
+        return $this->env->get_real_environment_variables_with_server(
+            $this->env->resolveReferencedValue(),
+            $this->env->resourceable,
+            revealLockedSharedVariables: false,
+        );
+    }
+
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
@@ -204,7 +243,7 @@ class Show extends Component
             $this->is_required = (bool) ($this->env->is_required ?? false);
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
-            $this->isValueHidden = auth()->user()?->isMember() ?? false;
+            $this->isValueHidden = $this->valuesHiddenForUser();
 
             if ($this->valuesLoaded) {
                 $this->hydrateValueFields();
@@ -224,19 +263,26 @@ class Show extends Component
         $this->is_shared = (bool) ($this->env->is_shared ?? false);
 
         if ($this->is_shared) {
-            $this->real_value = $this->env->real_value;
+            $this->real_value = $this->env instanceof ModelsEnvironmentVariable
+                ? $this->env->displayRealValue()
+                : $this->env->real_value;
             $this->is_really_required = $this->is_required && blank($this->real_value);
         } else {
             $this->real_value = null;
             $this->is_really_required = $this->is_required && blank($this->value);
         }
 
-        if ($this->env->is_shown_once || auth()->user()?->isMember()) {
+        if ($this->env->is_shown_once || $this->valuesHiddenForUser()) {
             $this->value = null;
             $this->real_value = null;
         }
 
-        $this->isValueHidden = auth()->user()?->isMember() ?? false;
+        $this->isValueHidden = $this->valuesHiddenForUser();
+    }
+
+    private function valuesHiddenForUser(): bool
+    {
+        return auth()->user()?->cannot('update', $this->env) ?? true;
     }
 
     public function checkEnvs()
@@ -269,12 +315,26 @@ class Show extends Component
         }
         $this->serialize();
         $this->env->save();
-        $this->checkEnvs();
-        $this->dispatch('refreshEnvs');
+        $this->refresh();
+        $this->dispatch('refreshEnvs')->to(All::class);
     }
 
     public function instantSave()
     {
+        $this->submit();
+    }
+
+    public function useComposeDefault(): void
+    {
+        $this->authorize('update', $this->env);
+        $this->loadValues();
+        $composeInfo = $this->serverComposeInfo();
+        if ($this->env->is_shown_once || $composeInfo === null || $composeInfo['default'] === null || $composeInfo['required']) {
+            return;
+        }
+
+        $this->env->preserve_compose_null = false;
+        $this->value = null;
         $this->submit();
     }
 
@@ -283,6 +343,17 @@ class Show extends Component
         try {
             $this->authorize('update', $this->env);
             $this->loadValues();
+
+            $composeInfo = $this->serverComposeInfo();
+            if ($composeInfo !== null) {
+                $storedKey = $this->env->fresh()?->key;
+                if ($storedKey === null || $this->key !== $storedKey) {
+                    $this->key = $storedKey ?? $this->key;
+                    $this->dispatch('error', 'Compose-linked environment variable names cannot be changed.');
+
+                    return;
+                }
+            }
 
             if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
@@ -296,11 +367,41 @@ class Show extends Component
             $this->syncData(true);
             $this->syncData(false);
             $this->dispatch('success', 'Environment variable updated.');
+            $this->dispatch('environment-variable-updated', envId: $this->env->id);
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
+
+            if ($this->is_required && $this->resource instanceof Service) {
+                event(new ApplicationConfigurationChanged($this->resource->team()->id));
+            }
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    private function serverComposeInfo(): ?array
+    {
+        if ($this->isSharedVariable) {
+            return null;
+        }
+
+        $storedEnvironmentVariable = $this->env->fresh();
+        if ($storedEnvironmentVariable === null) {
+            return null;
+        }
+
+        $resource = $storedEnvironmentVariable->resourceable;
+        if (! $resource instanceof Application && ! $resource instanceof Service) {
+            return null;
+        }
+
+        return dockerComposeEnvironmentVariableInfo(
+            $resource->docker_compose_raw ?? $resource->docker_compose,
+            $storedEnvironmentVariable->key
+        );
     }
 
     #[Computed]
@@ -309,7 +410,7 @@ class Show extends Component
         // Shared across all Show row components in the same request (edit modals).
         static $requestCache = [];
 
-        $team = currentTeam();
+        $team = $this->isSharedVariable ? $this->env->team : $this->env->resourceable?->team();
         $cacheKey = implode('|', [
             $team?->id ?? 'none',
             data_get($this->parameters, 'project_uuid', ''),

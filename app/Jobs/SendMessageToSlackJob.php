@@ -2,12 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Models\SlackNotificationSettings;
 use App\Notifications\Dto\SlackMessage;
 use App\Rules\SafeWebhookUrl;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
@@ -16,7 +19,7 @@ use Illuminate\Support\Facades\Validator;
 
 class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -30,7 +33,8 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         private SlackMessage $message,
-        private string $webhookUrl
+        private string $webhookUrl,
+        public ?SlackNotificationSettings $settings = null,
     ) {
         $this->onQueue('high');
     }
@@ -62,18 +66,17 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if ($this->isSlackWebhook()) {
-            $this->sendToSlack($httpOptions);
-
-            return;
-        }
-
         /**
          * This works with Mattermost and as a fallback also with Slack, the notifications just look slightly different and advanced formatting for slack is not supported with Mattermost.
          *
          * @see https://github.com/coollabsio/coolify/pull/6139#issuecomment-3756777708
          */
-        $this->sendToMattermost($httpOptions);
+        $response = $this->isSlackWebhook()
+            ? $this->sendToSlack($httpOptions)
+            : $this->sendToMattermost($httpOptions);
+
+        // 403: posting is not allowed, 404: the webhook or channel was removed, 410: the channel is archived.
+        $this->handleNotificationResponse($response, 'Slack', in_array($response->status(), [403, 404, 410], true));
     }
 
     private function isSlackWebhook(): bool
@@ -93,9 +96,9 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @param  array<string, mixed>  $httpOptions
      */
-    private function sendToSlack(array $httpOptions): void
+    private function sendToSlack(array $httpOptions): Response
     {
-        Http::withOptions($httpOptions)->post($this->webhookUrl, [
+        return Http::withOptions($httpOptions)->post($this->webhookUrl, [
             'text' => $this->message->title,
             'blocks' => [
                 [
@@ -136,11 +139,11 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @param  array<string, mixed>  $httpOptions
      */
-    private function sendToMattermost(array $httpOptions): void
+    private function sendToMattermost(array $httpOptions): Response
     {
         $username = config('app.name');
 
-        Http::withOptions($httpOptions)->post($this->webhookUrl, [
+        return Http::withOptions($httpOptions)->post($this->webhookUrl, [
             'username' => $username,
             'attachments' => [
                 [

@@ -18,9 +18,24 @@ class DecideWhatToDoWithUser
         }
         if (auth()?->user()?->currentTeam()) {
             refreshSession(auth()->user()->currentTeam());
+            // A team is already active; the selection screen no longer applies.
+            if ($request->routeIs('team.select')) {
+                return redirect()->route('dashboard');
+            }
         } elseif (auth()?->user()?->teams?->count() > 0) {
-            // User's session team is invalid (e.g., removed from team), switch to first available team
-            refreshSession(auth()->user()->teams->first());
+            // No active team in the session (fresh login or invalidated selection).
+            // Restore the last active team, or the sole team of a single-team user.
+            $resolvedTeam = auth()->user()->resolveStoredTeam();
+            if ($resolvedTeam) {
+                refreshSession($resolvedTeam);
+            } elseif ($request->routeIs('team.select') || $request->routeIs('*livewire.update')) {
+                // Ambiguous choice: let the user pick a team on the selection screen.
+                // Livewire's update endpoint must pass through too, otherwise the
+                // selection action's AJAX call is redirected to HTML and never runs.
+                return $next($request);
+            } else {
+                return redirect()->route('team.select');
+            }
         }
         if (! auth()->user() || ! isCloud()) {
             if (! isCloud() && showBoarding() && ! in_array($request->path(), allowedPathsForBoardingAccounts())) {

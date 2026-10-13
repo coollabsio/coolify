@@ -28,7 +28,7 @@
         <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($tokens as $token)
                 <a wire:key="{{ $provider }}-token-{{ $token->id }}"
-                    class="group flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                    class="group flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     href="{{ route('server.create.token', ['type' => $routeType ?: $provider, 'token_uuid' => $token->uuid]) }}"
                     {{ wireNavigate() }}>
                     <div class="flex items-start gap-3">
