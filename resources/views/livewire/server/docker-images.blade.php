@@ -13,11 +13,13 @@
             <x-application.settings-section id="server-docker-images-section" title="Images"
                 helper="Docker images stored on this server. Images that no container uses can be deleted here."
                 flush>
-                <x-slot:actions>
-                    @if ($usage)
+                @if ($usage)
+                    <x-slot:badges>
                         <x-status-badge :status="'Total ' . $usage['size']" type="neutral" />
                         <x-status-badge :status="'Reclaimable ' . $usage['reclaimable']" type="warning" />
-                    @endif
+                    </x-slot:badges>
+                @endif
+                <x-slot:actions>
                     <x-forms.button wire:click="load">
                         <x-reicon name="refresh" class="size-3.5" />
                         Refresh
@@ -104,6 +106,15 @@
                             </div>
                         @endforeach
                     </div>
+                    <x-table-pagination :from="$visibleImages->firstItem()" :to="$visibleImages->lastItem()"
+                        :total="$visibleImages->total()" :current-page="$visibleImages->currentPage()"
+                        :last-page="$visibleImages->lastPage()" wire-target="previousPage,nextPage,perPage"
+                        previous-action="previousPage" next-action="nextPage">
+                        <x-slot:pageSize>
+                            <x-page-size-select model="perPage" livewire
+                                storage-key="coolify.page-size.server-docker-images" />
+                        </x-slot:pageSize>
+                    </x-table-pagination>
                 @endif
             </x-application.settings-section>
         </div>
