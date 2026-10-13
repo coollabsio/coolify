@@ -114,7 +114,7 @@ class BackupExecutions extends Component
     private function formatExecutions(Collection $rows): Collection
     {
         $databaseExecutions = ScheduledDatabaseBackupExecution::query()
-            ->with(['scheduledDatabaseBackup.database', 'scheduledDatabaseBackup.s3'])
+            ->with(['scheduledDatabaseBackup.database', 'scheduledDatabaseBackup.s3', 'scheduledDatabaseBackup.s3Storages'])
             ->whereIn('id', $rows->where('type', 'database')->pluck('id'))
             ->get()->keyBy('id');
         $volumeExecutions = ScheduledVolumeBackupExecution::query()
@@ -128,11 +128,16 @@ class BackupExecutions extends Component
             $isDatabase = $row->type === 'database';
             $execution = $isDatabase ? $databaseExecutions->get($row->id) : $volumeExecutions->get($row->id);
             $schedule = $isDatabase ? $execution->scheduledDatabaseBackup : $execution->scheduledVolumeBackup;
-            $storage = $isDatabase ? ($schedule->save_s3 ? $schedule->s3 : null) : $execution->s3;
-            if ($storage?->team_id !== $serviceTeamId) {
-                $storage = null;
-            }
-            $storageLabel = $storage ? $storage->name.' (bucket: '.$storage->bucket.')' : 'Unavailable';
+            $storages = match (true) {
+                ! $isDatabase => collect([$execution->s3]),
+                ! $schedule->save_s3 => collect(),
+                $schedule->s3Storages->isNotEmpty() => $schedule->s3Storages,
+                default => collect([$schedule->s3]),
+            };
+            $storageLabel = $storages
+                ->filter(fn ($storage) => $storage?->team_id === $serviceTeamId)
+                ->map(fn ($storage) => $storage->name.' (bucket: '.$storage->bucket.')')
+                ->implode(', ') ?: 'Unavailable';
             if ($isDatabase && ! $schedule->save_s3) {
                 $storageLabel = 'Not configured';
             } elseif (! $isDatabase && ! $execution->s3_storage_id && ! $execution->s3_uploaded && ! $execution->s3_storage_deleted) {

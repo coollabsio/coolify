@@ -10,13 +10,15 @@
             <x-application.settings-section title="API disabled"
                 description="Enable the Coolify API before creating access tokens.">
                 <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
-                    size="sm">
-                    <x-slot:actions>
-                        <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                            Open settings
-                        </a>
-                    </x-slot:actions>
+                    description="{{ isInstanceAdmin() ? 'Enable API access in instance settings to issue tokens.' : 'Ask an instance admin to enable API access.' }}"
+                    icon-name="keys" size="sm">
+                    @if (isInstanceAdmin())
+                        <x-slot:actions>
+                            <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
+                                Enable API access
+                            </a>
+                        </x-slot:actions>
+                    @endif
                 </x-empty>
             </x-application.settings-section>
         </div>

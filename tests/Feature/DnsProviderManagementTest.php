@@ -120,6 +120,23 @@ test('a cloudflare record is created and tracked as managed by coolify', functio
         && $request->data()['comment'] === $record->ownershipComment());
 });
 
+test('cloudflare records are created proxied only when the credential enables proxy mode', function (?array $metadata, bool $proxied) {
+    $token = IntegrationToken::factory()->create(['provider' => 'cloudflare', 'token' => 'secret', 'metadata' => $metadata]);
+    $zone = DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records' => Http::response(['success' => true, 'result' => ['id' => 'record-1']]),
+    ]);
+
+    app(CloudflareDnsProvider::class)->createRecord($zone, 'app.example.com', '203.0.113.10');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST' && $request->data()['proxied'] === $proxied);
+})->with([
+    'default' => [null, false],
+    'enabled' => [['proxied_dns' => true], true],
+]);
+
 test('queued dns configuration creates the record and broadcasts completion', function () {
     Event::fake([DnsRecordConfigurationFinished::class]);
     $token = IntegrationToken::factory()->create(['provider' => 'cloudflare', 'token' => 'secret']);

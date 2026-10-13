@@ -156,7 +156,7 @@ class Change extends Component
                 $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
             }
             if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+                $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
             }
 
             $this->parameters = get_route_parameters();

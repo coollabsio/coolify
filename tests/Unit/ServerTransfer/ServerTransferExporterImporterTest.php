@@ -913,6 +913,26 @@ test('import rejects shell-like file ownership and mode metadata', function (str
     'option mode' => ['chmod', '--reference=/etc/passwd'],
 ]);
 
+test('transfer keeps the legacy escaping flag and treats old exports as legacy', function () {
+    $secret = $this->application->environment_variables()->where('key', 'APP_SECRET')->firstOrFail();
+    $secret->uses_legacy_escaping = true;
+    $secret->save();
+
+    $bundle = $this->exporter->export($this->server);
+    $exported = collect($bundle['projects'][0]['environments'][0]['applications'][0]['environment_variables'])
+        ->firstWhere('key', 'APP_SECRET');
+
+    $importEnvVars = new ReflectionMethod($this->importer, 'importEnvVars');
+    $importEnvVars->invoke($this->importer, [
+        ['key' => 'EXACT_VAR', 'value' => 'a', 'uses_legacy_escaping' => false],
+        ['key' => 'OLD_EXPORT_VAR', 'value' => 'b'],
+    ], $this->application, false);
+
+    expect($exported['uses_legacy_escaping'])->toBeTrue()
+        ->and($this->application->environment_variables()->where('key', 'EXACT_VAR')->first()->uses_legacy_escaping)->toBeFalse()
+        ->and($this->application->environment_variables()->where('key', 'OLD_EXPORT_VAR')->first()->uses_legacy_escaping)->toBeTrue();
+});
+
 test('transfer keeps whether a volume ignores the Compose driver options', function (?bool $exported, bool $expected) {
     LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => (bool) $exported]);
     $bundle = $this->exporter->export($this->server);
@@ -1012,4 +1032,42 @@ test('export warns about secret manager links without exporting the integration 
     $result = $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
 
     expect($result['warnings'])->toContain($warning);
+});
+
+test('transfer keeps the Traefik certificate resolver of applications and service applications', function () {
+    $this->application->settings->update(['traefik_certificate_resolver' => 'none']);
+    $serviceApp = new ServiceApplication;
+    $serviceApp->forceFill([
+        'service_id' => $this->service->id,
+        'name' => 'whoami',
+        'fqdn' => 'https://whoami.example.com',
+        'image' => 'traefik/whoami:latest',
+        'traefik_certificate_resolver' => 'cloudflare',
+        'status' => 'running:healthy',
+    ]);
+    $serviceApp->uuid = 'svc-app-resolver';
+    $serviceApp->save();
+    $originalAppUuid = $this->application->uuid;
+
+    $bundle = $this->exporter->export($this->server);
+
+    ServiceApplication::withoutEvents(function () {
+        ServiceApplication::withTrashed()->get()->each->forceDelete();
+    });
+    DB::table('environment_variables')->delete();
+    DB::table('local_persistent_volumes')->delete();
+    DB::table('scheduled_database_backups')->delete();
+    DB::table('scheduled_tasks')->delete();
+    DB::table('services')->delete();
+    DB::table('applications')->delete();
+    DB::table('standalone_postgresqls')->delete();
+    DB::table('standalone_dockers')->delete();
+    DB::table('servers')->delete();
+    $this->privateKey->delete();
+    Tag::query()->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none')
+        ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
 });

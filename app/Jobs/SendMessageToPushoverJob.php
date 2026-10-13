@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\PushoverNotificationSettings;
 use App\Notifications\Dto\PushoverMessage;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,7 +15,7 @@ use Illuminate\Support\Facades\Http;
 
 class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -33,6 +35,7 @@ class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
         public PushoverMessage $message,
         public string $token,
         public string $user,
+        public ?PushoverNotificationSettings $settings = null,
     ) {
         $this->onQueue('high');
     }
@@ -43,8 +46,10 @@ class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         $response = Http::post('https://api.pushover.net/1/messages.json', $this->message->toPayload($this->token, $this->user));
-        if ($response->failed()) {
-            throw new \RuntimeException('Pushover notification failed with '.$response->status().' status code.'.$response->body());
-        }
+
+        // Pushover marks the invalid field in the error body, for example {"token": "invalid"}.
+        $isConfigurationError = $response->clientError()
+            && ($response->json('token') === 'invalid' || $response->json('user') === 'invalid');
+        $this->handleNotificationResponse($response, 'Pushover', $isConfigurationError);
     }
 }

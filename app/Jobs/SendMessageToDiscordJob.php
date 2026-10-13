@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\DiscordNotificationSettings;
 use App\Notifications\Dto\DiscordMessage;
 use App\Rules\SafeWebhookUrl;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,7 +18,7 @@ use Illuminate\Support\Facades\Validator;
 
 class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -34,7 +36,8 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public DiscordMessage $message,
-        public string $webhookUrl
+        public string $webhookUrl,
+        public ?DiscordNotificationSettings $settings = null,
     ) {
         $this->onQueue('high');
     }
@@ -69,6 +72,9 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        Http::withOptions($httpOptions)->post($this->webhookUrl, $this->message->toPayload());
+        $response = Http::withOptions($httpOptions)->post($this->webhookUrl, $this->message->toPayload());
+
+        // 401: invalid webhook token, 403: missing access, 404: unknown (deleted) webhook.
+        $this->handleNotificationResponse($response, 'Discord', in_array($response->status(), [401, 403, 404], true));
     }
 }

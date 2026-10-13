@@ -38,6 +38,7 @@ use OpenApi\Attributes as OA;
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
         'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
+        'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -71,6 +72,16 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    /**
+     * Allowed Traefik certificate resolver names; also keeps the value safe inside generated labels.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_PATTERN = '/^[A-Za-z0-9_-]+$/';
+
+    /**
+     * Resolver value that turns the resolver off (no certresolver label) on a resource or server.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_NONE = 'none';
+
     public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
 
     public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
@@ -87,6 +98,9 @@ class ServerSetting extends Model
         'is_usable',
         'wildcard_domain',
         'is_cloudflare_tunnel',
+        'cloudflare_tunnel_id',
+        'cloudflare_tunnel_account_id',
+        'cloudflare_tunnel_integration_token_id',
         'is_logdrain_newrelic_enabled',
         'logdrain_newrelic_license_key',
         'logdrain_newrelic_base_uri',
@@ -134,6 +148,7 @@ class ServerSetting extends Model
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
         'traffic_ip_mode',
+        'traefik_certificate_resolver',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
@@ -330,7 +345,7 @@ class ServerSetting extends Model
         return match (true) {
             filled($fqdn) => $fqdn,
             filled($publicIpv4) => 'http://'.$publicIpv4.':8000',
-            filled($publicIpv6) => 'http://'.$publicIpv6.':8000',
+            filled($publicIpv6) => 'http://'.formatHostForUrl($publicIpv6).':8000',
             default => null,
         };
     }
@@ -392,7 +407,7 @@ class ServerSetting extends Model
         }
 
         $request = request();
-        $host = strtolower($request->getHost());
+        $host = normalizeIpAddress(strtolower($request->getHost()));
 
         if (
             $host === 'localhost' ||

@@ -14,6 +14,9 @@ use Laravel\Fortify\Events\RecoveryCodesGenerated;
 use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
 use Laravel\Fortify\Events\TwoFactorAuthenticationDisabled;
 use Laravel\Fortify\Events\TwoFactorAuthenticationEnabled;
+use Laravel\Passkeys\Events\PasskeyDeleted;
+use Laravel\Passkeys\Events\PasskeyRegistered;
+use Laravel\Passkeys\Events\PasskeyVerified;
 use SocialiteProviders\Authentik\AuthentikExtendSocialite;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Clerk\ClerkExtendSocialite;
@@ -71,6 +74,15 @@ class EventServiceProvider extends ServiceProvider
         });
         Event::listen(RecoveryCodesGenerated::class, function (RecoveryCodesGenerated $event): void {
             auditLog('auth.user.recovery_codes_regenerated', $this->authContext($event->user));
+        });
+        Event::listen(PasskeyRegistered::class, function (PasskeyRegistered $event): void {
+            auditLog('auth.user.passkey_registered', $this->authContext($event->user));
+        });
+        Event::listen(PasskeyVerified::class, function (PasskeyVerified $event): void {
+            auditLog('auth.user.passkey_verified', $this->authContext($event->user));
+        });
+        Event::listen(PasskeyDeleted::class, function (PasskeyDeleted $event): void {
+            auditLog('auth.user.passkey_deleted', $this->authContext($event->user));
         });
     }
 

@@ -12,7 +12,7 @@ class SmtpTransportFactory
         $mode = self::encryptionMode($settings);
 
         $transport = new EsmtpTransport(
-            $settings->smtp_host,
+            formatHostForUrl((string) $settings->smtp_host),
             (int) $settings->smtp_port,
             match ($mode) {
                 'none' => false,

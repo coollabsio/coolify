@@ -15,7 +15,7 @@
                         'lg:col-span-2' => !str_starts_with(strtolower($fqdn ?? ''), 'https://'),
                     ])>
                         <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
-                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-warning'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS."
+                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-warning'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS.<br><br>Passkeys are tied to this domain. If you change it, users must add their passkeys again."
                             placeholder="https://coolify.yourdomain.com" />
                     </div>
 

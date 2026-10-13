@@ -151,6 +151,10 @@ describe('owner resolution', function () {
             // Deployed before mid-2024: compose project was the deployment directory, the compose service starts with the UUID.
             ->and(resolveContainerOwner($applications, ['coolify.applicationId' => '999999', 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => $this->application->uuid.'-104512123456'], 'application')?->id)->toBe($this->application->id)
             ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => 'other-instance-uuid-104512123456'], 'application'))->toBeNull()
+            // Compose application with a custom start command: the compose project is the deployment directory, the container name is `{service}-{uuid}-{suffix}`.
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => '999999', 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => 'public-api', 'coolify.name' => 'public-api-'.$this->application->uuid.'-104512123456'], 'application')?->id)->toBe($this->application->id)
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => 'public-api', 'coolify.name' => 'public-api-other-instance-uuid-104512123456'], 'application'))->toBeNull()
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'deployment-dir', 'coolify.name' => 'public-api-'.$this->application->uuid.'x-104512123456'], 'application'))->toBeNull()
             ->and(implode("\n", dockerPsByOwnerCommands('application', 'app-uuid')))->not->toContain('label=coolify.applicationId=');
     });
 
@@ -163,9 +167,9 @@ describe('owner resolution', function () {
             ->and($commands[1])->toContain("--filter 'label=coolify.applicationId'")
             ->toContain("--filter 'label=com.docker.compose.project=app-uuid'")
             ->toContain("--filter 'label=coolify.pullRequestId=0'")
-            // Deployed before mid-2024: the container name starts with the application UUID.
+            // Compose project is the deployment directory: the container name contains the application UUID.
             ->and($commands[2])->toContain("--filter 'label=coolify.applicationId'")
-            ->toContain("--filter 'name=^app-uuid'")
+            ->toContain("--filter 'name=app-uuid'")
             ->toContain("--filter 'label=coolify.pullRequestId=0'")
             ->and(dockerPsByOwnerCommands('service', 'service-uuid'))->toHaveCount(2);
     });
@@ -284,6 +288,35 @@ describe('status updates after a server transfer', function () {
         $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
         GetContainersStatus::run($this->server->fresh(), collect([[
             'Name' => '/'.$this->application->uuid,
+            'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
+            'RestartCount' => 0,
+            'Config' => ['Labels' => $labels],
+        ]]), collect());
+        expect($this->application->fresh()->status)->toStartWith('running');
+    });
+
+    test('Sentinel push and status check match a 4.3 compose container deployed with a custom start command', function () {
+        $containerName = 'public-api-'.$this->application->uuid.'-104512123456';
+        $labels = [
+            'coolify.managed' => 'true',
+            'coolify.applicationId' => (string) $this->application->id,
+            'coolify.pullRequestId' => '0',
+            'coolify.name' => $containerName,
+            // Without --project-name, the compose project is the deployment directory.
+            'com.docker.compose.project' => 'r8wkc0gk0o4ws8gs4s8wwgs4',
+            'com.docker.compose.service' => 'public-api',
+        ];
+
+        $job = new PushServerUpdateJob($this->server, ['containers' => [[
+            'name' => $containerName, 'state' => 'running', 'health_status' => 'healthy', 'labels' => $labels,
+        ]]]);
+        $job->handle();
+        expect($this->application->fresh()->status)->toStartWith('running');
+
+        $this->application->update(['status' => 'exited']);
+        $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+        GetContainersStatus::run($this->server->fresh(), collect([[
+            'Name' => '/'.$containerName,
             'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
             'RestartCount' => 0,
             'Config' => ['Labels' => $labels],

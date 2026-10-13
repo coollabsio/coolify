@@ -2317,7 +2317,7 @@ html[data-theme="custom"] textarea:disabled {
     gap: 0.5rem;
     width: 100%;
     min-width: 0;
-    height: 2.25rem;
+    height: 2rem;
     padding: 0 0.625rem 0 0.75rem;
     overflow: hidden;
     border-radius: 8px;
@@ -3155,6 +3155,26 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
 }
 
+.fleet-servers-table-grid {
+    grid-template-columns: minmax(9rem, 1.4fr) 8rem 8rem 8rem 5rem 8rem 5.5rem;
+}
+
+.fleet-containers-table-grid {
+    grid-template-columns: 2.25rem minmax(9rem, 1.7fr) minmax(6rem, 0.9fr) minmax(8.5rem, 1fr);
+}
+
+.scheduled-executions-table-grid {
+    grid-template-columns: 5.5rem minmax(9rem, 1fr) minmax(7rem, 0.7fr) 8.5rem 5rem minmax(12rem, 1.5fr);
+}
+
+.scheduler-runs-table-grid {
+    grid-template-columns: 9rem minmax(12rem, 1.5fr) 6rem 6rem 6rem;
+}
+
+.skipped-jobs-table-grid {
+    grid-template-columns: 9rem 7rem minmax(10rem, 1fr) minmax(12rem, 1.4fr);
+}
+
 .server-resources-managed-table-grid {
     grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) 8rem 9.5rem;
 }
@@ -3956,6 +3976,25 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     opacity: 1 !important;
 }
 
+/* View and Export menus sit after the search field and the Lines control. */
+.runtime-log-menus {
+    display: flex;
+    order: 3;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.runtime-log-menu-label {
+    padding: 0.5rem 0.5rem 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #737373;
+}
+
+.dark .runtime-log-menu-label {
+    color: var(--color-fg-faint);
+}
+
 .runtime-log-viewport {
     min-height: 12rem;
     border-radius: 0 0 8px 8px;
@@ -4138,6 +4177,43 @@ html[data-theme="custom"] .runtime-log-columns {
 .runtime-log-without-time [data-line-text] {
     grid-column: 2;
 }
+
+/* Text view: one compact, wrapped text line per log entry, like the old viewer. */
+.runtime-log-text-view {
+    padding-block: 0.5rem;
+}
+
+.runtime-log-viewport .runtime-log-text-view [data-log-line]:not(.hidden) {
+    display: flex;
+    gap: 0.75rem;
+    min-height: 0;
+    padding: 0 1rem;
+    border-bottom: 0;
+    cursor: text;
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+.runtime-log-viewport .runtime-log-text-view [data-log-line]::before,
+.runtime-log-viewport .runtime-log-text-view [data-log-line]::after {
+    display: none;
+}
+
+.runtime-log-viewport .runtime-log-text-view .logs-viewer-timestamp {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.runtime-log-viewport .runtime-log-text-view [data-line-text] {
+    flex: 1 1 auto;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.runtime-log-viewport .runtime-log-text-view .log-error [data-line-text] { color: #e55e73; }
+.runtime-log-viewport .runtime-log-text-view .log-warning [data-line-text] { color: #d79945; }
+.runtime-log-viewport .runtime-log-text-view .log-debug [data-line-text] { color: #929099; }
 
 @container runtime-log-explorer (max-width: 650px) {
     .runtime-log-columns,
