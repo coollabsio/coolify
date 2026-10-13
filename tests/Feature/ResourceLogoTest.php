@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\Service;
 use App\Models\StandaloneKeydb;
 use App\Models\StandalonePostgresql;
@@ -16,13 +18,17 @@ test('databases get the logo of their engine', function () {
         ->toBe(['src' => asset('svgs/resources/keydb.svg'), 'dark' => asset('svgs/resources/keydb-dark.svg'), 'fallback' => null, 'padded' => false]);
 });
 
-test('applications get the logo of how they are built', function (string $buildPack, string $logo) {
-    expect(resource_logo(new Application(['build_pack' => $buildPack]))['src'])->toBe(asset("svgs/resources/{$logo}.svg"));
+test('applications get the logo of how they are built', function (string $buildPack, ?string $sourceType, string $logo) {
+    $application = (new Application)->forceFill(['build_pack' => $buildPack, 'source_type' => $sourceType]);
+
+    expect(resource_logo($application)['src'])->toBe(asset("svgs/resources/{$logo}.svg"));
 })->with([
-    ['nixpacks', 'public-repo'],
-    ['dockerimage', 'docker-image'],
-    ['dockerfile', 'dockerfile'],
-    ['dockercompose', 'docker-compose'],
+    ['nixpacks', null, 'public-repo'],
+    ['railpack', GithubApp::class, 'github-app'],
+    ['static', GitlabApp::class, 'gitlab-app'],
+    ['dockerimage', null, 'docker-image'],
+    ['dockerfile', GithubApp::class, 'dockerfile'],
+    ['dockercompose', GitlabApp::class, 'docker-compose'],
 ]);
 
 test('services get the logo of their template, with the CDN as fallback', function () {

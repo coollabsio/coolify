@@ -26,6 +26,8 @@ function service_logo_urls(mixed $logo): array
 }
 
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -66,12 +68,14 @@ function resource_logo(Model $resource): ?array
     }
 
     if ($resource instanceof Application) {
-        return $resourceLogo(match ($resource->build_pack) {
-            'dockerimage' => 'docker-image',
-            'dockerfile' => 'dockerfile',
-            'dockercompose' => 'docker-compose',
-            default => 'public-repo',
-        });
+        return match (true) {
+            $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
+            $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
+            $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
+            $resource->source_type === GithubApp::class => $resourceLogo('github-app', true),
+            $resource->source_type === GitlabApp::class => $resourceLogo('gitlab-app'),
+            default => $resourceLogo('public-repo'),
+        };
     }
 
     if (! method_exists($resource, 'type')) {
