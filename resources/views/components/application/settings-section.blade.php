@@ -7,7 +7,7 @@
 
 <section {{ $attributes->merge(['class' => 'application-settings-section', 'data-settings-section-title' => $title]) }}>
     <header>
-        <div class="min-w-0 py-0.5">
+        <div @class(['min-w-0 py-0.5', 'flex flex-wrap items-center gap-2' => isset($badges)])>
             @if (filled($description ?? $helper))
                 <h3>
                     <x-helper :helper="$description ?? $helper" :label="'More information about '.$title">
@@ -19,6 +19,7 @@
             @else
                 <h3>{{ $title }}</h3>
             @endif
+            {{ $badges ?? '' }}
         </div>
         @isset($actions)
             <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">

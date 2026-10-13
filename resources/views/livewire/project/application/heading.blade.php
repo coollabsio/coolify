@@ -58,13 +58,13 @@
                             @else
                                 <x-slot:main wire:click="deploy">
                                     <x-reicon name="refresh" class="size-3.5" />
-                                    Deploy
+                                    Redeploy
                                 </x-slot:main>
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
                                     @click="open = false" role="menuitem">
                                     <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Deploy (without cache)
+                                    Redeploy (without cache)
                                 </button>
                                 @if ($application->build_pack !== 'dockercompose')
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -165,13 +165,13 @@
                                     @else
                                         <x-slot:main wire:click="deploy">
                                             <x-reicon name="refresh" class="size-3.5" />
-                                            Deploy
+                                            Redeploy
                                         </x-slot:main>
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            Deploy (without cache)
+                                            Redeploy (without cache)
                                         </button>
                                         @if ($application->build_pack !== 'dockercompose')
                                             <button type="button" class="listbox-option justify-start! gap-2.5!"
