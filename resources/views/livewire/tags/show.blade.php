@@ -19,11 +19,26 @@
                 @endif
             </p>
         </div>
+        @unless (isset($tag))
+            <div class="flex shrink-0 items-center gap-2">
+                @can('create', App\Models\Tag::class)
+                    <x-modal-input title="New tag">
+                        <x-slot:content>
+                            <button type="button" class="button button-highlighted whitespace-nowrap">
+                                <x-reicon name="plus" class="size-3.5" />
+                                New tag
+                            </button>
+                        </x-slot:content>
+                        @include('livewire.tags.partials.new-tag-form')
+                    </x-modal-input>
+                @endcan
+            </div>
+        @endunless
     </header>
 
     @if ($tags->isEmpty())
         <x-empty title="No tags yet"
-            description="Open a resource and add a tag to start grouping related deployments."
+            description="Create a tag, then connect it to resources to group related deployments."
             icon-name="tags" />
     @elseif (! isset($tag))
         <div x-data="tagsIndex()" class="w-full">
@@ -68,27 +83,8 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle :list-url="route('tags.show')"
+                        :canvas-url="route('tags.canvas')" />
                 </div>
             </div>
 
@@ -176,7 +172,7 @@
                     search: '',
                     sortBy: 'name-asc',
                     sortOpen: false,
-                    viewMode: localStorage.getItem('tags-view') || 'grid',
+                    viewMode: @js($this->listView('tags', 'grid')),
                     page: 1,
                     pageSize: 12,
                     tags: @js($tagsJs),
@@ -231,7 +227,7 @@
                     setViewMode(mode) {
                         this.viewMode = mode;
                         this.page = 1;
-                        localStorage.setItem('tags-view', mode);
+                        this.$wire.saveListView('tags', mode);
                     },
                     previousPage() {
                         this.page = Math.max(1, this.page - 1);
@@ -284,6 +280,22 @@
             <x-application.settings-section :title="$tag->name"
                 description="Use this webhook to deploy every resource with this tag.">
                 <x-slot:actions>
+                    <a href="{{ app(App\Services\TagCanvas::class)->connectLink($tag) }}" class="button whitespace-nowrap"
+                        title="Add this tag to resources, and see which resources have it">
+                        <x-reicon name="link" class="size-3.5" />
+                        Connect to resources
+                    </a>
+                    @can('delete', $tag)
+                        <x-modal-confirmation title="Delete this tag?" isErrorButton buttonTitle="Delete"
+                            submitAction="deleteTag" :actions="[
+                                'The tag will be removed from every resource.',
+                                'The deploy webhook of this tag will stop working.',
+                            ]"
+                            confirmationText="{{ $tag->name }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Tag Name below"
+                            shortConfirmationLabel="Tag Name" :confirmWithPassword="false"
+                            step2ButtonText="Delete tag" />
+                    @endcan
                     <x-modal-confirmation title="Redeploy all resources with this tag?"
                         buttonTitle="Redeploy all" submitAction="redeployAll" :actions="[
                             'All resources with this tag will be redeployed.',
@@ -302,7 +314,7 @@
                 description="{{ $resourceCount }} {{ Str::plural('resource', $resourceCount) }} use this tag.">
                 @if ($resourceCount === 0)
                     <x-empty title="No resources use this tag"
-                        description="Add this tag to an application or service to see it here."
+                        description="Connect this tag to resources to see them here."
                         icon-name="tags" size="sm" />
                 @else
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

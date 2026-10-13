@@ -32,6 +32,7 @@
             const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
             const themeColor = localStorage.themeColor || '#6b16ed';
             const customMode = localStorage.customMode || 'dark';
+            document.documentElement.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
             const isDark = theme === 'dark'
                 || (theme === 'custom' && customMode === 'dark')
                 || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -49,7 +50,8 @@
             theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
             themeColor: localStorage.getItem('themeColor') || '#6b16ed',
             customMode: localStorage.getItem('customMode') || 'dark',
-            pageWidth: localStorage.getItem('pageWidth') || 'full',
+            pageWidth: localStorage.getItem('pageWidth') || 'centered',
+            navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
             themeColorFrame: null,
             pickerOpen: false,
             init() {
@@ -78,6 +80,11 @@
                 this.pageWidth = width;
                 localStorage.setItem('pageWidth', width);
                 window.dispatchEvent(new CustomEvent('page-width-changed', { detail: width }));
+            },
+            setNavStyle(style) {
+                this.navStyle = style;
+                localStorage.setItem('navStyle', style);
+                document.documentElement.dataset.navStyle = style;
             },
             previewThemeColor(color) {
                 this.themeColor = color;

@@ -1383,7 +1383,7 @@ html[data-theme="custom"] .coolbox,
 html[data-theme="custom"] .resource-view,
 html[data-theme="custom"] [class~="bg-surface"],
 html[data-theme="custom"] [class~="dark:bg-surface"],
-html[data-theme="custom"] [class~="dark:bg-white/[0.025]"] {
+html[data-theme="custom"] [class*="dark:bg-white/[0.025]"] {
     background-color: var(--color-content-surface) !important;
 }
 
@@ -1856,6 +1856,13 @@ html[data-theme="custom"] textarea:disabled {
     min-width: 0;
 }
 
+/* Below xl the rail is a grid above the content; a canvas has no room for it. */
+@media (max-width: 1279.98px) {
+    .app-main-full .application-settings-navigation {
+        display: none;
+    }
+}
+
 @media (min-width: 1280px) {
     /* Fixed like the main sidebar (3rem → bottom); left tracks its width (--sidebar-w).
        Fixed leaves the grid, so the content sibling is pinned to column 2 below. */
@@ -1901,6 +1908,16 @@ html[data-theme="custom"] textarea:disabled {
 
     .application-settings-navigation::-webkit-scrollbar-thumb:hover {
         background: var(--coollabs-line);
+    }
+
+    /* Canvas pages with a rail (server canvas): the rail stays above the canvas,
+       and the canvas starts after the rail. */
+    .app-main-full .application-settings-navigation {
+        z-index: 20;
+    }
+
+    .app-main-full .application-settings-navigation ~ [data-environment-canvas] {
+        margin-left: calc(210px + 2.5rem);
     }
 
     /* Embeds: keep the surface, drop the fixed positioning. */
@@ -5184,4 +5201,395 @@ a.command-palette-item:focus-visible {
         width: 2.5rem;
         height: 2.5rem;
     }
+}
+
+/* Navigation items: each sidebar icon sits in a framed 32px tile with the 3D
+   depth of .button, like the canvas tool rail. Only the tile reacts; the row
+   has no background. Applies to both navigation styles. */
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle) {
+    height: 2.5rem;
+    padding-left: 0.25rem;
+}
+
+/* Only the icon tile reacts: no row background on hover or for the current
+   item; the current item shows through its tile and its brighter label.
+   In the utilities layer so it can beat the search row's !bg-* utilities
+   (a layered !important wins over an unlayered one). */
+@layer utilities {
+    html :is(.menu-item, .menu-subitem):not(.sidebar-toggle),
+    html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover {
+        background-color: transparent !important;
+    }
+
+    /* The expanded Search field keeps its input fill (see .menu-search below). */
+    html nav:not(.sidebar-collapsed) .menu-search.menu-item {
+        background-color: var(--color-neutral-100) !important;
+    }
+
+    html nav:not(.sidebar-collapsed) .menu-search.menu-item:hover {
+        background-color: var(--color-neutral-200) !important;
+    }
+
+    html.dark nav:not(.sidebar-collapsed) .menu-search.menu-item {
+        background-color: oklch(100% 0 0 / 0.04) !important;
+    }
+
+    html.dark nav:not(.sidebar-collapsed) .menu-search.menu-item:hover {
+        background-color: oklch(100% 0 0 / 0.07) !important;
+    }
+
+    @media (max-width: 1023.98px) {
+        html nav.sidebar-collapsed .menu-search.menu-item {
+            background-color: var(--color-neutral-100) !important;
+        }
+
+        html.dark nav.sidebar-collapsed .menu-search.menu-item {
+            background-color: oklch(100% 0 0 / 0.04) !important;
+        }
+    }
+}
+
+/* The current item's tile takes the accent, like the active tab pill. */
+html :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    color: var(--color-coollabs);
+    border-color: color-mix(in oklab, var(--color-coollabs) 45%, transparent) !important;
+    --button-depth-color: color-mix(in oklab, var(--color-coollabs) 45%, transparent) !important;
+}
+
+html.dark :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    color: var(--color-warning);
+    border-color: color-mix(in oklab, var(--color-warning) 40%, transparent) !important;
+    --button-depth-color: color-mix(in oklab, var(--color-warning) 35%, transparent) !important;
+}
+
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible {
+    outline: none;
+}
+
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible .menu-item-icon {
+    outline: 1px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
+    box-sizing: content-box;
+    width: 1rem;
+    height: 1rem;
+    padding: 0.4375rem;
+    border: 1px solid oklch(0% 0 0 / 0.09);
+    border-radius: 8px;
+    background: #fafafa;
+    opacity: 1;
+    /* Same 3D depth as .button: rests on a 2px ledge, lifts on hover, presses on click. */
+    --button-depth-color: rgb(0 0 0 / 0.22);
+    box-shadow: 0 2px 0 var(--button-depth-color);
+    transition: border-color 120ms, background-color 120ms, box-shadow 80ms, transform 80ms;
+}
+
+html.dark :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
+    --button-depth-color: rgb(255 255 255 / 0.08);
+}
+
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 0 var(--button-depth-color);
+}
+
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):active .menu-item-icon {
+    transform: translateY(2px);
+    box-shadow: none;
+}
+
+html.dark :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
+    border-color: oklch(100% 0 0 / 0.09);
+    background: oklch(100% 0 0 / 0.04);
+}
+
+html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
+html :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    border-color: oklch(0% 0 0 / 0.18);
+    background: #fff;
+}
+
+html.dark :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
+html.dark :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    border-color: oklch(100% 0 0 / 0.18);
+    background: oklch(100% 0 0 / 0.08);
+}
+
+/* Search keeps its original input look while the sidebar is expanded (always on
+   mobile, where the rail never collapses). Only the collapsed rail shows the 3D tile.
+   The icon resets use .menu-search.menu-item to beat the html.dark tile rules. */
+html nav:not(.sidebar-collapsed) .menu-search {
+    height: 2rem;
+    padding-left: 0.625rem;
+}
+
+html nav:not(.sidebar-collapsed) .menu-search.menu-item .menu-item-icon,
+html nav:not(.sidebar-collapsed) .menu-search.menu-item:is(:hover, :active, :focus-visible) .menu-item-icon {
+    box-sizing: border-box;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    outline: none;
+    opacity: 0.9;
+}
+
+html nav:not(.sidebar-collapsed) .menu-search:focus-visible {
+    outline: 1px solid var(--color-accent);
+}
+
+@media (max-width: 1023.98px) {
+    html nav.sidebar-collapsed .menu-search {
+        height: 2rem;
+        padding-left: 0.625rem;
+    }
+
+    html nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon,
+    html nav.sidebar-collapsed .menu-search.menu-item:is(:hover, :active, :focus-visible) .menu-item-icon {
+        box-sizing: border-box;
+        width: 1rem;
+        height: 1rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        transform: none;
+        outline: none;
+        opacity: 0.9;
+    }
+}
+
+@media (min-width: 1024px) {
+    /* The collapsed rail is 64px wide with 40px of content: center the 32px tile. */
+    html .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+}
+
+/* Secondary navigation (settings rails): text-only rows with a filled pill for
+   the current item, like Sentry. Only the main sidebar keeps the icon tiles. */
+html .application-settings-navigation :is(.menu-item, .menu-subitem) {
+    height: 2rem;
+    padding-left: 0.625rem;
+}
+
+html .application-settings-navigation .menu-item-icon {
+    display: none;
+}
+
+/* In the utilities layer to beat the transparent row rule above. */
+@layer utilities {
+    html .application-settings-navigation :is(.menu-item, .menu-subitem):hover {
+        background-color: oklch(0% 0 0 / 0.04) !important;
+    }
+
+    html.dark .application-settings-navigation :is(.menu-item, .menu-subitem):hover {
+        background-color: oklch(100% 0 0 / 0.05) !important;
+    }
+
+    html .application-settings-navigation :is(.menu-item-active, .menu-subitem-active),
+    html .application-settings-navigation :is(.menu-item-active, .menu-subitem-active):hover {
+        background-color: oklch(0% 0 0 / 0.06) !important;
+    }
+
+    html.dark .application-settings-navigation :is(.menu-item-active, .menu-subitem-active),
+    html.dark .application-settings-navigation :is(.menu-item-active, .menu-subitem-active):hover {
+        background-color: oklch(100% 0 0 / 0.08) !important;
+    }
+}
+
+/* Canvases at full zoom: the grid dots turn into small Coolify logos, one
+   per 20px tile. setCanvasDots() (environment-canvas.js) sets .canvas-zoom-max. */
+.canvas-zoom-max {
+    --canvas-dots-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath transform='translate(8 8) scale(0.0125)' d='M64 256H0V64h64Zm0-192V0h256v64Zm0 192h256v64H64Z' fill='rgb(0 0 0 / 0.13)'/%3E%3C/svg%3E");
+}
+
+html.dark .canvas-zoom-max {
+    --canvas-dots-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath transform='translate(8 8) scale(0.0125)' d='M64 256H0V64h64Zm0-192V0h256v64Zm0 192h256v64H64Z' fill='rgb(255 255 255 / 0.09)'/%3E%3C/svg%3E");
+}
+
+.canvas-zoom-max :is([data-ec-viewport], .cv-viewport) {
+    background-image: var(--canvas-dots-image);
+}
+
+/* "Floating" navigation (Appearance → Navigation style): the top bar, sidebar,
+   tab strip, and settings rail float as framed panels over a dotted backdrop,
+   like the canvas islands. Set on <html> by applyStoredTheme() from
+   localStorage.navStyle; the default style keeps edge-to-edge bars. */
+@media (min-width: 1024px) {
+    html[data-nav-style="floating"] {
+        --floating-gap: 0.5rem;
+        --floating-radius: 12px;
+        --floating-line: oklch(0% 0 0 / 0.09);
+        /* Bottom edge of the top bar panel plus one gap. */
+        --floating-top: calc(3rem + var(--floating-gap) * 2);
+    }
+
+    html.dark[data-nav-style="floating"] {
+        --floating-line: oklch(100% 0 0 / 0.08);
+        --floating-dot: rgb(255 255 255 / 0.09);
+    }
+
+    /* Dotted backdrop behind the floating panels and in the gaps between them,
+       like the canvas stage. Fixed so the dots stay still while content scrolls. */
+    html[data-nav-style="floating"] .app-shell {
+        background-image: radial-gradient(circle, var(--floating-dot, rgb(0 0 0 / 0.13)) 1px, transparent 1.3px);
+        background-size: 20px 20px;
+        background-attachment: fixed;
+    }
+
+    html[data-nav-style="floating"] .app-main {
+        background-color: transparent;
+    }
+
+    html[data-nav-style="floating"] .app-topbar {
+        background-color: #fff;
+    }
+
+    html.dark[data-nav-style="floating"] .app-topbar {
+        background-color: var(--color-panel);
+    }
+
+    html[data-nav-style="floating"] :is(.app-topbar, .app-sidebar > div > nav, .app-tabbar) {
+        border: 1px solid var(--floating-line);
+        border-radius: var(--floating-radius);
+    }
+
+    /* The top bar hugs its content (brand, breadcrumb, docked actions)
+       instead of spanning an empty full-width panel. */
+    html[data-nav-style="floating"] .app-topbar {
+        top: var(--floating-gap);
+        left: var(--floating-gap);
+        right: auto;
+        max-width: calc(100vw - var(--floating-gap) * 2);
+    }
+
+    /* The panel border replaces the inner dividers of the top bar. */
+    html[data-nav-style="floating"] .app-topbar > div {
+        border-bottom-width: 0;
+    }
+
+    html[data-nav-style="floating"] .app-sidebar {
+        top: var(--floating-top);
+        bottom: var(--floating-gap);
+        left: var(--floating-gap);
+    }
+
+    html[data-nav-style="floating"] .app-sidebar > div > nav > .sticky {
+        border-radius: 0 0 var(--floating-radius) var(--floating-radius);
+    }
+
+    html[data-nav-style="floating"] .app-main {
+        margin-left: calc(var(--sidebar-w, 14rem) + var(--floating-gap));
+        padding-top: calc(var(--floating-top) + 1.75rem);
+    }
+
+    /* Full-bleed pages (canvases): no top padding gap, and the same gap as the panels. */
+    html[data-nav-style="floating"] .app-main.app-main-full {
+        margin-left: calc(var(--sidebar-w, 14rem) + var(--floating-gap) * 2);
+        padding: var(--floating-top) var(--floating-gap) var(--floating-gap) 0;
+    }
+
+    /* Canvases fill the space under the top bar too, and the canvas root
+       paints the canvas dots (set by the canvas JS) behind the top bar, so
+       the dots are the same there and on the canvas. */
+    html[data-nav-style="floating"] .app-main.app-main-full:has(:is([data-ec-root], .cv-root)) {
+        padding-top: 0;
+    }
+
+    /* The resource canvases fill the whole screen behind the floating panels
+       (top bar, toolbar, sidebar), so the panels do not cut off the cards. */
+    html[data-nav-style="floating"] .app-main.app-main-full:has([data-ec-root]) {
+        margin-left: 0;
+        padding: 0;
+    }
+
+    html[data-nav-style="floating"] .app-main-full [data-ec-root] {
+        padding: 0 !important;
+    }
+
+    html[data-nav-style="floating"] .app-main-full :is([data-ec-root], .cv-root) {
+        padding-top: calc(var(--floating-top) + 0.5rem);
+        background-image: var(--canvas-dots-image, radial-gradient(circle, var(--floating-dot, rgb(0 0 0 / 0.13)) 1px, transparent 1px));
+        background-size: var(--canvas-dots-size, 20px 20px);
+        background-position: var(--canvas-dots-position, 0 0);
+    }
+
+    html[data-nav-style="floating"] .app-main-full :is([data-ec-viewport], .cv-viewport) {
+        background-image: none;
+    }
+
+    html[data-nav-style="floating"] .app-tabbar {
+        top: var(--floating-top);
+        left: calc(var(--sidebar-w, 14rem) + var(--floating-gap) * 2);
+        right: var(--floating-gap);
+    }
+}
+
+@media (min-width: 1280px) {
+    html[data-nav-style="floating"] .application-settings-navigation {
+        top: var(--floating-top);
+        left: calc(var(--sidebar-w, 14rem) + var(--floating-gap) * 2);
+        /* Hug the menu items; long menus scroll inside the viewport. */
+        height: auto;
+        max-height: calc(100dvh - var(--floating-top) - var(--floating-gap));
+        border: 1px solid var(--floating-line);
+        border-radius: var(--floating-radius);
+    }
+
+    /* The canvas fills the screen behind the rail too; the canvas JS keeps cards clear of it. */
+    html[data-nav-style="floating"] .app-main-full .application-settings-navigation ~ [data-environment-canvas] {
+        margin-left: 0;
+    }
+}
+
+/* Floating dark mode: the dotted backdrop shows through see-through surfaces
+   (dark:bg-white/[x] with or without `!`, .button, …). Give the outermost ones the same color as
+   an opaque mix with the app background, like the canvas cards. Nested
+   surfaces keep their tint on top, also inside opaque CSS-class panels
+   (settings sections, boxes, tables, …) that are not app-colored. Generated from the dark:bg-white|black/x
+   utilities used in resources/views and resources/js; in the utilities layer
+   with !important so it beats the !bg-* utilities. */
+@layer utilities {
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/10"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 10%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/15"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 15%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/20"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 20%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/30"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 30%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/40"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 40%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/55"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 55%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-black/60"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #000 60%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/10"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/40"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 40%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.025]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 2.5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.02]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 2%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.035]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 3.5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.03]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 3%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.045]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 4.5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.04]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 4%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.05]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.06]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 6%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.07]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 7%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.08]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 8%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.09]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 9%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.14]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 14%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:bg-white/[0.1]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main :is(.button, .view-toggle):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 6%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/10"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.025]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 2.5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.035]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 3.5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.03]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 3%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.04]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 4%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.05]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 5%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.06]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 6%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.07]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 7%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.08]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 8%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.12]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 12%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.1]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
+    html.dark[data-nav-style="floating"] .app-main .button:not(:disabled):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
 }

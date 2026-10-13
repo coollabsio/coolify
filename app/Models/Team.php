@@ -10,6 +10,7 @@ use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Notifications\Server\Unreachable;
+use App\Services\TeamAvatarStorageService;
 use App\Traits\Auditable;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
@@ -122,6 +123,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             foreach ($team->s3s as $s3) {
                 $s3->delete();
             }
+        });
+
+        static::deleted(function (Team $team) {
+            app(TeamAvatarStorageService::class)->deleteTeamFile($team);
         });
     }
 

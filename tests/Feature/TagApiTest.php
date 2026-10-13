@@ -350,14 +350,15 @@ describe('DELETE /api/v1/applications/{uuid}/tags/{tag_uuid}', function () {
         expect($this->application->tags()->count())->toBe(0);
     });
 
-    test('garbage-collects orphaned tag', function () {
+    test('keeps the tag after its last resource is removed', function () {
         $tag = Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
         $this->application->tags()->attach($tag->id);
 
         $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
             ->deleteJson("/api/v1/applications/{$this->application->uuid}/tags/{$tag->uuid}");
 
-        expect(Tag::find($tag->id))->toBeNull();
+        // Tags can exist without resources; delete them with DELETE /api/v1/tags/{uuid}.
+        expect(Tag::find($tag->id))->not->toBeNull();
     });
 
     test('returns 404 when deleting a tag that is not attached to the application', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Resource;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
 use Illuminate\Support\Collection;
@@ -9,6 +10,8 @@ use Livewire\Component;
 
 class Index extends Component
 {
+    use RemembersCanvasView;
+
     public Project $project;
 
     public Environment $environment;
@@ -54,6 +57,12 @@ class Index extends Component
             ->select('id', 'uuid', 'name', 'project_id')
             ->where('uuid', request()->route('environment_uuid'))
             ->firstOrFail();
+
+        if ($this->prefersCanvasView('environment')) {
+            $this->redirectRoute('project.environment.canvas', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid], navigate: true);
+
+            return;
+        }
 
         $this->project = $project;
 

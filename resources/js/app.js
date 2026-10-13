@@ -1,4 +1,6 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
+import { initializeDeployCanvas } from './deploy-canvas.js';
+import { initializeEnvironmentCanvas } from './environment-canvas.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
@@ -6,6 +8,9 @@ import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
+
+initializeDeployCanvas();
+initializeEnvironmentCanvas();
 
 // Used by the modal-confirmation Blade component to call its submitAction.
 window.parseModalSubmitAction = parseSubmitAction;
