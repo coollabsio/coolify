@@ -86,6 +86,7 @@ function allowedPathsForUnsubscribedAccounts()
         'profile',
         'profile/appearance',
         'profile/passkeys/confirm',
+        'user/confirm-password',
         'user/passkeys',
         'user/passkeys/options',
         'passkeys/confirm',

@@ -61,6 +61,26 @@ it('asks for the password before the add passkey form opens', function () {
         ->assertSessionHas('status', 'passkey-add');
 });
 
+it('lets restricted accounts confirm their password before adding a passkey', function (bool $selfHosted) {
+    config()->set('constants.coolify.self_hosted', $selfHosted);
+    $this->team->update(['show_boarding' => true]);
+    $this->actingAs($this->user)->withSession(['currentTeam' => $this->team]);
+
+    $this->get(route('profile.passkeys.confirm'))->assertRedirect(route('password.confirm'));
+    $this->get(route('password.confirm'))->assertOk();
+    $this->post(route('password.confirm.store'), ['password' => 'wrong-password'])
+        ->assertSessionHasErrors('password');
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+
+    $this->post(route('password.confirm.store'), ['password' => 'password'])
+        ->assertRedirect(route('profile.passkeys.confirm'));
+    expect(session('auth.password_confirmed_at'))->toBeInt();
+    $this->get(route('profile.passkeys.confirm'))
+        ->assertRedirect(route('profile'))
+        ->assertSessionHas('status', 'passkey-add');
+    $this->getJson(route('passkey.registration-options'))->assertOk();
+})->with(['onboarding' => true, 'cloud without a subscription' => false]);
+
 it('records audit events for passkey changes', function (string $eventClass, string $auditName) {
     $passkey = $this->user->passkeys()->create([
         'name' => 'Laptop',
