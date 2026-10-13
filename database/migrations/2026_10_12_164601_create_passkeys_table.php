@@ -22,6 +22,10 @@ return new class extends Migration
 
             $table->index('user_id');
         });
+
+        Schema::table('instance_settings', function (Blueprint $table) {
+            $table->boolean('is_passkey_enabled')->default(true);
+        });
     }
 
     /**
@@ -29,6 +33,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('instance_settings', function (Blueprint $table) {
+            $table->dropColumn('is_passkey_enabled');
+        });
+
         Schema::dropIfExists('passkeys');
     }
 };
