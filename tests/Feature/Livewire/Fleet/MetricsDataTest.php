@@ -1,14 +1,20 @@
 <?php
 
 use App\Livewire\Fleet\Metrics;
+use App\Models\Application;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Concurrency;
 use Livewire\Livewire;
+use Tests\Support\ConcurrentMetricsClient;
 
 uses(RefreshDatabase::class);
 
@@ -19,6 +25,10 @@ class StubMetricsClient extends SentinelMetricsClient
 
     /** @var array<string, array> serverUuid => containers */
     public static array $containers = [];
+
+    public static array $histories = [];
+
+    public static array $failingMetrics = [];
 
     public function summary(): ?array
     {
@@ -32,7 +42,11 @@ class StubMetricsClient extends SentinelMetricsClient
 
     public function history(string $metric, string $range): array
     {
-        return [];
+        if (in_array($metric, self::$failingMetrics, true)) {
+            throw new RuntimeException('metric unavailable');
+        }
+
+        return self::$histories[$this->server->uuid][$metric] ?? [];
     }
 
     public function networkHistory(string $range): array
@@ -49,9 +63,20 @@ class TestableMetrics extends Metrics
     }
 }
 
+class ProcessTestableMetrics extends Metrics
+{
+    protected function metricsClient(Server $server): SentinelMetricsClient
+    {
+        return new ConcurrentMetricsClient($server);
+    }
+}
+
 beforeEach(function () {
+    Concurrency::setDefaultInstance('sync');
     StubMetricsClient::$summaries = [];
     StubMetricsClient::$containers = [];
+    StubMetricsClient::$histories = [];
+    StubMetricsClient::$failingMetrics = [];
 
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $user = User::factory()->create();
@@ -226,4 +251,132 @@ it('passes the spark time axis to the KPI sparklines on first paint', function (
     $component->set('chartData', ['sparkCategories' => [1700000100000], 'cpuSpark' => [12.5]]);
 
     $component->assertSeeHtml('1700000100000');
+});
+
+it('removes a transferred server on refresh', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    $component = Livewire::test(TestableMetrics::class);
+    expect($component->get('serverRows'))->toHaveCount(1);
+
+    $server->update(['team_id' => Team::factory()->create()->id]);
+    $component->call('loadData');
+
+    expect($component->get('serverRows'))->toBe([]);
+    expect($component->get('containersRaw'))->toBe([]);
+    expect($component->get('kpis')['serversTotal'])->toBe(0);
+});
+
+it('permits team members to read metrics', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+
+    expect(Livewire::test(TestableMetrics::class)->get('kpis')['serversOnline'])->toBe(1);
+});
+
+it('keeps host trends when an older Sentinel has no summary endpoint', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$histories = [$server->uuid => ['cpu' => [[1000, 25.0]], 'memory' => [[1000, 100.0]]]];
+
+    $component = Livewire::test(TestableMetrics::class);
+
+    expect($component->get('chartData')['cpu'])->toBe([[1000, 25.0]]);
+    expect($component->get('chartData')['memory'])->toBe([[1000, 100.0]]);
+    expect($component->get('topContainers'))->toBe([]);
+});
+
+it('keeps other metrics when one independent operation fails', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    StubMetricsClient::$histories = [$server->uuid => ['cpu' => [[1000, 25.0]]]];
+    StubMetricsClient::$failingMetrics = ['disk'];
+
+    $component = Livewire::test(TestableMetrics::class);
+
+    expect($component->get('chartData')['cpu'])->toBe([[1000, 25.0]]);
+    expect($component->get('chartData')['disk'])->toBe([]);
+    expect($component->get('kpis')['serversOnline'])->toBe(1);
+});
+
+it('resolves container names for the instance team with id zero', function () {
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    auth()->user()->teams()->attach($rootTeam, ['role' => 'owner']);
+    auth()->user()->unsetRelation('teams');
+    session(['currentTeam' => $rootTeam]);
+    $project = Project::factory()->create(['team_id' => 0]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id]);
+
+    $meta = Livewire::test(TestableMetrics::class)->instance()->containerMeta($application->uuid);
+
+    expect($meta['name'])->toBe($application->name);
+    expect($meta['link'])->toContain($application->uuid);
+});
+
+it('denies metrics refresh after team membership is removed', function () {
+    $this->withoutVite();
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    $component = Livewire::test(TestableMetrics::class);
+
+    auth()->user()->teams()->detach($this->team);
+    auth()->user()->unsetRelation('teams');
+
+    $component->call('loadData')->assertForbidden();
+});
+
+it('clears stale container rankings after a server transfer', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    StubMetricsClient::$containers = [$server->uuid => [['id' => 'private-container', 'cpu' => 10]]];
+    $component = Livewire::test(TestableMetrics::class);
+
+    $server->update(['team_id' => Team::factory()->create()->id]);
+    $component->set('containerMetric', 'memory');
+
+    expect($component->get('topContainers'))->toBe([]);
+    expect($component->get('serverRows'))->toBe([]);
+});
+
+it('merges metrics from real concurrent workers and isolates endpoint failures', function () {
+    Concurrency::setDefaultInstance('process');
+    metricsServer($this->team, $this->privateKey);
+    metricsServer($this->team, $this->privateKey);
+
+    $component = Livewire::test(ProcessTestableMetrics::class);
+
+    expect($component->get('kpis')['serversOnline'])->toBe(2);
+    expect($component->get('topContainers'))->toHaveCount(2);
+    expect($component->get('chartData')['cpu'])->toBe([[1000, 25.0]]);
+    expect($component->get('chartData')['memory'])->toBe([[1000, 200.0]]);
+    expect($component->get('chartData')['disk'])->toBe([]);
+    expect($component->get('chartData')['networkRx'])->toBe([[1000, 10.0]]);
+});
+
+it('clears stale metrics after the last server is deleted', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    StubMetricsClient::$containers = [$server->uuid => [['id' => 'deleted-container', 'cpu' => 10]]];
+    $component = Livewire::test(TestableMetrics::class);
+
+    $server->delete();
+    $component->set('containerMetric', 'memory');
+
+    expect($component->get('topContainers'))->toBe([]);
+    expect($component->get('serverRows'))->toBe([]);
+});
+
+it('repairs the Sentinel token before creating worker clients', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    $server->settings->updateQuietly(['sentinel_token' => 'invalid token']);
+    app()->bind(SentinelMetricsClient::class, fn ($app, $parameters) => new ConcurrentMetricsClient($parameters['server']));
+
+    loadLazy(Livewire::test(Metrics::class));
+
+    $token = $server->settings->fresh()->sentinel_token;
+    expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
+    expect($token)->not->toBe('invalid token');
 });

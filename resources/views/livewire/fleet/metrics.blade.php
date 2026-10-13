@@ -29,7 +29,8 @@ $serverListboxOptions = array_merge(
             <div class="flex flex-wrap items-center gap-2">
                 <div class="relative w-full transition-opacity sm:w-52"
                     wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid">
-                    <x-forms.listbox id="serverUuid" live :options="$serverListboxOptions" placeholder="All servers" />
+                    <x-forms.listbox id="serverUuid" live :options="$serverListboxOptions" placeholder="All servers"
+                        canGate="view" :canResource="$servers->first()" />
                     <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
                         wire:loading.flex wire:target="serverUuid">
                         <x-loading compact aria-label="Loading metrics" />

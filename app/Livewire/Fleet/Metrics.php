@@ -8,7 +8,9 @@ use App\Models\Server;
 use App\Services\FleetMetricsAggregator;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Concurrency;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -16,6 +18,7 @@ use Livewire\Component;
 #[Lazy]
 class Metrics extends Component
 {
+    use AuthorizesRequests;
     use BuildsMetricsChartPayload;
 
     public string $chartId = 'fleet-metrics';
@@ -59,11 +62,38 @@ class Metrics extends Component
 
     public function mount(): void
     {
-        $allServers = Server::ownedByCurrentTeamCached();
+        $this->refreshServers();
 
-        $this->servers = $allServers
+        $this->normalizeContainerMetric();
+
+        if ($this->servers->isNotEmpty()) {
+            $this->loadData();
+        }
+    }
+
+    public function hydrate(): void
+    {
+        $previous = array_column($this->serverRows, 'uuid');
+        $this->refreshServers();
+        $current = $this->targetServers()->pluck('uuid')->all();
+        sort($previous);
+        sort($current);
+
+        if ($previous !== $current) {
+            $this->loadData();
+        }
+    }
+
+    private function refreshServers(): void
+    {
+        abort_unless(currentTeam() !== null, 403);
+        $this->servers = Server::ownedByCurrentTeam()->get()
             ->filter(fn (Server $server) => $server->isMetricsEnabled())
             ->values();
+
+        foreach ($this->servers as $server) {
+            $this->authorize('view', $server);
+        }
 
         $this->serverOptions = $this->servers
             ->mapWithKeys(fn (Server $server) => [$server->uuid => $server->name])
@@ -71,12 +101,6 @@ class Metrics extends Component
 
         if ($this->serverUuid !== '' && ! array_key_exists($this->serverUuid, $this->serverOptions)) {
             $this->serverUuid = '';
-        }
-
-        $this->normalizeContainerMetric();
-
-        if ($this->servers->isNotEmpty()) {
-            $this->loadData();
         }
     }
 
@@ -125,21 +149,39 @@ class Metrics extends Component
 
     public function loadData(): void
     {
-        if ($this->servers->isEmpty()) {
-            return;
-        }
+        $this->refreshServers();
+        $this->normalizeContainerMetric();
 
         $rows = [];
         $containers = [];
         $series = ['cpu' => [], 'memory' => [], 'disk' => [], 'load' => [], 'networkRx' => [], 'networkTx' => []];
 
-        foreach ($this->targetServers() as $server) {
-            $client = $this->metricsClient($server);
+        $targets = $this->targetServers();
+        $clients = [];
+        $summaryTasks = [];
+        foreach ($targets as $server) {
+            $client = $clients[$server->uuid] = $this->metricsClient($server);
+            $summaryTasks[$server->uuid] = static fn () => $client->summary();
+        }
+        $summaries = $this->runMetricTasks($summaryTasks);
+        $tasks = [];
+        $range = $this->range;
+        foreach ($clients as $uuid => $client) {
+            $metrics = $summaries[$uuid] === null ? ['cpu', 'memory'] : ['cpu', 'memory', 'disk', 'load'];
+            foreach ($metrics as $metric) {
+                $tasks[$uuid.':'.$metric] = static fn () => $client->history($metric, $range);
+            }
+            if ($summaries[$uuid] !== null) {
+                $tasks[$uuid.':containers'] = static fn () => $client->containersCurrent();
+                $tasks[$uuid.':network'] = static fn () => $client->networkHistory($range);
+            }
+        }
+        $results = $this->runMetricTasks($tasks);
 
-            try {
-                $summary = $client->summary();
-            } catch (\Throwable) {
-                $summary = null;
+        foreach ($targets as $server) {
+            $summary = $summaries[$server->uuid];
+            foreach (['cpu', 'memory', 'disk', 'load'] as $metric) {
+                $series[$metric][] = $results[$server->uuid.':'.$metric] ?? [];
             }
 
             if ($summary === null) {
@@ -148,7 +190,7 @@ class Metrics extends Component
                 continue;
             }
 
-            $current = $client->containersCurrent();
+            $current = $results[$server->uuid.':containers'] ?? [];
             $rows[] = array_merge(
                 ['uuid' => $server->uuid, 'name' => $server->name, 'online' => true, 'containers' => count($current)],
                 $summary
@@ -160,11 +202,7 @@ class Metrics extends Component
                 $containers[] = array_merge($c, ['server' => $server->name, 'serverUuid' => $server->uuid]);
             }
 
-            $series['cpu'][] = $client->history('cpu', $this->range);
-            $series['memory'][] = $client->history('memory', $this->range);
-            $series['disk'][] = $client->history('disk', $this->range);
-            $series['load'][] = $client->history('load', $this->range);
-            $net = $client->networkHistory($this->range);
+            $net = $results[$server->uuid.':network'] ?? ['rx' => [], 'tx' => []];
             $series['networkRx'][] = $net['rx'];
             $series['networkTx'][] = $net['tx'];
         }
@@ -176,6 +214,31 @@ class Metrics extends Component
         $this->chartData = $this->buildChartPayload($series);
 
         $this->dispatch("refreshChartData-{$this->chartId}", $this->chartData);
+    }
+
+    /**
+     * Bound the number of PHP workers and SSH connections for large fleets.
+     *
+     * @param  array<string, \Closure>  $tasks
+     * @return array<string, mixed>
+     */
+    protected function runMetricTasks(array $tasks): array
+    {
+        foreach ($tasks as $key => $task) {
+            $tasks[$key] = static function () use ($task) {
+                try {
+                    return $task();
+                } catch (\Throwable) {
+                    return null;
+                }
+            };
+        }
+        $results = [];
+        foreach (array_chunk($tasks, 8, true) as $batch) {
+            $results += Concurrency::run($batch);
+        }
+
+        return $results;
     }
 
     /**
@@ -193,6 +256,8 @@ class Metrics extends Component
 
     protected function metricsClient(Server $server): SentinelMetricsClient
     {
+        $server->settings->ensureValidSentinelToken();
+
         return app(SentinelMetricsClient::class, ['server' => $server]);
     }
 
@@ -211,7 +276,7 @@ class Metrics extends Component
         }
 
         $teamId = currentTeam()?->id;
-        $resource = $teamId ? getResourceByUuid($id, $teamId) : null;
+        $resource = $teamId !== null ? getResourceByUuid($id, $teamId) : null;
 
         $image = null;
         $link = null;

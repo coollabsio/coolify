@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Concurrency;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -62,6 +63,7 @@ class DenseTestableMetrics extends Metrics
 }
 
 beforeEach(function () {
+    Concurrency::setDefaultInstance('sync');
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $user = User::factory()->create();
     $team = Team::factory()->create();

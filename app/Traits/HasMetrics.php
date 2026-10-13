@@ -38,9 +38,11 @@ trait HasMetrics
             return null;
         }
 
-        $root = collect($rows)->filter(fn ($r) => ($r['mount'] ?? null) === '/')->values()->all();
+        if (array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
+            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/'));
+        }
 
-        return $this->mapRows($root ?: $rows, 'usedPercent', $mins);
+        return $this->mapRows($rows, 'usedPercent', $mins);
     }
 
     /**

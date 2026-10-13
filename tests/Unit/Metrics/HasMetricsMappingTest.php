@@ -59,3 +59,17 @@ it('returns null for a metric when metrics are unavailable', function () {
     expect($d->getNetworkMetrics(5))->toBeNull();
     expect($d->getLoadMetrics(5))->toBeNull();
 });
+
+it('does not use non-root mounts when root disk samples are missing', function () {
+    $double = new MetricsMappingDouble;
+    $double->rowsByType['disk'] = [['time' => 1000, 'mount' => '/boot', 'usedPercent' => 90]];
+
+    expect($double->getDiskMetrics(5))->toBe([]);
+});
+
+it('supports older disk rows without a mount field', function () {
+    $double = new MetricsMappingDouble;
+    $double->rowsByType['disk'] = [['time' => 1000, 'usedPercent' => 40]];
+
+    expect($double->getDiskMetrics(5))->toBe([[1000, 40.0]]);
+});

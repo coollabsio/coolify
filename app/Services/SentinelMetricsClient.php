@@ -108,7 +108,7 @@ class SentinelMetricsClient
             default => ['/cpu/history', 'percent'],
         };
 
-        return $this->seriesRows($this->url($path, ['from' => self::rangeFrom($range)]), $field, $range);
+        return $this->seriesRows($this->url($path, ['from' => self::rangeFrom($range)]), $field, $range, $metric === 'disk');
     }
 
     /**
@@ -127,7 +127,7 @@ class SentinelMetricsClient
     /**
      * @return array<int, array{0: int, 1: float}>
      */
-    private function seriesRows(string $url, string $field, string $range): array
+    private function seriesRows(string $url, string $field, string $range, bool $rootOnly = false): array
     {
         try {
             $rows = json_decode($this->raw($url), true);
@@ -140,9 +140,8 @@ class SentinelMetricsClient
         }
 
         // Disk history interleaves every mount; keep the root filesystem only.
-        $root = array_filter($rows, fn ($r) => ($r['mount'] ?? null) === '/');
-        if ($root !== []) {
-            $rows = $root;
+        if ($rootOnly && array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
+            $rows = array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/');
         }
 
         // Average raw samples into epoch-aligned buckets so every server shares the same
@@ -166,11 +165,14 @@ class SentinelMetricsClient
      */
     private function rootMount(array $mounts): array
     {
-        if ($mounts === []) {
-            return ['used' => null, 'total' => null, 'percent' => null];
+        $root = collect($mounts)->firstWhere('mount', '/');
+        if ($root === null && ! array_any($mounts, fn ($mount) => array_key_exists('mount', $mount))) {
+            $root = $mounts[0] ?? null;
         }
 
-        $root = collect($mounts)->firstWhere('mount', '/') ?? $mounts[0];
+        if ($root === null) {
+            return ['used' => null, 'total' => null, 'percent' => null];
+        }
 
         return [
             'used' => (int) ($root['used'] ?? 0),
@@ -206,7 +208,8 @@ class SentinelMetricsClient
         return instant_remote_process(
             ["docker exec coolify-sentinel sh -c 'curl -s --max-time 10 -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
             $this->server,
-            false
+            false,
+            timeout: 15
         );
     }
 
