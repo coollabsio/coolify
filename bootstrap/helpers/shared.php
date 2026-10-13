@@ -5447,7 +5447,7 @@ function trafficCityRows(iterable $rows): array
                 $label = 'Unknown, '.$country;
             } else {
                 $hasCity = true;
-                $region = preg_match('/^[A-Z0-9]{1,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
+                $region = preg_match('/^[A-Z]{2,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
                 $label = $city.', '.$region.$country;
 
                 $rawLat = data_get($row, 'lat');

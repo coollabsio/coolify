@@ -137,7 +137,7 @@ it('mounts the globe from the element itself when country data arrives after the
         ->assertSeeHtml('window.mountTrafficGlobe(canvas');
 });
 
-it('renders the city list and the switch when Sentinel returns city data', function () {
+it('renders the top cities card and city markers when Sentinel returns city data', function () {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
@@ -153,50 +153,35 @@ it('renders the city list and the switch when Sentinel returns city data', funct
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSee('Locations')
-        ->assertSeeHtml('aria-label="Location detail"')
-        ->assertSee('Cities')
+        ->assertSeeHtml('id="analytics-city-section"')
         ->assertSee('Germany')
         ->assertSee('Berlin, BE, DE')
         ->assertSee('Unknown, DE')
-        ->assertSee('Other')
         // City markers, not the country centroid, go to the globe.
         ->assertSeeHtml('lat\u0022:52.52')
         // Only the row with coordinates turns the globe on hover.
         ->assertSeeHtml('focus([52.52, 13.405])');
 });
 
-it('shows no switch and country markers when Sentinel returns no city data', function () {
+it('shows an empty top cities card and country markers when Sentinel returns no city data', function (array $cityRows) {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
     $fake->responses = fakeGeoResponses([
         ['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000],
-    ]);
+    ], $cityRows);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSee('Countries')
-        ->assertDontSeeHtml('aria-label="Location detail"')
+        ->assertSee('Germany')
+        ->assertSee('No city data for the selected range.')
+        ->assertDontSee('Unknown, DE')
         ->assertSeeHtml('code\u0022:\u0022DE');
-});
-
-it('shows no switch when the GeoIP database has countries only', function () {
-    $server = bootGeoServer();
-
-    $fake = new FakeGeoTrafficClient($server);
-    $fake->responses = fakeGeoResponses(
-        [['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000]],
-        [['value' => 'DE||', 'requests' => 600, 'bytes_out' => 15000]],
-    );
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->assertOk()
-        ->assertDontSeeHtml('aria-label="Location detail"')
-        ->assertDontSee('Unknown, DE');
-});
+})->with([
+    'old sentinel' => [[]],
+    'country-only database' => [[['value' => 'DE||', 'requests' => 600, 'bytes_out' => 15000]]],
+]);
 
 it('escapes a city name that contains quotes or HTML', function () {
     $server = bootGeoServer();

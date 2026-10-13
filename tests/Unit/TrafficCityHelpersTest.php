@@ -13,13 +13,17 @@ describe('trafficCityRows', function () {
         ]);
     });
 
-    it('omits a subdivision that is a name, not a short code', function () {
+    it('omits a subdivision that is not a letter code', function (string $value, string $label) {
         $rows = trafficCityRows([
-            ['value' => 'DE|Land Berlin|Berlin', 'requests' => 1, 'bytesOut' => 1],
+            ['value' => $value, 'requests' => 1, 'bytesOut' => 1],
         ]);
 
-        expect($rows[0]['label'])->toBe('Berlin, DE');
-    });
+        expect($rows[0]['label'])->toBe($label);
+    })->with([
+        'a name' => ['DE|Land Berlin|Berlin', 'Berlin, DE'],
+        'a number' => ['AT|3|Neunkirchen', 'Neunkirchen, AT'],
+        'one letter' => ['SE|O|Lidköping', 'Lidköping, SE'],
+    ]);
 
     it('labels an unknown city with its country and gives it no coordinates', function () {
         $rows = trafficCityRows([
