@@ -970,11 +970,11 @@ it('keeps buildpack variables read at container start in the runtime env', funct
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
     expect($runtimeEnvs)->toContain(
-        'APP_NAME=coolify',
-        'NIXPACKS_PHP_ROOT_DIR=/app/public',
-        'NIXPACKS_PHP_FALLBACK_PATH=/index.php',
-        'NIXPACKS_SPA_OUTPUT_DIR=dist',
-        'RAILPACK_SKIP_MIGRATIONS=true',
+        'APP_NAME='.escapeComposeEnvFileValue('coolify'),
+        'NIXPACKS_PHP_ROOT_DIR='.escapeComposeEnvFileValue('/app/public'),
+        'NIXPACKS_PHP_FALLBACK_PATH='.escapeComposeEnvFileValue('/index.php'),
+        'NIXPACKS_SPA_OUTPUT_DIR='.escapeComposeEnvFileValue('dist'),
+        'RAILPACK_SKIP_MIGRATIONS='.escapeComposeEnvFileValue('true'),
     );
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('NIXPACKS_NODE_VERSION=')))->toBeFalse();
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
@@ -1004,6 +1004,30 @@ it('keeps buildpack variables read at container start out of generic build args'
 
     expect($envArgs->has('NIXPACKS_PHP_ROOT_DIR'))->toBeFalse();
     expect($envArgs->has('RAILPACK_SKIP_MIGRATIONS'))->toBeFalse();
+});
+
+it('creates missing Laravel defaults as preview variables for preview deployments', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'nixpacks']);
+
+    $keys = ['NIXPACKS_PHP_ROOT_DIR', 'NIXPACKS_PHP_FALLBACK_PATH'];
+    foreach (array_combine($keys, ['/app/web', '/app.php']) as $key => $value) {
+        createApplicationEnvironmentVariable($application, ['key' => $key, 'value' => $value]);
+    }
+    $application->environment_variables_preview()->whereIn('key', $keys)->delete();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['pull_request_id' => 42]);
+
+    [$fallbackPath, $rootDir] = invokeDeploymentJobMethod($job, $reflection, 'laravel_finetunes');
+
+    expect($fallbackPath->is_preview)->toBeTrue()
+        ->and($fallbackPath->value)->toBe('/index.php')
+        ->and($rootDir->is_preview)->toBeTrue()
+        ->and($rootDir->value)->toBe('/app/public')
+        ->and($application->environment_variables()->whereIn('key', $keys)->pluck('value', 'key')->all())->toBe([
+            'NIXPACKS_PHP_ROOT_DIR' => '/app/web',
+            'NIXPACKS_PHP_FALLBACK_PATH' => '/app.php',
+        ])
+        ->and($application->environment_variables_preview()->whereIn('key', $keys)->count())->toBe(2);
 });
 
 it('filters buildpack control vars from dockerfile arg injection', function () {
