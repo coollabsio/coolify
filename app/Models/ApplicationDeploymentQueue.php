@@ -54,8 +54,12 @@ class ApplicationDeploymentQueue extends Model
      */
     private array $remoteSecretsForRedaction = [];
 
+    public const HIDDEN_ENV_VALUES_HINT = 'Some environment variable values are hidden in this log. To show values that are not locked, go to Environment Variables > Environment values in logs and select "Hide locked values only".';
+
     /** @var array{known: array<int, string>, locked: array<int, string>}|null */
     private ?array $logRedactionSecrets = null;
+
+    private bool $hiddenEnvValuesHintAdded = false;
 
     protected static function booted(): void
     {
@@ -229,6 +233,20 @@ class ApplicationDeploymentQueue extends Model
         );
     }
 
+    /**
+     * Tell if the "redact all values" setting hides an environment value that is not locked in this text.
+     */
+    private function hidesUnlockedEnvValues(string $text): bool
+    {
+        if ($this->logRedactionSecrets === null) {
+            return false;
+        }
+
+        $unlockedValues = array_diff($this->logRedactionSecrets['known'], $this->logRedactionSecrets['locked'], $this->remoteSecretsForRedaction);
+
+        return app(SensitiveDataRedactor::class)->containsKnownSecret($text, $unlockedValues);
+    }
+
     public function addLogEntry(
         string $message,
         string $type = 'stdout',
@@ -252,11 +270,19 @@ class ApplicationDeploymentQueue extends Model
             'batch' => $batch,
         ];
 
-        DB::transaction(function () use ($newLogEntry): void {
+        $addHiddenEnvValuesHint = ! $this->hiddenEnvValuesHintAdded && $this->hidesUnlockedEnvValues($message.' '.$command);
+
+        DB::transaction(function () use ($newLogEntry, $addHiddenEnvValuesHint): void {
             $storedLogs = static::query()->whereKey($this->getKey())->lockForUpdate()->value('logs');
             $previousLogs = $this->decodeLogs($storedLogs);
             $newLogEntry['order'] = count($previousLogs) + 1;
             $previousLogs[] = $newLogEntry;
+            if ($addHiddenEnvValuesHint) {
+                $this->hiddenEnvValuesHintAdded = true;
+                if (! collect($previousLogs)->contains('output', self::HIDDEN_ENV_VALUES_HINT)) {
+                    $previousLogs[] = [...$newLogEntry, 'command' => null, 'output' => self::HIDDEN_ENV_VALUES_HINT, 'type' => 'stdout', 'hidden' => false, 'order' => $newLogEntry['order'] + 1];
+                }
+            }
             $logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
 
             // Update only the logs column without model events to prevent race conditions.

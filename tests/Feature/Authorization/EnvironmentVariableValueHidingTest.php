@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -379,6 +380,34 @@ test('admin can limit log redaction to locked values for one service', function 
         ->call('saveLogRedactionSetting');
 
     expect($service->fresh()->redact_all_env_values_in_logs)->toBeFalse();
+});
+
+test('admin can limit log redaction to locked values for one database and a member cannot', function () {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-database',
+        'postgres_password' => 'database-password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    session(['currentTeam' => $this->team]);
+
+    $this->actingAs($this->member);
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $database])
+        ->assertSee('Environment values in logs')
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting')
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->assertNotDispatched('success');
+    expect($database->fresh()->redact_all_env_values_in_logs)->toBeTrue();
+
+    $this->actingAs($this->admin);
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $database])
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting')
+        ->assertDispatched('success');
+    expect($database->fresh()->redact_all_env_values_in_logs)->toBeFalse();
 });
 
 test('member cannot change log redaction and the control returns to the stored value', function (string $resourceType, bool $storedValue) {

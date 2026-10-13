@@ -584,6 +584,7 @@ class DatabasesController extends Controller
                         'health_check_timeout' => ['type' => 'integer', 'description' => 'Healthcheck timeout in seconds.', 'minimum' => 1, 'default' => 5],
                         'health_check_retries' => ['type' => 'integer', 'description' => 'Healthcheck retries count.', 'minimum' => 1, 'default' => 5],
                         'health_check_start_period' => ['type' => 'integer', 'description' => 'Healthcheck start period in seconds.', 'minimum' => 0, 'default' => 5],
+                        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'],
                     ],
                 ),
             )
@@ -638,6 +639,7 @@ class DatabasesController extends Controller
             'limits_cpus' => 'string',
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
+            'redact_all_env_values_in_logs' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -647,6 +649,7 @@ class DatabasesController extends Controller
             ], 422);
         }
         $uuid = $request->uuid;
+        $redactAllEnvValuesInLogs = $request->has('redact_all_env_values_in_logs') ? $request->boolean('redact_all_env_values_in_logs') : null;
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
@@ -654,6 +657,10 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('update', $database);
+
+        if ($redactAllEnvValuesInLogs !== null) {
+            $this->authorize('manageEnvironment', $database);
+        }
 
         if ($request->is_public && $request->public_port) {
             if (isPublicPortAlreadyUsed($database->destination->server, $request->public_port, $database->id)) {
@@ -887,6 +894,9 @@ class DatabasesController extends Controller
         }
 
         // Only update database fields, not backup configuration
+        if ($redactAllEnvValuesInLogs !== null) {
+            $database->redact_all_env_values_in_logs = $redactAllEnvValuesInLogs;
+        }
         $database->update($request->only($allowedFields));
 
         if ($whatToDoWithDatabaseProxy === 'start') {
@@ -900,7 +910,10 @@ class DatabasesController extends Controller
             'database_uuid' => $database->uuid,
             'database_name' => $database->name,
             'database_type' => $database->type(),
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+            'changed_fields' => [
+                ...array_values(array_intersect($allowedFields, array_keys($request->all()))),
+                ...($redactAllEnvValuesInLogs === null ? [] : ['redact_all_env_values_in_logs']),
+            ],
         ]);
 
         return response()->json([

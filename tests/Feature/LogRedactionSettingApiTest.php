@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,6 +39,13 @@ beforeEach(function () {
         'destination_type' => $destination->getMorphClass(),
         'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
     ]);
+    $this->database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-database',
+        'postgres_password' => 'database-password',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
 });
 
 /**
@@ -60,16 +68,20 @@ function logRedactionApiToken(Team $team, string $role, array $abilities = ['wri
 
 function logRedactionSettingOf(string $resource): bool
 {
-    return $resource === 'application'
-        ? test()->application->settings->fresh()->redact_all_env_values_in_logs
-        : test()->service->fresh()->redact_all_env_values_in_logs;
+    return match ($resource) {
+        'application' => test()->application->settings->fresh()->redact_all_env_values_in_logs,
+        'service' => test()->service->fresh()->redact_all_env_values_in_logs,
+        'database' => test()->database->fresh()->redact_all_env_values_in_logs,
+    };
 }
 
 function logRedactionPath(string $resource): string
 {
-    return $resource === 'application'
-        ? '/api/v1/applications/'.test()->application->uuid
-        : '/api/v1/services/'.test()->service->uuid;
+    return match ($resource) {
+        'application' => '/api/v1/applications/'.test()->application->uuid,
+        'service' => '/api/v1/services/'.test()->service->uuid,
+        'database' => '/api/v1/databases/'.test()->database->uuid,
+    };
 }
 
 it('lets a team admin limit log redaction to locked values', function (string $resource) {
@@ -78,7 +90,7 @@ it('lets a team admin limit log redaction to locked values', function (string $r
         ->assertOk();
 
     expect(logRedactionSettingOf($resource))->toBeFalse();
-})->with(['application', 'service']);
+})->with(['application', 'service', 'database']);
 
 it('rejects a non-boolean log redaction value', function (string $resource) {
     $this->withToken(logRedactionApiToken($this->team, 'admin'))
@@ -86,7 +98,7 @@ it('rejects a non-boolean log redaction value', function (string $resource) {
         ->assertUnprocessable();
 
     expect(logRedactionSettingOf($resource))->toBeTrue();
-})->with(['application', 'service']);
+})->with(['application', 'service', 'database']);
 
 it('forbids a team member from changing log redaction', function (string $resource) {
     $this->withToken(logRedactionApiToken($this->team, 'member'))
@@ -94,7 +106,7 @@ it('forbids a team member from changing log redaction', function (string $resour
         ->assertForbidden();
 
     expect(logRedactionSettingOf($resource))->toBeTrue();
-})->with(['application', 'service']);
+})->with(['application', 'service', 'database']);
 
 it('forbids a read-only token from changing log redaction', function (string $resource) {
     $this->withToken(logRedactionApiToken($this->team, 'owner', ['read']))
@@ -102,7 +114,7 @@ it('forbids a read-only token from changing log redaction', function (string $re
         ->assertForbidden();
 
     expect(logRedactionSettingOf($resource))->toBeTrue();
-})->with(['application', 'service']);
+})->with(['application', 'service', 'database']);
 
 it('does not let an admin of another team change log redaction', function (string $resource) {
     $this->withToken(logRedactionApiToken(Team::factory()->create(), 'owner'))
@@ -110,4 +122,4 @@ it('does not let an admin of another team change log redaction', function (strin
         ->assertNotFound();
 
     expect(logRedactionSettingOf($resource))->toBeTrue();
-})->with(['application', 'service']);
+})->with(['application', 'service', 'database']);

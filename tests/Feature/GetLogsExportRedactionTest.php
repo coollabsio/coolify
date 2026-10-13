@@ -126,6 +126,34 @@ it('redacts stored and effective database passwords in exported logs', function 
     }
 })->with(['copyLogs', 'downloadAllLogs', 'api'])->with([false, true]);
 
+it('redacts database environment values with the same rules as other resources', function (bool $redactAll, string $expected) {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-rules-database',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+        'postgres_password' => 'xy',
+    ]);
+    $database->update(['redact_all_env_values_in_logs' => $redactAll]);
+    foreach ([['TZ', 'UTC', false], ['APP_MODE', 'production-database-mode', false], ['LOCKED', 'q7', true]] as [$key, $value, $locked]) {
+        EnvironmentVariable::query()->create([
+            'key' => $key,
+            'value' => $value,
+            'resourceable_type' => $database->getMorphClass(),
+            'resourceable_id' => $database->id,
+            'is_preview' => false,
+            'is_shown_once' => $locked,
+        ]);
+    }
+
+    $secrets = EnvironmentVariable::logRedactionSecretsFor($database->fresh());
+
+    expect(sanitizeLogsForExport('tz UTC mode production-database-mode locked q7 password xy', $secrets))->toBe($expected);
+})->with([
+    'hide all values' => [true, 'tz UTC mode '.REDACTED.' locked '.REDACTED.' password '.REDACTED],
+    'hide locked values only' => [false, 'tz UTC mode production-database-mode locked '.REDACTED.' password '.REDACTED],
+]);
+
 it('redacts stored database credentials even without environment variables', function (string $model, array $attributes) {
     $database = new $model($attributes);
     if ($database instanceof StandaloneMongodb) {

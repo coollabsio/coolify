@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
-use App\Models\Service;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
@@ -112,7 +111,7 @@ class All extends Component
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
-        if ($this->resource instanceof Application || $this->resource instanceof Service) {
+        if ($this->hasLogRedactionSetting()) {
             $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
         }
         $this->resourceClass = get_class($this->resource);
@@ -143,6 +142,14 @@ class All extends Component
         }
     }
 
+    /**
+     * Applications, services, and standalone databases have the "Environment values in logs" setting.
+     */
+    public function hasLogRedactionSetting(): bool
+    {
+        return method_exists($this->resource, 'redactsAllEnvValuesInLogs');
+    }
+
     public function saveLogRedactionSetting()
     {
         try {
@@ -151,8 +158,8 @@ class All extends Component
             if ($this->resource instanceof Application) {
                 $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
                 $this->saveApplicationSettingsWithAudit($this->resource);
-            } elseif ($this->resource instanceof Service) {
-                // Service uses the Auditable trait, so saving records `ui.service.updated` with the changed field.
+            } elseif ($this->hasLogRedactionSetting()) {
+                // Services and databases use the Auditable trait, so saving records the changed field.
                 $this->resource->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
                 $this->resource->save();
             } else {
@@ -161,7 +168,7 @@ class All extends Component
 
             $this->dispatch('success', 'Log redaction setting updated.');
         } catch (\Throwable $e) {
-            if ($this->resource instanceof Application || $this->resource instanceof Service) {
+            if ($this->hasLogRedactionSetting()) {
                 $this->resource->refresh();
                 $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
             }

@@ -95,6 +95,37 @@ it('redacts only locked environment values when the application allows it', func
     expect($output)->toBe('env visible-production-value '.REDACTED);
 });
 
+it('adds one hint to the deployment log when values that are not locked are hidden', function () {
+    [$application, $deployment] = makeSafeDeploymentLogFixture();
+    createSafeDeploymentLogVariable($application, 'APP_ENV_NAME', 'hidden-production-value', locked: false);
+
+    $deployment->addLogEntry('env hidden-production-value');
+    $deployment->addLogEntry('again hidden-production-value');
+    ApplicationDeploymentQueue::query()->findOrFail($deployment->id)->addLogEntry('other worker hidden-production-value');
+
+    $outputs = collect(json_decode($deployment->refresh()->logs, true))->pluck('output');
+
+    expect($outputs->all())->toBe([
+        'env '.REDACTED,
+        ApplicationDeploymentQueue::HIDDEN_ENV_VALUES_HINT,
+        'again '.REDACTED,
+        'other worker '.REDACTED,
+    ]);
+});
+
+it('adds no hidden values hint when only locked values are hidden', function (bool $redactAll) {
+    [$application, $deployment] = makeSafeDeploymentLogFixture();
+    $application->settings->update(['redact_all_env_values_in_logs' => $redactAll]);
+    createSafeDeploymentLogVariable($application, 'APP_ENV_NAME', 'plain-production-value', locked: false);
+    createSafeDeploymentLogVariable($application, 'LOCKED_VALUE', 'coolify-canary-locked-value', locked: true);
+
+    $deployment->addLogEntry('env coolify-canary-locked-value');
+    $deployment->addLogEntry($redactAll ? 'no env value here' : 'env plain-production-value');
+
+    expect(collect(json_decode($deployment->refresh()->logs, true))->pluck('output'))
+        ->not->toContain(ApplicationDeploymentQueue::HIDDEN_ENV_VALUES_HINT);
+})->with(['redact all on' => true, 'redact all off' => false]);
+
 it('keeps redacting all values for other applications in the same team', function () {
     [$application, $deployment] = makeSafeDeploymentLogFixture();
     createSafeDeploymentLogVariable($application, 'APP_ENV_NAME', 'hidden-production-value', locked: false);

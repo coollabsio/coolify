@@ -4823,6 +4823,9 @@ paths:
                   description: 'Healthcheck start period in seconds.'
                   minimum: 0
                   default: 5
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'
               type: object
       responses:
         '200':

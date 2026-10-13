@@ -412,8 +412,9 @@ class EnvironmentVariable extends BaseModel
     /**
      * Collect the values to hide in a resource's logs.
      *
-     * Locked values are always hidden, whatever their length. Other values are hidden
-     * unless the resource limits log redaction to locked values only.
+     * Locked values, database passwords, and remote secrets of databases are always hidden,
+     * whatever their length. Other values are hidden unless the resource limits log redaction
+     * to locked values only.
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
@@ -456,15 +457,15 @@ class EnvironmentVariable extends BaseModel
         $variables = $variables->map(fn (self $variable): self => (clone $variable)->setRelation('resourceable', $resource));
         $sharedVariables = self::sharedVariablesReferencedBy($variables, $resource->team()?->id);
 
-        $redactAllValues = ! $isDatabase && $resource->redactsAllEnvValuesInLogs();
+        $redactAllValues = $resource->redactsAllEnvValuesInLogs();
         foreach ($variables as $variable) {
-            if ($isDatabase) {
+            if ($isDatabase && $resource->environmentVariableUsesSecretManager($variable)) {
                 $secrets['locked'] = array_merge(
                     $secrets['locked'],
-                    $variable->logRedactionValues($sharedVariables),
                     self::remoteSecretLogRedactionValues([$resource->resolveSecretManagerEnvironmentVariableValue($variable)]),
                 );
-            } elseif ($variable->isLockedForLogs($sharedVariables)) {
+            }
+            if ($variable->isLockedForLogs($sharedVariables)) {
                 $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues($sharedVariables));
             } elseif ($redactAllValues) {
                 $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues($sharedVariables));

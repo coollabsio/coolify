@@ -36,6 +36,22 @@ final class SensitiveDataRedactor
     }
 
     /**
+     * Tell if redactText() would hide one of these known secrets in the text.
+     *
+     * @param  array<array-key, mixed>  $knownSecrets
+     */
+    public function containsKnownSecret(string $text, array $knownSecrets): bool
+    {
+        foreach ($knownSecrets as $secret) {
+            if (is_scalar($secret) && trim((string) $secret) !== '' && strlen((string) $secret) >= self::MIN_KNOWN_SECRET_LENGTH && str_contains($text, (string) $secret)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param  array<array-key, mixed>  $knownSecrets  Exact values to replace when they are long enough to be safe to match, such as unlocked environment values.
      * @param  array<array-key, mixed>  $lockedSecrets  Exact values to always replace, whatever their length, such as locked or remote secrets.
      */
