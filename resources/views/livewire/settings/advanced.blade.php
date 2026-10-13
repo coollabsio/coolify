@@ -32,6 +32,12 @@
                             ['value' => false, 'label' => 'Require two-step confirmation'],
                             ['value' => true, 'label' => 'Skip two-step confirmation'],
                         ]" />
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="is_passkey_enabled" label="Passkeys"
+                        helper="Let users sign in with a passkey. Passkeys need an HTTPS instance URL. Stored passkeys are kept when this is disabled."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
                 </div>
             </x-application.settings-section>
 

@@ -186,6 +186,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+    Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
+        ->middleware('password.confirm')
+        ->name('profile.passkeys.confirm');
 
     Route::prefix('tags')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
