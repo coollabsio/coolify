@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Exceptions\RemoteSecretException;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -412,13 +415,16 @@ class EnvironmentVariable extends BaseModel
     /**
      * Collect the values to hide in a resource's logs.
      *
-     * Locked values, database passwords, and remote secrets of databases are always hidden,
+     * Locked values, database passwords, and resolved remote secrets are always hidden,
      * whatever their length. Other values are hidden unless the resource limits log redaction
      * to locked values only.
      *
+     * Remote secrets are fetched at most once per call, and only when a variable references one.
+     * Callers that already hold the fetched values, such as deployments, pass $resolveRemoteSecrets = false.
+     *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
-    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false): array
+    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
     {
         if ($resource === null) {
             return ['known' => [], 'locked' => []];
@@ -458,11 +464,13 @@ class EnvironmentVariable extends BaseModel
         $sharedVariables = self::sharedVariablesReferencedBy($variables, $resource->team()?->id);
 
         $redactAllValues = $resource->redactsAllEnvValuesInLogs();
+        $unresolvedKeys = [];
+        $remoteSecretFailure = null;
         foreach ($variables as $variable) {
-            if ($isDatabase && $resource->environmentVariableUsesSecretManager($variable)) {
+            if ($resolveRemoteSecrets) {
                 $secrets['locked'] = array_merge(
                     $secrets['locked'],
-                    self::remoteSecretLogRedactionValues([$resource->resolveSecretManagerEnvironmentVariableValue($variable)]),
+                    self::remoteSecretLogRedactionValuesFor($resource, $variable, $sharedVariables, $remoteSecretFailure, $unresolvedKeys),
                 );
             }
             if ($variable->isLockedForLogs($sharedVariables)) {
@@ -472,7 +480,49 @@ class EnvironmentVariable extends BaseModel
             }
         }
 
+        if ($remoteSecretFailure !== null) {
+            Log::warning('Could not resolve remote secrets for log redaction; their resolved values are not hidden.', [
+                'resource_type' => $resource->getMorphClass(),
+                'resource_uuid' => $resource->uuid,
+                'variables' => array_values(array_unique($unresolvedKeys)),
+                'exception' => $remoteSecretFailure::class,
+            ]);
+        }
+
         return $secrets;
+    }
+
+    /**
+     * Resolved remote secret values of a variable; these are always hidden.
+     *
+     * When the references cannot be resolved, export still works: the reference text and any keys
+     * that did resolve are hidden, and the variable is reported. After a failed or empty fetch the
+     * source is not asked again.
+     *
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     * @param  array<int, string>  $unresolvedKeys
+     * @return array<int, string>
+     */
+    private static function remoteSecretLogRedactionValuesFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource, self $variable, ?Collection $sharedVariables, ?RemoteSecretException &$failure, array &$unresolvedKeys): array
+    {
+        // Cheap check first, so variables without references never query or contact a source.
+        $value = $variable->resolveRealValue(escapeLegacyValue: false, sharedVariables: $sharedVariables);
+        if (! RemoteSecretReferences::containsReference($value) || ! $resource->environmentVariableUsesSecretManager($variable)) {
+            return [];
+        }
+
+        if ($failure === null || $resource->resolvedSecretManagerValuesForRedaction() !== []) {
+            try {
+                return self::remoteSecretLogRedactionValues([$resource->resolveSecretManagerEnvironmentVariableValue($variable)]);
+            } catch (RemoteSecretException $e) {
+                $failure = $e;
+            }
+        }
+
+        $unresolvedKeys[] = $variable->key;
+        $available = array_intersect_key($resource->resolvedSecretManagerValuesForRedaction(), array_flip(RemoteSecretReferences::referencedKeys($value)));
+
+        return [...self::remoteSecretLogRedactionValues(array_values($available)), ...$variable->logRedactionValues($sharedVariables)];
     }
 
     /**

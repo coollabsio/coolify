@@ -869,7 +869,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->upload_to_s3($storage);
                 $uploaded = true;
             } catch (Throwable $e) {
-                $uploadError = $e->getMessage();
+                $uploadError = $this->redact($e->getMessage());
                 $failures[] = "{$storage->name}: {$uploadError}";
             }
 
@@ -880,7 +880,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     'message' => $uploadError,
                 ]);
             } catch (Throwable $e) {
-                $failures[] = "{$storage->name}: {$e->getMessage()}";
+                $failures[] = "{$storage->name}: {$this->redact($e->getMessage())}";
             }
         }
 
@@ -1128,7 +1128,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Redact the backed-up database credentials and the S3 key and secret from text that is stored or sent in notifications.
+     * Redact the backed-up database credentials and the key and secret of every S3 destination from text that is stored or sent in notifications.
      */
     private function redact(string $text): string
     {
@@ -1136,6 +1136,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $database = $this->database ?? $this->backup->database;
             $s3 = $this->s3 ?? $this->backup->s3;
             $lockedSecrets = [$this->postgres_password, $this->mongo_root_password, $s3?->key, $s3?->secret];
+            foreach ($this->backup->selectedS3Storages() as $storage) {
+                $lockedSecrets[] = $storage->key;
+                $lockedSecrets[] = $storage->secret;
+            }
             foreach (array_keys($database?->getAttributes() ?? []) as $attribute) {
                 if (str_contains($attribute, 'password')) {
                     $lockedSecrets[] = $database->getAttribute($attribute);

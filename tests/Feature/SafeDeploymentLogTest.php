@@ -17,7 +17,10 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\ExecuteRemoteCommand;
+use Illuminate\Contracts\Process\InvokedProcess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\FakeProcessResult;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
@@ -220,17 +223,99 @@ it('caches normalized remote secrets only after they are loaded', function () {
     expect($redact->invoke($otherJob, 'pin 7392'))->toBe('pin '.REDACTED);
 });
 
-it('starts a new log list when stored logs are corrupted', function () {
+it('keeps corrupted stored logs and warns once instead of overwriting them', function () {
     [, $deployment] = makeSafeDeploymentLogFixture();
     ApplicationDeploymentQueue::query()->whereKey($deployment->id)->update(['logs' => '{not json']);
+    Log::shouldReceive('warning')->once()->withArgs(fn (string $message, array $context) => $context === ['deployment_uuid' => $deployment->deployment_uuid]);
 
     $deployment->addLogEntry('fresh entry');
+    $deployment->addLogEntry('second entry');
 
-    $logs = json_decode($deployment->refresh()->logs, true);
+    expect($deployment->refresh()->getRawOriginal('logs'))->toBe('{not json');
+});
 
-    expect($logs)->toHaveCount(1)
-        ->and($logs[0]['output'])->toBe('fresh entry')
-        ->and($logs[0]['order'])->toBe(1);
+/**
+ * A deployment job whose remote command sends its output in the given chunks, like a real SSH stream.
+ *
+ * @param  list<array{0: string, 1: string}>  $chunks
+ */
+function runDeploymentCommandWithChunks(ApplicationDeploymentQueue $deployment, array $chunks, bool $hidden = false): void
+{
+    $team = $deployment->application->team();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+    ]);
+    $job = new class
+    {
+        use ExecuteRemoteCommand;
+
+        public $application;
+
+        public $application_deployment_queue;
+
+        public $server;
+
+        public $saved_outputs;
+    };
+    $job->application = $deployment->application;
+    $job->application_deployment_queue = $deployment;
+    $job->server = $server;
+    $job->saved_outputs = collect();
+    // The process fake ends every output chunk with a newline, so the chunks are sent by hand.
+    $invoked = Mockery::mock(InvokedProcess::class);
+    $invoked->shouldReceive('id')->andReturn(123);
+    Process::shouldReceive('timeout->idleTimeout->input->start')->andReturnUsing(function (string $command, Closure $output) use ($invoked, $chunks) {
+        $invoked->shouldReceive('wait')->andReturnUsing(function () use ($output, $chunks) {
+            foreach ($chunks as [$type, $chunk]) {
+                $output($type, $chunk);
+            }
+
+            return new FakeProcessResult;
+        });
+
+        return $invoked;
+    });
+
+    (new ReflectionMethod($job, 'executeCommandWithProcess'))->invoke($job, 'cat output', $hidden, null, true, false);
+}
+
+it('redacts a deployment output secret that is split across output chunks', function () {
+    [$application, $deployment] = makeSafeDeploymentLogFixture();
+    $application->settings->update(['redact_all_env_values_in_logs' => false]);
+    createSafeDeploymentLogVariable($application, 'LOCKED_VALUE', 'coolify-canary-locked-value', locked: true);
+
+    runDeploymentCommandWithChunks($deployment, [
+        ['out', 'value is coolify-canary-lo'],
+        ['err', 'error coolify-canary-'],
+        ['out', "cked-value\nnext "],
+        ['err', "locked-value\n"],
+        ['out', 'line coolify-canary-locked-value'],
+    ], hidden: true);
+
+    $logs = collect(json_decode($deployment->refresh()->logs, true));
+
+    expect($logs->map(fn (array $entry) => [$entry['type'], $entry['output']])->all())->toBe([
+        ['stdout', 'value is '.REDACTED],
+        ['stderr', 'error '.REDACTED],
+        ['stdout', 'next line '.REDACTED],
+    ])
+        ->and($logs->pluck('hidden')->unique()->all())->toBe([true])
+        ->and($logs->pluck('command')->unique()->all())->toBe(['cat output']);
+});
+
+it('redacts a private key that is split across deployment output chunks', function () {
+    [, $deployment] = makeSafeDeploymentLogFixture();
+
+    runDeploymentCommandWithChunks($deployment, [
+        ['out', "before\n-----BEGIN RSA PRIVATE KEY-----\nKEYBODYLINEONE\n"],
+        ['out', "KEYBODYLINETWO\n-----END RSA PRIVATE KEY-----\nafter\n"],
+    ]);
+
+    $outputs = collect(json_decode($deployment->refresh()->logs, true))->pluck('output');
+
+    expect($outputs->implode("\n"))->not->toContain('KEYBODYLINE')
+        ->and($outputs->all())->toBe(['before', REDACTED."\nafter"]);
 });
 
 /**

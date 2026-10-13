@@ -126,6 +126,50 @@ it('redacts stored and effective database passwords in exported logs', function 
     }
 })->with(['copyLogs', 'downloadAllLogs', 'api'])->with([false, true]);
 
+it('still exports database logs when its remote secret source fails', function (string $path) {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-failing-source',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+        'postgres_password' => 'xy',
+        'status' => 'running:healthy',
+    ]);
+    EnvironmentVariable::query()->create([
+        'key' => 'POSTGRES_PASSWORD',
+        'value' => '{{vault.DB_PASSWORD}}',
+        'resourceable_type' => $database->getMorphClass(),
+        'resourceable_id' => $database->id,
+        'is_preview' => false,
+    ]);
+    Http::preventStrayRequests();
+    Http::fake(['https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response(['message' => 'down'], 500)]);
+    $token = IntegrationToken::factory()->create([
+        'team_id' => $database->team()->id,
+        'provider' => 'doppler',
+        'capabilities' => ['secrets'],
+    ]);
+    $database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    Process::fake(fn ($process) => match (true) {
+        str_contains($process->command, 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => $database->uuid, 'Labels' => '', 'State' => 'running'])),
+        str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+        str_contains($process->command, 'docker logs') => Process::result(output: 'booted xy {{vault.DB_PASSWORD}}'),
+        default => Process::result(output: ''),
+    });
+
+    if ($path === 'api') {
+        InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+        $accessToken = auth()->user()->createToken('database-logs', ['read', 'read:sensitive']);
+        $accessToken->accessToken->update(['team_id' => $database->team()->id]);
+        auth()->forgetGuards();
+        $this->withToken($accessToken->plainTextToken)->getJson("/api/v1/databases/{$database->uuid}/logs")
+            ->assertOk()->assertJsonPath('logs', 'booted '.REDACTED.' '.REDACTED);
+    } else {
+        Livewire::test(GetLogs::class, ['server' => $this->server, 'container' => $database->uuid, 'resource' => $database])
+            ->call($path)->assertReturned('booted '.REDACTED.' '.REDACTED);
+    }
+})->with(['copyLogs', 'downloadAllLogs', 'api']);
+
 it('redacts database environment values with the same rules as other resources', function (bool $redactAll, string $expected) {
     $database = StandalonePostgresql::query()->create([
         'name' => 'log-redaction-rules-database',

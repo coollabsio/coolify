@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
@@ -31,9 +32,11 @@ trait ExecuteRemoteCommand
     private function redact_sensitive_info(string $text): string
     {
         try {
+            // Remote secrets come from the job's remote_secrets_cache below, so they are not fetched again.
             $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor(
                 $this->application ?? null,
                 isset($this->pull_request_id) && $this->pull_request_id !== 0,
+                resolveRemoteSecrets: false,
             );
         } catch (\Throwable) {
             return REDACTED;
@@ -169,10 +172,9 @@ trait ExecuteRemoteCommand
         $remote_command = $input === null
             ? SshMultiplexingHelper::generateSshCommand($this->server, $command)
             : SshMultiplexingHelper::generateSshStdinCommand($this->server, $command);
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
+        $addLogEntry = function (string $type, string $output) use ($command, $hidden, $customType, $command_hidden, $skip_command_log): void {
             // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
-            $sanitized_output = sanitize_utf8_text($output);
-            $log_output = str($sanitized_output)->trim();
+            $log_output = str(sanitize_utf8_text($output))->trim();
             if ($log_output->startsWith('╔')) {
                 $log_output = "\n".$log_output;
             }
@@ -184,14 +186,32 @@ trait ExecuteRemoteCommand
                 command: $skip_command_log || $command_hidden ? null : $command,
                 batch: static::$batch_counter,
             );
+        };
+        // Output is logged per complete line, so a secret split across two output chunks is still redacted.
+        $pending = [];
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($addLogEntry, $append, &$pending) {
+            $pending[$type] = ($pending[$type] ?? '').$output;
+            $complete_output = RunRemoteProcess::takeCompleteOutput($pending[$type]);
+            if ($complete_output !== '') {
+                $addLogEntry($type, $complete_output);
+            }
 
-            $this->saveCommandOutput($sanitized_output, $append);
+            $this->saveCommandOutput(sanitize_utf8_text($output), $append);
         });
         $this->application_deployment_queue->update([
             'current_process_id' => $process->id(),
         ]);
 
-        $process_result = $process->wait();
+        try {
+            $process_result = $process->wait();
+        } finally {
+            foreach ($pending as $type => $output) {
+                $remaining_output = RunRemoteProcess::takeCompleteOutput($pending[$type], final: true);
+                if ($remaining_output !== '') {
+                    $addLogEntry($type, $remaining_output);
+                }
+            }
+        }
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
                 // Check if deployment was cancelled while command was running

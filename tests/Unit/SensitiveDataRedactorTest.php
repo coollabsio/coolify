@@ -115,7 +115,7 @@ it('redacts complete quoted assignment values that contain spaces', function () 
         ->not->toContain('second')
         ->not->toContain('third')
         ->not->toContain('fourth')
-        ->toBe('password='.REDACTED.' PASSWORD='.REDACTED.' next=1');
+        ->toBe('password="'.REDACTED.'" PASSWORD=\''.REDACTED.'\' next=1');
 });
 
 it('redacts arrayable objects and hides unknown objects', function () {
@@ -143,5 +143,69 @@ it('redacts keys that end with a sensitive name', function () {
     expect($redactor->redactValue(['smtp_password' => 'hunter2', 'githubToken' => 'abc', 'X-Webhook-Secret' => 'def', 'token_count' => 5, 'password_reset_at' => 'today']))
         ->toBe(['smtp_password' => REDACTED, 'githubToken' => REDACTED, 'X-Webhook-Secret' => REDACTED, 'token_count' => 5, 'password_reset_at' => 'today'])
         ->and($redactor->redactText('smtp_password=hunter2 "db-password": "p w" max_tokens=100'))
-        ->toBe('smtp_password='.REDACTED.' "db-password": '.REDACTED.' max_tokens=100');
+        ->toBe('smtp_password='.REDACTED.' "db-password": "'.REDACTED.'" max_tokens=100');
+});
+
+it('keeps quotes around redacted assignment values so JSON stays valid', function () {
+    $redactor = new SensitiveDataRedactor;
+
+    $json = $redactor->redactText('{"token": "abc", "password": "a\\"b", "name": "demo"}');
+
+    expect($json)->toBe('{"token": "'.REDACTED.'", "password": "'.REDACTED.'", "name": "demo"}')
+        ->and(json_decode($json, true))->toBe(['token' => REDACTED, 'password' => REDACTED, 'name' => 'demo'])
+        ->and($redactor->redactText("{'secret': 'abc'}"))->toBe("{'secret': '".REDACTED."'}");
+});
+
+it('does not treat prose or working directories as secret assignments', function () {
+    $redactor = new SensitiveDataRedactor;
+
+    expect($redactor->redactText('Failed to refresh token: Connection refused'))->toBe('Failed to refresh token: Connection refused')
+        ->and($redactor->redactText('PWD=/artifacts/abc'))->toBe('PWD=/artifacts/abc');
+});
+
+it('still redacts real secret assignments', function (string $text, string $expected) {
+    expect((new SensitiveDataRedactor)->redactText($text))->toBe($expected);
+})->with([
+    'equals' => ['password=abc', 'password='.REDACTED],
+    'quoted key and value' => ['"password": "abc"', '"password": "'.REDACTED.'"'],
+    'quoted key with bare value' => ['"token": abc123,', '"token": '.REDACTED.','],
+    'env style' => ['API_TOKEN=abc', 'API_TOKEN='.REDACTED],
+    'env style with colon' => ['POSTGRES_PASSWORD: abc next', 'POSTGRES_PASSWORD: '.REDACTED.' next'],
+    'compound key with colon' => ['smtp_password: abc next', 'smtp_password: '.REDACTED.' next'],
+    'yaml value at line end' => ["password: correcthorse\nnext", 'password: '.REDACTED."\nnext"],
+    'value that looks like a secret' => ['Password: hunter2 was set', 'Password: '.REDACTED.' was set'],
+    'authorization header' => ['Authorization: Bearer x', 'Authorization: '.REDACTED],
+]);
+
+it('replaces short locked values only as whole tokens', function () {
+    $redactor = new SensitiveDataRedactor;
+
+    expect($redactor->redactText('database ab_c cab 9ab', lockedSecrets: ['ab']))->toBe('database ab_c cab 9ab')
+        ->and($redactor->redactText('password xy user=xy "xy" postgres://u:xy@host', lockedSecrets: ['xy']))
+        ->toBe('password '.REDACTED.' user='.REDACTED.' "'.REDACTED.'" postgres://u:'.REDACTED.'@host')
+        ->and($redactor->redactText('éxyé xy', lockedSecrets: ['xy']))->toBe('éxyé '.REDACTED);
+});
+
+it('replaces encoded short locked values and long locked values longest first', function () {
+    $result = (new SensitiveDataRedactor)->redactText('p%40s p\\"s\\"q long-locked-value long-locked-value-2 inside-long-locked-valueX', lockedSecrets: ['p@s', 'p"s"q', 'long-locked-value', 'long-locked-value-2']);
+
+    expect($result)->toBe(REDACTED.' '.REDACTED.' '.REDACTED.' '.REDACTED.' inside-'.REDACTED.'X');
+});
+
+it('falls back to line by line redaction when a chunk exceeds PCRE limits', function () {
+    $text = "password=first-secret\n".str_repeat('a-', 40000)."\nToken=locked-value-123 next=1\nlast line";
+
+    $result = (new SensitiveDataRedactor)->redactText($text, lockedSecrets: ['locked-value-123']);
+
+    expect($result)->toBe('password='.REDACTED."\n".SensitiveDataRedactor::FAILURE_MESSAGE."\nToken=".REDACTED." next=1\nlast line");
+});
+
+it('redacts an unterminated private key followed by a lot of output without suppressing other lines', function () {
+    $text = "before password=abc\n-----BEGIN PRIVATE KEY-----\n".str_repeat("secret-key-line\n", 70000).'tail';
+
+    $result = (new SensitiveDataRedactor)->redactText($text);
+
+    expect($result)->not->toContain('secret-key-line')
+        ->not->toContain(SensitiveDataRedactor::FAILURE_MESSAGE)
+        ->toStartWith('before password='.REDACTED."\n");
 });

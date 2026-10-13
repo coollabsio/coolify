@@ -304,13 +304,22 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Redact the S3 key and secret of the backup destination from text that is stored or sent in notifications.
+     * Redact the key and secret of every S3 destination of the backup from text that is stored or sent in notifications.
      */
     private function redact(string $text): string
     {
-        $s3 = $this->backup->s3;
+        try {
+            $s3 = $this->backup->s3;
+            $lockedSecrets = [$s3?->key, $s3?->secret];
+            foreach ($this->backup->selectedS3Storages() as $storage) {
+                $lockedSecrets[] = $storage->key;
+                $lockedSecrets[] = $storage->secret;
+            }
+        } catch (Throwable) {
+            return SensitiveDataRedactor::FAILURE_MESSAGE;
+        }
 
-        return app(SensitiveDataRedactor::class)->redactText($text, lockedSecrets: array_filter([$s3?->key, $s3?->secret], fn ($secret): bool => is_string($secret) && $secret !== ''));
+        return app(SensitiveDataRedactor::class)->redactText($text, lockedSecrets: array_filter($lockedSecrets, fn ($secret): bool => is_string($secret) && $secret !== ''));
     }
 
     /**
@@ -391,8 +400,9 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->uploadToS3($replica->s3, $backupLocation, $backupDirectory, $server);
                 $replica->update(['s3_uploaded' => true, 'message' => null]);
             } catch (Throwable $exception) {
-                $replica->update(['s3_uploaded' => false, 'message' => $exception->getMessage()]);
-                $errors[] = ($replica->s3?->name ?? 'Deleted storage').': '.$exception->getMessage();
+                $message = $this->redact($exception->getMessage());
+                $replica->update(['s3_uploaded' => false, 'message' => $message]);
+                $errors[] = ($replica->s3?->name ?? 'Deleted storage').': '.$message;
             }
         }
 

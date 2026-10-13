@@ -158,3 +158,76 @@ it('redacts a database start secret that is split across output chunks', functio
     expect(RunRemoteProcess::decodeOutput(Activity::query()->findOrFail($activity->id)))
         ->toBe('value is '.REDACTED."\nnext line ".REDACTED);
 });
+
+/**
+ * Runs a remote process whose output arrives in the given chunks, like a real SSH stream.
+ *
+ * @param  list<array{0: string, 1: string}>  $chunks
+ */
+function runRemoteProcessWithChunks(Activity $activity, array $chunks, ?Throwable $failure = null): void
+{
+    // The process fake ends every output chunk with a newline, so the chunks are sent by hand.
+    $invoked = Mockery::mock(InvokedProcess::class);
+    $invoked->shouldReceive('id')->andReturn(123);
+    Process::shouldReceive('timeout->start')->andReturnUsing(function (string $command, Closure $output) use ($invoked, $chunks, $failure) {
+        $invoked->shouldReceive('wait')->andReturnUsing(function () use ($output, $chunks, $failure) {
+            foreach ($chunks as [$type, $chunk]) {
+                $output($type, $chunk);
+            }
+            if ($failure !== null) {
+                throw $failure;
+            }
+
+            return new FakeProcessResult;
+        });
+
+        return $invoked;
+    });
+
+    (new RunRemoteProcess(Activity::query()->findOrFail($activity->id)))();
+}
+
+it('redacts a remote process secret that is split across output chunks', function () {
+    $service = remoteProcessRedactionService($this->team, redactAll: false);
+    $activity = remote_process(['docker compose up -d'], $this->server, type_uuid: $service->uuid);
+
+    runRemoteProcessWithChunks($activity, [
+        ['out', 'value is locked-ser'],
+        ['err', 'error locked-se'],
+        ['out', "vice-value\nnext "],
+        ['err', "rvice-value\n"],
+        ['out', 'line locked-service-value'],
+    ]);
+
+    $entries = collect(json_decode(Activity::query()->findOrFail($activity->id)->description, true));
+    expect($entries->where('type', 'out')->pluck('output')->implode(''))->toBe('value is '.REDACTED."\nnext line ".REDACTED)
+        ->and($entries->where('type', 'err')->pluck('output')->implode(''))->toBe('error '.REDACTED."\n")
+        ->and($entries->pluck('output')->implode(''))->not->toContain('locked-');
+});
+
+it('redacts a private key that is split across remote process output chunks', function () {
+    $activity = remote_process(['cat key'], $this->server);
+
+    runRemoteProcessWithChunks($activity, [
+        ['out', "before\n-----BEGIN OPENSSH PRIVATE KEY-----\nKEYBODYLINEONE\n"],
+        ['out', "KEYBODYLINETWO\n-----END OPENSSH PRIVATE KEY-----\nafter\n"],
+    ]);
+
+    expect(RunRemoteProcess::decodeOutput(Activity::query()->findOrFail($activity->id)))
+        ->toBe("before\n".REDACTED."\nafter\n");
+});
+
+it('hides an unfinished private key and keeps the last partial line of a timed out remote process', function () {
+    $service = remoteProcessRedactionService($this->team, redactAll: false);
+    $activity = remote_process(['cat key'], $this->server, type_uuid: $service->uuid);
+
+    expect(fn () => runRemoteProcessWithChunks($activity, [
+        ['out', "-----BEGIN PRIVATE KEY-----\nKEYBODYLINEONE\n"],
+        ['err', 'tail locked-service-value'],
+    ], remoteProcessTimeout()))->toThrow(RuntimeException::class);
+
+    $output = RunRemoteProcess::decodeOutput(Activity::query()->findOrFail($activity->id));
+    expect($output)->not->toContain('KEYBODYLINEONE')
+        ->not->toContain('locked-service-value')
+        ->toContain('tail '.REDACTED);
+});

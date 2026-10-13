@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -60,6 +61,8 @@ class ApplicationDeploymentQueue extends Model
     private ?array $logRedactionSecrets = null;
 
     private bool $hiddenEnvValuesHintAdded = false;
+
+    private bool $corruptedLogsWarned = false;
 
     protected static function booted(): void
     {
@@ -221,7 +224,8 @@ class ApplicationDeploymentQueue extends Model
     public function redactLogText(string $text): string
     {
         try {
-            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor($this->application, $this->pull_request_id !== 0);
+            // The deployment job registers its remote secrets with redactRemoteSecrets(), so they are not fetched again.
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor($this->application, $this->pull_request_id !== 0, resolveRemoteSecrets: false);
         } catch (\Throwable) {
             return REDACTED;
         }
@@ -275,6 +279,17 @@ class ApplicationDeploymentQueue extends Model
         DB::transaction(function () use ($newLogEntry, $addHiddenEnvValuesHint): void {
             $storedLogs = static::query()->whereKey($this->getKey())->lockForUpdate()->value('logs');
             $previousLogs = $this->decodeLogs($storedLogs);
+            if ($previousLogs === null) {
+                // Keep the stored log history instead of overwriting it with a new list.
+                if (! $this->corruptedLogsWarned) {
+                    $this->corruptedLogsWarned = true;
+                    Log::warning('Skipped a deployment log entry because the stored deployment logs cannot be decoded.', [
+                        'deployment_uuid' => $this->deployment_uuid,
+                    ]);
+                }
+
+                return;
+            }
             $newLogEntry['order'] = count($previousLogs) + 1;
             $previousLogs[] = $newLogEntry;
             if ($addHiddenEnvValuesHint) {
@@ -292,8 +307,10 @@ class ApplicationDeploymentQueue extends Model
         });
     }
 
-    /** @return array<int, mixed> */
-    private function decodeLogs(?string $logs): array
+    /**
+     * @return array<int, mixed>|null Null when the stored logs are not blank and cannot be decoded.
+     */
+    private function decodeLogs(?string $logs): ?array
     {
         if (blank($logs)) {
             return [];
@@ -302,9 +319,9 @@ class ApplicationDeploymentQueue extends Model
         try {
             $decoded = json_decode($logs, associative: true, flags: JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            return [];
+            return null;
         }
 
-        return is_array($decoded) ? array_values($decoded) : [];
+        return is_array($decoded) ? array_values($decoded) : null;
     }
 }

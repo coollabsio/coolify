@@ -356,13 +356,15 @@ class DatabasesController extends Controller
         }
 
         $databaseIds = $databases->pluck('id')->toArray();
+        $databasesByMorphKey = $databases->keyBy(fn ($database) => $database->getMorphClass().':'.$database->id);
+        $messageSecrets = [];
 
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['latest_log', 's3', 's3Storages'])
             ->whereIn('database_id', $databaseIds)
             ->get()
-            ->map(function (ScheduledDatabaseBackup $backup): ScheduledDatabaseBackup {
+            ->map(function (ScheduledDatabaseBackup $backup) use ($databasesByMorphKey, &$messageSecrets): ScheduledDatabaseBackup {
                 if ($backup->latest_log) {
-                    $this->redactBackupExecutionMessage($backup->latest_log);
+                    $this->redactBackupExecutionMessage($backup->latest_log, $databasesByMorphKey->get($backup->database_type.':'.$backup->database_id), $messageSecrets);
                 }
 
                 return $this->withBackupS3StorageUuids($backup);
@@ -438,9 +440,12 @@ class DatabasesController extends Controller
 
         $this->authorize('view', $database);
 
+        $messageSecrets = [];
         $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->get()
-            ->map(function (ScheduledDatabaseBackup $backup): ScheduledDatabaseBackup {
-                $backup->executions->each(fn (ScheduledDatabaseBackupExecution $execution) => $this->redactBackupExecutionMessage($execution));
+            ->map(function (ScheduledDatabaseBackup $backup) use ($database, &$messageSecrets): ScheduledDatabaseBackup {
+                $backup->executions->each(function (ScheduledDatabaseBackupExecution $execution) use ($database, &$messageSecrets): void {
+                    $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
+                });
 
                 return $this->withBackupS3StorageUuids($backup);
             });
@@ -3253,11 +3258,12 @@ class DatabasesController extends Controller
         }
 
         // Get all executions for this backup configuration
+        $messageSecrets = [];
         $executions = $backup->executions()
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($execution) {
-                $this->redactBackupExecutionMessage($execution);
+            ->map(function ($execution) use ($database, &$messageSecrets) {
+                $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
 
                 return [
                     'uuid' => $execution->uuid,
@@ -5314,12 +5320,31 @@ class DatabasesController extends Controller
 
     /**
      * Execution output can embed credentials: hide it unless the token can read sensitive data, and redact it when shown.
+     * The database secrets are loaded once per database and kept in $secretsByDatabase for the rest of the request.
+     *
+     * @param  array<string, array{known: array<int, string>, locked: array<int, string>}|null>  $secretsByDatabase
      */
-    private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution): void
+    private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution, ?Model $database, array &$secretsByDatabase): void
     {
         $message = $execution->message;
-        $execution->setAttribute('message', request()->attributes->get('can_read_sensitive', false) === true && is_string($message)
-            ? sanitizeLogsForExport($message)
-            : null);
+        if (request()->attributes->get('can_read_sensitive', false) !== true || ! is_string($message) || ! $database) {
+            $execution->setAttribute('message', null);
+
+            return;
+        }
+
+        $key = $database->getMorphClass().':'.$database->getKey();
+        if (! array_key_exists($key, $secretsByDatabase)) {
+            try {
+                // Use a copy so the relations loaded for redaction do not end up in the response.
+                $secretsByDatabase[$key] = EnvironmentVariable::logRedactionSecretsFor(clone $database);
+            } catch (\Throwable $e) {
+                report($e);
+                $secretsByDatabase[$key] = null;
+            }
+        }
+
+        // Without the database secrets the message cannot be redacted reliably, so hide it.
+        $execution->setAttribute('message', $secretsByDatabase[$key] === null ? null : sanitizeLogsForExport($message, $secretsByDatabase[$key]));
     }
 }

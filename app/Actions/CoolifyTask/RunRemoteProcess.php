@@ -28,6 +28,11 @@ use Throwable;
 
 class RunRemoteProcess
 {
+    /**
+     * A private key block that has no END line yet.
+     */
+    private const UNFINISHED_PRIVATE_KEY_PATTERN = '/-----BEGIN [A-Z ]*PRIVATE KEY-----(?![\s\S]*-----END [A-Z ]*PRIVATE KEY-----)[\s\S]*/';
+
     public Activity $activity;
 
     public bool $hide_from_output;
@@ -47,6 +52,13 @@ class RunRemoteProcess
     protected $throttle_interval_ms = 200;
 
     protected int $counter = 1;
+
+    /**
+     * Output of each stream that is not redacted yet, because its line or private key block is not complete.
+     *
+     * @var array<string, string>
+     */
+    private array $pendingOutput = [];
 
     /**
      * Environment values of the activity's resource to hide in its output, resolved once.
@@ -114,6 +126,8 @@ class RunRemoteProcess
         } catch (ProcessTimedOutException|SymfonyProcessTimedOutException) {
             // The timeout message contains the full SSH command, which can contain secrets.
             throw new \RuntimeException("The command on the server timed out after {$timeout} seconds.", 124);
+        } finally {
+            $this->flushPendingOutput();
         }
 
         // A database import whose SSH command ended without the restore result keeps blocking the
@@ -214,6 +228,11 @@ class RunRemoteProcess
         if ($this->hide_from_output) {
             return;
         }
+        $this->pendingOutput[$type] = ($this->pendingOutput[$type] ?? '').$output;
+        $output = self::takeCompleteOutput($this->pendingOutput[$type]);
+        if ($output === '') {
+            return;
+        }
         $this->current_time = $this->elapsedTime();
         $this->activity->description = $this->encodeOutput($type, $output);
         if ($this->isAfterLastThrottle()) {
@@ -223,6 +242,51 @@ class RunRemoteProcess
                 $this->last_write_at = $this->current_time;
             });
         }
+    }
+
+    /**
+     * Write the output that is still buffered when the process ends, also after a timeout or failure.
+     */
+    private function flushPendingOutput(): void
+    {
+        $written = false;
+        foreach ($this->pendingOutput as $type => $pending) {
+            $output = self::takeCompleteOutput($this->pendingOutput[$type], final: true);
+            if ($output !== '') {
+                $this->activity->description = $this->encodeOutput($type, $output);
+                $written = true;
+            }
+        }
+        if ($written) {
+            $this->activity->save();
+        }
+    }
+
+    /**
+     * Take the complete lines from the buffered output of a stream, so a secret split across output
+     * chunks is redacted as a whole. A private key block stays buffered until its END line. With
+     * $final, all buffered output is taken, and an unfinished private key block is hidden.
+     */
+    public static function takeCompleteOutput(string &$pending, bool $final = false): string
+    {
+        if ($final) {
+            $output = preg_replace(self::UNFINISHED_PRIVATE_KEY_PATTERN, REDACTED, $pending) ?? REDACTED;
+            $pending = '';
+
+            return $output;
+        }
+
+        $end = max(strrpos($pending, "\n"), strrpos($pending, "\r"));
+        if ($end === false) {
+            return '';
+        }
+        $output = substr($pending, 0, $end + 1);
+        if (preg_match(self::UNFINISHED_PRIVATE_KEY_PATTERN, $output, $match, PREG_OFFSET_CAPTURE) === 1) {
+            $output = substr($output, 0, $match[0][1]);
+        }
+        $pending = substr($pending, strlen($output));
+
+        return $output;
     }
 
     protected function elapsedTime(): int

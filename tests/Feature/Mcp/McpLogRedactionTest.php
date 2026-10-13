@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Database\RestartDatabase;
 use App\Actions\Service\RestartService;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
@@ -138,3 +139,19 @@ it('redacts standalone database passwords in get_logs output and errors', functi
 
     expect($data[$fails ? 'message' : 'logs'])->toBe(($fails ? 'failed near ' : 'booted ').REDACTED);
 })->with([false, true]);
+
+it('redacts standalone database passwords in control error messages', function () {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'control-redaction-database',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+        'postgres_password' => 'control-db-password',
+    ]);
+    RestartDatabase::partialMock()->shouldReceive('handle')->andThrow(new RuntimeException('restart failed near control-db-password'));
+
+    $response = mcpLogRedactionCall(['read', 'deploy'], 'control', ['resource' => 'database', 'action' => 'restart', 'uuid' => $database->uuid]);
+
+    expect(json_encode($response))->toContain('restart failed near')
+        ->not->toContain('control-db-password');
+});

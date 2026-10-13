@@ -22,7 +22,7 @@ final class SensitiveDataRedactor
 
     private bool $redactEmails = true;
 
-    private const SENSITIVE_KEYS = ['password', 'passwd', 'pwd', 'secret', 'client_secret', 'api_key', 'apikey', 'access_key', 'private_key', 'token', 'access_token', 'refresh_token', 'auth_token', 'authorization', 'proxy_authorization', 'cookie', 'set_cookie', 'webhook_secret', 'signing_secret', 'credential', 'credentials', 'connection_string', 'database_url'];
+    private const SENSITIVE_KEYS = ['password', 'passwd', 'secret', 'client_secret', 'api_key', 'apikey', 'access_key', 'private_key', 'token', 'access_token', 'refresh_token', 'auth_token', 'authorization', 'proxy_authorization', 'cookie', 'set_cookie', 'webhook_secret', 'signing_secret', 'credential', 'credentials', 'connection_string', 'database_url'];
 
     /**
      * Return a copy that keeps email addresses, for sinks such as the audit log that must record who acted.
@@ -63,7 +63,7 @@ final class SensitiveDataRedactor
 
             $redacted = '';
             foreach ($this->chunks($text) as $chunk) {
-                $redacted .= $this->redactAssignments($this->redactPatterns($chunk));
+                $redacted .= $this->redactChunk($chunk);
             }
 
             return $redacted;
@@ -108,6 +108,40 @@ final class SensitiveDataRedactor
             return '[object '.$value::class.']';
         } catch (Throwable) {
             return self::FAILURE_MESSAGE;
+        }
+    }
+
+    /**
+     * Redact one chunk. When a pattern hits a PCRE limit, redact the chunk line by line so one huge line
+     * or an unterminated private key does not suppress the whole log. A line that still fails is suppressed.
+     */
+    private function redactChunk(string $chunk): string
+    {
+        try {
+            return $this->redactAssignments($this->redactPatterns($chunk));
+        } catch (RuntimeException) {
+            $redacted = '';
+            $insidePrivateKey = false;
+            foreach (preg_split('/(?<=\n)/', $chunk) ?: [$chunk] as $line) {
+                if (! $insidePrivateKey && preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/', $line) === 1 && preg_match('/-----END [A-Z ]*PRIVATE KEY-----/', $line) !== 1) {
+                    $insidePrivateKey = true;
+                    $redacted .= REDACTED.(str_ends_with($line, "\n") ? "\n" : '');
+
+                    continue;
+                }
+                if ($insidePrivateKey) {
+                    $insidePrivateKey = preg_match('/-----END [A-Z ]*PRIVATE KEY-----/', $line) !== 1;
+
+                    continue;
+                }
+                try {
+                    $redacted .= $this->redactAssignments($this->redactPatterns($line));
+                } catch (RuntimeException) {
+                    $redacted .= self::FAILURE_MESSAGE.(str_ends_with($line, "\n") ? "\n" : '');
+                }
+            }
+
+            return $redacted;
         }
     }
 
@@ -172,22 +206,40 @@ final class SensitiveDataRedactor
     private function replaceKnownSecrets(string $text, array $knownSecrets, array $lockedSecrets): string
     {
         $variants = [];
+        $shortVariants = [];
         foreach ([[$knownSecrets, self::MIN_KNOWN_SECRET_LENGTH], [$lockedSecrets, 1]] as [$secrets, $minimumLength]) {
             foreach ($secrets as $secret) {
                 if (! is_scalar($secret) || trim((string) $secret) === '' || strlen((string) $secret) < $minimumLength) {
                     continue;
                 }
                 $secret = (string) $secret;
-                $variants[] = $secret;
-                $variants[] = rawurlencode($secret);
                 $json = json_encode($secret, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
-                $variants[] = substr($json, 1, -1);
+                // Short locked values such as "ab" would hit inside ordinary words, so they only match as whole tokens.
+                if (strlen($secret) < self::MIN_KNOWN_SECRET_LENGTH) {
+                    array_push($shortVariants, $secret, rawurlencode($secret), substr($json, 1, -1));
+                } else {
+                    array_push($variants, $secret, rawurlencode($secret), substr($json, 1, -1));
+                }
             }
         }
+        $byLengthDescending = fn (string $left, string $right): int => strlen($right) <=> strlen($left);
         $variants = array_values(array_unique(array_filter($variants)));
-        usort($variants, fn (string $left, string $right): int => strlen($right) <=> strlen($left));
+        usort($variants, $byLengthDescending);
+        $text = str_replace($variants, REDACTED, $text);
 
-        return str_replace($variants, REDACTED, $text);
+        // The text is valid UTF-8 after normalization, so a variant that is not valid UTF-8 cannot appear in it.
+        $shortVariants = array_values(array_unique(array_filter($shortVariants, fn (string $variant): bool => $variant !== '' && mb_check_encoding($variant, 'UTF-8'))));
+        if ($shortVariants === []) {
+            return $text;
+        }
+        usort($shortVariants, $byLengthDescending);
+        $alternatives = implode('|', array_map(fn (string $variant): string => preg_quote($variant, '/'), $shortVariants));
+        $text = preg_replace('/(?<![\p{L}\p{M}\p{N}_])(?:'.$alternatives.')(?![\p{L}\p{M}\p{N}_])/u', REDACTED, $text);
+        if ($text === null) {
+            throw new RuntimeException('Log redaction failed.');
+        }
+
+        return $text;
     }
 
     private function redactAssignments(string $text): string
@@ -196,10 +248,24 @@ final class SensitiveDataRedactor
         $keys = implode('|', array_map(fn (string $key): string => preg_quote($key, '/'), $assignmentKeys));
         // A key matches when it is a sensitive name or ends with one, such as smtp_password or github-token.
         $keys = '(?i:(?:[a-z0-9]+[_-])*(?:'.$keys.'))|[A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*';
-        $value = '(?:"[^"\r\n]*"|\'[^\'\r\n]*\'|[^\s,;}\]]+)';
+        $value = '(?<value>"(?:[^"\\\\\r\n]|\\\\.)*"|\'(?:[^\'\\\\\r\n]|\\\\.)*\'|[^\s,;}\]]+)';
         // Skip values that an earlier rule already replaced, such as the token in https://x-access-token:<REDACTED>@host.
         $alreadyRedacted = '(?!'.preg_quote(REDACTED, '/').')';
-        $result = preg_replace('/(?<![\w-])(["\']?(?:'.$keys.')["\']?\s*[=:]\s*)'.$alreadyRedacted.$value.'/', '$1'.REDACTED, $text);
+        // Set when nothing but a delimiter follows the value on its line, as in YAML or object literals.
+        $endsValue = '(?<end>(?=[^\S\r\n]*(?:$|[\r\n,;}\]])))?';
+        $result = preg_replace_callback('/(?<![\w-])(?<prefix>["\']?(?<key>'.$keys.')["\']?\s*(?<separator>[=:])\s*)'.$alreadyRedacted.$value.$endsValue.'/m', function (array $match): string {
+            $value = $match['value'];
+            $quote = strlen($value) > 1 && in_array($value[0], ['"', "'"], true) && str_ends_with($value, $value[0]) ? $value[0] : '';
+            // Prose such as "Failed to refresh token: Connection refused" uses a plain word key, a colon, and a plain word value.
+            $isProse = $quote === ''
+                && $match['separator'] === ':'
+                && ! in_array($match['prefix'][0], ['"', "'"], true)
+                && preg_match('/^[A-Za-z][a-z]*$/', $match['key']) === 1
+                && ctype_alpha($value)
+                && $match['end'] === null;
+
+            return $isProse ? $match[0] : $match['prefix'].$quote.REDACTED.$quote;
+        }, $text, flags: PREG_UNMATCHED_AS_NULL);
         if ($result === null) {
             throw new RuntimeException('Log redaction failed.');
         }
