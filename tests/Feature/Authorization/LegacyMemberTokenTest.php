@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0, 'is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
     $this->member = User::factory()->create();
@@ -28,65 +28,34 @@ function apiRequest($test, string $token, string $method = 'get', string $url = 
     ])->{$method.'Json'}($url);
 }
 
+/**
+ * The api.token.team middleware rejects elevated abilities on member tokens
+ * before ApiAbility runs, so REST clients get its generic role message.
+ */
 describe('member with legacy elevated token is rejected', function () {
-    test('member with legacy write token gets 403 with descriptive message', function () {
+    test('member with legacy elevated token gets 403', function (array $abilities) {
+        $token = $this->member->createToken('legacy-elevated', $abilities);
+
+        $response = apiRequest($this, $token->plainTextToken);
+
+        $response->assertStatus(403);
+        $response->assertExactJson(['message' => 'Missing required team role.']);
+    })->with([
+        'write' => [['read', 'write']],
+        'deploy' => [['read', 'deploy']],
+        'root' => [['root']],
+        'read:sensitive' => [['read', 'read:sensitive']],
+        'write:sensitive' => [['read', 'write:sensitive']],
+        'multiple' => [['read', 'write', 'deploy', 'read:sensitive']],
+    ]);
+
+    test('member with legacy elevated token cannot reach a write endpoint', function () {
         $token = $this->member->createToken('legacy-write', ['read', 'write']);
 
-        $response = apiRequest($this, $token->plainTextToken);
+        $response = apiRequest($this, $token->plainTextToken, 'patch', '/api/v1/team');
 
         $response->assertStatus(403);
-        $response->assertJsonFragment([
-            'message' => 'This API token has permissions (write) that exceed your current role as a team member. Members are restricted to read-only API access. Please revoke this token and create a new one with only read permissions.',
-        ]);
-    });
-
-    test('member with legacy deploy token gets 403', function () {
-        $token = $this->member->createToken('legacy-deploy', ['read', 'deploy']);
-
-        $response = apiRequest($this, $token->plainTextToken);
-
-        $response->assertStatus(403);
-        $response->assertSee('deploy');
-        $response->assertSee('revoke this token');
-    });
-
-    test('member with legacy root token gets 403', function () {
-        $token = $this->member->createToken('legacy-root', ['root']);
-
-        $response = apiRequest($this, $token->plainTextToken);
-
-        $response->assertStatus(403);
-        $response->assertSee('root');
-    });
-
-    test('member with legacy read:sensitive token gets 403', function () {
-        $token = $this->member->createToken('legacy-sensitive', ['read', 'read:sensitive']);
-
-        $response = apiRequest($this, $token->plainTextToken);
-
-        $response->assertStatus(403);
-        $response->assertSee('read:sensitive');
-    });
-
-    test('member with legacy write:sensitive token gets 403', function () {
-        $token = $this->member->createToken('legacy-ws', ['read', 'write:sensitive']);
-
-        $response = apiRequest($this, $token->plainTextToken);
-
-        $response->assertStatus(403);
-        $response->assertSee('write:sensitive');
-    });
-
-    test('member with multiple disallowed abilities lists them all', function () {
-        $token = $this->member->createToken('legacy-multi', ['read', 'write', 'deploy', 'read:sensitive']);
-
-        $response = apiRequest($this, $token->plainTextToken);
-
-        $response->assertStatus(403);
-        $json = $response->json();
-        expect($json['message'])->toContain('write');
-        expect($json['message'])->toContain('deploy');
-        expect($json['message'])->toContain('read:sensitive');
+        $response->assertExactJson(['message' => 'Missing required team role.']);
     });
 });
 

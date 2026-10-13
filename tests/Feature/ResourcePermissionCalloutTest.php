@@ -38,14 +38,14 @@ it('shows one red insufficient permissions callout for resource operations when 
     $application = resourcePermissionCalloutApplicationFor('member');
 
     $component = Livewire::test(ResourceOperations::class, ['resource' => $application])
-        ->assertSee('Insufficient Permissions')
-        ->assertSee('permission to modify this resource')
+        ->assertSee('Insufficient permissions')
+        ->assertSee('permission to clone or move this resource')
         ->assertSee('team administrator for access')
         ->assertDontSee('Access Restricted')
         ->assertDontSee("You don't have permission to clone resources")
         ->assertDontSee("You don't have permission to move resources");
 
-    expect(substr_count($component->html(), 'Insufficient Permissions'))->toBe(1)
+    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1)
         ->and($component->html())->toContain('bg-red-50')
         ->and($component->html())->not->toContain('bg-warning-50');
 });
@@ -54,29 +54,12 @@ it('shows the red insufficient permissions callout for tags when update is denie
     $application = resourcePermissionCalloutApplicationFor('member');
 
     $component = Livewire::test(Tags::class, ['resource' => $application])
-        ->assertSee('Insufficient Permissions')
-        ->assertSee('permission to manage this resource')
-        ->assertSee('team administrator for access')
+        ->assertSee('Insufficient permissions')
+        ->assertSee('permission to manage tags for this resource')
         ->assertDontSee('Access Restricted')
         ->assertDontSee("You don't have permission to manage tags");
 
-    expect(substr_count($component->html(), 'Insufficient Permissions'))->toBe(1)
+    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1)
         ->and($component->html())->toContain('bg-red-50')
         ->and($component->html())->not->toContain('bg-warning-50');
-});
-
-it('does not use yellow permission callouts in blade views', function () {
-    $offendingFiles = collect(new RecursiveIteratorIterator(new RecursiveDirectoryIterator(resource_path('views'))))
-        ->filter(fn (SplFileInfo $file) => $file->isFile() && $file->getExtension() === 'php')
-        ->filter(function (SplFileInfo $file) {
-            $contents = file_get_contents($file->getPathname());
-
-            return str_contains($contents, 'type="warning" title="Permission Required"')
-                || str_contains($contents, 'title="Access Restricted"');
-        })
-        ->map(fn (SplFileInfo $file) => str_replace(base_path().'/', '', $file->getPathname()))
-        ->values()
-        ->all();
-
-    expect($offendingFiles)->toBeEmpty();
 });

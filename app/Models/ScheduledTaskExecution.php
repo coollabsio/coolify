@@ -39,7 +39,7 @@ class ScheduledTaskExecution extends BaseModel
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
             'retry_count' => 'integer',
-            'duration' => 'decimal:2',
+            'duration' => 'float',
         ];
     }
 

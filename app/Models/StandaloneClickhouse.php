@@ -2,17 +2,24 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Throwable;
 
 class StandaloneClickhouse extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+
+    protected array $auditExclude = ['last_online_at'];
+
+    public const DATA_DIRECTORY = '/var/lib/clickhouse';
 
     protected $fillable = [
         'uuid',
@@ -179,6 +186,57 @@ class StandaloneClickhouse extends BaseModel
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
+    }
+
+    /**
+     * Name of the unnamed Docker volume that holds this database's data, or null.
+     *
+     * Before v4.4, adding a file mount removed the data volume from the compose file, so the
+     * container keeps its data in an unnamed volume. Recreating the container leaves that volume
+     * behind and starts on the configured data volume, so the current data seems lost.
+     */
+    public function anonymousDataVolume(): ?string
+    {
+        $server = data_get($this, 'destination.server');
+        if (! $server?->isFunctional()) {
+            return null;
+        }
+
+        $format = '{{range .Mounts}}{{if eq .Destination "'.self::DATA_DIRECTORY.'"}}{{.Type}} {{.Name}}{{end}}{{end}}';
+        try {
+            $output = instant_remote_process_with_timeout([
+                'docker inspect --format '.escapeshellarg($format).' '.escapeshellarg($this->uuid).' 2>/dev/null || true',
+            ], $server, false);
+        } catch (Throwable) {
+            return null;
+        }
+
+        [$type, $name] = array_pad(explode(' ', trim((string) $output), 2), 2, '');
+        if ($type !== 'volume' || $name === '' || $this->persistentStorages()->where('name', $name)->exists()) {
+            return null;
+        }
+
+        return $name;
+    }
+
+    /**
+     * Use the unnamed volume that holds the current data as the data volume, so a restart keeps that data.
+     */
+    public function keepAnonymousDataVolume(string $volumeName): void
+    {
+        $storage = $this->persistentStorages()->where('mount_path', self::DATA_DIRECTORY)->first();
+        if ($storage) {
+            $storage->update(['name' => $volumeName]);
+
+            return;
+        }
+
+        LocalPersistentVolume::create([
+            'name' => $volumeName,
+            'mount_path' => self::DATA_DIRECTORY,
+            'resource_id' => $this->id,
+            'resource_type' => $this->getMorphClass(),
+        ]);
     }
 
     public function deleteVolumes()

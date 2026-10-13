@@ -14,7 +14,7 @@
         <div class="mt-4 grid gap-4 lg:grid-cols-2">
             <x-forms.input id="swarmReplicas" label="Replicas" required canGate="update"
                 :canResource="$application" />
-            <x-forms.listbox id="isSwarmOnlyWorkerNodes" label="Node placement" live onChange="instantSave"
+            <x-forms.listbox canGate="update" :canResource="$application" id="isSwarmOnlyWorkerNodes" label="Node placement" live onChange="instantSave"
                 :disabled="! auth()->user()->can('update', $application)" :options="[
                     ['value' => true, 'label' => 'Worker nodes only'],
                     ['value' => false, 'label' => 'Manager and worker nodes'],

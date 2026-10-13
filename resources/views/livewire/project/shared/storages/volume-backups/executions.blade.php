@@ -25,7 +25,7 @@
             @if ($executionCount > 0)
                 <div class="data-table w-full overflow-x-auto">
                     <div
-                        class="data-table-header volume-backup-executions-grid border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="data-table-header volume-backup-executions-grid border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <span>Status</span>
                         <span>Archive</span>
                         <span>Time</span>
@@ -62,6 +62,14 @@
                             if (empty($deleteActions)) {
                                 $deleteActions[] = 'This backup execution record will be deleted.';
                             }
+                            $recoveryPending = $execution->status !== 'running' && $execution->hasPendingRecovery();
+                            $recoveryErrorLabel = match ($execution->recovery_error) {
+                                's3_auth' => 'S3 credentials',
+                                's3_bucket' => 'S3 bucket missing',
+                                'server_unreachable' => 'server unreachable',
+                                'remote_command' => 'remote command failed',
+                                default => 'unknown error',
+                            };
                         @endphp
 
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
@@ -71,7 +79,7 @@
                             </span>
 
                             <span class="min-w-0">
-                                <x-forms.copy-button :text="$execution->filename ?? 'No archive name'" />
+                                <x-forms.copy-input :text="$execution->filename ?? 'No archive name'" />
                             </span>
 
                             <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
@@ -99,6 +107,14 @@
                                             ? 'neutral'
                                             : ($execution->s3_uploaded ? 'success' : 'error')" />
                                 @endif
+                                @if ($recoveryPending)
+                                    @if ($execution->recovery_needs_attention)
+                                        <x-status-badge :status="'Needs attention ('.$recoveryErrorLabel.')'" type="error" />
+                                    @else
+                                        <x-status-badge status="Recovery pending" type="warning"
+                                            :title="$execution->recovery_error ? 'Last attempt: '.$recoveryErrorLabel : null" />
+                                    @endif
+                                @endif
                             </span>
 
                             <span class="flex items-center justify-end gap-1">
@@ -107,6 +123,14 @@
                                         x-on:click="download_volume_backup_file('{{ $execution->id }}')"
                                         title="Download backup" aria-label="Download backup">
                                         <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                    </button>
+                                @endif
+                                @if ($recoveryPending)
+                                    <button type="button" class="icon-button shrink-0"
+                                        wire:click="retryRecovery({{ $execution->id }})"
+                                        wire:loading.attr="disabled" wire:target="retryRecovery({{ $execution->id }})"
+                                        title="Retry recovery" aria-label="Retry recovery">
+                                        <x-reicon name="refresh" class="size-3.5" />
                                     </button>
                                 @endif
                                 @if ($execution->status !== 'running')
@@ -129,7 +153,7 @@
 
                             @if ($execution->message)
                                 <pre
-                                    class="volume-backup-execution-message col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">{{ $execution->message }}</pre>
+                                    class="volume-backup-execution-message col-span-6 min-w-0 max-w-full max-h-20 overflow-y-auto overflow-x-hidden bg-transparent py-2 text-[11px] break-words whitespace-pre-wrap text-neutral-600 dark:text-fg-dim">{{ $execution->message }}</pre>
                             @endif
                         </div>
                     @endforeach

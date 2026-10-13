@@ -8,7 +8,7 @@ use App\Models\User;
 class CloudInitScriptPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Listing and creating happen on the session team's security pages.
      */
     public function viewAny(User $user): bool
     {
@@ -16,11 +16,11 @@ class CloudInitScriptPolicy
     }
 
     /**
-     * Determine whether the user can view the model.
+     * A loaded resource is checked against its own team: the session team can differ.
      */
     public function view(User $user, CloudInitScript $cloudInitScript): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudInitScript->team_id);
     }
 
     /**
@@ -36,7 +36,7 @@ class CloudInitScriptPolicy
      */
     public function update(User $user, CloudInitScript $cloudInitScript): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudInitScript->team_id);
     }
 
     /**
@@ -44,7 +44,7 @@ class CloudInitScriptPolicy
      */
     public function delete(User $user, CloudInitScript $cloudInitScript): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudInitScript->team_id);
     }
 
     /**
@@ -52,7 +52,7 @@ class CloudInitScriptPolicy
      */
     public function restore(User $user, CloudInitScript $cloudInitScript): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudInitScript->team_id);
     }
 
     /**
@@ -60,6 +60,6 @@ class CloudInitScriptPolicy
      */
     public function forceDelete(User $user, CloudInitScript $cloudInitScript): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudInitScript->team_id);
     }
 }

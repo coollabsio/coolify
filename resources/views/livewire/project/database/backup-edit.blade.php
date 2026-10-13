@@ -1,4 +1,4 @@
-<div>
+<div class="flex flex-col gap-6">
     @if ($backup->database_id === 0)
         @include('livewire.project.database.backup-edit.general')
         @include('livewire.project.database.backup-edit.s3')

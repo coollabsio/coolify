@@ -130,13 +130,9 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->mysqlRootPassword = '';
-            $this->mysqlPassword = '';
-        }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -158,9 +154,10 @@ class General extends Component
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->mysqlRootPassword = $this->database->mysql_root_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->mysqlRootPassword = $canSeeCredentials ? $this->database->mysql_root_password : '';
             $this->mysqlUser = $this->database->mysql_user;
-            $this->mysqlPassword = $this->database->mysql_password;
+            $this->mysqlPassword = $canSeeCredentials ? $this->database->mysql_password : '';
             $this->mysqlDatabase = $this->database->mysql_database;
             $this->mysqlConf = $this->database->mysql_conf;
             $this->image = $this->database->image;
@@ -244,6 +241,7 @@ class General extends Component
             }
             $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 

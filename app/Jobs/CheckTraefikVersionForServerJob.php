@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
@@ -20,6 +22,8 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 60;
 
+    private ?array $previousOutdatedInfo = null;
+
     /**
      * Create a new job instance.
      */
@@ -33,10 +37,17 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
+        $this->server->refresh();
+        $this->previousOutdatedInfo = $this->server->traefik_outdated_info;
+        $this->clearOutdatedInfo();
+
+        if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value || $this->server->proxy->get('status') !== ProxyStatus::RUNNING->value) {
+            return;
+        }
+
         // Detect current version (makes SSH call)
         $currentVersion = getTraefikVersionFromDockerCompose($this->server);
 
-        // Update detected version in database
         $this->server->update(['detected_traefik_version' => $currentVersion]);
 
         if (! $currentVersion) {
@@ -98,12 +109,10 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
         // Always check for newer branches first
         $newerBranchInfo = $this->getNewerBranchInfo($currentBranch);
 
-        if (version_compare($current, $latest, '<')) {
-            // Patch update available
-            $this->storeOutdatedInfo($current, $latest, 'patch_update', null, $newerBranchInfo);
-        } elseif ($newerBranchInfo) {
-            // Only newer branch available (no patch update)
+        if ($newerBranchInfo) {
             $this->storeOutdatedInfo($current, $newerBranchInfo['latest'], 'minor_upgrade', $newerBranchInfo['target']);
+        } elseif (version_compare($current, $latest, '<')) {
+            $this->storeOutdatedInfo($current, $latest, 'patch_update');
         } else {
             // Fully up to date
             $this->server->update(['traefik_outdated_info' => null]);
@@ -111,6 +120,14 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         // Dispatch UI update event so warning state refreshes in real-time
         ProxyStatusChangedUI::dispatch($this->server->team_id);
+    }
+
+    private function clearOutdatedInfo(): void
+    {
+        $this->server->update([
+            'detected_traefik_version' => null,
+            'traefik_outdated_info' => null,
+        ]);
     }
 
     /**
@@ -142,10 +159,11 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Store outdated information in database and send immediate notification.
+     * Store outdated information and notify for minor or major upgrades.
      */
-    private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null, ?array $newerBranchInfo = null): void
+    private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null): void
     {
+        $previousOutdatedInfo = $this->previousOutdatedInfo ?? $this->server->traefik_outdated_info;
         $outdatedInfo = [
             'current' => $current,
             'latest' => $latest,
@@ -158,16 +176,16 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
             $outdatedInfo['upgrade_target'] = $upgradeTarget;
         }
 
-        // If there's a newer branch available (even for patch updates), include that info
-        if ($newerBranchInfo) {
-            $outdatedInfo['newer_branch_target'] = $newerBranchInfo['target'];
-            $outdatedInfo['newer_branch_latest'] = $newerBranchInfo['latest'];
-        }
-
         $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
 
-        // Send immediate notification to the team
-        $this->sendNotification($outdatedInfo);
+        $isRepeatedUpgrade = ($previousOutdatedInfo['type'] ?? null) === $type
+            && ($previousOutdatedInfo['upgrade_target'] ?? null) === $upgradeTarget;
+
+        if ($type !== 'patch_update' && ! $isRepeatedUpgrade) {
+            $this->sendNotification($outdatedInfo);
+        }
+
+        $this->previousOutdatedInfo = $outdatedInfo;
     }
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class Change extends Component
@@ -70,8 +71,8 @@ class Change extends Component
     {
         return [
             'name' => 'required|string',
-            'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
-            'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'apiUrl' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
+            'htmlUrl' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
             'customUser' => 'required|string',
             'customPort' => 'required|int',
             'clientId' => 'nullable|string',
@@ -79,7 +80,7 @@ class Change extends Component
             'webhookToken' => 'nullable|string',
             'groupName' => 'nullable|string',
             'isSystemWide' => 'required|bool',
-            'privateKeyId' => 'nullable|int',
+            'privateKeyId' => ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', $this->gitlab_app->team_id)],
             'webhook_endpoint' => ['required', 'string', 'url'],
             'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
             'use_custom_webhook_endpoint' => ['required', 'bool'],
@@ -338,7 +339,7 @@ class Change extends Component
             // @can and canGate checks against a deleted model (null team_id TypeError).
             $this->gitlab_app = null;
 
-            return redirect()->route('source.all');
+            return redirectRoute($this, 'source.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

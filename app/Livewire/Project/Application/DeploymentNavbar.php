@@ -2,17 +2,18 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
+use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 class DeploymentNavbar extends Component
 {
-    use AuthorizesRequests;
+    use AuditsApplicationSettings, AuthorizesRequests;
 
     public ApplicationDeploymentQueue $application_deployment_queue;
 
@@ -43,7 +44,7 @@ class DeploymentNavbar extends Component
         try {
             $this->authorize('update', $this->application);
             $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
             $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
             $this->dispatch('refreshQueue');
         } catch (\Throwable $e) {
@@ -55,7 +56,12 @@ class DeploymentNavbar extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
-            force_start_deployment($this->application_deployment_queue);
+            $started = force_start_deployment($this->application_deployment_queue);
+            $this->application_deployment_queue->refresh();
+
+            if (! $started) {
+                $this->dispatch('info', 'This deployment is no longer queued, so it was not started again.');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -63,19 +69,22 @@ class DeploymentNavbar extends Component
 
     public function copyLogsToClipboard(): string
     {
+        $this->authorize('view', $this->application);
+
         $logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
 
         if (! $logs) {
             return '';
         }
 
-        $isMember = auth()->user()->isMember();
+        $teamId = $this->application->team()?->id;
+        $hideDebugLines = is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId);
 
         $markdown = "# Deployment Logs\n\n";
         $markdown .= "```\n";
 
         foreach ($logs as $log) {
-            if ($isMember && ! empty($log['hidden'])) {
+            if ($hideDebugLines && ! empty($log['hidden'])) {
                 continue;
             }
             if (isset($log['output'])) {
@@ -95,71 +104,22 @@ class DeploymentNavbar extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-        $deployment_uuid = $this->application_deployment_queue->deployment_uuid;
-        $kill_command = "docker rm -f {$deployment_uuid}";
-        $build_server_id = $this->application_deployment_queue->build_server_id ?? $this->application->destination->server_id;
+        $teamId = $this->application->team()->id;
         $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
+        $server = Server::where('team_id', $teamId)->find($server_id);
 
         // First, mark the deployment as cancelled to prevent further processing
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
         ]);
-
         try {
-            if ($this->application->settings->is_build_server_enabled) {
-                $server = Server::ownedByCurrentTeam()->find($build_server_id);
-            } else {
-                $server = Server::ownedByCurrentTeam()->find($server_id);
-            }
-
-            // Add cancellation log entry
-            if ($this->application_deployment_queue->logs) {
-                $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-
-                $new_log_entry = [
-                    'command' => $kill_command,
-                    'output' => 'Deployment cancelled by user.',
-                    'type' => 'stderr',
-                    'order' => count($previous_logs) + 1,
-                    'timestamp' => Carbon::now('UTC'),
-                    'hidden' => false,
-                ];
-                $previous_logs[] = $new_log_entry;
-                $this->application_deployment_queue->update([
-                    'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
-                ]);
-            }
-
-            // Try to stop the helper container if it exists
-            // Check if container exists first
-            $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
-            $containerExists = instant_remote_process([$checkCommand], $server);
-
-            if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                // Container exists, kill it
-                instant_remote_process([$kill_command], $server);
-            } else {
-                // Container hasn't started yet
-                $this->application_deployment_queue->addLogEntry('Helper container not yet started. Deployment will be cancelled when job checks status.');
-            }
-
-            // Also try to kill any running process if we have a process ID
-            if ($this->application_deployment_queue->current_process_id) {
-                try {
-                    $processKillCommand = "kill -9 {$this->application_deployment_queue->current_process_id}";
-                    instant_remote_process([$processKillCommand], $server);
-                } catch (\Throwable $e) {
-                    // Process might already be gone, that's ok
-                }
-            }
+            $this->application_deployment_queue->addLogEntry('Deployment cancelled by user.', 'stderr');
+            CleanupCancelledDeployment::run($this->application_deployment_queue, $teamId);
         } catch (\Throwable $e) {
             // Still mark as cancelled even if cleanup fails
             return handleError($e, $this);
         } finally {
-            $this->application_deployment_queue->update([
-                'current_process_id' => null,
-            ]);
-            next_after_cancel($server);
+            next_after_cancel($server, $this->application);
         }
     }
 }

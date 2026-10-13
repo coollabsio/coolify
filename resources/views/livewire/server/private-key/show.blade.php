@@ -78,7 +78,7 @@
                                     @endif
                                 </div>
                                 <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
-                                    {{ $privateKey->description ?: 'No description provided.' }}
+                                    {{ $privateKey->description }}
                                 </p>
                             </div>
                         </div>

@@ -28,7 +28,10 @@
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
-        <div class="justify-self-end">
+        <div class="flex items-center gap-0.5 justify-self-end">
+            @unless ($isValueHidden)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endunless
             <x-modal-input title="Environment variable details" :closeOutside="false">
                 <x-slot:content>
                     <button type="button" data-env-settings-trigger class="icon-button shrink-0"
@@ -38,7 +41,15 @@
                 </x-slot:content>
                 <div class="flex w-full flex-col gap-4">
                     <x-forms.input label="Name" :value="$key" readonly />
-                    <x-forms.input label="Value" :value="$value ?? ''" readonly />
+                    @if ($isValueHidden)
+                        <div class="w-full">
+                            <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
+                            <input disabled type="text" value="Hidden (only admins can view)"
+                                class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                        </div>
+                    @else
+                        <x-forms.input label="Value" :value="$value ?? ''" readonly />
+                    @endif
                     @if (filled($comment))
                         <x-forms.input label="Comment" :value="$comment" readonly />
                     @endif

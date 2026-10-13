@@ -24,14 +24,13 @@ class StopDatabaseProxy
     {
         $server = data_get($database, 'destination.server');
         $uuid = $database->uuid;
-        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        if ($database->getMorphClass() === ServiceDatabase::class) {
             $server = data_get($database, 'service.server');
         }
-        instant_remote_process(["docker rm -f {$uuid}-proxy"], $server);
+        instant_remote_process([dockerRemoveCommand("{$uuid}-proxy")], $server);
 
         $database->save();
 
-        DatabaseProxyStopped::dispatch();
-
+        DatabaseProxyStopped::dispatch($server->team_id);
     }
 }

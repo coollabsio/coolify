@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
-it('selects the Coolify service network for Traefik routed compose services', function () {
+it('selects the private service network for Traefik routed compose services', function () {
     Bus::fake();
 
     $team = Team::factory()->create();
@@ -46,4 +46,39 @@ YAML,
     $labels = collect(data_get($parsedCompose, 'services.app.labels'));
 
     expect($labels->values()->all())->toContain("traefik.docker.network={$service->uuid}");
+});
+
+it('labels an existing service application from its stored type after its image changes', function () {
+    Bus::fake();
+
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $service = Service::factory()->create([
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: postgres:17
+YAML,
+    ]);
+
+    $serviceApplication = ServiceApplication::create([
+        'name' => 'app',
+        'service_id' => $service->id,
+        'image' => 'nginx:latest',
+    ]);
+
+    $parsedCompose = serviceParser($service);
+    $labels = collect(data_get($parsedCompose, 'services.app.labels'));
+
+    expect($serviceApplication->fresh()->image)->toBe('postgres:17')
+        ->and($labels->values()->all())
+        ->toContain('coolify.service.subType=application')
+        ->not->toContain('coolify.service.subType=database');
 });

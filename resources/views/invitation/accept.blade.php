@@ -21,8 +21,11 @@
                 <x-auth.alert type="warning">You are already a member of this team. Dismiss the invitation to continue.</x-auth.alert>
             @endif
 
-            <form method="POST" action="{{ route('team.invitation.accept', $invitation->uuid) }}">
+            <form method="POST" action="{{ $formAction }}">
                 @csrf
+                @isset($token)
+                    <input type="hidden" name="token" value="{{ $token }}">
+                @endisset
                 <x-forms.button class="w-full justify-center" type="submit" isHighlighted>
                     {{ $alreadyMember ? 'Dismiss invitation' : 'Accept invitation' }}
                 </x-forms.button>

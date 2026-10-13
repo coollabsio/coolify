@@ -1,11 +1,13 @@
 <?php
 
+use App\Jobs\DeleteResourceJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\CloudInitScript;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
+use App\Models\NotificationThrottle;
 use App\Models\Project;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -14,6 +16,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Database\BackupMissing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
@@ -137,6 +140,14 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             'destination_id' => $this->destination->id,
             'destination_type' => $this->destination->getMorphClass(),
         ]);
+        $backup = $database->scheduledBackups()->create([
+            'team_id' => $this->team->id,
+            'enabled' => true,
+            'frequency' => '0 0 * * *',
+            'save_s3' => false,
+        ]);
+        $backup->forceFill(['last_execution_at' => now()->subDay()])->save();
+        NotificationThrottle::record($backup, BackupMissing::class);
 
         $response = $this->withHeaders($this->headers)
             ->postJson("/api/v1/databases/{$database->uuid}/clone", [
@@ -148,11 +159,14 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             ->assertJsonPath('message', 'Database cloned.');
 
         $cloned = StandalonePostgresql::where('uuid', $response->json('uuid'))->first();
+        $clonedBackup = $cloned->scheduledBackups()->sole();
         expect($cloned)->not->toBeNull()
             ->and($cloned->name)->toBe('cloned-db')
             ->and($cloned->environment_id)->toBe($database->environment_id)
             ->and($cloned->destination_id)->toBe($this->destination->id)
-            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue();
+            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue()
+            ->and($clonedBackup->last_execution_at)->toBeNull()
+            ->and(NotificationThrottle::wasSent($clonedBackup, BackupMissing::class))->toBeFalse();
     });
 
     test('creates renamed volumes when cloning a database with clone_volumes', function () {
@@ -273,6 +287,67 @@ describe('POST /api/v1/services/{uuid}/clone', function () {
                 'destination_uuid' => $this->destination->uuid,
             ])
             ->assertNotFound();
+    });
+});
+
+describe('DELETE resource endpoints', function () {
+    test('soft deletes an application before queuing cleanup', function () {
+        Queue::fake();
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/applications/{$this->application->uuid}")
+            ->assertOk();
+
+        expect(Application::find($this->application->id))->toBeNull()
+            ->and(Application::withTrashed()->find($this->application->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
+    });
+
+    test('soft deletes a service before queuing cleanup', function () {
+        Queue::fake();
+        $service = Service::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'server_id' => $this->server->id,
+        ]);
+
+        $response = $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/services/{$service->uuid}")
+            ->assertOk();
+
+        $response->assertJson([
+            'message' => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
+        ]);
+
+        expect(Service::find($service->id))->toBeNull()
+            ->and(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(
+            DeleteResourceJob::class,
+            fn (DeleteResourceJob $job): bool => $job->deleteFromCoolifyOnly
+        );
+    });
+
+    test('soft deletes a database before queuing cleanup', function () {
+        Queue::fake();
+        $database = StandalonePostgresql::create([
+            'name' => 'database-to-delete',
+            'image' => 'postgres:17-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/databases/{$database->uuid}")
+            ->assertOk();
+
+        expect(StandalonePostgresql::find($database->id))->toBeNull()
+            ->and(StandalonePostgresql::withTrashed()->find($database->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
     });
 });
 
@@ -405,6 +480,70 @@ describe('Application multi-destination cross-team', function () {
 
         $response->assertNotFound();
         expect($this->application->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('attaches a destination on another server of the same team', function () {
+        $secondServer = Server::factory()->create(['team_id' => $this->team->id]);
+        $secondDestination = StandaloneDocker::where('server_id', $secondServer->id)->firstOrFail();
+
+        $this->withHeaders($this->headers)
+            ->postJson("/api/v1/applications/{$this->application->uuid}/destinations", [
+                'destination_uuid' => $secondDestination->uuid,
+            ])
+            ->assertSuccessful();
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(1);
+    });
+
+    test('rejects an additional server for an application with persistent storage', function () {
+        LocalPersistentVolume::create([
+            'name' => 'app-data-'.$this->application->uuid,
+            'mount_path' => '/data',
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+        $secondServer = Server::factory()->create(['team_id' => $this->team->id]);
+        $secondDestination = StandaloneDocker::where('server_id', $secondServer->id)->firstOrFail();
+
+        $this->withHeaders($this->headers)
+            ->postJson("/api/v1/applications/{$this->application->uuid}/destinations", [
+                'destination_uuid' => $secondDestination->uuid,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Applications with persistent storage cannot use multiple servers because volumes are not shared between servers.');
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('rejects an additional server for a Docker Compose application', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        $secondServer = Server::factory()->create(['team_id' => $this->team->id]);
+        $secondDestination = StandaloneDocker::where('server_id', $secondServer->id)->firstOrFail();
+
+        $this->withHeaders($this->headers)
+            ->postJson("/api/v1/applications/{$this->application->uuid}/destinations", [
+                'destination_uuid' => $secondDestination->uuid,
+            ])
+            ->assertUnprocessable();
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('rejects a volume for an application with an additional server', function () {
+        $secondServer = Server::factory()->create(['team_id' => $this->team->id]);
+        $secondDestination = StandaloneDocker::where('server_id', $secondServer->id)->firstOrFail();
+        $this->application->additional_networks()->attach($secondDestination->id, ['server_id' => $secondServer->id]);
+
+        $this->withHeaders($this->headers)
+            ->postJson("/api/v1/applications/{$this->application->uuid}/storages", [
+                'type' => 'persistent',
+                'name' => 'data',
+                'mount_path' => '/data',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Applications that use multiple servers cannot have persistent storage because volumes are not shared between servers.');
+
+        expect($this->application->persistentStorages()->count())->toBe(0);
     });
 
     test('lists primary destination', function () {

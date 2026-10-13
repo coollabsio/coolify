@@ -70,14 +70,12 @@
             <div class="application-settings-section-body">
                 @if ($repositories->isNotEmpty())
                     <div class="flex items-end gap-2">
-                        <x-forms.datalist class="w-full" label="Repository"
-                            placeholder="Search repositories…" wire:model.live="selected_project_id">
-                            @foreach ($repositories as $repo)
-                                <option value="{{ data_get($repo, 'id') }}">
-                                    {{ data_get($repo, 'path_with_namespace') }}
-                                </option>
-                            @endforeach
-                        </x-forms.datalist>
+                        <x-forms.listbox id="selected_project_id" label="Repository" searchable live
+                            placeholder="Select a repository" searchPlaceholder="Search repositories…"
+                            :options="$repositories->map(fn ($repository) => [
+                                'value' => data_get($repository, 'id'),
+                                'label' => data_get($repository, 'path_with_namespace'),
+                            ])->values()->all()" />
                         <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches"
                             wire:target="loadBranches,selected_project_id">
                             <x-loading-on-button wire:loading.delay

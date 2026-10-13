@@ -2,6 +2,29 @@
     <form wire:submit="submit" class="flex flex-col gap-6">
         <x-unsaved-bar action="submit" />
 
+        @if ($anonymousDataVolume)
+            <x-callout type="danger" title="Current data is not in the data volume">
+                <p>Because of a bug in older Coolify versions, a file mount removed the data volume. This database
+                    keeps its current data in the unnamed Docker volume <code>{{ $anonymousDataVolume }}</code>.
+                    Starting or restarting it is blocked, because it would use the data volume and the current data
+                    would seem lost.</p>
+                <p class="mt-2">An admin can click "Keep current data" to use this volume as the data volume. The previous data
+                    volume is not used anymore, but stays on the server. It can contain data from before the file
+                    mount was added.</p>
+                @can('update', $database)
+                    <div class="mt-3">
+                        <x-modal-confirmation title="Keep current data?" buttonTitle="Keep current data"
+                            submitAction="keepCurrentDataVolume" :actions="[
+                                'Use the unnamed volume ' . $anonymousDataVolume . ' as the data volume of this database.',
+                                'Starts and restarts are allowed again and keep the current data.',
+                                'The previous data volume stays on the server and is not used anymore.',
+                            ]" :confirmWithText="false" :confirmWithPassword="false"
+                            step2ButtonText="Keep current data" />
+                    </div>
+                @endcan
+            </x-callout>
+        @endif
+
         <x-application.settings-section title="Database details"
             description="Manage the identity and container image for this ClickHouse database.">
             <x-slot:actions>
@@ -79,7 +102,7 @@
             <div class="grid gap-4 lg:grid-cols-2">
                 <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
                     <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
-                        :disabled="! auth()->user()->can('update', $database)" :options="[
+                        :disabled="! auth()->user()->can('update', $database)" canGate="update" :canResource="$database" :options="[
                             ['value' => false, 'label' => 'Private'],
                             ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
                         ]" />
@@ -94,7 +117,7 @@
 
         <x-application.settings-section title="Log delivery"
             description="Forward container logs to the drain configured on the server.">
-            <x-forms.listbox id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
+            <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
                 :disabled="! auth()->user()->can('update', $database)" :options="[
                     ['value' => false, 'label' => 'Do not forward logs'],
                     ['value' => true, 'label' => 'Forward logs to the server drain'],

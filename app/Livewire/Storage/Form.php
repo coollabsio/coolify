@@ -5,6 +5,7 @@ namespace App\Livewire\Storage;
 use App\Models\S3Storage;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,10 @@ class Form extends Component
     public ?string $description = null;
 
     public string $endpoint;
+
+    public array $endpointParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $endpointPartsChanged = false;
 
     public string $bucket;
 
@@ -101,10 +106,13 @@ class Form extends Component
             $this->name = $this->storage->name;
             $this->description = $this->storage->description;
             $this->endpoint = $this->storage->endpoint;
+            $this->endpointParts = DomainUrlParts::split($this->endpoint);
+            $this->endpointPartsChanged = false;
             $this->bucket = $this->storage->bucket;
             $this->region = $this->storage->region;
-            $this->key = $this->storage->key;
-            $this->secret = $this->storage->secret;
+            $canSeeCredentials = auth()->user()?->can('update', $this->storage) ?? false;
+            $this->key = $canSeeCredentials ? $this->storage->key : '';
+            $this->secret = $canSeeCredentials ? $this->storage->secret : '';
             $this->isUsable = $this->storage->is_usable;
         }
     }
@@ -114,10 +122,6 @@ class Form extends Component
         $this->syncData(false);
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->key = '';
-            $this->secret = '';
-        }
     }
 
     public function testConnection()
@@ -126,6 +130,9 @@ class Form extends Component
 
         try {
             $this->authorize('validateConnection', $this->storage);
+            if ($this->endpointPartsChanged) {
+                $this->endpoint = DomainUrlParts::compose(...$this->endpointParts);
+            }
             $testedStorage = new S3Storage;
             $testedStorage->uuid = $this->storage->uuid;
             $testedStorage->team_id = $this->storage->team_id;
@@ -166,6 +173,9 @@ class Form extends Component
     {
         try {
             $this->authorize('update', $this->storage);
+            if ($this->endpointPartsChanged) {
+                $this->endpoint = DomainUrlParts::compose(...$this->endpointParts);
+            }
 
             DB::transaction(function () {
                 $this->validate();
@@ -194,5 +204,10 @@ class Form extends Component
 
             return handleError($e, $this);
         }
+    }
+
+    public function updatedEndpointParts(): void
+    {
+        $this->endpointPartsChanged = true;
     }
 }

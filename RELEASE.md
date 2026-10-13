@@ -9,7 +9,7 @@
 | `feature/*` | New features based on and merged into `next` |
 | `hotfix/X.Y.Z` | Production fixes based on `main` |
 
-Release workflows never edit or commit versions. Set the intended version in `config/constants.php` before running a release workflow.
+Release workflows never edit or commit versions. Stable versions come from `config/constants.php`; RC versions come from `coolify.nightly.version` in `versions.json` and `other/nightly/versions.json`.
 
 ## Where changes go
 
@@ -25,11 +25,12 @@ feature/* → next → RC
 ```
 
 1. Merge feature branches into `next`.
-2. Set the intended RC version on `next`, such as `4.4-rc.1`.
-3. Regular builds publish `sha-<commit>`, `4.4-rc.1.<short-sha>`, and the moving `next` tag.
+2. Set `coolify.nightly.version` in both version files to the intended RC, such as `4.4-rc.1`.
+3. Regular `next` builds publish `sha-<short-sha>`, `4.4-rc.1.<short-sha>`, and the moving `next` tag. They never publish the exact `4.4-rc.1` tag.
 4. Create a reviewed draft GitHub Release named `v4.4-rc.1` and mark it as a prerelease.
-5. Run the RC workflow from `next`. It publishes `4.4-rc.1`, updates `next`, and publishes the draft.
-6. Advance `next` to the next intended RC version.
+5. Run **Release Coolify RC** manually from `next` and enter `v4.4-rc.1`.
+6. The workflow validates the draft and configured nightly version, builds the exact RC, publishes `4.4-rc.1`, updates `next`, and publishes the draft prerelease.
+7. Advance `coolify.nightly.version` to the next intended RC version.
 
 ## Stable release flow
 

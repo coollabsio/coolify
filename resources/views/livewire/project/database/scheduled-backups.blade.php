@@ -56,7 +56,7 @@
                 description="Create a schedule to start protecting this database."
                 icon-name="storages" />
         @else
-            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div class="data-table-header scheduled-backups-table-grid">
                     <span>Schedule</span>
                     <span>Latest run</span>
@@ -100,13 +100,13 @@
                             {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
                         </div>
                         <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                            <a wire:navigate href="{{ $backupExecutionsRoute }}"
+                            <a {{ wireNavigate() }} href="{{ $backupExecutionsRoute }}"
                                 class="font-medium hover:underline hover:text-black dark:hover:text-fg">
                                 {{ $backup->executions_count ?? $backup->executions()->count() }}
                             </a>
                         </div>
                         <div class="flex justify-end">
-                            <a class="button" wire:navigate href="{{ $backupRoute }}">Manage</a>
+                            <a class="button" {{ wireNavigate() }} href="{{ $backupRoute }}">Manage</a>
                         </div>
                     </div>
                 @endforeach

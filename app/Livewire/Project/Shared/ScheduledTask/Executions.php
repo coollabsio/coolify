@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -10,6 +11,9 @@ use Livewire\Component;
 
 class Executions extends Component
 {
+    use ListensToTeamChannel;
+
+    #[Locked]
     public ScheduledTask $task;
 
     #[Locked]
@@ -28,24 +32,23 @@ class Executions extends Component
 
     public $logsPerPage = 100;
 
+    #[Locked]
     public $selectedExecution = null;
 
     public $isPollingActive = false;
 
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ScheduledTaskDone" => 'refreshExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'ScheduledTaskDone' => 'refreshExecutions',
+        ]);
     }
 
     public function mount($taskId)
     {
         try {
             $this->taskId = $taskId;
-            $this->task = ScheduledTask::findOrFail($taskId);
+            $this->task = ScheduledTask::where('team_id', Auth::user()->currentTeam()->id)->findOrFail($taskId);
             $this->executions = $this->task->executions()->take(20)->get();
             $this->serverTimezone = data_get($this->task, 'application.destination.server.settings.server_timezone');
             if (! $this->serverTimezone) {
@@ -124,6 +127,10 @@ class Executions extends Component
             return collect();
         }
 
+        if (! $this->canReadOutput()) {
+            return collect(['Hidden (only admins can view)']);
+        }
+
         if (! $this->selectedExecution->message) {
             return collect(['Waiting for task output...']);
         }
@@ -136,7 +143,7 @@ class Executions extends Component
     public function downloadLogs(int $executionId)
     {
         $execution = $this->executions->firstWhere('id', $executionId);
-        if (! $execution) {
+        if (! $execution || ! $this->canReadOutput()) {
             return;
         }
 
@@ -145,9 +152,17 @@ class Executions extends Component
         }, 'task-execution-'.$execution->id.'.log');
     }
 
+    /**
+     * Task output can contain secrets, so only users who can edit the task's resource may read it.
+     */
+    public function canReadOutput(): bool
+    {
+        return auth()->user()?->can('update', $this->task->application ?? $this->task->service) ?? false;
+    }
+
     public function hasMoreLogs()
     {
-        if (! $this->selectedExecution || ! $this->selectedExecution->message) {
+        if (! $this->selectedExecution || ! $this->selectedExecution->message || ! $this->canReadOutput()) {
             return false;
         }
         $lines = collect(explode("\n", $this->selectedExecution->message));

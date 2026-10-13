@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
@@ -12,6 +13,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Tag;
+use App\Support\ResourceStartActivity;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -238,57 +240,45 @@ class DeployController extends Controller
             ApplicationDeploymentStatus::IN_PROGRESS->value,
         ];
 
-        if (! in_array($deployment->status, $cancellableStatuses)) {
+        if (! in_array($deployment->status, $cancellableStatuses, true)) {
             return response()->json([
                 'message' => "Deployment cannot be cancelled. Current status: {$deployment->status}",
             ], 400);
         }
 
         // Perform the cancellation
+        $cancelled = false;
+        $deploymentServer = Server::whereTeamId($teamId)->find($deployment->server_id);
+
         try {
-            $deployment_uuid = $deployment->deployment_uuid;
-            $kill_command = "docker rm -f {$deployment_uuid}";
-            $build_server_id = $deployment->build_server_id ?? $deployment->server_id;
-
             // Mark deployment as cancelled
-            $deployment->update([
-                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
-            ]);
+            $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
+                ->whereIn('status', $cancellableStatuses)
+                ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
 
-            // Get the server
-            $server = Server::whereTeamId($teamId)->find($build_server_id);
+            if ($updated !== 1) {
+                $deployment->refresh();
 
-            if ($server) {
-                // Add cancellation log entry
+                return response()->json([
+                    'message' => "Deployment cannot be cancelled. Current status: {$deployment->status}",
+                ], 400);
+            }
+
+            $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
+            $cancelled = true;
+
+            try {
                 $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
-
-                // Check if container exists and kill it
-                $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
-                $containerExists = instant_remote_process([$checkCommand], $server);
-
-                if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                    instant_remote_process([$kill_command], $server);
-                    $deployment->addLogEntry('Deployment container stopped.');
-                } else {
-                    $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
-                }
-
-                // Kill running process if process ID exists
-                if ($deployment->current_process_id) {
-                    try {
-                        $processKillCommand = "kill -9 {$deployment->current_process_id}";
-                        instant_remote_process([$processKillCommand], $server);
-                    } catch (\Throwable $e) {
-                        // Process might already be gone
-                    }
-                }
+                CleanupCancelledDeployment::run($deployment, (int) $teamId);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to clean up cancelled deployment {$deployment->id}: {$e->getMessage()}");
             }
 
             auditLog('api.deployment.cancelled', [
                 'team_id' => $teamId,
                 'deployment_uuid' => $deployment->deployment_uuid,
-                'application_id' => $application?->id,
-                'application_uuid' => $application?->uuid,
+                'application_id' => $deployment->application_id,
+                'application_uuid' => $deployment->application?->uuid,
                 'server_id' => $deployment->server_id,
             ]);
 
@@ -301,6 +291,14 @@ class DeployController extends Controller
             return response()->json([
                 'message' => 'Failed to cancel deployment: '.$e->getMessage(),
             ], 500);
+        } finally {
+            if ($cancelled) {
+                try {
+                    next_after_cancel($deploymentServer, $deployment->application);
+                } catch (\Throwable $e) {
+                    \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
+                }
+            }
         }
     }
 
@@ -317,8 +315,8 @@ class DeployController extends Controller
             new OA\Parameter(name: 'tag', in: 'query', description: 'Tag name(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer', maximum: 2147483647)),
+            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer', maximum: 2147483647)),
             new OA\Parameter(name: 'docker_tag', in: 'query', description: 'Docker image tag for Docker Image preview deployments. Requires pull_request_id.', schema: new OA\Schema(type: 'string')),
         ],
 
@@ -374,6 +372,9 @@ class DeployController extends Controller
         $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
         $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
 
+        if ($pr > 2147483647) {
+            return response()->json(['message' => 'pull_request_id must be between 1 and 2147483647.'], 400);
+        }
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
         }
@@ -409,8 +410,8 @@ class DeployController extends Controller
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
                 $dockerTagForResource = $dockerTag;
+                $preview = null;
                 if ($pr !== 0) {
-                    $preview = null;
                     if ($resource instanceof Application && $resource->build_pack === 'dockerimage') {
                         $preview = $this->upsertDockerImagePreview($resource, $pr, $dockerTag);
                         $dockerTagForResource = $preview?->docker_registry_image_tag;
@@ -423,7 +424,7 @@ class DeployController extends Controller
                         continue;
                     }
                 }
-                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource);
+                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource, $preview?->git_type);
                 if (isset($result['status']) && $result['status'] === 429) {
                     return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
                 }
@@ -461,8 +462,8 @@ class DeployController extends Controller
                 // $message->push("Tag {$tag} not found.");
                 continue;
             }
-            $applications = $found_tag->applications()->get();
-            $services = $found_tag->services()->get();
+            $applications = $found_tag->applications()->whereRelation('environment.project', 'team_id', $team_id)->get();
+            $services = $found_tag->services()->whereRelation('environment.project', 'team_id', $team_id)->get();
             if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
 
@@ -496,7 +497,7 @@ class DeployController extends Controller
         return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
-    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null): array
+    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null, ?string $gitType = null): array
     {
         $message = null;
         $deployment_uuid = null;
@@ -521,6 +522,7 @@ class DeployController extends Controller
                     force_rebuild: $force,
                     pull_request_id: $pr,
                     is_api: true,
+                    git_type: $gitType,
                     docker_registry_image_tag: $dockerTag,
                 );
                 if ($result['status'] === 'queue_full') {
@@ -560,7 +562,17 @@ class DeployController extends Controller
                 } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to start this database.', 'deployment_uuid' => null];
                 }
-                StartDatabase::dispatch($resource);
+                $prerequisiteError = StartDatabase::prerequisiteError($resource);
+                if ($prerequisiteError !== null) {
+                    $message = $prerequisiteError;
+                    break;
+                }
+                $reservation = StartDatabase::reserveOperation($resource);
+                if ($reservation === null) {
+                    $message = ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
+                    break;
+                }
+                StartDatabase::dispatchReserved(StartDatabase::class, $resource, $reservation);
 
                 $resource->started_at ??= now();
                 $resource->save();

@@ -132,32 +132,27 @@
                         @endif
 
                         <div class="flex flex-col gap-4">
-                            <x-forms.datalist label="Extra SSH keys" id="selectedHetznerSshKeyIds"
-                                helper="Existing keys from the Hetzner account." :multiple="true"
-                                :disabled="count($hetznerSshKeys) === 0"
-                                :placeholder="count($hetznerSshKeys) ? 'Search SSH keys' : 'No account keys found'">
-                                @foreach ($hetznerSshKeys as $sshKey)
-                                    <option value="{{ $sshKey['id'] }}">{{ $sshKey['name'] }}</option>
-                                @endforeach
-                            </x-forms.datalist>
+                            <x-forms.listbox label="Extra SSH keys" id="selectedHetznerSshKeyIds"
+                                helper="Existing keys from the Hetzner account." multiple searchable
+                                :disabled="count($hetznerSshKeys) === 0" searchPlaceholder="Search SSH keys…"
+                                :placeholder="count($hetznerSshKeys) ? 'Select SSH keys' : 'No account keys found'"
+                                :options="collect($hetznerSshKeys)->map(fn ($sshKey) => ['value' => $sshKey['id'], 'label' => $sshKey['name']])->values()->all()" />
 
                             <div class="grid gap-4 lg:grid-cols-2">
-                                <x-forms.datalist label="Firewalls" id="selectedHetznerFirewallIds"
-                                    :multiple="true" :disabled="count($hetznerFirewalls) === 0"
-                                    :placeholder="count($hetznerFirewalls) ? 'Search firewalls' : 'No firewalls found'">
-                                    @foreach ($hetznerFirewalls as $firewall)
-                                        <option value="{{ $firewall['id'] }}">{{ $firewall['name'] }}</option>
-                                    @endforeach
-                                </x-forms.datalist>
-                                <x-forms.datalist label="Private networks" id="selectedHetznerNetworkIds"
-                                    :multiple="true" :disabled="count($this->availableNetworks) === 0"
-                                    :placeholder="count($this->availableNetworks) ? 'Search networks' : 'No compatible networks'">
-                                    @foreach ($this->availableNetworks as $network)
-                                        <option value="{{ $network['id'] }}">
-                                            {{ $network['name'] }} · {{ $network['ip_range'] }}
-                                        </option>
-                                    @endforeach
-                                </x-forms.datalist>
+                                <x-forms.listbox label="Firewalls" id="selectedHetznerFirewallIds"
+                                    multiple searchable :disabled="count($hetznerFirewalls) === 0"
+                                    searchPlaceholder="Search firewalls…"
+                                    :placeholder="count($hetznerFirewalls) ? 'Select firewalls' : 'No firewalls found'"
+                                    :options="collect($hetznerFirewalls)->map(fn ($firewall) => ['value' => $firewall['id'], 'label' => $firewall['name']])->values()->all()" />
+                                <x-forms.listbox label="Private networks" id="selectedHetznerNetworkIds"
+                                    multiple searchable :disabled="count($this->availableNetworks) === 0"
+                                    searchPlaceholder="Search networks…"
+                                    :placeholder="count($this->availableNetworks) ? 'Select networks' : 'No compatible networks'"
+                                    :options="collect($this->availableNetworks)->map(fn ($network) => [
+                                        'value' => $network['id'],
+                                        'label' => $network['name'],
+                                        'description' => $network['ip_range'],
+                                    ])->values()->all()" />
                             </div>
 
                             <div class="grid gap-3 lg:grid-cols-3">

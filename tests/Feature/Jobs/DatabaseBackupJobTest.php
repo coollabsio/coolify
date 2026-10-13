@@ -44,6 +44,14 @@ test('scheduled database backup execution model casts storage deletion fields co
     expect($casts['s3_storage_deleted'])->toBe('boolean');
 });
 
+test('scheduled database backup casts full dump selection to boolean', function () {
+    $model = new ScheduledDatabaseBackup;
+
+    expect($model->getCasts())->toMatchArray(['dump_all' => 'boolean'])
+        ->and((new ScheduledDatabaseBackup(['dump_all' => '0']))->dump_all)->toBeFalse()
+        ->and((new ScheduledDatabaseBackup(['dump_all' => '1']))->dump_all)->toBeTrue();
+});
+
 test('upload_to_s3 throws exception and disables s3 when storage is null', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
@@ -338,10 +346,11 @@ test('database dump compression uses the helper image and shared CPU setting', f
 
     $command = (new ReflectionClass($job))
         ->getMethod('buildCompressedDumpCommand')
-        ->invoke($job, 'docker exec database pg_dumpall');
+        ->invoke($job, 'docker exec database pg_dumpall', "'/backups/pg-dump-all.gz'");
 
     expect($command)
-        ->toStartWith('docker exec database pg_dumpall | docker run --rm -i')
+        ->toStartWith('status=$( { { docker exec database pg_dumpall; echo $? >&3; } | docker run --rm -i')
+        ->toContain("> '/backups/pg-dump-all.gz'; } 3>&1 ) && [ \"\$status\" -eq 0 ]")
         ->toContain('coolify-helper')
         ->toContain('command -v pigz')
         ->toContain('pigz -3 -p')
@@ -352,13 +361,30 @@ test('database dump compression uses the helper image and shared CPU setting', f
     'high' => 75,
 ]);
 
-test('all dump all database commands use shared helper compression', function () {
-    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
+test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {
+    $backup = new ScheduledDatabaseBackup([
+        'dump_all' => true,
+        'databases_to_backup' => 'default,analytics',
+    ]);
+    $job = new DatabaseBackupJob($backup);
 
-    expect($source)
-        ->toContain('$this->buildCompressedDumpCommand($backupCommand)')
-        ->toContain('mysqldump -u root')
-        ->toContain('mariadb-dump -u root')
-        ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(2)
-        ->and($source)->not->toContain('| gzip >');
-});
+    $databases = (new ReflectionClass($job))
+        ->getMethod('databasesToBackup')
+        ->invoke($job, $databaseType, $backup->databases_to_backup);
+
+    expect($databases)->toBe(['all']);
+})->with(['postgresql', 'mysql', 'mariadb']);
+
+test('specific database dumps keep every selected database', function (string $databaseType) {
+    $backup = new ScheduledDatabaseBackup([
+        'dump_all' => false,
+        'databases_to_backup' => 'default, analytics',
+    ]);
+    $job = new DatabaseBackupJob($backup);
+
+    $databases = (new ReflectionClass($job))
+        ->getMethod('databasesToBackup')
+        ->invoke($job, $databaseType, $backup->databases_to_backup);
+
+    expect($databases)->toBe(['default', 'analytics']);
+})->with(['postgresql', 'mysql', 'mariadb']);

@@ -41,7 +41,7 @@
                     <div class="lg:col-span-2">
                         @if (isCloud())
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="useInstanceEmailSettings" label="Email service"
+                                <x-forms.listbox canGate="update" :canResource="$settings" id="useInstanceEmailSettings" label="Email service"
                                     onChange="instantSave"
                                     :disabled="!auth()->user()->can('update', $settings)" :options="[
                                         ['value' => true, 'label' => 'Use hosted email service'],
@@ -50,7 +50,7 @@
                             </div>
                         @else
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="useInstanceEmailSettings" label="Email service"
+                                <x-forms.listbox canGate="update" :canResource="$settings" id="useInstanceEmailSettings" label="Email service"
                                     onChange="instantSave"
                                     :disabled="!auth()->user()->can('update', $settings)" :options="[
                                         ['value' => true, 'label' => 'Use system-wide settings'],
@@ -85,7 +85,7 @@
                     <div class="grid gap-4 lg:grid-cols-3">
                         <div class="lg:col-span-3">
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="smtpEnabled" label="SMTP delivery"
+                                <x-forms.listbox canGate="update" :canResource="$settings" id="smtpEnabled" label="SMTP delivery"
                                     onChange="submitSmtp"
                                     :disabled="!auth()->user()->can('update', $settings)" :options="[
                                         ['value' => true, 'label' => 'Enabled'],
@@ -97,7 +97,7 @@
                             placeholder="smtp.mailgun.org" label="Host" />
                         <x-forms.input canGate="update" :canResource="$settings" required id="smtpPort"
                             type="number" placeholder="587" label="Port" />
-                        <x-forms.listbox id="smtpEncryption" label="Encryption" required
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="smtpEncryption" label="Encryption" required
                             :disabled="!auth()->user()->can('update', $settings)" :options="[
                             ['value' => 'starttls', 'label' => 'StartTLS'],
                             ['value' => 'tls', 'label' => 'TLS / SSL'],
@@ -113,6 +113,10 @@
                         @endcan
                         <x-forms.input canGate="update" :canResource="$settings" id="smtpTimeout" type="number"
                             helper="Timeout value for sending emails." label="Timeout" />
+                        <x-forms.input canGate="update" :canResource="$settings" id="smtpEhloDomain"
+                            placeholder="coolify.example.com"
+                            helper="Fully qualified domain sent in the SMTP EHLO command. Uses the system default when empty."
+                            label="EHLO domain" />
                     </div>
                 </x-application.settings-section>
             </div>
@@ -120,7 +124,7 @@
             <div class="application-settings-form">
                 <x-application.settings-section title="Resend">
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.listbox id="resendEnabled" label="Resend delivery"
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="resendEnabled" label="Resend delivery"
                             onChange="submitResend"
                             :disabled="!auth()->user()->can('update', $settings)" :options="[
                                 ['value' => true, 'label' => 'Enabled'],
@@ -145,7 +149,11 @@
                         :events="[
                             ['property' => 'deploymentSuccessEmailNotifications', 'label' => 'Deployment success', 'enabled' => $deploymentSuccessEmailNotifications],
                             ['property' => 'deploymentFailureEmailNotifications', 'label' => 'Deployment failure', 'enabled' => $deploymentFailureEmailNotifications],
-                            ['property' => 'statusChangeEmailNotifications', 'label' => 'Container status changes', 'enabled' => $statusChangeEmailNotifications],
+                        ]" />
+                    <x-notification.event-multiselect :settings="$settings" id="resource-email-events" label="Resources"
+                        :events="[
+                            ['property' => 'statusChangeEmailNotifications', 'label' => 'Resource status changes', 'enabled' => $statusChangeEmailNotifications],
+                            ['property' => 'restartLimitReachedEmailNotifications', 'label' => 'Restart limit reached', 'enabled' => $restartLimitReachedEmailNotifications],
                         ]" />
                     <x-notification.event-multiselect :settings="$settings" id="backup-email-events" label="Backups"
                         :events="[

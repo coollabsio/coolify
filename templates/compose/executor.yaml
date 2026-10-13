@@ -1,0 +1,35 @@
+# documentation: https://executor.sh/docs/hosted/docker
+# slogan: Self-hosted AI agent integrations and code execution server.
+# category: development
+# tags: executor,ai,agents,mcp,automation,development
+# logo: svgs/executor.png
+# port: 4788
+
+services:
+  executor:
+    image: 'ghcr.io/rhyssullivan/executor-selfhost:${EXECUTOR_VERSION:-latest}'
+    environment:
+      - SERVICE_URL_EXECUTOR_4788
+      - EXECUTOR_WEB_BASE_URL=${SERVICE_URL_EXECUTOR_4788}
+      - EXECUTOR_HOST=${EXECUTOR_HOST:-0.0.0.0}
+      - PORT=${PORT:-4788}
+      - EXECUTOR_DATA_DIR=/data
+      - EXECUTOR_DB_PATH=${EXECUTOR_DB_PATH:-/data/data.db}
+      - EXECUTOR_ORG_NAME=${EXECUTOR_ORG_NAME:-Default}
+      - EXECUTOR_ORG_SLUG=${EXECUTOR_ORG_SLUG:-default}
+      - EXECUTOR_ALLOW_LOCAL_NETWORK=${EXECUTOR_ALLOW_LOCAL_NETWORK:-false}
+    volumes:
+      - executor-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch(`http://127.0.0.1:${process.env.PORT||4788}/api/health`).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  executor-data:

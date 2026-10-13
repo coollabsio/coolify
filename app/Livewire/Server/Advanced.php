@@ -18,6 +18,9 @@ class Advanced extends Component
     #[Validate(['required', 'integer', 'min:1', 'max:99'])]
     public int|string $serverDiskUsageNotificationThreshold = 50;
 
+    #[Validate(['required', 'integer', 'min:1', 'max:720'])]
+    public int|string $serverDiskUsageNotificationIntervalHours = 24;
+
     #[Validate(['required', 'integer', 'min:1'])]
     public int|string $concurrentBuilds = 1;
 
@@ -42,10 +45,9 @@ class Advanced extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->concurrent_builds = $this->concurrentBuilds;
             $this->server->settings->dynamic_timeout = $this->dynamicTimeout;
@@ -53,7 +55,10 @@ class Advanced extends Component
             $this->server->settings->backup_compression_cpu_percentage = $this->backupCompressionCpuPercentage;
             $this->server->settings->server_disk_usage_notification_threshold = $this->serverDiskUsageNotificationThreshold;
             $this->server->settings->server_disk_usage_check_frequency = $this->serverDiskUsageCheckFrequency;
+            $this->server->settings->server_disk_usage_notification_interval_hours = $this->serverDiskUsageNotificationIntervalHours;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->concurrentBuilds = $this->server->settings->concurrent_builds;
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
@@ -61,12 +66,14 @@ class Advanced extends Component
             $this->backupCompressionCpuPercentage = $this->server->settings->backup_compression_cpu_percentage;
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
             $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
+            $this->serverDiskUsageNotificationIntervalHours = $this->server->settings->server_disk_usage_notification_interval_hours;
         }
     }
 
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
@@ -81,6 +88,7 @@ class Advanced extends Component
                 $this->serverDiskUsageCheckFrequency = $this->server->settings->getOriginal('server_disk_usage_check_frequency');
                 throw new \Exception('Invalid Cron / Human expression for Disk Usage Check Frequency.');
             }
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
@@ -91,5 +99,22 @@ class Advanced extends Component
     public function render()
     {
         return view('livewire.server.advanced');
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.settings_updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

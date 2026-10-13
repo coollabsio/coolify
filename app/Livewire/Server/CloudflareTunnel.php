@@ -3,7 +3,9 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureCloudflared;
+use App\Actions\Server\UpdateCloudflared;
 use App\Models\Server;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -11,6 +13,7 @@ use Livewire\Component;
 class CloudflareTunnel extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -25,11 +28,9 @@ class CloudflareTunnel extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
-        ];
+        return $this->teamChannelListeners([
+            'CloudflareTunnelConfigured' => 'refresh',
+        ]);
     }
 
     public function refresh()
@@ -59,6 +60,7 @@ class CloudflareTunnel extends Component
             $this->isCloudflareTunnelsEnabled = false;
             $this->server->settings->is_cloudflare_tunnel = false;
             $this->server->settings->save();
+            auditLog('ui.server.cloudflare_tunnel.disabled', $this->auditContext());
             if ($this->server->ip_previous) {
                 $this->server->update(['ip' => $this->server->ip_previous]);
                 $this->dispatch('success', 'Cloudflare Tunnel disabled.<br><br>Manually updated the server IP address to its previous IP address.');
@@ -77,6 +79,7 @@ class CloudflareTunnel extends Component
             $this->isCloudflareTunnelsEnabled = true;
             $this->server->settings->is_cloudflare_tunnel = true;
             $this->server->settings->save();
+            auditLog('ui.server.cloudflare_tunnel.enabled', $this->auditContext());
             $this->server->refresh();
             $this->dispatch('success', 'Cloudflare Tunnel enabled.');
         } catch (\Throwable $e) {
@@ -93,6 +96,22 @@ class CloudflareTunnel extends Component
                 $this->ssh_domain = str($this->ssh_domain)->replace('/', '');
             }
             $activity = ConfigureCloudflared::run($this->server, $this->cloudflare_token, $this->ssh_domain);
+            auditLog('ui.server.cloudflare_tunnel.configuration_started', $this->auditContext([
+                'ssh_domain' => (string) $this->ssh_domain,
+            ]));
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function updateCloudflareTunnel()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $activity = UpdateCloudflared::run($this->server);
+            auditLog('ui.server.cloudflare_tunnel.update_started', $this->auditContext());
+            $this->dispatch('cloudflare-tunnel-update-started');
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -102,5 +121,18 @@ class CloudflareTunnel extends Component
     public function render()
     {
         return view('livewire.server.cloudflare-tunnel');
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 }

@@ -255,6 +255,13 @@ it('shows Vultr power on button when stopped even if server was previously funct
         ->assertSee('Power On');
 });
 
+it('hides Vultr power on button while the instance is running', function () {
+    $this->server->update(['vultr_instance_status' => 'active']);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertDontSee('Power On');
+});
+
 it('starts a Vultr instance', function () {
     Http::fake([
         'https://api.vultr.com/v2/instances/instance-1/start' => Http::response([], 204),
@@ -332,4 +339,25 @@ it('links a server to Vultr by matching IP', function () {
         'vultr_instance_id' => 'instance-2',
         'vultr_instance_status' => 'active',
     ]);
+});
+
+it('does not refresh Vultr status for a user outside the server team', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/instances/instance-1' => Http::response([
+            'instance' => ['id' => 'instance-1', 'status' => 'active'],
+        ], 200),
+    ]);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid]);
+
+    $outsider = User::factory()->create();
+    Team::factory()->create()->members()->attach($outsider->id, ['role' => 'owner']);
+    $this->actingAs($outsider);
+
+    $component->call('checkVultrInstanceStatus', true)
+        ->assertDispatched('error')
+        ->assertNotDispatched('success');
+
+    expect($this->server->fresh()->vultr_instance_status)->toBe('pending');
+    Http::assertNothingSent();
 });

@@ -1,4 +1,5 @@
 @php
+    $hasSourcePaths = $resource->persistentStorages->contains(fn ($storage) => filled($storage->host_path));
     $gridClass = match (true) {
         $supportsPreviewSuffix => 'volumes-table-grid-with-pr',
         $showActionsColumn => 'volumes-table-grid',
@@ -16,15 +17,17 @@
 
     @if ($resource->persistentStorages->isNotEmpty())
         <div class="data-table w-full">
-            <div class="data-table-header {{ $gridClass }}">
-                <span>Volume Name</span>
-                <span class="volumes-col-source">Source Path</span>
+            <div class="data-table-header {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }}">
+                <span>Storage Name</span>
+                @if ($hasSourcePaths)
+                    <span>Source Path</span>
+                @endif
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
-                    <span class="volumes-col-pr"
-                        title="Whether preview deployments receive an isolated -pr-N volume suffix.">
-                        PR suffix
-                    </span>
+                    <div class="volumes-col-pr flex items-center gap-1.5">
+                        <span>PR suffix</span>
+                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                    </div>
                 @endif
                 <span class="volumes-col-backup text-center">Backup</span>
                 @if ($showActionsColumn)
@@ -44,26 +47,40 @@
                     $hasS3Backup = $backupMeta['s3'];
                     $backupUrl = $backupMeta['url'];
                     $inputsReadonly = $form['isReadOnly'];
-                    $displayHostPath = filled($form['hostPath']) ? $form['hostPath'] : '—';
                 @endphp
 
                 @if ($inputsReadonly)
                     <div class="env-table-item" wire:key="storage-row-{{ $id }}">
-                        <div class="data-table-row {{ $gridClass }} text-[13px] text-neutral-700 dark:text-fg-dim">
+                        <div class="data-table-row {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }} text-[13px] text-neutral-700 dark:text-fg-dim">
                             <div class="volumes-cell-name min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
+                                <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <span
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
+                                @if ($form['replacedExternalVolume'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
+                                    </span>
+                                @endif
+                                @if ($form['ignoresDriverOptions'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Coolify does not apply the driver options of this volume because it was created before they were supported. To apply them: stop the resource, back up any data you need, delete this entry together with the Docker volume, then redeploy.
+                                    </span>
+                                @endif
                             </div>
 
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <span class="block min-w-0 truncate text-[13px]"
-                                    title="{{ $form['hostPath'] }}">{{ $displayHostPath }}</span>
-                            </div>
+                            @if ($hasSourcePaths)
+                                <div class="volumes-cell-source min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Source Path</span>
+                                    @if (filled($storage->host_path))
+                                        <x-forms.input aria-label="Source Path" :value="$storage->host_path" readonly />
+                                    @else
+                                        <span class="data-table-cell-dash">-</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
@@ -74,7 +91,10 @@
 
                             @if ($supportsPreviewSuffix)
                                 <div class="volumes-col-pr min-w-0">
-                                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
+                                    <div class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                                        <span>PR suffix</span>
+                                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                                    </div>
                                     <span>{{ $form['isPreviewSuffixEnabled'] ? 'Add suffix' : 'Share volume' }}</span>
                                 </div>
                             @endif
@@ -82,16 +102,22 @@
                             <div class="volumes-col-backup flex items-center justify-center gap-1.5">
                                 <span class="volumes-mobile-label volumes-field-label">Backup</span>
                                 @if ($hasEnabledBackup)
-                                    <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="2" stroke="currentColor" class="size-4">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                        </svg>
-                                    </a>
-                                    <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
-                                        title="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
-                                        {{ $hasS3Backup ? 'S3' : 'Local' }}
-                                    </span>
+                                    @if ($backupUrl)
+                                        <a href="{{ $backupUrl }}" @class([
+                                            'table-badge underline-offset-2 hover:underline',
+                                            'table-badge-success' => $hasS3Backup,
+                                        ])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </a>
+                                    @else
+                                        <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </span>
+                                    @endif
                                 @else
                                     <span class="data-table-cell-dash">-</span>
                                 @endif
@@ -99,14 +125,14 @@
 
                             @if ($showBackupAction)
                                 <div
-                                    class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                    class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
-                                                <button type="button" class="icon-button" title="Configure backup"
-                                                    aria-label="Configure backup">
-                                                    <x-reicon name="database" class="size-4" />
-                                                </button>
+                                                <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
+                                                    :canResource="$resource">
+                                                    Backup
+                                                </x-forms.button>
                                             </x-slot:content>
                                             @if ($resource instanceof \App\Models\Application)
                                                 <livewire:project.application.backup.create :application="$resource"
@@ -130,9 +156,28 @@
                                                 'label' => 'Also permanently delete the Docker volume and all its data.',
                                                 'default_warning' => 'The Docker volume and its data will not be deleted.',
                                             ]]"
-                                            :actions="[
+                                            :actions="array_values(array_filter([
                                                 'This removes only the stale volume entry from Coolify.',
-                                            ]" confirmationText="{{ $form['name'] }}"
+                                                $form['replacedExternalVolume']
+                                                    ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
+                                                    : null,
+                                            ]))" confirmationText="{{ $form['name'] }}"
+                                            confirmationLabel="Please confirm by entering the Storage Name below"
+                                            shortConfirmationLabel="Storage Name" />
+                                    @endif
+
+                                    @if ($form['canDeleteToApplyDriverOptions'])
+                                        <x-modal-confirmation title="Delete volume entry to apply driver options?" isErrorButton
+                                            buttonTitle="Delete" submitAction="delete({{ $id }})"
+                                            :checkboxes="[[
+                                                'id' => 'deleteDockerVolume',
+                                                'label' => 'Permanently delete the Docker volume and all data in it. The next deployment creates the volume again with the driver options.',
+                                                'default_warning' => 'The Docker volume and its data stay on the server. The driver options are not applied, because Docker keeps using the existing volume.',
+                                            ]]"
+                                            :actions="[
+                                                'Remove the storage entry from Coolify.',
+                                            ]"
+                                            warningMessage="Stop the resource first: Docker cannot delete a volume that a running container uses. If the volume contains data you need, use Backup before you delete it." confirmationText="{{ $form['name'] }}"
                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                             shortConfirmationLabel="Storage Name" />
                                     @endif
@@ -142,20 +187,31 @@
                     </div>
                 @else
                     <form wire:submit="submit({{ $id }})" class="env-table-item" wire:key="storage-row-{{ $id }}">
-                        <div class="data-table-row {{ $gridClass }}">
+                        <div class="data-table-row {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }}">
                             <div class="volumes-cell-name min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
+                                <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <div class="min-w-0 flex-1">
-                                        <x-forms.input id="forms.{{ $id }}.name" required />
+                                        <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared']" />
                                     </div>
                                 </div>
+                                @if ($storage->standaloneSqlite)
+                                    <a href="{{ $storage->standaloneSqlite->link() }}"
+                                        class="block text-xs text-neutral-500 underline underline-offset-2 hover:text-black dark:text-fg-dim dark:hover:text-fg">SQLite
+                                        database {{ $storage->standaloneSqlite->name }}</a>
+                                @endif
                             </div>
 
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <x-forms.input id="forms.{{ $id }}.hostPath" placeholder="Host path (optional)" />
-                            </div>
+                            @if ($hasSourcePaths)
+                                <div class="volumes-cell-source min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Source Path</span>
+                                    @if (filled($storage->host_path))
+                                        <x-forms.input aria-label="Source Path" :value="$storage->host_path" readonly />
+                                    @else
+                                        <span class="data-table-cell-dash">-</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
@@ -165,45 +221,54 @@
 
                             @if ($supportsPreviewSuffix)
                                 <div class="volumes-col-pr min-w-0">
-                                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
-                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" :options="[
+                                    <div class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                                        <span>PR suffix</span>
+                                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                                    </div>
+                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
-                                    ]" />
+                                    ]" canGate="update" :canResource="$resource" />
                                 </div>
                             @endif
 
                             <div class="volumes-col-backup flex items-center justify-center gap-1.5">
                                 <span class="volumes-mobile-label volumes-field-label">Backup</span>
                                 @if ($hasEnabledBackup)
-                                    <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="2" stroke="currentColor" class="size-4">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                        </svg>
-                                    </a>
-                                    <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
-                                        title="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
-                                        {{ $hasS3Backup ? 'S3' : 'Local' }}
-                                    </span>
+                                    @if ($backupUrl)
+                                        <a href="{{ $backupUrl }}" @class([
+                                            'table-badge underline-offset-2 hover:underline',
+                                            'table-badge-success' => $hasS3Backup,
+                                        ])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </a>
+                                    @else
+                                        <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </span>
+                                    @endif
                                 @else
                                     <span class="data-table-cell-dash">-</span>
                                 @endif
                             </div>
 
                             <div
-                                class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                 <x-forms.button type="submit" class="!px-2.5 !text-xs">
                                     Update
                                 </x-forms.button>
 
-                                @if ($showBackupAction)
+                                @if ($showBackupAction && ! $form['isShared'])
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <button type="button" class="icon-button" title="Configure backup"
-                                                aria-label="Configure backup">
-                                                <x-reicon name="database" class="size-4" />
-                                            </button>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
+                                                :canResource="$resource">
+                                                Backup
+                                            </x-forms.button>
                                         </x-slot:content>
                                         @if ($resource instanceof \App\Models\Application)
                                             <livewire:project.application.backup.create :application="$resource"
@@ -218,16 +283,17 @@
                                 @elseif (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable())
                                     <x-modal-input title="New Scheduled Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <button type="button" class="icon-button" title="Configure backup"
-                                                aria-label="Configure backup">
-                                                <x-reicon name="database" class="size-4" />
-                                            </button>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
+                                                :canResource="$resource">
+                                                Backup
+                                            </x-forms.button>
                                         </x-slot:content>
                                         <livewire:project.database.create-scheduled-backup :database="$resource"
                                             wire:key="configure-database-backup-{{ $id }}" />
                                     </x-modal-input>
                                 @endif
 
+                                @unless ($form['isShared'])
                                 <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton
                                     buttonTitle="Delete" submitAction="delete({{ $id }})" :actions="[
                                         'The selected persistent storage/volume will be permanently deleted.',
@@ -235,6 +301,7 @@
                                     ]" confirmationText="{{ $form['name'] }}"
                                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
                                     shortConfirmationLabel="Storage Name" />
+                                @endunless
                             </div>
                         </div>
                     </form>

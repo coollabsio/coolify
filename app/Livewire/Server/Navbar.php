@@ -9,12 +9,15 @@ use App\Enums\ProxyTypes;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 class Navbar extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -34,14 +37,18 @@ class Navbar extends Component
 
     public array $serverSwitcherOptions = [];
 
+    public ?bool $sentinelWarningOverride = null;
+
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
             'refreshServerShow' => 'refreshServer',
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
-            "echo-private:team.{$teamId},SentinelRestarted" => 'refreshSentinelStatus',
+            'sentinel-restart-requested' => 'hideSentinelWarning',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => 'showNotification',
+                'SentinelRestarted' => 'refreshSentinelStatus',
+                'SentinelSynchronized' => 'refreshSentinelStatus',
+            ]),
         ];
     }
 
@@ -101,6 +108,11 @@ class Navbar extends Component
 
             // Always use background job for all servers
             RestartProxyJob::dispatch($this->server);
+            auditLog('ui.proxy.restarted', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
 
         } catch (\Throwable $e) {
             $this->restartInitiated = false;
@@ -125,6 +137,11 @@ class Navbar extends Component
         try {
             $this->authorize('manageProxy', $this->server);
             $activity = StartProxy::run($this->server, force: true);
+            auditLog('ui.proxy.started', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -136,6 +153,12 @@ class Navbar extends Component
         try {
             $this->authorize('manageProxy', $this->server);
             StopProxy::dispatch($this->server, $forceStop);
+            auditLog('ui.proxy.stopped', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'force' => $forceStop,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -163,6 +186,7 @@ class Navbar extends Component
         $previousStatus = $this->proxyStatus;
         $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $this->dispatchProxyConfigurationState();
 
         // If event contains activityId, open activity monitor
         if ($event && isset($event['activityId'])) {
@@ -227,6 +251,17 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->server->load('settings');
+        $this->dispatchProxyConfigurationState();
+    }
+
+    private function dispatchProxyConfigurationState(): void
+    {
+        $this->dispatch(
+            'proxy-configuration-state-changed',
+            pending: $this->server->hasPendingProxyConfiguration(),
+            traefikOutdated: $this->server->hasCurrentTraefikOutdatedInfo(),
+            proxyNotRunning: $this->server->proxySet() && ($this->server->proxy->status ?? 'unknown') !== 'running',
+        );
     }
 
     public function refreshSentinelStatus($event = null): void
@@ -236,6 +271,31 @@ class Navbar extends Component
         }
 
         $this->refreshServer();
+        $this->sentinelWarningOverride = null;
+        $sentinelStatus = $this->server->sentinelStatus();
+        $sentinelStatusStartedAt = $this->server->sentinel_waiting_since ?? Carbon::parse($this->server->sentinel_updated_at);
+        $sentinelTimeoutSeconds = $this->server->sentinel_waiting_since !== null
+            ? $this->server->firstSentinelReportTimeoutSeconds()
+            : $this->server->waitBeforeDoingSshCheck();
+        $expiresInMilliseconds = max(
+            0,
+            ($sentinelStatusStartedAt->copy()->addSeconds($sentinelTimeoutSeconds)->timestamp - now()->timestamp) * 1000
+        );
+        $this->dispatch(
+            'sentinel-status-changed',
+            outOfSync: $this->server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
+            expiresInMilliseconds: $expiresInMilliseconds,
+        );
+    }
+
+    public function hideSentinelWarning(): void
+    {
+        $this->sentinelWarningOverride = false;
+    }
+
+    public function refreshAgentStatus(): void
+    {
+        $this->refreshSentinelStatus();
     }
 
     /**
@@ -248,10 +308,12 @@ class Navbar extends Component
             return false;
         }
 
-        // Check if server has outdated info stored
-        $outdatedInfo = $this->server->traefik_outdated_info;
+        return $this->server->hasCurrentTraefikOutdatedInfo();
+    }
 
-        return ! empty($outdatedInfo) && isset($outdatedInfo['type']);
+    public function getHasPendingProxyConfigurationProperty(): bool
+    {
+        return $this->server->hasPendingProxyConfiguration();
     }
 
     public function render()

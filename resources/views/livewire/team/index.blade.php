@@ -18,11 +18,20 @@
                     <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
                     <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
                     <div class="lg:col-span-2">
-                        <x-forms.listbox id="is_mcp_server_enabled" label="MCP server"
+                        <x-forms.listbox canGate="update" :canResource="$team" id="is_mcp_server_enabled" label="MCP server"
                             helper="Controls whether this team's API tokens can use the instance MCP endpoint."
                             :disabled="! auth()->user()->can('update', $team)" :options="[
                                 ['value' => false, 'label' => 'Disabled for this team'],
                                 ['value' => true, 'label' => 'Enabled for this team'],
+                            ]" />
+                    </div>
+                    <div class="lg:col-span-2">
+                        <x-forms.listbox canGate="update" :canResource="$team"
+                            id="is_build_server_fallback_enabled" label="Build server fallback"
+                            helper="Controls what happens when an application is configured to use a dedicated build server, but no usable build server is available."
+                            :disabled="! auth()->user()->can('update', $team)" :options="[
+                                ['value' => true, 'label' => 'Build on the deployment server'],
+                                ['value' => false, 'label' => 'Fail the deployment'],
                             ]" />
                     </div>
                 </div>

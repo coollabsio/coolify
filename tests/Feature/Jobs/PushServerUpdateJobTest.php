@@ -47,7 +47,7 @@ test('containers with empty service subId are skipped', function () {
     expect($job->serviceContainerStatuses)->toBeEmpty();
 });
 
-test('containers with valid service subId are processed', function () {
+test('service containers are matched by their UUID labels', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
     $service = Service::factory()->create([
@@ -67,9 +67,9 @@ test('containers with valid service subId are processed', function () {
                 'health_status' => 'healthy',
                 'labels' => [
                     'coolify.managed' => true,
-                    'coolify.serviceId' => (string) $service->id,
+                    'coolify.serviceUuid' => $service->uuid,
                     'coolify.service.subType' => 'application',
-                    'coolify.service.subId' => (string) $serviceApp->id,
+                    'coolify.service.subUuid' => $serviceApp->uuid,
                     'com.docker.compose.service' => 'myapp',
                 ],
             ],
@@ -80,4 +80,42 @@ test('containers with valid service subId are processed', function () {
     $job->handle();
 
     expect($job->foundServiceApplicationIds)->toContain((string) $serviceApp->id);
+});
+
+test('legacy service containers from another instance are matched by compose project, not by their numeric ids', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $service = Service::factory()->create([
+        'server_id' => $server->id,
+    ]);
+    $serviceApp = ServiceApplication::create([
+        'service_id' => $service->id,
+        'uuid' => (string) str()->uuid(),
+        'name' => 'web',
+    ]);
+
+    // Ids from the source instance: they point to nothing, or to other resources, on this instance.
+    $data = [
+        'containers' => [
+            [
+                'name' => 'web-'.$service->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => true,
+                    'coolify.serviceId' => (string) ($service->id + 1000),
+                    'coolify.service.subType' => 'application',
+                    'coolify.service.subId' => (string) ($serviceApp->id + 1000),
+                    'com.docker.compose.project' => $service->uuid,
+                    'com.docker.compose.service' => 'web',
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    expect($job->foundServiceApplicationIds)->toContain((string) $serviceApp->id)
+        ->and($job->serviceContainerStatuses->keys()->all())->toBe(["{$service->id}:application:{$serviceApp->id}"]);
 });

@@ -41,6 +41,10 @@ class ApiTokenExpirationWarningJob implements ShouldBeEncrypted, ShouldQueue, Si
                         continue;
                     }
 
+                    if (! $team->members()->whereKey($token->tokenable_id)->exists()) {
+                        continue;
+                    }
+
                     $warningSentAt = now();
 
                     $team->notify(new ApiTokenExpiringNotification($token));

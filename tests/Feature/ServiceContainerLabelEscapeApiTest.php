@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0, 'is_api_enabled' => true]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0, 'is_api_enabled' => true]));
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -37,7 +37,41 @@ function serviceContainerLabelAuthHeaders($bearerToken): array
     ];
 }
 
+test('service API creation preserves source Compose comments', function () {
+    $source = "# Operator note\nservices:\n  app:\n    image: nginx:alpine # Keep this note\n";
+
+    $response = $this->withHeaders(serviceContainerLabelAuthHeaders($this->bearerToken))
+        ->postJson('/api/v1/services', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'docker_compose_raw' => base64_encode($source),
+        ]);
+
+    $response->assertSuccessful();
+
+    expect(Service::whereUuid($response->json('uuid'))->firstOrFail()->docker_compose_raw)->toBe($source);
+});
+
 describe('PATCH /api/v1/services/{uuid}', function () {
+    test('preserves source Compose comments when updating a service', function () {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+        ]);
+        $source = "# Operator note\nservices:\n  app:\n    image: nginx:alpine # Keep this note\n";
+
+        $response = $this->withHeaders(serviceContainerLabelAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/services/{$service->uuid}", [
+                'docker_compose_raw' => base64_encode($source),
+            ]);
+        $response->assertSuccessful();
+
+        expect($service->fresh()->docker_compose_raw)->toBe($source);
+    });
+
     test('accepts is_container_label_escape_enabled field', function () {
         $service = Service::factory()->create([
             'server_id' => $this->server->id,
@@ -54,7 +88,7 @@ describe('PATCH /api/v1/services/{uuid}', function () {
         $response->assertStatus(200);
 
         $service->refresh();
-        expect($service->is_container_label_escape_enabled)->toBeFalse();
+        expect($service->is_container_label_escape_enabled)->toBeFalsy();
     });
 
     test('rejects invalid is_container_label_escape_enabled value', function () {

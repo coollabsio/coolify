@@ -138,6 +138,88 @@ test('proxy settings regenerate managed labels', function () {
     expect(base64_decode($this->application->fresh()->custom_labels))->not->toContain('sentinel-label=true');
 });
 
+test('changing a domain port regenerates managed labels with the requested port', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'ports_exposes' => '80',
+        'domain_port_overrides' => [
+            'https://app.example.com' => 3000,
+        ],
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'domains' => 'https://app.example.com:8080',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect($application->fqdn)->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 8080,
+        ])
+        ->and($labels)->toContain('loadbalancer.server.port=8080')
+        ->and($labels)->not->toContain('loadbalancer.server.port=3000');
+});
+
+test('compose domain ports are stored as overrides when updating through the API', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  api:\n    image: nginx\n  frontend:\n    image: nginx\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_compose_domains' => [
+                ['name' => 'api', 'domain' => 'https://api.example.com'],
+                ['name' => 'frontend', 'domain' => 'https://app.example.com:80'],
+            ],
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'frontend.domain'))->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 80,
+        ]);
+});
+
+test('compose domain ports are stored as overrides when creating through the API', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/compose-domain-port-test',
+            'git_branch' => 'main',
+            'build_pack' => 'dockercompose',
+            'autogenerate_domain' => false,
+            'docker_compose_domains' => [
+                ['name' => 'frontend', 'domain' => 'https://app.example.com:80'],
+            ],
+        ])
+        ->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'frontend.domain'))->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 80,
+        ]);
+});
+
 test('http basic auth updates regenerate managed labels', function () {
     $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
     $this->application->update([
@@ -184,6 +266,35 @@ test('http basic auth updates preserve user-managed labels', function () {
 
     expect(base64_decode($this->application->fresh()->custom_labels))->toBe('sentinel-label=true');
 });
+
+test('http basic auth hash settings are saved and applied to managed labels', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => true,
+        'http_basic_auth_username' => 'api-user',
+        'http_basic_auth_password' => 'api-password',
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['http_basic_auth_bcrypt_cost' => 4])
+        ->assertOk();
+
+    expect($this->application->fresh()->parseContainerLabels())->toContain('.basicauth.users=api-user:$2y$04$');
+});
+
+test('rejects http basic auth settings that are not supported', function (string $field, mixed $value) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [$field => $value])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors($field);
+})->with([
+    'Argon2id on a proxy without it' => ['http_basic_auth_hash_algorithm', 'argon2id'],
+    'unknown algorithm' => ['http_basic_auth_hash_algorithm', 'md5'],
+    'bcrypt cost above 14' => ['http_basic_auth_bcrypt_cost', 15],
+    'Argon2id memory above 256 MiB' => ['http_basic_auth_argon2id_memory_cost', 262145],
+    'Argon2id iterations above 12' => ['http_basic_auth_argon2id_time_cost', 13],
+    'password longer than 72 characters' => ['http_basic_auth_password', str_repeat('a', 73)],
+]);
 
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
@@ -265,6 +376,60 @@ test('PATCH /api/v1/applications/{uuid} updates advanced application settings', 
     }
 });
 
+test('PATCH /api/v1/applications/{uuid} accepts Docker-compatible custom internal names', function (string $name) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'custom_internal_name' => $name,
+            'is_consistent_container_name_enabled' => true,
+        ])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->custom_internal_name)->toBe($name);
+})->with([
+    'hyphens' => 'my-app-container',
+    'uppercase, underscores, and dots' => 'My_App.v2',
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects unsafe custom internal names', function (string $name) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'custom_internal_name' => $name,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_internal_name');
+
+    expect($this->application->fresh()->settings->custom_internal_name)->toBeNull();
+})->with([
+    'semicolon' => 'app;id',
+    'command substitution' => 'app$(id)',
+    'backticks' => 'app`id`',
+    'single quote' => "app'id",
+    'double quote' => 'app"id',
+    'space' => 'app name',
+    'newline' => "app\nid",
+    'option-like prefix' => '--help',
+    'pipe' => 'app|id',
+    'ampersand' => 'app&id',
+]);
+
+test('application creation rejects an unsafe custom internal name', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/custom-name-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'custom_internal_name' => 'app$(id)',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_internal_name');
+});
+
 test('PATCH /api/v1/applications/{uuid} updates preview_url_template and max_restart_count', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -278,6 +443,34 @@ test('PATCH /api/v1/applications/{uuid} updates preview_url_template and max_res
     expect($application->preview_url_template)->toBe('{{pr_id}}.preview.example.com')
         ->and($application->max_restart_count)->toBe(5);
 });
+
+test('PATCH /api/v1/applications/{uuid} clears ports_exposes with null or an empty string', function (mixed $portsExposes) {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'ports_exposes' => $portsExposes,
+        ])
+        ->assertOk();
+
+    expect($this->application->fresh()->ports_exposes)->toBeNull();
+})->with([
+    'null' => null,
+    'empty string' => '',
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects invalid exposed ports', function (string $portsExposes) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'ports_exposes' => $portsExposes,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ports_exposes');
+})->with([
+    'not numeric' => '80,abc',
+    'zero' => '0',
+    'above TCP range' => '65536',
+]);
 
 test('GET /api/v1/applications/{uuid} includes advanced settings', function () {
     $this->application->settings->update(advancedApplicationSettingsPayload());
@@ -357,3 +550,61 @@ test('rejects swarm fields on application update', function (string $field, mixe
     'swarm_placement_constraints' => ['swarm_placement_constraints', 'node.role==worker'],
     'is_swarm_only_worker_nodes' => ['is_swarm_only_worker_nodes', true],
 ]);
+
+test('PATCH /api/v1/applications/{uuid} saves a slugged container name prefix', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'My API'])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBe('my-api');
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/applications/{$this->application->uuid}")
+        ->assertOk()
+        ->assertJsonPath('settings.custom_container_name_prefix', 'my-api');
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a container name prefix that is in use', function () {
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherApplication->settings->update(['custom_container_name_prefix' => 'shared-prefix']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'shared-prefix'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});
+
+test('application creation rejects a non-string container name prefix with 422', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/prefix-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'custom_container_name_prefix' => ['nested' => 'value'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect(Application::query()->where('git_repository', 'like', '%prefix-test%')->exists())->toBeFalse();
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a non-string container name prefix with 422', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => ['a', 'b']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});

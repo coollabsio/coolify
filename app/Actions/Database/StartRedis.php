@@ -2,15 +2,18 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartRedis
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneRedis $database;
 
@@ -20,7 +23,13 @@ class StartRedis
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneRedis $database)
+    private string $resolvedRedisPassword = '';
+
+    private bool $redisPasswordFromSecretManager = false;
+
+    private ?string $resolvedRedisUsername = null;
+
+    public function handle(StandaloneRedis $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -55,18 +64,8 @@ class StartRedis
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -195,8 +194,8 @@ class StartRedis
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
@@ -209,7 +208,7 @@ class StartRedis
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -247,25 +246,43 @@ class StartRedis
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        // The stored REDIS_PASSWORD value, unresolved: the v4.3.23 server password of legacy databases.
+        $this->resolvedRedisPassword = (string) $this->database->redis_password;
+        $passwordVariable = $this->database->serverPasswordEnvironmentVariable();
 
         foreach ($this->database->runtime_environment_variables as $env) {
-            if ($env->is_shared) {
-                $environment_variables->push("$env->key=$env->real_value");
+            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
 
-                if ($env->key === 'REDIS_PASSWORD') {
-                    $this->database->update(['redis_password' => $env->real_value]);
+            if ($passwordVariable?->is($env)) {
+                $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                if ($rawValue !== '') {
+                    // Credentials below are placed directly in the compose file (command).
+                    $this->resolvedRedisPassword = $this->database->formatComposeFileValue($env, $rawValue);
+                    $this->redisPasswordFromSecretManager = $usesSecretManager;
+                }
+            }
+
+            if ($env->is_shared) {
+                $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+
+                if ($env->key === 'REDIS_USERNAME') {
+                    $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                    if (! $usesSecretManager) {
+                        $this->database->update(['redis_username' => $this->resolvedRedisUsername]);
+                    }
+                }
+            } else {
+                if ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
+                    $env->update(['value' => $this->database->redis_username]);
                 }
 
                 if ($env->key === 'REDIS_USERNAME') {
-                    $this->database->update(['redis_username' => $env->real_value]);
+                    $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
                 }
-            } else {
-                if ($env->key === 'REDIS_PASSWORD') {
-                    $env->update(['value' => $this->database->redis_password]);
-                } elseif ($env->key === 'REDIS_USERNAME') {
-                    $env->update(['value' => $this->database->redis_username]);
-                }
-                $environment_variables->push("$env->key=$env->real_value");
+
+                $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
             }
         }
 
@@ -276,6 +293,7 @@ class StartRedis
 
     private function buildStartCommand(): string
     {
+        $redisPassword = $this->requirePassArgument();
         $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
         $redisConfPath = '/usr/local/etc/redis/redis.conf';
 
@@ -286,10 +304,10 @@ class StartRedis
             if ($hasRequirePass) {
                 $command = "redis-server $redisConfPath";
             } else {
-                $command = "redis-server $redisConfPath --requirepass {$this->database->redis_password}";
+                $command = "redis-server $redisConfPath --requirepass {$redisPassword}";
             }
         } else {
-            $command = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
+            $command = "redis-server --requirepass {$redisPassword} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {
@@ -307,6 +325,21 @@ class StartRedis
         }
 
         return $command;
+    }
+
+    /**
+     * The password argument of the start command. Docker Compose splits the command like a shell, so the
+     * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
+     * quoting would change it (quotes, backslashes, whitespace, ; & | < >): Compose splits or cuts the old
+     * command there, so quoting now would change the password or options and can lose data.
+     */
+    private function requirePassArgument(): string
+    {
+        $keepsUnquotedPassword = $this->database->legacy_password_quoting
+            && ! $this->redisPasswordFromSecretManager
+            && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
+
+        return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }
 
     private function add_custom_redis()

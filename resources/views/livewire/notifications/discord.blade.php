@@ -11,11 +11,12 @@
                 description="Send team notifications to a Discord channel through an incoming webhook.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$discordEnabled" enabledProperty="discordEnabled"
-                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.listbox id="discordPingEnabled" label="Critical event mention"
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="discordPingEnabled" label="Critical event mention"
                         helper="Mention @here when a critical event occurs."
                         onChange="instantSaveDiscordPingEnabled"
                         :disabled="!auth()->user()->can('update', $settings)" :options="[

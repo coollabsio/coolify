@@ -64,8 +64,8 @@ test('generateDockerEnvFlags produces correct format', function () {
 
     $envFlags = generateDockerEnvFlags($variables);
 
-    expect($envFlags)->toContain('-e NORMAL_VAR=');
-    expect($envFlags)->toContain('-e MULTILINE_VAR="');
+    expect($envFlags)->toContain("-e 'NORMAL_VAR=value'");
+    expect($envFlags)->toContain("-e 'MULTILINE_VAR=line1");
     expect($envFlags)->toContain('line1');
     expect($envFlags)->toContain('line2');
 });
@@ -78,20 +78,41 @@ test('generateDockerEnvFlags works with collection input', function () {
 
     $envFlags = generateDockerEnvFlags($variables);
     expect($envFlags)->toBeString();
-    expect($envFlags)->toContain('-e VAR1=');
-    expect($envFlags)->toContain('-e VAR2="');
+    expect($envFlags)->toContain("-e 'VAR1=value1'");
+    expect($envFlags)->toContain("-e 'VAR2=multiline");
 });
 
-test('generateDockerBuildArgs escapes legacy keys', function () {
-    $variables = [
-        ['key' => 'BAD$(id)', 'value' => '1'],
-        ['key' => "BAD'KEY", 'value' => '1'],
-    ];
+test('docker argument helpers reject unsafe legacy keys', function (string $key) {
+    $variables = [['key' => $key, 'value' => '1']];
 
-    $buildArgs = generateDockerBuildArgs($variables);
+    expect(fn () => generateDockerBuildArgs($variables))->toThrow(InvalidArgumentException::class);
+    expect(fn () => generateDockerEnvFlags($variables))->toThrow(InvalidArgumentException::class);
+})->with([
+    'semicolon' => 'BAD;id',
+    'command substitution' => 'BAD$(id)',
+    'backticks' => 'BAD`id`',
+    'pipe' => 'BAD|id',
+    'logical operator' => 'BAD&&id',
+    'single quote' => "BAD'KEY",
+    'double quote' => 'BAD"KEY',
+    'backslash' => 'BAD\\KEY',
+    'space' => 'BAD KEY',
+    'newline' => "BAD\nKEY",
+    'control character' => "BAD\x1BKEY",
+    'equals sign' => 'BAD=KEY',
+    'option prefix' => '--BAD',
+    'parameter expansion' => 'BAD${PATH}',
+    'braces' => 'BAD{KEY}',
+    'unicode lookalike' => 'BＡD',
+    'empty' => '',
+    'leading digit' => '1BAD',
+]);
 
-    expect($buildArgs->values()->toArray())->toBe([
-        "--build-arg 'BAD$(id)'",
-        "--build-arg 'BAD'\''KEY'",
+test('generateDockerEnvFlags quotes the complete assignment', function () {
+    $flags = generateDockerEnvFlags([
+        ['key' => 'NORMAL_VAR', 'value' => 'value with spaces', 'is_multiline' => false],
+        ['key' => 'MULTILINE_VAR', 'value' => "line1\nline2", 'is_multiline' => true],
     ]);
+
+    expect($flags)->toBe("-e 'NORMAL_VAR=value with spaces' -e 'MULTILINE_VAR=line1\nline2'");
 });

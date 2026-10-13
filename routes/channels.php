@@ -12,7 +12,6 @@
 */
 
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('team.{teamId}', function (User $user, int $teamId) {
@@ -23,10 +22,6 @@ Broadcast::channel('team.{teamId}', function (User $user, int $teamId) {
     return false;
 });
 
-Broadcast::channel('user.{userId}', function (User $user) {
-    if ($user->id === Auth::id()) {
-        return true;
-    }
-
-    return false;
+Broadcast::channel('user.{userId}', function (User $user, int $userId) {
+    return (int) $user->id === $userId;
 });

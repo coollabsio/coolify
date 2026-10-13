@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
-use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -51,7 +51,9 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
                 continue;
             }
 
-            if ($process['etimes'] >= $minAge && ! file_exists($pathMatch[1])) {
+            if ($process['etimes'] >= $minAge
+                && ! file_exists($pathMatch[1])
+                && ! SshMultiplexingHelper::isMuxProcessRetiring($process['pid'], $pathMatch[1])) {
                 $this->reapOrphan('ssh', $process);
             }
         }
@@ -169,14 +171,6 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
             if ($checkProcess->exitCode() !== 0) {
                 $this->removeMultiplexFile($muxFile, 'connection_check_failed');
-            } else {
-                $muxContent = Storage::disk('ssh-mux')->get($muxFile);
-                $establishedAt = Carbon::parse(substr($muxContent, 37));
-                $expirationTime = $establishedAt->addSeconds(config('constants.ssh.mux_persist_time'));
-
-                if (Carbon::now()->isAfter($expirationTime)) {
-                    $this->removeMultiplexFile($muxFile, 'expired');
-                }
             }
         }
     }
@@ -216,8 +210,20 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         }
 
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-        $closeCommand = "ssh -O exit -o ControlPath={$muxSocket} localhost 2>/dev/null";
-        Process::run($closeCommand);
+        $checkProcess = Process::run("ssh -O check -o ControlPath={$muxSocket} localhost");
+        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+            ? $matches[1]
+            : null;
+
+        if ($pid !== null) {
+            SshMultiplexingHelper::markMuxProcessAsRetiring($pid, $muxSocket);
+        }
+
+        $closeCommand = "ssh -O stop -o ControlPath={$muxSocket} localhost 2>/dev/null";
+        $stopProcess = Process::run($closeCommand);
+        if ($pid !== null && ! $stopProcess->successful()) {
+            SshMultiplexingHelper::unmarkMuxProcessAsRetiring($pid, $muxSocket);
+        }
         Storage::disk('ssh-mux')->delete($muxFile);
 
         Log::info('Removed stale mux file', [

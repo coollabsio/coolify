@@ -29,7 +29,10 @@ class ActivityMonitor extends Component
 
     public static $eventDispatched = false;
 
-    protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
+    protected $listeners = [
+        'activityMonitor' => 'newMonitorActivity',
+        'processDialogClosed' => 'clearActivity',
+    ];
 
     public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null, $header = null)
     {
@@ -48,6 +51,16 @@ class ActivityMonitor extends Component
         $this->hydrateActivity();
 
         $this->isPollingActive = true;
+    }
+
+    public function clearActivity(): void
+    {
+        $this->activityId = null;
+        $this->activity = null;
+        $this->isPollingActive = false;
+        $this->eventToDispatch = 'activityFinished';
+        $this->eventData = null;
+        self::$eventDispatched = false;
     }
 
     public function hydrateActivity()

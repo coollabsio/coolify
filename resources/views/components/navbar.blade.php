@@ -1,3 +1,5 @@
+@props(['deploymentsIndicator' => false])
+
 <nav class="flex flex-col flex-1 bg-white border-r border-neutral-200 dark:border-white/[0.06] dark:bg-panel pt-2"
     :class="collapsed ? 'px-2 lg:px-3 sidebar-collapsed' : 'px-2 lg:px-3'"
     @mouseover="
@@ -52,14 +54,19 @@
     }">
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
-        <div class="px-1 pb-3" :class="collapsed && 'lg:px-0 lg:flex lg:justify-center'">
+        <div class="px-1 pb-3" :class="collapsed && 'lg:px-0'">
+            {{-- On pages with settings or sections the palette also searches the current page --}}
             <button @click="$dispatch('open-global-search')" type="button"
-                :title="'Search (Press / or ' + modKeyLabel + 'K)'"
-                class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint"
-                :class="collapsed && 'lg:w-8 lg:justify-center lg:px-0'">
+                x-data="{ hasPageSearch: false }"
+                x-init="$nextTick(() => hasPageSearch = (window.currentPageSearchItems?.() ?? []).length > 0)"
+                :title="hasPageSearch
+                    ? 'Search this page and everything (Press / or ' + modKeyLabel + 'K, then Tab to switch)'
+                    : 'Search (Press / or ' + modKeyLabel + 'K)'"
+                class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
                 <span class="flex items-center gap-2.5 min-w-0">
                     <x-reicon name="search" class="menu-item-icon" />
-                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Search</span>
+                    <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search<span
+                            x-show="hasPageSearch" x-cloak class="text-[11px] opacity-70"> page &amp; global</span></span>
                 </span>
                 <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
                     :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
@@ -87,6 +94,14 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Projects</span>
                 </a>
             </li>
+            <li>
+                <a title="Analytics" {{ wireNavigate() }}
+                    class="{{ request()->is('analytics') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('analytics') }}">
+                    <x-reicon name="analytics" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Analytics</span>
+                </a>
+            </li>
             @can('canAccessTerminal')
                 <li>
                     <a title="Terminal"
@@ -98,7 +113,9 @@
                 </li>
             @endcan
             {{-- Infrastructure --}}
-            <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
+            <li class="nav-section mt-3" aria-hidden="true"
+                :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
+                Infrastructure</li>
             <li>
                 <a title="Servers" {{ wireNavigate() }}
                     class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
@@ -123,6 +140,16 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Destinations</span>
                 </a>
             </li>
+            @if (auth()->user()?->isAdmin())
+                <li>
+                    <a title="Registries" {{ wireNavigate() }}
+                        class="{{ request()->is('registries*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('registries.index') }}">
+                        <x-reicon name="layers" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Registries</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="S3 Storage" {{ wireNavigate() }}
                     class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -141,7 +168,9 @@
             </li>
 
             {{-- Manage --}}
-            <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Manage</li>
+            <li class="nav-section mt-3" aria-hidden="true"
+                :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
+                Manage</li>
             <li>
                 <a title="Team" {{ wireNavigate() }}
                     class="{{ request()->is('team*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -209,7 +238,9 @@
         @endif
         @if (isCloud() && ! isSubscribed())
             {{-- Unsubscribed cloud has no workspace items — keep these at the top of the list. --}}
-            <li class="nav-section" :class="collapsed && 'lg:hidden'">Account</li>
+            <li class="nav-section" aria-hidden="true"
+                :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
+                Account</li>
             <li>
                 <a title="Subscription" {{ wireNavigate() }}
                     class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -226,20 +257,24 @@
             @endif
         @endif
     </ul>
-    {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}
-    <div class="sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3"
-        :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
-        <x-top-user-menu sidebar />
-        <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
-            class="menu-item w-8 shrink-0 justify-center px-0">
-            <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
-                <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
-            </svg>
-        </button>
+    {{-- Sticky sidebar footer (desktop only; mobile uses a temporary slide-over) --}}
+    <div class="sticky bottom-0 mt-auto -mx-2 hidden flex-col gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3">
+        @if ($deploymentsIndicator)
+            <livewire:deployments-indicator variant="sidebar" />
+        @endif
+        <div class="flex items-center gap-1" :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
+            <x-top-user-menu sidebar />
+            <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
+                class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
+                <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+            </button>
+        </div>
     </div>
     <div x-show="collapsed && tooltip.show" x-cloak x-transition.opacity.duration.100ms
         :style="`left: ${tooltip.x}px; top: ${tooltip.y}px;`"
-        class="fixed z-[10000] -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-lg bg-neutral-900 dark:bg-raised text-white whitespace-nowrap pointer-events-none shadow-lg border border-neutral-700 dark:border-white/10"
+        class="fixed z-[10000] -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-lg bg-neutral-900 dark:bg-raised text-white whitespace-nowrap pointer-events-none shadow-dropdown border border-neutral-700 dark:border-white/10"
         x-text="tooltip.text"></div>
 </nav>

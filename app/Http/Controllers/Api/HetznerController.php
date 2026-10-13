@@ -15,6 +15,7 @@ use App\Rules\ValidHostname;
 use App\Services\HetznerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 class HetznerController extends Controller
@@ -939,7 +940,7 @@ class HetznerController extends Controller
             }
 
             // Create server in Coolify database
-            $server = Server::create([
+            $server = Team::createServerWithinLimit($teamId, [
                 'name' => $normalizedServerName,
                 'ip' => $ipAddress,
                 'user' => 'root',
@@ -980,6 +981,19 @@ class HetznerController extends Controller
                 'hetzner_server_id' => $hetznerServer['id'],
                 'ip' => $ipAddress,
             ])->setStatusCode(201);
+        } catch (ValidationException $e) {
+            if (! isset($e->errors()['server'])) {
+                throw $e;
+            }
+            if (isset($hetznerService, $hetznerServer['id'])) {
+                try {
+                    $hetznerService->deleteServer((int) $hetznerServer['id']);
+                } catch (\Throwable $cleanupError) {
+                    report($cleanupError);
+                }
+            }
+
+            return response()->json(['message' => 'Server limit reached for your subscription.'], 400);
         } catch (RateLimitException $e) {
             $response = response()->json(['message' => $e->getMessage()], 429);
             if ($e->retryAfter !== null) {

@@ -5,7 +5,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Exceptions\CannotUpdateLockedPropertyException;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 
@@ -130,3 +130,23 @@ test('activityId property is locked and cannot be set from client', function () 
         ->set('activityId', $otherActivity->id)
         ->assertStatus(500);
 })->throws(CannotUpdateLockedPropertyException::class);
+
+test('closing a process dialog clears the previous activity logs', function () {
+    $activity = Activity::create([
+        'log_name' => 'default',
+        'description' => 'proxy restart activity',
+        'properties' => ['team_id' => $this->team->id],
+    ]);
+
+    $this->actingAs($this->user);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    Livewire::test(ActivityMonitor::class)
+        ->call('newMonitorActivity', $activity->id)
+        ->assertSet('activityId', $activity->id)
+        ->assertSet('isPollingActive', true)
+        ->dispatch('processDialogClosed')
+        ->assertSet('activityId', null)
+        ->assertSet('activity', null)
+        ->assertSet('isPollingActive', false);
+});

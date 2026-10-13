@@ -1,12 +1,13 @@
 <?php
 
-use App\Jobs\ConnectProxyToNetworksJob;
+use App\Events\ServiceChecked;
 use App\Jobs\PushServerUpdateJob;
 use App\Jobs\ServerStorageCheckJob;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -121,81 +122,7 @@ it('dispatches storage check when disk percentage changes from cached value', fu
     });
 });
 
-it('rate-limits ConnectProxyToNetworksJob dispatch to every 10 minutes', function () {
-    $team = Team::factory()->create();
-    $server = Server::factory()->create(['team_id' => $team->id]);
-    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    // First push: should dispatch ConnectProxyToNetworksJob
-    $containersWithProxy = [
-        [
-            'name' => 'coolify-proxy',
-            'state' => 'running',
-            'health_status' => 'healthy',
-            'labels' => ['coolify.managed' => true],
-        ],
-    ];
-
-    $data = [
-        'containers' => $containersWithProxy,
-        'filesystem_usage_root' => ['used_percentage' => 10],
-    ];
-
-    $job = new PushServerUpdateJob($server, $data);
-    $job->handle();
-
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
-
-    // Second push: should NOT dispatch ConnectProxyToNetworksJob (rate-limited)
-    Queue::fake();
-    $job2 = new PushServerUpdateJob($server, $data);
-    $job2->handle();
-
-    Queue::assertNotPushed(ConnectProxyToNetworksJob::class);
-});
-
-it('dispatches ConnectProxyToNetworksJob again after cache expires', function () {
-    $team = Team::factory()->create();
-    $server = Server::factory()->create(['team_id' => $team->id]);
-    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    $containersWithProxy = [
-        [
-            'name' => 'coolify-proxy',
-            'state' => 'running',
-            'health_status' => 'healthy',
-            'labels' => ['coolify.managed' => true],
-        ],
-    ];
-
-    $data = [
-        'containers' => $containersWithProxy,
-        'filesystem_usage_root' => ['used_percentage' => 10],
-    ];
-
-    // First push
-    $job = new PushServerUpdateJob($server, $data);
-    $job->handle();
-
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
-
-    // Clear cache to simulate expiration
-    Cache::forget('connect-proxy:'.$server->id);
-
-    // Next push: should dispatch again
-    Queue::fake();
-    $job2 = new PushServerUpdateJob($server, $data);
-    $job2->handle();
-
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
-});
-
-it('respects the configured proxy connect interval', function () {
-    // Interval 0 → the connect-proxy gate key expires immediately, so every
-    // push re-dispatches without a manual Cache::forget. Proves the TTL is
-    // driven by config('constants.proxy.connect_networks_interval_seconds').
-    config(['constants.proxy.connect_networks_interval_seconds' => 0]);
-
+it('does not dispatch proxy network work when the proxy is running', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
@@ -212,12 +139,11 @@ it('respects the configured proxy connect interval', function () {
         'filesystem_usage_root' => ['used_percentage' => 10],
     ];
 
-    (new PushServerUpdateJob($server, $data))->handle();
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
+    Event::fake([ServiceChecked::class]);
 
-    Queue::fake();
     (new PushServerUpdateJob($server, $data))->handle();
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
+
+    Queue::assertNothingPushed();
 });
 
 it('uses default queue for PushServerUpdateJob', function () {

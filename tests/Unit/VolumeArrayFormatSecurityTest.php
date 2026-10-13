@@ -243,6 +243,39 @@ YAML;
         ->toThrow(Exception::class);
 });
 
+test('compose validator rejects unsafe array source defaults', function (string $source) {
+    $compose = "services:\n  web:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))
+        ->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with([
+    '${DATA:-/tmp/evil`id`}',
+    '${DATA:-/tmp/evil$(id)}',
+    '${DATA:-/tmp/evil;id}',
+    '${DATA:-/tmp/evil|id}',
+    '${DATA:-/tmp/evil$(id)}/config.yml',
+    '${DATA:-${HOME:-$(id)}/config.yml}',
+    '${DATA:+/srv/app;id}/config.yml',
+    '${DATA:?missing;id}',
+    '${DATA?$(id)}',
+    '${DATA-/tmp/evil`id`}',
+    '${DATA+/tmp/evil|id}',
+    '/srv/$HOME/evil`id`',
+]);
+
+test('compose validator keeps safe array source expressions', function (string $source) {
+    $compose = "services:\n  web:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
+})->with(['${DATA}', '${DATA}/config', '${DATA}//config', '${DATA:-/srv/app/data}', '/srv/$HOME/config.yml', '$HOME/$FILE', '${DATA:-/srv/$HOME/config.yml}']);
+
+test('compose validator keeps unsupported array source forms rejected', function (string $source) {
+    $compose = "services:\n  web:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))
+        ->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:+/srv/app}', '${DATA:-${HOME}/config.yml}', '${DATA:-/srv/app}/file', '${DATA:?missing}', '${DATA?missing}', '${DATA-/srv/app}', '${DATA+/srv/app}']);
+
 test('mixed string and array format volumes in same compose', function () {
     $dockerComposeYaml = <<<'YAML'
 services:

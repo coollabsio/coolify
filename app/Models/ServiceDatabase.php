@@ -84,7 +84,7 @@ class ServiceDatabase extends BaseModel
     public function restart()
     {
         $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        remote_process(['docker restart '.escapeshellarg($container_id)], $this->service->server);
     }
 
     public function isRunning()

@@ -6,6 +6,14 @@
     })">
     @if ($isUpgradeAvailable)
         <div :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+            @if ($fullButton)
+                <x-forms.button type="button" @click="modalOpen=true" x-show="!showProgress" x-cloak isHighlighted>
+                    Upgrade now
+                </x-forms.button>
+                <x-forms.button type="button" @click="modalOpen=true" x-show="showProgress" x-cloak isHighlighted>
+                    Updating…
+                </x-forms.button>
+            @else
             <button type="button" title="Upgrade in progress" aria-label="Upgrade in progress"
                 @click="modalOpen=true" x-show="showProgress" x-cloak
                 class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20">
@@ -16,6 +24,7 @@
                 class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20">
                 Update available
             </button>
+            @endif
             <template x-teleport="body">
                 <div x-show="modalOpen"
                     class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4"
@@ -162,6 +171,8 @@
                 </div>
             </template>
         </div>
+    @elseif ($fullButton)
+        <p class="text-sm text-neutral-600 dark:text-fg-dim">Coolify is up to date.</p>
     @endif
 </div>
 
@@ -294,6 +305,16 @@
                             return;
                         }
                         throw error;
+                    }
+                    if (!data) {
+                        if (this.instanceWentDown) {
+                            // The upgraded instance can no longer return data for the old Livewire component.
+                            // A healthy response after observed downtime confirms that the restart completed.
+                            this.showSuccess();
+                        } else {
+                            this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
+                        }
+                        return;
                     }
                     if (data.status === 'complete') {
                         this.showSuccess();

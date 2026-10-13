@@ -2,10 +2,8 @@
 
 namespace App\Livewire;
 
+use App\Actions\Team\DeleteTeam;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class NavbarDeleteTeam extends Component
@@ -28,22 +26,7 @@ class NavbarDeleteTeam extends Component
 
             $currentTeam = currentTeam();
             $this->authorize('delete', $currentTeam);
-
-            $currentTeam->members->each(function ($user) use ($currentTeam) {
-                if ($user->id === Auth::id()) {
-                    return;
-                }
-                $user->teams()->detach($currentTeam);
-                $session = DB::table('sessions')->where('user_id', $user->id)->first();
-                if ($session) {
-                    DB::table('sessions')->where('id', $session->id)->delete();
-                }
-            });
-
-            Cache::forget('user:'.Auth::id().':team:'.$currentTeam->id);
-            $currentTeam->delete();
-
-            $newTeam = Auth::user()->teams()->first();
+            $newTeam = app(DeleteTeam::class)->handle($currentTeam, auth()->user());
             refreshSession($newTeam);
 
             return redirect()->route('team.index');

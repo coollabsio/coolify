@@ -6,8 +6,23 @@
 
 @php
     $serverReady = $server->isFunctional();
-    $proxyNeedsAttention = $server->proxySet() && ! in_array($proxyStatus, ['running'], true);
-    $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
+    $proxyConfigurationPending = $server->proxySet() && $server->hasPendingProxyConfiguration();
+    $traefikUpdateAvailable = $server->proxySet() && $server->hasCurrentTraefikOutdatedInfo();
+    $proxyUpdateAvailable = $proxyConfigurationPending || $traefikUpdateAvailable;
+    $proxyNeedsAttention = $server->proxySet()
+        && (! in_array($proxyStatus, ['running'], true) || $proxyUpdateAvailable);
+    $proxyStatusLabel = match (true) {
+        $proxyConfigurationPending => 'Restart required',
+        $traefikUpdateAvailable => 'Update available',
+        default => str($proxyStatus ?: 'unknown')->headline(),
+    };
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelNeedsAttention = $showSentinelStatus && $sentinelStatus === 'out_of_sync';
+    $sentinelStatusLabel = match ($sentinelStatus) {
+        'waiting' => 'Waiting for first report',
+        'in_sync' => 'In sync',
+        default => 'Out of sync',
+    };
 
     [$summaryLabel, $summaryType] = match (true) {
         ! $serverReady => ['Unavailable', 'error'],
@@ -58,20 +73,25 @@
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
-                    'bg-success' => $proxyStatus === 'running',
-                    'bg-warning' => in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
-                    'bg-error' => ! in_array($proxyStatus, ['running', 'starting', 'restarting', 'stopping'], true),
+                    'bg-success' => $proxyStatus === 'running' && ! $proxyUpdateAvailable,
+                    'bg-warning' => $proxyNeedsAttention && ($proxyUpdateAvailable || in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true)),
+                    'bg-error' => $proxyNeedsAttention && ! $proxyUpdateAvailable && ! in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
                 ])></span>
                 <span class="flex-1">Proxy</span>
-                <span>{{ str($proxyStatus ?: 'unknown')->headline() }}</span>
+                <span>{{ $proxyStatusLabel }}</span>
             </a>
         @endif
         @if ($showSentinelStatus)
             <a href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
-                <span class="size-1.5 shrink-0 rounded-full {{ $server->isSentinelLive() ? 'bg-success' : 'bg-error' }}"></span>
+                <span @class([
+                    'size-1.5 shrink-0 rounded-full',
+                    'bg-success' => $sentinelStatus === 'in_sync',
+                    'bg-neutral-400 dark:bg-fg-faint' => $sentinelStatus === 'waiting',
+                    'bg-warning' => $sentinelStatus === 'out_of_sync',
+                ])></span>
                 <span class="flex-1">Sentinel</span>
-                <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
+                <span>{{ $sentinelStatusLabel }}</span>
             </a>
         @endif
     </div>

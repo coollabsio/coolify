@@ -5,6 +5,7 @@ namespace App\Livewire\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Invitations extends Component
@@ -21,12 +22,20 @@ class Invitations extends Component
             $this->authorize('manageInvitations', currentTeam());
 
             $invitation = TeamInvitation::ownedByCurrentTeam()->findOrFail($invitation_id);
-            $user = User::whereEmail($invitation->email)->first();
-            if (filled($user)) {
-                $user->deleteIfNotVerifiedAndForcePasswordReset();
-            }
-
-            $invitation->delete();
+            $invitationEmail = $invitation->email;
+            $invitationUuid = $invitation->uuid;
+            DB::transaction(function () use ($invitation): void {
+                $invitation->delete();
+                $user = User::whereEmail($invitation->email)->first();
+                if (filled($user)) {
+                    $user->deleteIfNotVerifiedAndForcePasswordReset();
+                }
+            });
+            auditLog('ui.team_invitation.revoked', [
+                'team_id' => currentTeam()->id,
+                'invitation_uuid' => $invitationUuid,
+                'invitation_email' => $invitationEmail,
+            ]);
             $this->refreshInvitations();
             $this->dispatch('success', 'Invitation revoked.');
         } catch (\Exception) {

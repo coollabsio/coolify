@@ -14,12 +14,14 @@
                 <livewire:project.application.general :application="$application" />
             @elseif ($currentRoute === 'project.application.domains')
                 <livewire:project.application.domains :application="$application" />
+                <livewire:project.shared.maintenance :resource="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')
                 <livewire:project.application.advanced :application="$application" />
             @elseif ($currentRoute === 'project.application.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$application" />
+                <livewire:project.shared.secret-manager-links :resource="$application" />
             @elseif ($currentRoute === 'project.application.persistent-storage')
                 <livewire:project.service.storage :resource="$application" />
             @elseif ($currentRoute === 'project.application.source' && $application->git_based())
@@ -44,6 +46,9 @@
                 <livewire:project.shared.resource-operations :resource="$application" />
             @elseif ($currentRoute === 'project.application.metrics')
                 <livewire:project.shared.metrics :resource="$application" />
+            @elseif ($currentRoute === 'project.application.analytics')
+                <livewire:project.application.analytics :application="$application"
+                    :lazy="$application->destination?->server?->isTrafficAnalyticsEnabled()" />
             @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />
             @elseif ($currentRoute === 'project.application.danger')

@@ -2,13 +2,15 @@
 
 namespace App\Livewire\Server;
 
-use App\Models\DockerCleanupExecution;
 use App\Models\Server;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class DockerCleanupExecutions extends Component
 {
+    use ListensToTeamChannel;
+
     public Server $server;
 
     public Collection $executions;
@@ -25,11 +27,9 @@ class DockerCleanupExecutions extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},DockerCleanupDone" => 'refreshExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'DockerCleanupDone' => 'refreshExecutions',
+        ]);
     }
 
     public function mount(Server $server)
@@ -46,7 +46,7 @@ class DockerCleanupExecutions extends Component
             ->get();
 
         if ($this->selectedKey) {
-            $this->selectedExecution = DockerCleanupExecution::find($this->selectedKey);
+            $this->selectedExecution = $this->server->dockerCleanupExecutions()->find($this->selectedKey);
             if ($this->selectedExecution && $this->selectedExecution->status !== 'running') {
                 $this->isPollingActive = false;
             }
@@ -64,7 +64,7 @@ class DockerCleanupExecutions extends Component
             return;
         }
         $this->selectedKey = $key;
-        $this->selectedExecution = DockerCleanupExecution::find($key);
+        $this->selectedExecution = $this->server->dockerCleanupExecutions()->find($key);
         $this->currentPage = 1;
 
         if ($this->selectedExecution && $this->selectedExecution->status === 'running') {

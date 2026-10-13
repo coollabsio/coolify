@@ -106,6 +106,9 @@ class ServerTransferExporter
 
         $sourceInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
         $warnings = $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl);
+        if ($secretManagerWarning = $this->secretManagerWarning($applications->concat($databases)->concat($services))) {
+            $warnings[] = $secretManagerWarning;
+        }
 
         $payload = ServerTransferBundle::wrap([
             'source_instance' => [
@@ -332,6 +335,27 @@ class ServerTransferExporter
     }
 
     /**
+     * Secret manager links point to integration tokens of this instance, which are not exported.
+     *
+     * @param  Collection<int, Model>  $resources
+     */
+    private function secretManagerWarning(Collection $resources): ?string
+    {
+        $linkedNames = $resources
+            ->filter(fn (Model $resource) => method_exists($resource, 'secretManagerLink') && $resource->secretManagerLink()->exists())
+            ->pluck('name')
+            ->unique()
+            ->values();
+
+        if ($linkedNames->isEmpty()) {
+            return null;
+        }
+
+        return 'Some resources load environment variables from a secret manager: '.$linkedNames->implode(', ').'. '
+            .'Secret manager tokens and links are not exported. After import, add the integration token on the target instance and link the secret manager source again, or deployments of these resources fail.';
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function exportPrivateKey(PrivateKey $key): array
@@ -384,7 +408,8 @@ class ServerTransferExporter
             'port' => (int) $server->port,
             'user' => (string) $server->user,
             'proxy' => $server->proxy?->toArray() ?? [],
-            'is_build_server' => (bool) $server->is_build_server,
+            'server_role' => $server->settings->effectiveServerRole()->value,
+            'is_build_server' => $server->isBuildServer(),
             'cloud_provider_token_uuid' => $server->cloudProviderToken?->uuid,
             'settings' => $settingsPayload,
         ];
@@ -859,6 +884,8 @@ class ServerTransferExporter
                 'mount_path' => $volume->mount_path,
                 'host_path' => $volume->host_path,
                 'is_preview_suffix_enabled' => (bool) ($volume->is_preview_suffix_enabled ?? false),
+                'ignores_compose_driver_options' => (bool) $volume->ignores_compose_driver_options,
+                'standalone_sqlite_uuid' => $volume->standaloneSqlite?->uuid,
             ];
         }
 

@@ -119,6 +119,10 @@ describe('GitHub Source Create Component', function () {
 
         $githubApp = GithubApp::where('name', 'redirect-test')->first();
 
-        $component->assertRedirect(route('source.github.show', ['github_app_uuid' => $githubApp->uuid]));
+        $component->assertRedirect(route('source.github.show', [
+            'github_app_uuid' => $githubApp->uuid,
+            'previews' => 1,
+            'runners' => 0,
+        ]));
     });
 });

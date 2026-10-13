@@ -20,6 +20,9 @@ class Index extends Component
     #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
 
+    #[Validate('boolean')]
+    public bool $is_dashboard_force_https_enabled = true;
+
     #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_min;
 
@@ -68,6 +71,7 @@ class Index extends Component
             $this->server = Server::findOrFail(0);
         }
         $this->fqdn = $this->settings->fqdn;
+        $this->is_dashboard_force_https_enabled = $this->settings->is_dashboard_force_https_enabled;
         $this->public_port_min = $this->settings->public_port_min;
         $this->public_port_max = $this->settings->public_port_max;
         $this->instance_name = $this->settings->instance_name;
@@ -91,6 +95,7 @@ class Index extends Component
         $this->authorize('update', $this->settings);
         $this->validate();
         $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
+        $this->settings->is_dashboard_force_https_enabled = $this->is_dashboard_force_https_enabled;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->instance_name = $this->instance_name;
@@ -99,9 +104,29 @@ class Index extends Component
         $this->settings->instance_timezone = $this->instance_timezone;
         $this->settings->dev_helper_version = $this->dev_helper_version;
         if ($isSave) {
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
         }
+    }
+
+    /**
+     * Save the instance settings and record the changed field names.
+     */
+    private function saveAndAudit(): void
+    {
+        $changedFields = auditChangedFields($this->settings);
+        $this->settings->save();
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.instance.settings.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'section' => 'general',
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function confirmDomainUsage()
@@ -164,7 +189,7 @@ class Index extends Component
 
             $this->instantSave(isSave: false);
 
-            $this->settings->save();
+            $this->saveAndAudit();
             if ($this->server) {
                 $this->server->setupDynamicProxyConfiguration();
             }
@@ -207,7 +232,7 @@ class Index extends Component
                 return;
             }
 
-            $imageRef = escapeshellarg("ghcr.io/coollabsio/coolify-helper:{$version}");
+            $imageRef = escapeshellarg(coolifyHelperImage().":{$version}");
             $buildCommand = "docker build -t {$imageRef} -f docker/coolify-helper/Dockerfile .";
 
             $activity = remote_process(

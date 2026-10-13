@@ -98,6 +98,8 @@ trait ResolvesResource
      */
     protected function normalizeMcpLogLines(mixed $lines): int
     {
-        return normalizeLogLines($lines, default: 100, max: 500);
+        $lines = normalizeLogLines($lines, default: 100, max: 500);
+
+        return is_int($lines) && $lines > 0 ? $lines : 100;
     }
 }

@@ -23,10 +23,10 @@
         <x-forms.input :label="$label . ' URL (internal)'" disabled value="Hidden (only admins can view)" />
         <x-forms.input :label="$label . ' URL (public)'" disabled value="Hidden (only admins can view)" />
     @else
-        <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly
+        <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly copyable
             wire:model="dbUrl" canGate="update" :canResource="$database" />
         @if ($dbUrlPublic)
-            <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" type="password" readonly
+            <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" type="password" readonly copyable
                 wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
         @elseif ($showPublicUrlPlaceholder)
             <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" readonly
@@ -65,7 +65,7 @@
                 </div>
             @endif
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="enableSsl" label="SSL"
+                <x-forms.listbox canGate="update" :canResource="$database" id="enableSsl" label="SSL"
                     onChange="instantSaveSSL"
                     :disabled="! $isExited || ! auth()->user()?->can('update', $database)"
                     :options="[
@@ -73,7 +73,7 @@
                         ['value' => false, 'label' => 'Disabled'],
                     ]" />
                 @if ($sslModeOptions)
-                    <x-forms.listbox id="sslMode" label="SSL mode" :helper="$sslModeHelper"
+                    <x-forms.listbox canGate="update" :canResource="$database" id="sslMode" label="SSL mode" :helper="$sslModeHelper"
                         onChange="instantSaveSSL"
                         :disabled="! $enableSsl || ! $isExited || ! auth()->user()?->can('update', $database)"
                         :options="collect($sslModeOptions)->map(fn ($option, $value) => [

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -281,10 +282,17 @@ class OtherController extends Controller
 
         $webhook_url = config('constants.webhooks.feedback_discord_webhook');
         if ($webhook_url) {
-            Http::timeout(5)->post($webhook_url, [
-                'content' => $data['content'],
-                'allowed_mentions' => ['parse' => []],
-            ]);
+            try {
+                $response = Http::timeout(5)->post($webhook_url, [
+                    'content' => $data['content'],
+                    'allowed_mentions' => ['parse' => []],
+                ]);
+            } catch (ConnectionException) {
+                $response = null;
+            }
+            if (! $response?->successful()) {
+                return response()->json(['message' => 'Feedback could not be delivered.'], 502);
+            }
         }
 
         return response()->json(['message' => 'Feedback sent.'], 200);

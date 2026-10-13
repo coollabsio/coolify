@@ -3,8 +3,10 @@
 namespace App\Services\ServerTransfer;
 
 use App\Models\Server;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 use RuntimeException;
 use Throwable;
 
@@ -32,8 +34,6 @@ class ServerTransferMigrator
         Server $server,
         string $targetUrl,
         string $targetToken,
-        bool $writeRemote = false,
-        bool $rebindSentinel = true,
         bool $preserveUuids = true,
         bool $adoptMode = true,
     ): array {
@@ -54,8 +54,6 @@ class ServerTransferMigrator
             targetUrl: $targetUrl,
             token: $token,
             bundle: $bundle,
-            writeRemote: $writeRemote,
-            rebindSentinel: $rebindSentinel,
             preserveUuids: $preserveUuids,
             adoptMode: $adoptMode,
         );
@@ -64,8 +62,17 @@ class ServerTransferMigrator
             $warnings = array_values(array_unique(array_merge($warnings, $importBody['warnings'])));
         }
 
+        // Keep managing the server here until the target really manages it, so it is never left unmanaged.
+        if (data_get($importBody, 'claimed') !== true) {
+            throw new RuntimeException(
+                "Server was imported on {$targetUrl}, but the target could not take management of it. ".
+                'This instance still manages the server. Fix the problem on the target, click Enable management there, then click Disable management here. '.
+                'Target warnings: '.(implode(' ', (array) data_get($importBody, 'warnings', [])) ?: 'none')
+            );
+        }
+
         // Cross-instance 2PC is impossible: if complete fails after a successful import, the target
-        // already owns the server. Surface that clearly so the operator can retry complete only.
+        // already owns the server. Surface that clearly so the operator can disable management here.
         try {
             $complete = $this->claimer->markTransferred(
                 $server,
@@ -75,7 +82,7 @@ class ServerTransferMigrator
         } catch (Throwable $e) {
             throw new RuntimeException(
                 "Server was imported on {$targetUrl}, but this instance could not mark it as transferred: {$e->getMessage()}. ".
-                'Retry complete (API: POST /api/v1/servers/{uuid}/complete) so automations stay disabled here. Do not re-import on the target.',
+                'Disable management of this server here (or API: POST /api/v1/servers/{uuid}/transfer/complete) so automations stay disabled. Do not re-import on the target.',
                 previous: $e
             );
         }
@@ -95,19 +102,33 @@ class ServerTransferMigrator
     {
         $targetUrl = rtrim(trim($targetUrl), '/');
         if ($targetUrl === '' || ! filter_var($targetUrl, FILTER_VALIDATE_URL)) {
-            throw new RuntimeException('A valid target instance URL is required (e.g. http://localhost:8001).');
+            throw new RuntimeException('A valid target instance URL is required (e.g. https://coolify.example.com).');
         }
 
-        // From inside Docker, localhost is this container — use the host gateway for peer instances.
-        if (file_exists('/.dockerenv') || is_file('/run/.containerenv')) {
-            $targetUrl = (string) preg_replace(
-                '#^(https?://)(localhost|127\.0\.0\.1)(?=[:/]|$)#i',
-                '$1host.docker.internal',
-                $targetUrl
-            );
+        if ($this->isLocalDevelopmentTarget($targetUrl)) {
+            if (file_exists('/.dockerenv') || is_file('/run/.containerenv')) {
+                return (string) preg_replace(
+                    '#^(https?://)(localhost|127\.0\.0\.1)(?=[:/]|$)#i',
+                    '$1host.docker.internal',
+                    $targetUrl,
+                );
+            }
+
+            return $targetUrl;
         }
+
+        Validator::make(['target_url' => $targetUrl], [
+            'target_url' => ['required', new SafeWebhookUrl],
+        ])->validate();
 
         return $targetUrl;
+    }
+
+    private function isLocalDevelopmentTarget(string $url): bool
+    {
+        return isDev()
+            && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
+            && in_array(strtolower((string) parse_url($url, PHP_URL_HOST)), ['localhost', '127.0.0.1', 'host.docker.internal'], true);
     }
 
     private function normalizeToken(string $targetToken): string
@@ -131,8 +152,6 @@ class ServerTransferMigrator
         string $targetUrl,
         string $token,
         array $bundle,
-        bool $writeRemote,
-        bool $rebindSentinel,
         bool $preserveUuids,
         bool $adoptMode,
     ): array {
@@ -140,6 +159,9 @@ class ServerTransferMigrator
 
         try {
             $response = Http::timeout(120)
+                ->withOptions($this->isLocalDevelopmentTarget($importUrl)
+                    ? ['allow_redirects' => false]
+                    : SafeWebhookUrl::httpClientOptions($importUrl))
                 ->acceptJson()
                 ->withToken($token)
                 ->asJson()
@@ -148,9 +170,6 @@ class ServerTransferMigrator
                     'dry_run' => false,
                     'preserve_uuids' => $preserveUuids,
                     'adopt_mode' => $adoptMode,
-                    'claim' => true,
-                    'write_remote' => $writeRemote,
-                    'rebind_sentinel' => $rebindSentinel,
                 ]);
         } catch (ConnectionException $e) {
             throw new RuntimeException("Could not reach target instance at {$importUrl}: {$e->getMessage()}", previous: $e);

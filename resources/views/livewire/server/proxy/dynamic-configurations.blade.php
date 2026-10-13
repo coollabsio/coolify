@@ -60,11 +60,17 @@
                                         <livewire:server.proxy.dynamic-configuration-navbar
                                             :server_id="$server->id" :server="$server" :fileName="$fileName"
                                             :value="$value ?? ''" :newFile="false"
-                                            wire:key="{{ $fileName }}-{{ $loop->index }}" />
+                                            wire:key="proxy-navbar-{{ $fileName }}" />
                                     @endif
                                 </x-slot:actions>
-                                <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
-                                    rows="8" />
+                                @can('update', $server)
+                                    <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
+                                        rows="8" />
+                                @else
+                                    <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                        You do not have permission to view the contents of this configuration.
+                                    </p>
+                                @endcan
                             </x-application.settings-section>
                         @endforeach
                     @else

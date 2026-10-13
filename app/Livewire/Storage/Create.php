@@ -5,6 +5,7 @@ namespace App\Livewire\Storage;
 use App\Models\S3Storage;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Uri;
@@ -27,6 +28,10 @@ class Create extends Component
     public string $bucket;
 
     public string $endpoint = '';
+
+    public array $endpointParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $endpointPartsChanged = false;
 
     public S3Storage $storage;
 
@@ -76,6 +81,9 @@ class Create extends Component
         try {
             $this->authorize('create', S3Storage::class);
 
+            if ($this->endpointPartsChanged) {
+                $this->endpoint = DomainUrlParts::compose(...$this->endpointParts);
+            }
             $this->endpoint = $this->normalizeEndpoint($this->endpoint);
             $this->validate();
             $this->storage = new S3Storage;
@@ -99,6 +107,11 @@ class Create extends Component
             $this->dispatch('error', 'Failed to create storage.', $this->connectionErrorDescription($e));
             // return handleError($e, $this);
         }
+    }
+
+    public function updatedEndpointParts(): void
+    {
+        $this->endpointPartsChanged = true;
     }
 
     private function connectionErrorDescription(\Throwable $exception): string

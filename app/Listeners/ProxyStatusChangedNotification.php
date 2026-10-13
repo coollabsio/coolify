@@ -33,6 +33,7 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
 
         if ($status === 'running') {
             $server->setupDefaultRedirect();
+            $server->setupMaintenancePages();
             $server->setupDynamicProxyConfiguration();
             $server->proxy->force_stop = false;
             $server->save();
@@ -61,7 +62,7 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
 
         if ($status === 'created') {
             instant_remote_process([
-                'docker rm -f coolify-proxy',
+                dockerRemoveCommand('coolify-proxy'),
             ], $server);
         }
     }
