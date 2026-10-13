@@ -1516,7 +1516,6 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - PGDATABASE=${POSTGRES_DB:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - JWT_EXP=${JWT_EXPIRY:-3600}
     volumes:
       - supabase-db-data:/var/lib/postgresql/data
@@ -1772,11 +1771,9 @@ services:
         source: ./volumes/db/jwt.sql
         target: /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql
         content: |
-          \set jwt_secret `echo "$JWT_SECRET"`
           \set jwt_exp `echo "$JWT_EXP"`
           \set db_name `echo "${POSTGRES_DB:-postgres}"`
 
-          ALTER DATABASE :db_name SET "app.settings.jwt_secret" TO :'jwt_secret';
           ALTER DATABASE :db_name SET "app.settings.jwt_exp" TO :'jwt_exp';
 
       - type: bind
@@ -2136,7 +2133,6 @@ services:
       - PGRST_DB_ANON_ROLE=anon
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_DB_USE_LEGACY_GUCS=false
-      - PGRST_APP_SETTINGS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
     exclude_from_hc: true
