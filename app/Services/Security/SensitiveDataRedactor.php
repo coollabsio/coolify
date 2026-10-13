@@ -253,6 +253,12 @@ final class SensitiveDataRedactor
         $alreadyRedacted = '(?!'.preg_quote(REDACTED, '/').')';
         // Set when nothing but a delimiter follows the value on its line, as in YAML or object literals.
         $endsValue = '(?<end>(?=[^\S\r\n]*(?:$|[\r\n,;}\]])))?';
+        // A quote that opens before the key and closes after the value wraps the whole assignment, as in
+        // the shell argument 'DB_PASSWORD=a b'. Hide everything up to the closing quote and keep the quote.
+        $text = preg_replace('/(?<![\w-])(["\'])((?:'.$keys.')\s*=\s*)'.$alreadyRedacted.'(?:(?!\1)[^\r\n])*\1/', '$1$2'.REDACTED.'$1', $text);
+        if ($text === null) {
+            throw new RuntimeException('Log redaction failed.');
+        }
         $result = preg_replace_callback('/(?<![\w-])(?<prefix>["\']?(?<key>'.$keys.')["\']?\s*(?<separator>[=:])\s*)'.$alreadyRedacted.$value.$endsValue.'/m', function (array $match): string {
             $value = $match['value'];
             $quote = strlen($value) > 1 && in_array($value[0], ['"', "'"], true) && str_ends_with($value, $value[0]) ? $value[0] : '';

@@ -209,3 +209,20 @@ it('redacts an unterminated private key followed by a lot of output without supp
         ->not->toContain(SensitiveDataRedactor::FAILURE_MESSAGE)
         ->toStartWith('before password='.REDACTED."\n");
 });
+
+it('keeps the quotes around a quoted shell assignment and hides its whole value', function (string $text, string $expected) {
+    expect((new SensitiveDataRedactor)->redactText($text))->toBe($expected);
+})->with([
+    'single quoted build arg' => [
+        "docker build --build-arg 'COOLIFY_BUILD_SECRETS_HASH=abc123def' --build-arg 'COOLIFY_URL'",
+        "docker build --build-arg 'COOLIFY_BUILD_SECRETS_HASH=".REDACTED."' --build-arg 'COOLIFY_URL'",
+    ],
+    'double quoted value with a space' => [
+        'export "DB_PASSWORD=first second" && next',
+        'export "DB_PASSWORD='.REDACTED.'" && next',
+    ],
+    'single quoted value with a space' => [
+        "--env 'api_token=abc def' --rm",
+        "--env 'api_token=".REDACTED."' --rm",
+    ],
+]);
