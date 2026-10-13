@@ -86,7 +86,8 @@ it('selects Hostinger account SSH keys with the same dropdown as Hetzner', funct
         ->assertSee('Extra SSH keys')
         ->assertSee('Existing keys from the Hostinger account.')
         ->assertSee('Search SSH keys')
-        ->assertSeeHtml('<option value="42">&lt;b&gt;Operations&lt;/b&gt;</option>')
+        ->assertSee('Operations')
+        ->assertSeeHtml('x-text="current">Select SSH keys</span>')
         ->assertDontSeeHtml('<b>Operations</b>')
         ->assertDontSeeHtml('id="hostinger-public-key-42-');
 
@@ -413,7 +414,7 @@ it('labels the Hostinger status refresh button on the server page', function () 
 
     Livewire::test(Show::class, ['server_uuid' => $server->uuid])
         ->assertSee('Hostinger · Running')
-        ->assertSee('Refresh status')
+        ->assertSee('Refresh provider status')
         ->assertSeeHtml('wire:click.prevent="checkHostingerVirtualMachineStatus(true)"');
 });
 

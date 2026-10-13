@@ -120,14 +120,11 @@
                                 <x-forms.checkbox id="enable_backups" label="Enable weekly Hostinger backups (extra cost)" fullWidth
                                     helper="Hostinger charges extra for backups. Check the price in hPanel before you enable them." />
                             </div>
-                            <x-forms.datalist label="Extra SSH keys" id="selected_public_key_ids"
-                                helper="Existing keys from the Hostinger account." :multiple="true"
-                                :disabled="count($hostinger_public_keys) === 0"
-                                :placeholder="count($hostinger_public_keys) ? 'Search SSH keys' : 'No account keys found'">
-                                @foreach ($hostinger_public_keys as $publicKey)
-                                    <option value="{{ $publicKey['id'] }}">{{ $publicKey['name'] }}</option>
-                                @endforeach
-                            </x-forms.datalist>
+                            <x-forms.listbox label="Extra SSH keys" id="selected_public_key_ids"
+                                helper="Existing keys from the Hostinger account." multiple searchable
+                                :disabled="count($hostinger_public_keys) === 0" searchPlaceholder="Search SSH keys…"
+                                :placeholder="count($hostinger_public_keys) ? 'Select SSH keys' : 'No account keys found'"
+                                :options="collect($hostinger_public_keys)->map(fn ($publicKey) => ['value' => $publicKey['id'], 'label' => $publicKey['name']])->values()->all()" />
                             @if ($post_install_scripts)
                                 <x-forms.listbox id="selected_post_install_script_id"
                                     label="Hostinger post-install script"
