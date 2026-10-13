@@ -16,6 +16,7 @@
         "vite": "8.2.1"
     },
     "dependencies": {
+        "@laravel/passkeys": "^0.4.0",
         "@tailwindcss/forms": "0.5.11",
         "@tailwindcss/typography": "0.5.20",
         "@tanstack/virtual-core": "3.17.11",
