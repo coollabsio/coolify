@@ -285,10 +285,18 @@
                                         'menu-item-active' => $menuItem['active'],
                                     ])
                             @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                    @if ($menuItem['label'] === 'Files')
+                                        x-data="{ loading: false }"
+                                        @click="if (!$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) loading = true"
+                                        x-on:livewire:navigated.window="loading = false"
+                                    @endif
                                     href="{{ route($menuItem['route'], $applicationRouteParameters) }}"
                                     >
                                     <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                    @if ($menuItem['label'] === 'Files')
+                                        <span x-show="loading" x-cloak><x-loading compact /></span>
+                                    @endif
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
                                             <livewire:project.application.server-status-badge :application="$application"

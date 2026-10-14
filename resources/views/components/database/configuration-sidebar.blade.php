@@ -86,9 +86,17 @@
             @foreach ($groupItems as $menuItem)
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                    @if ($menuItem['label'] === 'Files')
+                        x-data="{ loading: false }"
+                        @click="if (!$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) loading = true"
+                        x-on:livewire:navigated.window="loading = false"
+                    @endif
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                    @if ($menuItem['label'] === 'Files')
+                        <span x-show="loading" x-cloak><x-loading compact /></span>
+                    @endif
                 </a>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
                     <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"

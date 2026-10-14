@@ -31,6 +31,12 @@ class FileBrowser extends Component
     public bool $containerRunning = false;
 
     #[Locked]
+    public bool $filesLoaded = false;
+
+    #[Locked]
+    public bool $loadFailed = false;
+
+    #[Locked]
     public ?string $container = null;
 
     /** @var array<int, string> */
@@ -70,21 +76,33 @@ class FileBrowser extends Component
         $this->type = $this->resolveType($resource);
         $this->containerRunning = (bool) $resource->isRunning();
 
-        if (! $this->containerRunning) {
+        $this->filesLoaded = ! $this->containerRunning;
+    }
+
+    public function loadFiles(): void
+    {
+        $this->authorizeFileAccess();
+        if ($this->filesLoaded) {
             return;
         }
+        $this->loadFailed = false;
+        $this->containerRunning = (bool) $this->resource->isRunning();
 
-        $this->availableContainers = $this->resolveContainers();
-        $this->container = $this->availableContainers[0] ?? null;
-
-        if (is_null($this->container)) {
-            $this->containerRunning = false;
-
-            return;
+        try {
+            $this->availableContainers = $this->containerRunning ? $this->resolveContainers() : [];
+            $this->container = $this->availableContainers[0] ?? null;
+            if (is_null($this->container)) {
+                $this->containerRunning = false;
+            } else {
+                $this->currentPath = $this->service()->defaultRoot();
+                $this->loadEntries();
+            }
+            $this->filesLoaded = true;
+        } catch (\Throwable $e) {
+            $this->container = null;
+            $this->loadFailed = true;
+            handleError($e, $this);
         }
-
-        $this->currentPath = $this->service()->defaultRoot();
-        $this->loadEntries();
     }
 
     public function selectContainer(string $name): void
@@ -327,12 +345,17 @@ class FileBrowser extends Component
         return rtrim($this->currentPath, '/').'/'.$name;
     }
 
-    protected function guard(): void
+    protected function authorizeFileAccess(): void
     {
         $this->authorize('canAccessTerminal');
         $this->resource->refresh();
         $this->authorize('view', $this->resource);
         abort_unless((int) $this->resource->environment->project->team_id === (int) auth()->user()->currentTeam()->id, 403);
+    }
+
+    protected function guard(): void
+    {
+        $this->authorizeFileAccess();
         $this->type = $this->resolveType($this->resource);
         $this->containerRunning = (bool) $this->resource->isRunning();
         $this->availableContainers = $this->containerRunning ? $this->resolveContainers() : [];
@@ -438,7 +461,7 @@ class FileBrowser extends Component
 
         if ($this->type === 'application') {
             $server = $this->server();
-            $names = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: false)
+            $names = getCurrentApplicationContainerStatus($server, $this->resource, includePullrequests: false)
                 ->filter(fn ($c) => data_get($c, 'State') === 'running')
                 ->map(fn ($c) => data_get($c, 'Names'))
                 ->filter()

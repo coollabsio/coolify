@@ -1,4 +1,4 @@
-<div>
+<div wire:init="loadFiles">
     <x-slot:title>
         {{ data_get_str($resource, 'name')->limit(10) }} > Files | Coolify
     </x-slot>
@@ -13,14 +13,9 @@
 
     {{-- Standard resource settings workspace (matches Logs/Configuration) so the
          heading spacing and sidebar behave identically to every other page. --}}
-    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0" x-data="{ navOpen: true }"
-        x-init="navOpen = (localStorage.getItem('coolify.filesNav') ?? 'open') !== 'closed';
-                $watch('navOpen', v => localStorage.setItem('coolify.filesNav', v ? 'open' : 'closed'))">
-        <div class="files-grid grid min-w-0 gap-8" :data-nav="navOpen ? 'open' : 'closed'">
-            {{-- Resource navigation, shown by default. The header toggle collapses
-                 this column smoothly on desktop; below xl it stacks like other
-                 resource pages. --}}
-            <div class="files-nav min-w-0">
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0" x-data>
+        <div class="files-grid grid min-w-0 gap-8">
+            <div class="min-w-0">
                 @if ($type === 'application')
                     <x-application.configuration-sidebar :application="$resource"
                         current-route="project.application.files" />
@@ -38,15 +33,7 @@
         helper="Browse and manage files inside the running container." :flush="true">
 
         <x-slot:actions>
-            {{-- Toggle resource navigation (desktop) --}}
-            <x-forms.button type="button" @click="navOpen = !navOpen"
-                x-bind:title="navOpen ? 'Hide navigation' : 'Show navigation'"
-                x-bind:class="navOpen && 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'"
-                class="hidden xl:inline-flex">
-                <x-reicon name="unordered-list" class="size-3.5" />
-            </x-forms.button>
-
-            @if ($containerRunning)
+            @if ($containerRunning && $filesLoaded)
                 <input type="file" class="hidden" x-ref="uploadInput"
                     @change="if ($event.target.files.length) { $wire.upload('upload', $event.target.files[0], () => $wire.uploadFile()) }" />
                 <x-forms.button type="button" title="Upload a file to this folder" canGate="canAccessTerminal" :canResource="$resource"
@@ -54,29 +41,56 @@
                     Upload
                 </x-forms.button>
 
-                <x-modal-input buttonTitle="New file" title="New file">
-                    <form x-data="{ name: '' }"
-                        @submit.prevent="$wire.createFile(name); name=''; $dispatch('close-modal')"
-                        class="flex flex-col gap-4">
-                        <x-forms.input id="newFileName" label="File name" x-model="name"
-                            placeholder="config.yml" required />
-                        <div class="flex justify-end">
-                            <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Create file</x-forms.button>
-                        </div>
-                    </form>
-                </x-modal-input>
+                <div x-data="{ creationMenuOpen: false }" @keydown.escape.window="creationMenuOpen = false">
+                    <x-forms.button type="button" x-ref="newTrigger"
+                        @click="creationMenuOpen = !creationMenuOpen" x-bind:aria-expanded="creationMenuOpen"
+                        canGate="canAccessTerminal" :canResource="$resource">
+                        New
+                        <x-reicon name="chevron-down" class="size-3.5" />
+                    </x-forms.button>
+                    <template x-teleport="body">
+                        <div x-show="creationMenuOpen" x-cloak x-transition.opacity.duration.120ms
+                            x-anchor.bottom-end.fixed.offset.4="$refs.newTrigger"
+                            @click.outside="creationMenuOpen = false"
+                            class="listbox-panel min-w-36! w-36! z-50!">
+                            <x-modal-input title="New file">
+                                <x-slot:content>
+                                    <button type="button" class="listbox-option" @click="creationMenuOpen = false">
+                                        <x-reicon name="file" class="size-3.5 shrink-0" />
+                                        <span class="flex-1 text-left">New file</span>
+                                    </button>
+                                </x-slot:content>
+                                <form x-data="{ name: '' }"
+                                    @submit.prevent="$wire.createFile(name); name=''; $dispatch('close-modal')"
+                                    class="flex flex-col gap-4">
+                                    <x-forms.input id="newFileName" label="File name" x-model="name"
+                                        placeholder="config.yml" required />
+                                    <div class="flex justify-end">
+                                        <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Create file</x-forms.button>
+                                    </div>
+                                </form>
+                            </x-modal-input>
 
-                <x-modal-input buttonTitle="New folder" title="New folder">
-                    <form x-data="{ name: '' }"
-                        @submit.prevent="$wire.createDirectory(name); name=''; $dispatch('close-modal')"
-                        class="flex flex-col gap-4">
-                        <x-forms.input id="newFolderName" label="Folder name" x-model="name"
-                            placeholder="plugins" required />
-                        <div class="flex justify-end">
-                            <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Create folder</x-forms.button>
+                            <x-modal-input title="New folder">
+                                <x-slot:content>
+                                    <button type="button" class="listbox-option" @click="creationMenuOpen = false">
+                                        <x-reicon name="folder" class="size-3.5 shrink-0" />
+                                        <span class="flex-1 text-left">New folder</span>
+                                    </button>
+                                </x-slot:content>
+                                <form x-data="{ name: '' }"
+                                    @submit.prevent="$wire.createDirectory(name); name=''; $dispatch('close-modal')"
+                                    class="flex flex-col gap-4">
+                                    <x-forms.input id="newFolderName" label="Folder name" x-model="name"
+                                        placeholder="plugins" required />
+                                    <div class="flex justify-end">
+                                        <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Create folder</x-forms.button>
+                                    </div>
+                                </form>
+                            </x-modal-input>
                         </div>
-                    </form>
-                </x-modal-input>
+                    </template>
+                </div>
 
                 <x-forms.button type="button" wire:click="refresh" title="Refresh this folder">
                     Refresh
@@ -84,7 +98,16 @@
             @endif
         </x-slot:actions>
 
-        @if (! $containerRunning)
+        @if ($loadFailed)
+            <x-empty title="Could not load files" description="Check the server connection and try again." />
+            <div class="flex justify-center pb-4">
+                <x-forms.button wire:click="loadFiles">Retry</x-forms.button>
+            </div>
+        @elseif (! $filesLoaded)
+            <div class="flex justify-center py-12">
+                <x-loading text="Loading files..." />
+            </div>
+        @elseif (! $containerRunning)
             <x-empty title="Container is not running"
                 description="Start the container to browse its files.">
                 <x-slot:icon>
@@ -92,6 +115,10 @@
                 </x-slot:icon>
             </x-empty>
         @else
+            <div wire:loading.flex class="justify-center py-12">
+                <x-loading text="Loading files..." />
+            </div>
+            <div wire:loading.remove>
             {{-- Container picker (services / multi-container) --}}
             @if (count($availableContainers) > 1)
                 <div class="flex flex-wrap items-center gap-2 border-b border-coollabs-hairline px-4 py-2">
@@ -210,66 +237,70 @@
                                     x-data="{ open: false, name: @js($entry['name']) }"
                                     @keydown.escape.window="open = false">
                                     <div class="relative">
-                                        <x-forms.button type="button" title="Actions"
-                                            x-on:click="open = !open" @click.outside="open = false"
+                                        <x-forms.button type="button" title="Actions" x-ref="trigger"
+                                            x-on:click="open = !open" x-bind:aria-expanded="open"
                                             x-bind:class="open && 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'">
                                             <x-reicon name="dots-vertical" class="size-3.5" />
                                         </x-forms.button>
-                                        <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-                                            class="listbox-panel right-0! left-auto! z-30!">
-                                            @if ($entry['type'] !== 'dir')
+                                        <template x-teleport="body">
+                                            <div x-show="open" x-cloak x-transition.opacity.duration.120ms
+                                                x-anchor.bottom-end.fixed.offset.4="$refs.trigger"
+                                                @click.outside="open = false"
+                                                class="listbox-panel min-w-52! w-52! z-50!">
+                                                @if ($entry['type'] !== 'dir')
+                                                    <button type="button" class="listbox-option"
+                                                        x-on:click="open = false; $wire.openEditor(name)">
+                                                        <x-reicon name="file-content" class="size-3.5 shrink-0" />
+                                                        <span class="min-w-0 flex-1 text-left">Edit</span>
+                                                    </button>
+                                                @endif
                                                 <button type="button" class="listbox-option"
-                                                    x-on:click="open = false; $wire.openEditor(name)">
-                                                    <x-reicon name="file-content" class="size-3.5 shrink-0" />
-                                                    <span class="min-w-0 flex-1 text-left">Edit</span>
+                                                    x-on:click="open = false; $wire.download(name)">
+                                                    <x-reicon name="download" class="size-3.5 shrink-0" />
+                                                    <span class="min-w-0 flex-1 text-left">Download</span>
                                                 </button>
-                                            @endif
-                                            <button type="button" class="listbox-option"
-                                                x-on:click="open = false; $wire.download(name)">
-                                                <x-reicon name="download" class="size-3.5 shrink-0" />
-                                                <span class="min-w-0 flex-1 text-left">Download</span>
-                                            </button>
 
-                                            {{-- Rename --}}
-                                            <x-modal-input title="Rename">
-                                                <x-slot:content>
-                                                    <button type="button" class="listbox-option" x-on:click="open = false">
-                                                        <x-reicon name="edit" class="size-3.5 shrink-0" />
-                                                        <span class="min-w-0 flex-1 text-left">Rename</span>
-                                                    </button>
-                                                </x-slot:content>
-                                                <form x-data="{ newName: @js($entry['name']) }"
-                                                    @submit.prevent="$wire.renameEntry(name, newName); $dispatch('close-modal')"
-                                                    class="flex flex-col gap-4">
-                                                    <x-forms.input id="renameName-{{ $loop->index }}"
-                                                        label="New name" x-model="newName" required />
-                                                    <div class="flex justify-end">
-                                                        <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Rename</x-forms.button>
-                                                    </div>
-                                                </form>
-                                            </x-modal-input>
+                                                {{-- Rename --}}
+                                                <x-modal-input title="Rename">
+                                                    <x-slot:content>
+                                                        <button type="button" class="listbox-option" x-on:click="open = false">
+                                                            <x-reicon name="edit" class="size-3.5 shrink-0" />
+                                                            <span class="min-w-0 flex-1 text-left">Rename</span>
+                                                        </button>
+                                                    </x-slot:content>
+                                                    <form x-data="{ newName: @js($entry['name']) }"
+                                                        @submit.prevent="$wire.renameEntry(name, newName); $dispatch('close-modal')"
+                                                        class="flex flex-col gap-4">
+                                                        <x-forms.input id="renameName-{{ $loop->index }}"
+                                                            label="New name" x-model="newName" required />
+                                                        <div class="flex justify-end">
+                                                            <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Rename</x-forms.button>
+                                                        </div>
+                                                    </form>
+                                                </x-modal-input>
 
-                                            {{-- Delete --}}
-                                            <x-modal-input title="Delete this item?">
-                                                <x-slot:content>
-                                                    <button type="button" class="listbox-option" x-on:click="open = false">
-                                                        <x-reicon name="trash" class="size-3.5 shrink-0 text-red-600 dark:text-red-500" />
-                                                        <span class="min-w-0 flex-1 text-left text-red-600 dark:text-red-500">Delete</span>
-                                                    </button>
-                                                </x-slot:content>
-                                                <div class="flex flex-col gap-4">
-                                                    <p class="text-sm text-coollabs-subtle">
-                                                        This permanently deletes
-                                                        <span class="font-medium">{{ $entry['name'] }}</span>
-                                                        inside the container. This cannot be undone.
-                                                    </p>
-                                                    <div class="flex justify-end">
-                                                        <x-forms.button isError type="button" canGate="canAccessTerminal" :canResource="$resource"
-                                                            x-on:click="$wire.deleteEntry(name); $dispatch('close-modal')">Delete</x-forms.button>
+                                                {{-- Delete --}}
+                                                <x-modal-input title="Delete this item?">
+                                                    <x-slot:content>
+                                                        <button type="button" class="listbox-option" x-on:click="open = false">
+                                                            <x-reicon name="trash" class="size-3.5 shrink-0 text-red-600 dark:text-red-500" />
+                                                            <span class="min-w-0 flex-1 text-left text-red-600 dark:text-red-500">Delete</span>
+                                                        </button>
+                                                    </x-slot:content>
+                                                    <div class="flex flex-col gap-4">
+                                                        <p class="text-sm text-coollabs-subtle">
+                                                            This permanently deletes
+                                                            <span class="font-medium">{{ $entry['name'] }}</span>
+                                                            inside the container. This cannot be undone.
+                                                        </p>
+                                                        <div class="flex justify-end">
+                                                            <x-forms.button isError type="button" canGate="canAccessTerminal" :canResource="$resource"
+                                                                x-on:click="$wire.deleteEntry(name); $dispatch('close-modal')">Delete</x-forms.button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </x-modal-input>
-                                        </div>
+                                                </x-modal-input>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -361,6 +392,7 @@
                     </div>
                 </form>
             </x-modal-input>
+            </div>
         @endif
     </x-application.settings-section>
             </div>

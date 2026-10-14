@@ -89,7 +89,7 @@ it('shows a stopped state when the container is not running', function () {
         ->assertSee('Start the container to browse its files');
 });
 
-it('lists the default directory on mount for a running database', function () {
+it('loads the default directory in a deferred request for a running database', function () {
     Process::fake(['*' => Process::sequence()
         ->push(Process::result(output: '/var/lib/postgresql'))   // defaultRoot inspect
         ->push(Process::result(output: "dir\t0\t1\tdata\nfile\t10\t2\tpostgresql.conf"))]); // list
@@ -111,6 +111,7 @@ it('lists the default directory on mount for a running database', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->assertSet('containerRunning', true)
         ->assertSet('currentPath', '/var/lib/postgresql')
         ->assertSet('container', $database->uuid)
@@ -146,6 +147,7 @@ it('creates a directory and re-lists', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('createDirectory', 'plugins')
         ->assertSee('plugins');
 });
@@ -162,6 +164,7 @@ it('creates a file and re-lists', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('createFile', 'config.yml')
         ->assertSee('config.yml');
 });
@@ -178,6 +181,7 @@ it('changes permissions and re-lists', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->assertSee('644')
         ->call('chmodEntry', 'app.sh', '755')
         ->assertSee('755');
@@ -194,6 +198,7 @@ it('sets the editor language and content from the file when opening', function (
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('openEditor', 'config.yml')
         ->assertSet('editorOpen', true)
         ->assertSet('editorLanguage', 'yaml')
@@ -212,6 +217,7 @@ it('resolves a Monaco language for common extension-less files', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('openEditor', 'Dockerfile')
         ->assertSet('editorLanguage', 'dockerfile');
 });
@@ -227,6 +233,7 @@ it('refuses to open a binary or oversized file in the editor', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('openEditor', 'big.bin')
         ->assertSet('editingPath', null);
 });
@@ -241,6 +248,7 @@ it('rejects a client attempt to change the locked container property', function 
     session(['currentTeam' => $this->team]);
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->set('container', 'someone-elses-container');
 })->throws(CannotUpdateLockedPropertyException::class);
 
@@ -249,12 +257,13 @@ it('rechecks resource access before file operations', function (string $action, 
     $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
-    $component = Livewire::test(FileBrowser::class, ['resource' => $database]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])->call('loadFiles');
     $otherTeam = Team::factory()->create();
     $this->project->update(['team_id' => $otherTeam->id]);
     $component->call($action, ...$arguments)->assertForbidden();
 })->with([
     ['refresh', []],
+    ['loadFiles', []],
     ['selectContainer', ['unknown']],
     ['saveEditor', []],
     ['deleteEntry', ['config.yml']],
@@ -267,6 +276,7 @@ it('rejects a client attempt to replace the editor path', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->set('editingPath', '/etc/passwd');
 })->throws(CannotUpdateLockedPropertyException::class);
 
@@ -276,6 +286,7 @@ it('rejects unsafe child names without deleting the current folder', function (s
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('deleteEntry', $name)
         ->assertDispatched('error');
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'rm -rf'));
@@ -292,6 +303,7 @@ it('saves the opened file and clears editor state', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('openEditor', "it's.txt")
         ->set('editorContent', 'after')
         ->call('saveEditor')
@@ -307,6 +319,7 @@ it('clears the editor when selecting a container', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('openEditor', 'config.yml')
         ->assertSet('editorOpen', true)
         ->call('selectContainer', $database->uuid)
@@ -320,6 +333,7 @@ it('renames and deletes files with apostrophes', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->call('renameEntry', "it's.txt", "that's.txt")
         ->assertDispatched('success', 'Renamed.')
         ->call('deleteEntry', "that's.txt")
@@ -332,6 +346,7 @@ it('uploads a file and clears the upload state', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
         ->set('upload', UploadedFile::fake()->create("it's.txt", 1, 'text/plain'))
         ->call('uploadFile')
         ->assertSet('upload', null)
@@ -391,7 +406,111 @@ it('does not use a container that stopped after mounting', function () {
     $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
-    $component = Livewire::test(FileBrowser::class, ['resource' => $database]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])->call('loadFiles');
     $database->update(['status' => 'exited']);
     $component->call('refresh');
 })->throws(RuntimeException::class, 'Container is not running.');
+
+it('lists files for a running application and excludes stopped and preview containers', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'status' => 'running',
+    ]);
+    $containers = collect([
+        ['ID' => 'base', 'Names' => 'app-base', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0'],
+        ['ID' => 'stopped', 'Names' => 'app-stopped', 'State' => 'exited', 'Labels' => 'coolify.pullRequestId=0'],
+        ['ID' => 'preview', 'Names' => 'app-preview', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=42'],
+    ])->map(fn ($container) => json_encode($container))->implode("\n");
+    Process::fake(function ($process) use ($containers) {
+        $output = match (true) {
+            str_contains($process->command, 'docker ps') => $containers,
+            str_contains($process->command, 'docker inspect') => '/app',
+            default => "file\t12\t1\t644\tconfig.yml",
+        };
+
+        return Process::result(output: $output);
+    });
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $application])
+        ->call('loadFiles')
+        ->assertSet('availableContainers', ['app-base'])
+        ->assertSet('container', 'app-base')
+        ->assertSet('currentPath', '/app')
+        ->assertSee('config.yml')
+        ->call('refresh')
+        ->assertSet('container', 'app-base')
+        ->assertSee('config.yml');
+});
+
+it('renders before SSH starts and loads files in a later request', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: "file\t0\t1\t644\tconfig.yml"))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database]);
+    Process::assertNothingRan();
+    $component->assertSet('filesLoaded', false)
+        ->assertSet('container', null)
+        ->call('loadFiles')
+        ->assertSet('filesLoaded', true)
+        ->assertSet('currentPath', '/data')
+        ->assertSee('config.yml');
+});
+
+it('does not start SSH if the resource stops before deferred loading', function () {
+    Process::fake();
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database]);
+    $database->update(['status' => 'exited']);
+
+    $component->call('loadFiles')
+        ->assertSet('filesLoaded', true)
+        ->assertSet('containerRunning', false);
+    Process::assertNothingRan();
+});
+
+it('allows retrying a failed initial container lookup', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'status' => 'running',
+    ]);
+    $fail = true;
+    Process::fake(function ($process) use (&$fail) {
+        if (str_contains($process->command, 'docker ps')) {
+            if ($fail) {
+                $fail = false;
+
+                return Process::result(errorOutput: 'Permission denied', exitCode: 1);
+            }
+
+            return Process::result(output: json_encode([
+                'ID' => 'base', 'Names' => 'app-base', 'State' => 'running', 'Labels' => '',
+            ]));
+        }
+
+        return Process::result(output: str_contains($process->command, 'docker inspect') ? '/app' : '');
+    });
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $application])
+        ->call('loadFiles')
+        ->assertSet('filesLoaded', false)
+        ->assertSet('loadFailed', true)
+        ->assertSet('container', null)
+        ->call('loadFiles')
+        ->assertSet('filesLoaded', true)
+        ->assertSet('loadFailed', false)
+        ->assertSet('container', 'app-base');
+});
