@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ChecksTokenAbilities;
 use App\Mcp\Concerns\ResolvesResource;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
@@ -14,7 +15,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetLogs extends Tool
 {
     protected string $name = 'get_logs';
@@ -22,8 +25,14 @@ class GetLogs extends Tool
     protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires read:sensitive ability. Output is best-effort redacted (not a guarantee). Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
 
     use BuildsResponse;
+    use ChecksTokenAbilities;
     use ResolvesResource;
     use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return $this->currentTokenCan('read:sensitive');
+    }
 
     public function handle(Request $request): Response
     {
