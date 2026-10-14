@@ -38,6 +38,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -891,6 +892,10 @@ function profile_avatar_url(User $user): string
         }
     }
 
+    if (auth()->check() && $user->id !== auth()->id()) {
+        return route('team.member.avatar', ['user_id' => $user->id, 'v' => $user->updated_at->timestamp]);
+    }
+
     return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
 }
 
@@ -906,6 +911,21 @@ function project_icon_url(Project $project): string
     return route('project.icon', [
         'project_uuid' => $project->uuid,
         'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function team_avatar_url(Team $team): string
+{
+    if ($team->avatar_storage_type === 's3') {
+        $url = s3_image_url($team->avatar_s3_storage_id, $team->avatar_path, $team->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('team.avatar', [
+        'team_id' => $team->id,
+        'v' => $team->updated_at->timestamp,
     ]);
 }
 
@@ -1716,10 +1736,14 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
-function sanitizeLogsForExport(string $text): string
+/**
+ * Redact log text before it leaves Coolify (copy, download, API, MCP).
+ *
+ * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Resource values to hide, usually from EnvironmentVariable::logRedactionSecretsFor().
+ */
+function sanitizeLogsForExport(string $text, array $secrets = []): string
 {
-    // All sanitization is now handled by remove_iip()
-    return remove_iip($text);
+    return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
 }
 
 function getTopLevelNetworks(Service|Application $resource): Collection
@@ -4596,6 +4620,10 @@ function settingsSearchItems(iterable $groupedItems, array $routeParameters, arr
 
     foreach ($groupedItems as $groupLabel => $groupItems) {
         foreach ($groupItems as $item) {
+            if ($item['disabled'] ?? false) {
+                continue;
+            }
+
             $href = route($item['route'], $routeParameters);
             $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
 

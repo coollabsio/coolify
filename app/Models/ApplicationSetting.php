@@ -43,6 +43,7 @@ use OpenApi\Attributes as OA;
         'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
         'use_build_secrets' => ['type' => 'boolean'],
+        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'inject_build_args_to_dockerfile' => ['type' => 'boolean'],
         'include_source_commit_in_build' => ['type' => 'boolean'],
         'docker_images_to_keep' => ['type' => 'integer'],
@@ -87,6 +88,7 @@ class ApplicationSetting extends Model
         'is_stripprefix_enabled' => 'boolean',
         'connect_to_docker_network' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
         'disable_build_cache' => 'boolean',
     ];
 
@@ -125,6 +127,7 @@ class ApplicationSetting extends Model
         'is_git_shallow_clone_enabled',
         'is_pr_deployments_public_enabled',
         'use_build_secrets',
+        'redact_all_env_values_in_logs',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
         'docker_images_to_keep',

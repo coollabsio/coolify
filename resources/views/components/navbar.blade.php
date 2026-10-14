@@ -62,7 +62,7 @@
                 :title="hasPageSearch
                     ? 'Search this page and everything (Press / or ' + modKeyLabel + 'K, then Tab to switch)'
                     : 'Search (Press / or ' + modKeyLabel + 'K)'"
-                class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
+                class="menu-item menu-search justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
                 <span class="flex items-center gap-2.5 min-w-0">
                     <x-reicon name="search" class="menu-item-icon" />
                     <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search</span>

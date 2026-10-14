@@ -180,7 +180,7 @@ class CleanupDocker implements ShouldBeUnique
             if ($commandOutput !== null) {
                 $cleanupLog[] = [
                     'command' => $command,
-                    'output' => $commandOutput,
+                    'output' => remove_iip($commandOutput),
                 ];
             }
         }
@@ -363,7 +363,7 @@ class CleanupDocker implements ShouldBeUnique
             $deleteOutput = $this->runRemoteCommand($deleteCommand, $server);
             $cleanupLog[] = [
                 'command' => $deleteCommand,
-                'output' => $deleteOutput ?? 'Images removed or were in use',
+                'output' => remove_iip($deleteOutput ?? 'Images removed or were in use'),
             ];
         }
 

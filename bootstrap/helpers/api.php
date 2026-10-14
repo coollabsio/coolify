@@ -203,6 +203,7 @@ function sharedDataApplications(?Application $application = null): array
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
@@ -478,6 +479,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('disable_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
+    $request->offsetUnset('redact_all_env_values_in_logs');
     $request->offsetUnset('is_pr_deployments_public_enabled');
     $request->offsetUnset('stop_grace_period');
     $request->offsetUnset('docker_images_to_keep');

@@ -2609,6 +2609,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path->value = '/index.php';
             $nixpacks_php_fallback_path->resourceable_id = $this->application->id;
             $nixpacks_php_fallback_path->resourceable_type = 'App\Models\Application';
+            $nixpacks_php_fallback_path->is_preview = $this->pull_request_id !== 0;
             $nixpacks_php_fallback_path->save();
         }
         if (! $nixpacks_php_root_dir) {
@@ -2617,6 +2618,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir->value = '/app/public';
             $nixpacks_php_root_dir->resourceable_id = $this->application->id;
             $nixpacks_php_root_dir->resourceable_type = 'App\Models\Application';
+            $nixpacks_php_root_dir->is_preview = $this->pull_request_id !== 0;
             $nixpacks_php_root_dir->save();
         }
 
@@ -6025,7 +6027,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->failDeployment();
 
-        // Log comprehensive error information
+        // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
+        // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written
+        // because their truncated arguments can hold partial secrets that redaction cannot match.
         $errorMessage = $exception->getMessage() ?: 'Unknown error occurred';
         $errorCode = $exception->getCode();
         $errorClass = get_class($exception);
@@ -6052,14 +6056,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $previousClass = get_class($previous);
             $this->application_deployment_queue->addLogEntry("  {$previousClass}: {$previousMessage}", 'stderr', hidden: true);
             $this->application_deployment_queue->addLogEntry("  at {$previous->getFile()}:{$previous->getLine()}", 'stderr', hidden: true);
-        }
-
-        // Log first few lines of stack trace for debugging
-        $trace = $exception->getTraceAsString();
-        $traceLines = explode("\n", $trace);
-        $this->application_deployment_queue->addLogEntry('Stack trace (first 5 lines):', 'stderr', hidden: true);
-        foreach (array_slice($traceLines, 0, 5) as $traceLine) {
-            $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr', hidden: true);
         }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
 

@@ -12,7 +12,7 @@
 - `sshd` keeps the login shell of an open multiplexed SSH connection. Call `SshMultiplexingHelper::removeMuxFile()` before a live test of SSH or login-shell behavior.
 - SSH retries replay the full command batch. Only exit code 255 is an SSH transport failure; other exit codes come from the remote command, so do not retry them. Keep batches safe to run twice (for example `docker rm -f <name> || true` before `docker run --name <name>`).
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
-- Browser `click('Text')` can match a hidden element first (for example inactive modal steps) and wait forever; use `button:visible:has-text("Text")`.
+- Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors.
 - A new worktree has no `vendor/` or `public/build/`. Run `composer install --ignore-platform-req=ext-zip` on the host and copy `public/build` from the main checkout before page-rendering tests; otherwise they fail with a Vite manifest error.
 - Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
 - Do not symlink `vendor` into another worktree. Composer resolves the base path from the real `vendor` path, so the tests load the app classes of the other checkout. Run `composer install --ignore-platform-req=ext-zip` in the worktree.
@@ -105,6 +105,11 @@
 - In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`, `--project-directory <dir>`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs. scp also runs as the SSH user; stage files outside `/data/coolify`.
 - The parsers add sudo only to line starts (and after `&&`, `||`, `|`, `$(`). Put `if`/`else` branches on their own lines. When a redirect or `cd` must stay, make the whole line one `sh -c '...'` script; it runs as `sudo sh -c` without inner sudo or bash.
 - Tests that replace `DatabaseStartCommandExecutor` or use root servers miss non-root bugs. Test the parsed commands of a non-root server.
+
+## Redact sensitive output before every sink
+- Use one fail-closed redaction policy for database logs, framework logs, notifications, API output, exports, and MCP responses.
+- Replace known resource secrets before storage; format detection is only a second layer.
+- Keep read-time redaction for legacy records, but do not use it as the primary control.
 
 ## Cached and stored state
 - `StandaloneDocker`/`SwarmDocker` `server` uses `Server::findCached()`, a per-process identity map that is flushed only when the `servers` row updates. A `ServerSetting` save does not flush it, so pass the current `Server` instance (`setRelation('server', $server)`) when generated output depends on just-saved settings.

@@ -3,6 +3,8 @@
 namespace App\Livewire\Tags;
 
 use App\Http\Controllers\Api\DeployController;
+use App\Livewire\Concerns\CreatesTags;
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -15,6 +17,8 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use CreatesTags;
+    use RemembersCanvasView;
 
     #[Locked]
     public ?string $tagName = null;
@@ -39,6 +43,10 @@ class Show extends Component
 
     public function mount()
     {
+        if (str($this->tagName)->isEmpty() && $this->prefersCanvasView('tags')) {
+            return $this->redirectRoute('tags.canvas', navigate: true);
+        }
+
         try {
             $this->tags = Tag::ownedByCurrentTeam()
                 ->withCount(['applications', 'services'])
@@ -110,6 +118,25 @@ class Show extends Component
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->dispatch('success', 'Mass deployment started.');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Creates a tag without resources. Tag resources on the tags canvas or on the resource.
+     */
+    /**
+     * Deletes the tag and removes it from every resource.
+     */
+    public function deleteTag()
+    {
+        try {
+            $this->authorize('delete', $this->tag);
+            // taggables rows cascade-delete via FK on tag_id
+            $this->tag->delete();
+
+            return $this->redirectRoute('tags.show', navigate: true);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

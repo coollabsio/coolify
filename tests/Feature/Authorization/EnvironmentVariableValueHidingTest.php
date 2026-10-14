@@ -3,15 +3,20 @@
 use App\Livewire\Project\Shared\EnvironmentVariable\All as EnvironmentVariableAll;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show as EnvironmentVariableShow;
 use App\Models\Application;
+use App\Models\AuditEvent;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -343,4 +348,182 @@ test('member keeps isValueHidden after switching to a team they own', function (
     ]);
 
     expect($component->get('isValueHidden'))->toBeTrue();
+});
+
+test('admin can limit log redaction to locked values for one application', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->assertSee('Environment values in logs')
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting')
+        ->assertHasNoErrors();
+
+    expect($this->application->settings->fresh()->redact_all_env_values_in_logs)->toBeFalse();
+});
+
+test('admin can limit log redaction to locked values for one service', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $service])
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    expect($service->fresh()->redact_all_env_values_in_logs)->toBeFalse();
+});
+
+test('admin can limit log redaction to locked values for one database and a member cannot', function () {
+    $database = StandalonePostgresql::query()->create([
+        'name' => 'log-redaction-database',
+        'postgres_password' => 'database-password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    session(['currentTeam' => $this->team]);
+
+    $this->actingAs($this->member);
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $database])
+        ->assertSee('Environment values in logs')
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting')
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->assertNotDispatched('success');
+    expect($database->fresh()->redact_all_env_values_in_logs)->toBeTrue();
+
+    $this->actingAs($this->admin);
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $database])
+        ->assertSet('redact_all_env_values_in_logs', true)
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting')
+        ->assertDispatched('success');
+    expect($database->fresh()->redact_all_env_values_in_logs)->toBeFalse();
+});
+
+test('member cannot change log redaction and the control returns to the stored value', function (string $resourceType, bool $storedValue) {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+    $resource = $resourceType === 'application' ? $this->application : Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $settings = $resource instanceof Application ? $resource->settings : $resource;
+    $settings->update(['redact_all_env_values_in_logs' => $storedValue]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $resource])
+        ->set('redact_all_env_values_in_logs', ! $storedValue)
+        ->call('saveLogRedactionSetting')
+        ->assertSet('redact_all_env_values_in_logs', $storedValue)
+        ->assertNotDispatched('success');
+
+    expect($settings->fresh()->redact_all_env_values_in_logs)->toBe($storedValue);
+})->with(['application', 'service'])->with([true, false]);
+
+test('log redaction control returns to the stored value after a write failure', function (string $resourceType, bool $storedValue) {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $resource = $resourceType === 'application' ? $this->application : Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $settings = $resource instanceof Application ? $resource->settings : $resource;
+    $settings->update(['redact_all_env_values_in_logs' => $storedValue]);
+    $component = Livewire::test(EnvironmentVariableAll::class, ['resource' => $resource]);
+    $event = 'eloquent.saving: '.get_class($settings);
+    Event::listen($event, function () {
+        throw new RuntimeException('Saving the log redaction setting failed.');
+    });
+
+    try {
+        $component->set('redact_all_env_values_in_logs', ! $storedValue)
+            ->call('saveLogRedactionSetting')
+            ->assertSet('redact_all_env_values_in_logs', $storedValue)
+            ->assertNotDispatched('success');
+
+        expect($settings->fresh()->redact_all_env_values_in_logs)->toBe($storedValue);
+    } finally {
+        Event::forget($event);
+    }
+})->with(['application', 'service'])->with([true, false]);
+
+test('saving the log redaction setting records an audit event for the application', function () {
+    $this->withoutDefer();
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    $event = AuditEvent::query()->where('event', 'ui.application.settings_updated')->sole();
+
+    expect($event->metadata['changed_fields'])->toBe(['redact_all_env_values_in_logs'])
+        ->and($event->team_id)->toBe($this->team->id);
+});
+
+test('saving the log redaction setting records an audit event for the service', function () {
+    $this->withoutDefer();
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $service])
+        ->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    expect(AuditEvent::query()->where('event', 'ui.service.updated')->get()->pluck('metadata.changed_fields')->all())
+        ->toContain(['redact_all_env_values_in_logs']);
+});
+
+test('member of the resource team cannot change log redaction after switching to a team they own', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application]);
+
+    session(['currentTeam' => $ownTeam]);
+    Cache::flush();
+
+    $component->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    expect($this->application->settings->fresh()->redact_all_env_values_in_logs)->toBeTrue();
+});
+
+test('admin of the resource team can change log redaction after switching to a team where they are a member', function () {
+    $otherTeam = Team::factory()->create();
+    $this->admin->teams()->attach($otherTeam, ['role' => 'member']);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application]);
+
+    session(['currentTeam' => $otherTeam]);
+    Cache::flush();
+
+    $component->set('redact_all_env_values_in_logs', false)
+        ->call('saveLogRedactionSetting');
+
+    expect($this->application->settings->fresh()->redact_all_env_values_in_logs)->toBeFalse();
 });

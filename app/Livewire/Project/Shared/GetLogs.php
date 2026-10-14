@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared;
 
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -192,7 +193,7 @@ class GetLogs extends Component
 
         $options = "-n {$this->resolveLogTail()}".($this->showTimeStamps ? ' -t' : '');
 
-        return sanitizeLogsForExport($this->runLogCommand($this->logCommand($options), self::MAX_DISPLAY_SIZE_BYTES, '5MB', $this->showTimeStamps));
+        return sanitizeLogsForExport($this->runLogCommand($this->logCommand($options), self::MAX_DISPLAY_SIZE_BYTES, '5MB', $this->showTimeStamps), $this->logRedactionSecrets());
     }
 
     public function downloadAllLogs(): string
@@ -212,7 +213,19 @@ class GetLogs extends Component
 
         $command = $this->logCommand($this->showTimeStamps ? '-t' : '');
 
-        return sanitizeLogsForExport($this->runLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES, '50MB', $this->showTimeStamps));
+        return sanitizeLogsForExport($this->runLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES, '50MB', $this->showTimeStamps), $this->logRedactionSecrets());
+    }
+
+    /**
+     * Environment values and database credentials of the resource whose logs are exported.
+     *
+     * @return array{known: array<int, string>, locked: array<int, string>}
+     */
+    private function logRedactionSecrets(): array
+    {
+        $resource = $this->resource ?? $this->servicesubtype?->service;
+
+        return EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: $resource instanceof Application && filled($this->pull_request));
     }
 
     private function resolveLogTail(): int|string

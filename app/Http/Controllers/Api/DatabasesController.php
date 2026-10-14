@@ -18,6 +18,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -355,11 +356,19 @@ class DatabasesController extends Controller
         }
 
         $databaseIds = $databases->pluck('id')->toArray();
+        $databasesByMorphKey = $databases->keyBy(fn ($database) => $database->getMorphClass().':'.$database->id);
+        $messageSecrets = [];
 
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['latest_log', 's3', 's3Storages'])
             ->whereIn('database_id', $databaseIds)
             ->get()
-            ->map(fn (ScheduledDatabaseBackup $backup) => $this->withBackupS3StorageUuids($backup))
+            ->map(function (ScheduledDatabaseBackup $backup) use ($databasesByMorphKey, &$messageSecrets): ScheduledDatabaseBackup {
+                if ($backup->latest_log) {
+                    $this->redactBackupExecutionMessage($backup->latest_log, $databasesByMorphKey->get($backup->database_type.':'.$backup->database_id), $messageSecrets);
+                }
+
+                return $this->withBackupS3StorageUuids($backup);
+            })
             ->groupBy(fn (ScheduledDatabaseBackup $backup) => $backup->database_type.':'.$backup->database_id);
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
@@ -431,8 +440,15 @@ class DatabasesController extends Controller
 
         $this->authorize('view', $database);
 
+        $messageSecrets = [];
         $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->get()
-            ->map(fn (ScheduledDatabaseBackup $backup) => $this->withBackupS3StorageUuids($backup));
+            ->map(function (ScheduledDatabaseBackup $backup) use ($database, &$messageSecrets): ScheduledDatabaseBackup {
+                $backup->executions->each(function (ScheduledDatabaseBackupExecution $execution) use ($database, &$messageSecrets): void {
+                    $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
+                });
+
+                return $this->withBackupS3StorageUuids($backup);
+            });
 
         return response()->json($backupConfig);
     }
@@ -573,6 +589,7 @@ class DatabasesController extends Controller
                         'health_check_timeout' => ['type' => 'integer', 'description' => 'Healthcheck timeout in seconds.', 'minimum' => 1, 'default' => 5],
                         'health_check_retries' => ['type' => 'integer', 'description' => 'Healthcheck retries count.', 'minimum' => 1, 'default' => 5],
                         'health_check_start_period' => ['type' => 'integer', 'description' => 'Healthcheck start period in seconds.', 'minimum' => 0, 'default' => 5],
+                        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'],
                     ],
                 ),
             )
@@ -627,6 +644,7 @@ class DatabasesController extends Controller
             'limits_cpus' => 'string',
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
+            'redact_all_env_values_in_logs' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -636,6 +654,7 @@ class DatabasesController extends Controller
             ], 422);
         }
         $uuid = $request->uuid;
+        $redactAllEnvValuesInLogs = $request->has('redact_all_env_values_in_logs') ? $request->boolean('redact_all_env_values_in_logs') : null;
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
@@ -643,6 +662,10 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('update', $database);
+
+        if ($redactAllEnvValuesInLogs !== null) {
+            $this->authorize('manageEnvironment', $database);
+        }
 
         if ($request->is_public && $request->public_port) {
             if (isPublicPortAlreadyUsed($database->destination->server, $request->public_port, $database->id)) {
@@ -876,6 +899,9 @@ class DatabasesController extends Controller
         }
 
         // Only update database fields, not backup configuration
+        if ($redactAllEnvValuesInLogs !== null) {
+            $database->redact_all_env_values_in_logs = $redactAllEnvValuesInLogs;
+        }
         $database->update($request->only($allowedFields));
 
         if ($whatToDoWithDatabaseProxy === 'start') {
@@ -889,7 +915,10 @@ class DatabasesController extends Controller
             'database_uuid' => $database->uuid,
             'database_name' => $database->name,
             'database_type' => $database->type(),
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+            'changed_fields' => [
+                ...array_values(array_intersect($allowedFields, array_keys($request->all()))),
+                ...($redactAllEnvValuesInLogs === null ? [] : ['redact_all_env_values_in_logs']),
+            ],
         ]);
 
         return response()->json([
@@ -2783,7 +2812,10 @@ class DatabasesController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = getContainerLogs($database->destination->server, $container['ID'], $lines, $showTimestamps);
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($database->destination->server, $container['ID'], $lines, $showTimestamps),
+            EnvironmentVariable::logRedactionSecretsFor($database),
+        );
 
         return response()->json([
             'logs' => $logs,
@@ -3145,7 +3177,7 @@ class DatabasesController extends Controller
 
     #[OA\Get(
         summary: 'List backup executions',
-        description: 'Get all executions for a specific backup configuration.',
+        description: 'Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/executions',
         operationId: 'list-backup-executions',
         security: [
@@ -3185,7 +3217,7 @@ class DatabasesController extends Controller
                                     new OA\Property(property: 'filename', type: 'string'),
                                     new OA\Property(property: 'size', type: 'integer'),
                                     new OA\Property(property: 'created_at', type: 'string'),
-                                    new OA\Property(property: 'message', type: 'string'),
+                                    new OA\Property(property: 'message', type: 'string', nullable: true, description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.'),
                                     new OA\Property(property: 'status', type: 'string'),
                                 ]
                             )
@@ -3226,10 +3258,13 @@ class DatabasesController extends Controller
         }
 
         // Get all executions for this backup configuration
+        $messageSecrets = [];
         $executions = $backup->executions()
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($execution) {
+            ->map(function ($execution) use ($database, &$messageSecrets) {
+                $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
+
                 return [
                     'uuid' => $execution->uuid,
                     'filename' => $execution->filename,
@@ -5281,5 +5316,35 @@ class DatabasesController extends Controller
             'uuid' => $newDatabase->uuid,
             'message' => 'Database cloned.',
         ], 201);
+    }
+
+    /**
+     * Execution output can embed credentials: hide it unless the token can read sensitive data, and redact it when shown.
+     * The database secrets are loaded once per database and kept in $secretsByDatabase for the rest of the request.
+     *
+     * @param  array<string, array{known: array<int, string>, locked: array<int, string>}|null>  $secretsByDatabase
+     */
+    private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution, ?Model $database, array &$secretsByDatabase): void
+    {
+        $message = $execution->message;
+        if (request()->attributes->get('can_read_sensitive', false) !== true || ! is_string($message) || ! $database) {
+            $execution->setAttribute('message', null);
+
+            return;
+        }
+
+        $key = $database->getMorphClass().':'.$database->getKey();
+        if (! array_key_exists($key, $secretsByDatabase)) {
+            try {
+                // Use a copy so the relations loaded for redaction do not end up in the response.
+                $secretsByDatabase[$key] = EnvironmentVariable::logRedactionSecretsFor(clone $database);
+            } catch (\Throwable $e) {
+                report($e);
+                $secretsByDatabase[$key] = null;
+            }
+        }
+
+        // Without the database secrets the message cannot be redacted reliably, so hide it.
+        $execution->setAttribute('message', $secretsByDatabase[$key] === null ? null : sanitizeLogsForExport($message, $secretsByDatabase[$key]));
     }
 }
