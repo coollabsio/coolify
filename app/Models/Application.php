@@ -1109,7 +1109,7 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->withoutBuildpackControlVariables();
+            ->withoutBuildOnlyBuildpackControlVariables();
     }
 
     public function nixpacks_environment_variables()
@@ -1144,7 +1144,7 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->withoutBuildpackControlVariables();
+            ->withoutBuildOnlyBuildpackControlVariables();
     }
 
     public function nixpacks_environment_variables_preview()
