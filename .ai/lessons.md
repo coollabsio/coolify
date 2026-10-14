@@ -114,3 +114,4 @@
 ## Cached and stored state
 - `StandaloneDocker`/`SwarmDocker` `server` uses `Server::findCached()`, a per-process identity map that is flushed only when the `servers` row updates. A `ServerSetting` save does not flush it, so pass the current `Server` instance (`setRelation('server', $server)`) when generated output depends on just-saved settings.
 - Application deployments use the stored `custom_labels` when they exist. When a server-level setting changes the generated labels, regenerate the stored labels of read-only (`is_container_label_readonly_enabled`) applications, or a redeploy keeps the old labels.
+- Tailwind `text-base` is a colour utility here (`--color-base`, near-black), not a font size. Use `text-[16px]` for size.

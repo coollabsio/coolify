@@ -80,7 +80,7 @@
             </div>
         @endif
 
-        <div id="terminal" wire:ignore data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
+        <div id="terminal" wire:ignore @mouseup="focusConsoleFromOutput()" data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
             :class="fullscreen
                 ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent'
                 : @js($isApplicationConsole
@@ -90,21 +90,35 @@
 
         {{-- Command box for console (attach) mode — a terminal input line, never raw keystrokes. --}}
         <div x-cloak x-show="terminalActive && $wire.terminalMode === 'attach'"
-            class="terminal-console-input relative z-[2] mt-2 flex shrink-0 items-center gap-2 rounded-md bg-white/[0.03] px-3 ring-1 ring-white/[0.06] transition focus-within:bg-white/[0.05] focus-within:ring-white/[0.12]"
-            :class="fullscreen ? 'mb-1' : ''"
-            @click="$refs.consoleInput?.focus()">
-            <span class="shrink-0 font-mono text-xs leading-none text-white/35 select-none" aria-hidden="true">&gt;</span>
-            <input type="text" x-ref="consoleInput" x-model="consoleCommand"
-                @keydown.enter.prevent="submitConsoleCommand()"
-                @keydown.arrow-up.prevent="recallConsoleCommand(-1)"
-                @keydown.arrow-down.prevent="recallConsoleCommand(1)"
-                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                placeholder="Type a command and press Enter"
-                class="console-command-field min-w-0 flex-1 border-0! bg-transparent! px-0! py-2! font-mono text-xs text-white! shadow-none! ring-0! outline-none! placeholder:text-white/30 focus:border-0! focus:shadow-none! focus:ring-0! focus:outline-none!" />
-            <button type="button" @click.stop="submitConsoleCommand()"
-                class="-mr-1 shrink-0 rounded px-1.5 py-1 font-mono text-[11px] text-white/40 transition-colors hover:text-white/80">
-                Send
-            </button>
+            class="terminal-console-input relative z-[2] mt-2 shrink-0 border-t pt-2"
+            :class="fullscreen ? 'mx-1 mb-1' : ''"
+            :style="`--console-fg: ${consoleForegroundColor}`">
+            <div x-show="consolePendingLines.length > 0" x-cloak
+                class="console-command-pending mb-1 flex items-center gap-2 pl-2 text-xs">
+                <span x-text="`${consolePendingLines.length} pasted lines ready to send`"></span>
+                <span class="opacity-60">· Enter to send · Esc to cancel</span>
+            </div>
+            <div class="console-command-row flex min-h-9 cursor-text items-center gap-3 rounded-md pr-1 pl-2"
+                @click="$refs.consoleInput?.focus()">
+                <span class="console-command-prompt shrink-0 font-mono text-sm leading-none select-none"
+                    :data-sent="consoleSentFlash ? '' : null" aria-hidden="true">&gt;</span>
+                <input type="text" x-ref="consoleInput" x-model="consoleCommand"
+                    @keydown.enter.prevent="submitConsoleCommand()"
+                    @keydown.escape.prevent.stop="cancelConsoleInput()"
+                    @keydown.ctrl.l.prevent="clearConsoleOutput()"
+                    @keydown.arrow-up.prevent="recallConsoleCommand(-1)"
+                    @keydown.arrow-down.prevent="recallConsoleCommand(1)"
+                    @paste="pasteConsoleText($event)"
+                    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send"
+                    aria-label="Console command" placeholder="Send a command to the process…"
+                    class="console-command-field min-w-0 flex-1 border-0! bg-transparent! px-0! py-1.5! font-mono text-[16px]! shadow-none! ring-0! outline-none! focus:border-0! focus:shadow-none! focus:ring-0! focus:outline-none! sm:text-[13px]!" />
+                <button type="button" @click.stop="submitConsoleCommand()" :disabled="!canSubmitConsoleCommand()"
+                    title="Send (Enter) · Clear input (Esc) · Clear output (Ctrl+L)"
+                    class="console-command-send inline-flex h-7 shrink-0 items-center gap-2 rounded px-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-40">
+                    Send
+                    <span class="font-mono text-sm opacity-60" aria-hidden="true">↵</span>
+                </button>
+            </div>
         </div>
 
         <div x-show="terminalActive && $wire.terminalMode !== 'attach'" x-cloak class="sm:hidden"

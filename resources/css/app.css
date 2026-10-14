@@ -1084,6 +1084,68 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     background: var(--coollabs-base);
 }
 
+/* Console (attach) command box. Colours come from the active terminal theme's
+   foreground (--console-fg), so the input is readable on every console theme. */
+.terminal-console-input {
+    border-color: color-mix(in srgb, var(--console-fg, #fff) 10%, transparent);
+}
+
+.console-command-row {
+    box-shadow: inset 0 0 0 1px transparent;
+    transition:
+        background-color 150ms ease,
+        box-shadow 150ms ease;
+}
+
+.console-command-row:hover {
+    background-color: color-mix(in srgb, var(--console-fg, #fff) 3%, transparent);
+}
+
+.console-command-row:focus-within {
+    background-color: color-mix(in srgb, var(--console-fg, #fff) 6%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--console-fg, #fff) 22%, transparent);
+}
+
+.console-command-field {
+    color: var(--console-fg, #fff) !important;
+    caret-color: var(--console-fg, #fff);
+}
+
+.console-command-field::placeholder {
+    color: color-mix(in srgb, var(--console-fg, #fff) 40%, transparent);
+}
+
+.console-command-row:focus-within .console-command-field::placeholder {
+    color: color-mix(in srgb, var(--console-fg, #fff) 28%, transparent);
+}
+
+.console-command-prompt {
+    color: color-mix(in srgb, var(--console-fg, #fff) 40%, transparent);
+    transition: color 200ms ease;
+}
+
+.console-command-row:focus-within .console-command-prompt {
+    color: var(--console-fg, #fff);
+}
+
+.console-command-prompt[data-sent] {
+    color: #fcd452 !important;
+}
+
+.console-command-pending {
+    color: color-mix(in srgb, var(--console-fg, #fff) 60%, transparent);
+}
+
+.console-command-send {
+    color: color-mix(in srgb, var(--console-fg, #fff) 60%, transparent);
+    outline-color: color-mix(in srgb, var(--console-fg, #fff) 60%, transparent);
+}
+
+.console-command-send:hover {
+    color: var(--console-fg, #fff);
+    background-color: color-mix(in srgb, var(--console-fg, #fff) 8%, transparent);
+}
+
 .terminal-target-list {
     scrollbar-width: thin;
     scrollbar-color: var(--terminal-scrollbar, rgb(255 255 255 / 0.3)) transparent;
