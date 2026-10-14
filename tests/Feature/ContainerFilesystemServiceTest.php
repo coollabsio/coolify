@@ -1,6 +1,7 @@
 <?php
 
 use App\Data\FileEntry;
+use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -140,14 +141,14 @@ it('treats an empty file as editable text', function () {
     expect((new ContainerFilesystemService($server, 'app-123'))->read('/app/empty.txt'))->toBe('');
 });
 
-it('writes content larger than the shell argument limit via docker cp', function () {
+it('writes content near or above the shell argument limit via docker cp', function (int $size) {
     Process::fake(['*' => Process::result(output: '')]);
     $server = fsServer();
 
-    (new ContainerFilesystemService($server, 'app-123'))->write('/app/big.txt', str_repeat('a', 200_000));
+    (new ContainerFilesystemService($server, 'app-123'))->write('/app/big.txt', str_repeat('a', $size));
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp'));
-});
+})->with([96 * 1024, 200_000]);
 
 it('base64-encodes content in the write command', function () {
     $cmd = fsService()->buildWriteCommand('/app/a.txt', "hi\n");
@@ -248,4 +249,91 @@ it('uploads by scp-ing to the server then docker cp into the container', functio
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp')
         && str_contains($process->command, 'app-123'));
     @unlink($local);
+});
+
+it('rejects failed or corrupt read responses', function (string $output) {
+    Process::fake(['*' => Process::result(output: $output)]);
+    (new ContainerFilesystemService(fsServer(), 'app-123'))->read('/app/a.txt');
+})->with(['', 'ERROR', "OK\n!!!"])->throws(RuntimeException::class);
+
+it('executes read guards for real file bytes through the non-root sudo parser', function (string $content, bool $editable) {
+    $server = fsServer();
+    $server->update(['user' => 'deploy']);
+    $path = tempnam(sys_get_temp_dir(), 'fs-read-');
+    file_put_contents($path, $content);
+    Process::fake(function ($process) {
+        $lines = explode("\n", $process->command);
+        $body = implode("\n", array_slice($lines, 1, -1));
+        $local = new Symfony\Component\Process\Process([
+            'bash', '-c',
+            'sudo() { "$@"; }; docker() { shift 2; "$@"; }; export -f sudo docker;'."\n".$body,
+        ]);
+        $local->run();
+
+        return Process::result(output: $local->getOutput(), errorOutput: $local->getErrorOutput(), exitCode: $local->getExitCode());
+    });
+    try {
+        $service = new ContainerFilesystemService($server, 'app-123');
+        if ($editable) {
+            expect($service->read($path))->toBe($content);
+        } else {
+            expect(fn () => $service->read($path))->toThrow(RuntimeException::class);
+        }
+    } finally {
+        @unlink($path);
+    }
+})->with([
+    'empty' => ['', true],
+    'newline only' => ["\n\n", true],
+    'text' => ["hello\n", true],
+    'binary' => ["hello\0world", false],
+]);
+
+it('rejects a symlink to an oversized file before reading its content', function () {
+    $server = fsServer();
+    $path = tempnam(sys_get_temp_dir(), 'fs-size-');
+    $link = $path.'-link';
+    $handle = fopen($path, 'w');
+    ftruncate($handle, LocalFileVolume::MAX_CONTENT_SIZE + 1);
+    fclose($handle);
+    symlink($path, $link);
+    Process::fake(function ($process) {
+        $body = implode("\n", array_slice(explode("\n", $process->command), 1, -1));
+        $local = new Symfony\Component\Process\Process(['bash', '-c', 'sudo() { "$@"; }; docker() { shift 2; "$@"; }; export -f sudo docker;'."\n".$body]);
+        $local->run();
+
+        return Process::result(output: $local->getOutput(), exitCode: $local->getExitCode());
+    });
+    try {
+        expect(fn () => (new ContainerFilesystemService($server, 'app-123'))->read($link))
+            ->toThrow(RuntimeException::class, 'File is not editable');
+    } finally {
+        @unlink($link);
+        @unlink($path);
+    }
+});
+
+it('removes a partial local download when scp fails', function () {
+    $localPath = null;
+    Process::fake(function ($process) use (&$localPath) {
+        if (str_contains($process->command, ' scp ')) {
+            preg_match("/'([^']+)'$/", $process->command, $matches);
+            $localPath = $matches[1];
+            file_put_contents($localPath, 'partial bytes');
+
+            return Process::result(errorOutput: 'Permission denied', exitCode: 1);
+        }
+
+        return Process::result(output: 'file');
+    });
+    try {
+        expect(fn () => (new ContainerFilesystemService(fsServer(), 'app-123'))->download('/app/a.txt'))
+            ->toThrow(RuntimeException::class);
+        expect($localPath)->not->toBeNull();
+        expect(file_exists($localPath))->toBeFalse();
+    } finally {
+        if ($localPath !== null) {
+            @unlink($localPath);
+        }
+    }
 });

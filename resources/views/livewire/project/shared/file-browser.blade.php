@@ -47,9 +47,9 @@
             </x-forms.button>
 
             @if ($containerRunning)
-                <input type="file" class="hidden" x-ref="uploadInput" wire:model="upload"
-                    @change="$nextTick(() => $wire.uploadFile())" />
-                <x-forms.button type="button" title="Upload a file to this folder"
+                <input type="file" class="hidden" x-ref="uploadInput"
+                    @change="if ($event.target.files.length) { $wire.upload('upload', $event.target.files[0], () => $wire.uploadFile()) }" />
+                <x-forms.button type="button" title="Upload a file to this folder" canGate="canAccessTerminal" :canResource="$resource"
                     wire:target="uploadFile" @click="$refs.uploadInput.click()">
                     Upload
                 </x-forms.button>
@@ -61,7 +61,7 @@
                         <x-forms.input id="newFileName" label="File name" x-model="name"
                             placeholder="config.yml" required />
                         <div class="flex justify-end">
-                            <x-forms.button type="submit" isHighlighted>Create file</x-forms.button>
+                            <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Create file</x-forms.button>
                         </div>
                     </form>
                 </x-modal-input>
@@ -73,7 +73,7 @@
                         <x-forms.input id="newFolderName" label="Folder name" x-model="name"
                             placeholder="plugins" required />
                         <div class="flex justify-end">
-                            <x-forms.button type="submit" isHighlighted>Create folder</x-forms.button>
+                            <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Create folder</x-forms.button>
                         </div>
                     </form>
                 </x-modal-input>
@@ -184,7 +184,7 @@
                                             <x-forms.input id="chmodMode-{{ $loop->index }}" label="Octal mode"
                                                 x-model="mode" placeholder="644" required />
                                             <div class="flex justify-end">
-                                                <x-forms.button type="submit" isHighlighted>Apply</x-forms.button>
+                                                <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Apply</x-forms.button>
                                             </div>
                                         </form>
                                     </x-modal-input>
@@ -244,7 +244,7 @@
                                                     <x-forms.input id="renameName-{{ $loop->index }}"
                                                         label="New name" x-model="newName" required />
                                                     <div class="flex justify-end">
-                                                        <x-forms.button type="submit" isHighlighted>Rename</x-forms.button>
+                                                        <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Rename</x-forms.button>
                                                     </div>
                                                 </form>
                                             </x-modal-input>
@@ -264,7 +264,7 @@
                                                         inside the container. This cannot be undone.
                                                     </p>
                                                     <div class="flex justify-end">
-                                                        <x-forms.button isError type="button"
+                                                        <x-forms.button isError type="button" canGate="canAccessTerminal" :canResource="$resource"
                                                             x-on:click="$wire.deleteEntry(name); $dispatch('close-modal')">Delete</x-forms.button>
                                                     </div>
                                                 </div>

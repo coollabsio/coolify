@@ -12,9 +12,9 @@ class ContainerFilesystemService
     /**
      * Inline `echo <base64> | base64 -d` writes travel as a single execve
      * argument, capped at ~128 KiB by MAX_ARG_STRLEN. base64 inflates by 4/3,
-     * so anything above ~96 KiB of content must go through the docker cp path.
+     * so keep inline content below that limit with room for command quoting.
      */
-    private const MAX_INLINE_WRITE_SIZE = 96 * 1024;
+    private const MAX_INLINE_WRITE_SIZE = 64 * 1024;
 
     public function __construct(
         private Server $server,
@@ -67,15 +67,15 @@ class ContainerFilesystemService
         $escaped = $this->escapePath($path, 'read path');
         $max = LocalFileVolume::MAX_CONTENT_SIZE;
 
-        $cmd = 'sz=$(stat -c %s '.$escaped.' 2>/dev/null || echo 0); '
+        $cmd = '[ -f '.$escaped.' ] && [ -r '.$escaped.' ] || exit 1; '
+            .'sz=$(stat -Lc %s -- '.$escaped.') || exit 1; '
             .'if [ "$sz" -gt '.$max.' ]; then echo TOOBIG; exit 0; fi; '
-            .'if [ -s '.$escaped.' ] && ! grep -qI . '.$escaped.'; then echo BINARY; exit 0; fi; '
-            .'echo OK; base64 '.$escaped.' 2>/dev/null';
+            .'if [ -s '.$escaped.' ] && ! grep -qI \'\' -- '.$escaped.'; then echo BINARY; exit 0; fi; '
+            .'echo OK; base64 -- '.$escaped.' || exit 1';
 
         $raw = (string) instant_remote_process(
             [$this->dockerExecShell($cmd)],
             $this->server,
-            throwError: false,
         );
 
         $newline = strpos($raw, "\n");
@@ -86,7 +86,12 @@ class ContainerFilesystemService
 
         $payload = $newline === false ? '' : substr($raw, $newline + 1);
 
-        return (string) base64_decode(trim($payload), true);
+        $content = base64_decode(trim($payload), true);
+        if ($status !== 'OK' || $content === false || strlen($content) > $max) {
+            throw new \RuntimeException('Could not read file.');
+        }
+
+        return $content;
     }
 
     public function buildWriteCommand(string $path, string $content): string
@@ -329,6 +334,10 @@ class ContainerFilesystemService
                 );
             }
             instant_scp_from_server($serverTmp, $localTmp, $this->server);
+        } catch (\Throwable $e) {
+            @unlink($localTmp);
+
+            throw $e;
         } finally {
             instant_remote_process(["rm -f {$escapedServerTmp}"], $this->server, throwError: false);
         }

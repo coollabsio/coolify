@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -21,7 +22,7 @@ class FileBrowser extends Component
     use WithFileUploads;
 
     #[Locked]
-    public $resource;
+    public Model $resource;
 
     #[Locked]
     public string $type = '';
@@ -41,6 +42,7 @@ class FileBrowser extends Component
     /** @var array<int, array{name:string,type:string,size:int,mtime:int}> */
     public array $entries = [];
 
+    #[Locked]
     public ?string $editingPath = null;
 
     public bool $editorOpen = false;
@@ -49,12 +51,12 @@ class FileBrowser extends Component
 
     public string $editorLanguage = '';
 
-    public $upload;
+    public ?TemporaryUploadedFile $upload = null;
 
     /** @var array<string, mixed> */
     public array $parameters = [];
 
-    public function mount($resource = null): void
+    public function mount(?Model $resource = null): void
     {
         $this->parameters = get_route_parameters();
         $resource = $resource ?? $this->resolveResourceFromRoute();
@@ -62,6 +64,7 @@ class FileBrowser extends Component
         // Security gate first, before any server or container resolution.
         $this->authorize('canAccessTerminal');
         $this->authorize('view', $resource);
+        abort_unless((int) $resource->environment->project->team_id === (int) auth()->user()->currentTeam()->id, 403);
 
         $this->resource = $resource;
         $this->type = $this->resolveType($resource);
@@ -86,9 +89,11 @@ class FileBrowser extends Component
 
     public function selectContainer(string $name): void
     {
+        $this->guard();
         if (! in_array($name, $this->availableContainers, true)) {
             return;
         }
+        $this->closeEditor();
         $this->container = $name;
         $this->currentPath = $this->service()->defaultRoot();
         $this->loadEntries();
@@ -97,7 +102,7 @@ class FileBrowser extends Component
     public function open(string $name): void
     {
         $this->guard();
-        $this->currentPath = rtrim($this->currentPath, '/').'/'.$name;
+        $this->currentPath = $this->childPath($name);
         $this->loadEntries();
     }
 
@@ -248,6 +253,7 @@ class FileBrowser extends Component
 
             return null;
         }
+        app()->terminating(static fn () => @unlink($localTmp));
         $downloadName = str_ends_with($localTmp, '.tar.gz') ? $name.'.tar.gz' : $name;
 
         return response()->streamDownload(function () use ($localTmp) {
@@ -256,7 +262,7 @@ class FileBrowser extends Component
             } finally {
                 @unlink($localTmp);
             }
-        }, $downloadName)->deleteFileAfterSend();
+        }, $downloadName);
     }
 
     /**
@@ -313,13 +319,24 @@ class FileBrowser extends Component
 
     protected function childPath(string $name): string
     {
+        if ($name === '' || $name === '.' || $name === '..' || str_contains($name, '/') || str_contains($name, '\\') || str_contains($name, "\0")) {
+            throw new \InvalidArgumentException('Invalid file name.');
+        }
+        validateShellSafePath($name, 'file name');
+
         return rtrim($this->currentPath, '/').'/'.$name;
     }
 
     protected function guard(): void
     {
         $this->authorize('canAccessTerminal');
-        if (! $this->containerRunning || is_null($this->container)) {
+        $this->resource->refresh();
+        $this->authorize('view', $this->resource);
+        abort_unless((int) $this->resource->environment->project->team_id === (int) auth()->user()->currentTeam()->id, 403);
+        $this->type = $this->resolveType($this->resource);
+        $this->containerRunning = (bool) $this->resource->isRunning();
+        $this->availableContainers = $this->containerRunning ? $this->resolveContainers() : [];
+        if (! $this->containerRunning || is_null($this->container) || ! in_array($this->container, $this->availableContainers, true)) {
             throw new \RuntimeException('Container is not running.');
         }
     }
@@ -389,7 +406,7 @@ class FileBrowser extends Component
         abort(404);
     }
 
-    protected function resolveType($resource): string
+    protected function resolveType(Model $resource): string
     {
         return match (true) {
             $resource instanceof Application => 'application',
