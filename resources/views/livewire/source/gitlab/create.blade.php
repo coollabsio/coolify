@@ -11,7 +11,7 @@
                 placeholder="All accessible repositories when empty" />
         </div>
 
-        @if (! isCloud())
+        @if (! isCloud() && auth()->user()->can('makeSystemWide', \App\Models\GitlabApp::class))
             <div x-data="{ showWarning: @entangle('is_system_wide') }">
                 <div class="max-w-xs">
                     <x-forms.checkbox id="is_system_wide" label="System wide"
