@@ -88,16 +88,6 @@ class ApplicationPreviewPolicy
         return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
-    /**
-     * Determine whether the user can manage preview deployments.
-     */
-    public function manageDeployments(User $user, ApplicationPreview $applicationPreview): bool
-    {
-        $teamId = $this->getTeamId($applicationPreview);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
-    }
-
     private function getTeamId(ApplicationPreview $applicationPreview): ?int
     {
         return $applicationPreview->application?->team()?->id;
