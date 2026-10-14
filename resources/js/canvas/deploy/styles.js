@@ -28,7 +28,7 @@ const CSS = `
   .cv-root.cv-dark { color-scheme: dark; }
   .cv-root *, .cv-root *::before, .cv-root *::after { box-sizing: border-box; }
   /* Rounded boxes on the backdrop: the top bar and the step list. */
-  .cv-island { border: 1px solid var(--cv-line); border-radius: 12px; background: var(--cv-island); }
+  .cv-island { border: 1px solid var(--cv-line); border-radius: 8px; background: var(--cv-island); }
   .cv-root svg { width: 1rem; height: 1rem; flex: none; }
   .cv-root button:not(.button) { font: inherit; }
 
@@ -260,7 +260,7 @@ const CSS = `
   @media (prefers-reduced-motion: reduce) { .cv-node.blank .cv-port.out::after, .cv-hint::before, .cv-hint span { animation: none; } }
 
   /* Run panel: an island with the steps as status lights, then the logs. */
-  .cv-run { position: absolute; top: 0.75rem; right: 0.75rem; bottom: 0.75rem; z-index: 10; display: flex; flex-direction: column; width: min(26rem, 45%); overflow: hidden; border: 1px solid var(--cv-line); border-radius: 12px; background: var(--cv-island); box-shadow: 0 20px 48px -20px rgb(0 0 0 / 0.4); }
+  .cv-run { position: absolute; top: 0.75rem; right: 0.75rem; bottom: 0.75rem; z-index: 10; display: flex; flex-direction: column; width: min(26rem, 45%); overflow: hidden; border: 1px solid var(--cv-line); border-radius: 8px; background: var(--cv-island); box-shadow: 0 20px 48px -20px rgb(0 0 0 / 0.4); }
   .cv-run[hidden] { display: none; }
   .cv-run header { display: flex; align-items: flex-start; gap: 0.5rem; padding: 1rem 0.75rem 0.875rem 1.25rem; border-bottom: 1px solid var(--cv-line); }
   .cv-run header div { display: grid; gap: 0.0625rem; margin-right: auto; }
