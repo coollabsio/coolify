@@ -75,27 +75,8 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle :list-url="route('project.index')"
+                        :canvas-url="route('project.canvas.index')" />
                 </div>
             </div>
 
@@ -244,7 +225,7 @@
             search: '',
             sortBy: 'name-asc',
             sortOpen: false,
-            viewMode: localStorage.getItem('projects-view') || 'grid',
+            viewMode: @js($this->listView('projects', 'grid')),
             page: 1,
             pageSize: 12,
             projects: @js($projectsJs),
@@ -312,7 +293,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 this.page = 1;
-                localStorage.setItem('projects-view', mode);
+                this.$wire.saveListView('projects', mode);
             },
             previousPage() {
                 this.page = Math.max(1, this.page - 1);

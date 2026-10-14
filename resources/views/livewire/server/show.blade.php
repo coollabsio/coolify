@@ -75,6 +75,16 @@
 
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies, reaches, and validates this server.">
+                        <x-slot:badges>
+                            @if (isDev() && $server->isTransferredAway())
+                                @unless ($server->isManagementDisabled())
+                                    <x-status-badge label="Transferred away" type="warning" />
+                                @endunless
+                            @else
+                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @endif
+                        </x-slot:badges>
                         <x-slot:actions>
                             @if ($hasLinkableCloudProviders)
                                 <div x-data="{ open: false }" class="relative" @click.outside="open = false">
@@ -179,14 +189,6 @@
                                         </x-modal-confirmation>
                                     @endif
                                 </div>
-                            @endif
-                            @if (isDev() && $server->isTransferredAway())
-                                @unless ($server->isManagementDisabled())
-                                    <x-status-badge label="Transferred away" type="warning" />
-                                @endunless
-                            @else
-                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
                             @endif
                         </x-slot:actions>
 
@@ -321,9 +323,11 @@
                                 @endif
                             @endif
                             @if ($server->server_metadata)
-                                <x-forms.button type="button" class="size-8! px-0!"
-                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    :disabled="! $server->isFunctional()"
+                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
                                     <x-reicon name="refresh" class="size-3.5" />
+                                    Refresh details
                                 </x-forms.button>
                             @endif
                         </x-slot:actions>
@@ -355,7 +359,9 @@
                             @include('livewire.server.partials.server-details', ['server' => $server])
                         @else
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    :disabled="! $server->isFunctional()"
+                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
                                     <x-reicon name="refresh" class="size-3.5" />
                                     Fetch server details
                                 </x-forms.button>

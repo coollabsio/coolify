@@ -178,6 +178,7 @@ class GlobalSearch extends Component
             'new github app' => 'source',
             'new github' => 'source',
             'new source' => 'source',
+            'new canvas' => 'canvas',
 
             // Applications - Git-based
             'new public' => 'public',
@@ -1175,6 +1176,18 @@ class GlobalSearch extends Component
             ]);
         }
 
+        // Canvas - deploy resources visually; can be used if user has createAnyResource permission
+        if ($user->can('createAnyResource')) {
+            $items->push([
+                'name' => 'Canvas',
+                'description' => 'Deploy resources visually on the deploy canvas',
+                'quickcommand' => '(type: new canvas)',
+                'type' => 'canvas',
+                'category' => 'Quick Actions',
+                'route' => 'deploy-canvas',
+            ]);
+        }
+
         // === Applications Category ===
 
         if ($user->can('createAnyResource')) {
@@ -1352,6 +1365,13 @@ class GlobalSearch extends Component
 
         if (! $item) {
             return;
+        }
+
+        // If it has a route, it's a page-based quick action
+        if (isset($item['route'])) {
+            $this->dispatch('closeSearchModal');
+
+            return redirectRoute($this, $item['route']);
         }
 
         // If it has a component, it's a modal-based resource
