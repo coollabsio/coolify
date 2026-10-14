@@ -83,6 +83,9 @@ class Create extends Component
                 'is_system_wide' => $this->is_system_wide,
                 'team_id' => currentTeam()->id,
             ];
+            if ($this->is_system_wide) {
+                $this->authorize('makeSystemWide', GithubApp::class);
+            }
             $github_app = GithubApp::create($payload);
             if (session('from')) {
                 session(['from' => session('from') + ['source_id' => $github_app->id]]);
