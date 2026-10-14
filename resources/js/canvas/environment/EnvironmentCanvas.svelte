@@ -236,14 +236,14 @@
     const slot = desktop.matches && !floatingBar() && !('toolbarInline' in ds) && document.getElementById('page-toolbar-slot');
     bar.removeAttribute('style');
     if (floatingBar()) {
-      bar.className = 'fixed z-40 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-neutral-200 bg-white px-2 py-1.5 dark:border-white/[0.08] dark:bg-panel';
+      bar.className = 'fixed z-40 flex flex-wrap items-center justify-center gap-3 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 dark:border-white/[0.08] dark:bg-panel';
       bodyEl.append(bar);
       alignFloatingBar();
     } else if (slot) {
       bar.className = 'flex items-center gap-3 pl-3';
       slot.append(bar);
     } else {
-      bar.className = 'flex shrink-0 flex-wrap items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 dark:border-white/[0.08] dark:bg-panel';
+      bar.className = 'flex shrink-0 flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 dark:border-white/[0.08] dark:bg-panel';
       barSlot.append(bar);
       panelTop = '';
     }

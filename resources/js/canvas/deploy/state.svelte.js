@@ -103,7 +103,7 @@ export function dock(top) {
     const topbar = document.querySelector('.app-topbar');
     top.removeAttribute('style');
     if (desktop && topbar && document.documentElement.dataset.navStyle === 'floating') {
-      top.className = 'fixed z-40 flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-2 py-1.5 dark:border-white/[0.08] dark:bg-panel';
+      top.className = 'fixed z-40 flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 dark:border-white/[0.08] dark:bg-panel';
       root.append(top);
       const gap = 8;
       const head = topbar.getBoundingClientRect();
