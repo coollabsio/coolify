@@ -30,7 +30,7 @@ const CSS = `
   /* Rounded boxes on the backdrop: the top bar and the step list. */
   .cv-island { border: 1px solid var(--cv-line); border-radius: 8px; background: var(--cv-island); }
   .cv-root svg { width: 1rem; height: 1rem; flex: none; }
-  .cv-root button:not(.button) { font: inherit; }
+  .cv-root button:not(.button, [data-canvas-controls] button) { font: inherit; }
 
   /* Header island on small screens; on desktop the header docks into the app top bar. */
   .cv-top { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; }

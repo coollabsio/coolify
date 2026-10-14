@@ -388,9 +388,7 @@ class ContainerFilesystemService
      */
     public function buildS3UploadCommand(string $path, bool $isDir, string $url, array $headers): string
     {
-        $headerArgs = collect($headers)
-            ->map(fn (string $value, string $name) => '-H '.escapeshellarg("{$name}: {$value}"))
-            ->implode(' ');
+        $headerArgs = FileDownloadStorageService::curlHeaderArgs($headers);
         $script = 'tmp=$(mktemp /tmp/coolify-download-XXXXXXXXXX) || exit 1; '
             .'trap \'rm -f "$tmp"\' EXIT; '
             .$this->buildDownloadCommand($path, $isDir).' > "$tmp" && '

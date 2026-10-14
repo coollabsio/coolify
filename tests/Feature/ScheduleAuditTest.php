@@ -422,3 +422,27 @@ test('updating, toggling, and deleting a storage backup schedule record audit ev
         ->and($deleteEvent->metadata['storage_uuid'])->toBe($volume->uuid)
         ->and($backup->fresh())->toBeNull();
 });
+
+test('a request that reaches the danger section after the backup schedule is deleted does not render it', function () {
+    $database = createScheduleAuditPostgres($this->environment, $this->destination);
+    $backup = createScheduleAuditDatabaseBackup($this->team, $database);
+
+    Event::listen(RouteMatched::class, function (RouteMatched $event) use ($database): void {
+        $event->route->setParameter('project_uuid', $this->project->uuid);
+        $event->route->setParameter('environment_uuid', $this->environment->uuid);
+        $event->route->setParameter('database_uuid', $database->uuid);
+    });
+
+    Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+        'section' => 'danger',
+    ])
+        ->call('delete', 'password', ['delete_associated_backups_locally'])
+        ->assertRedirect()
+        ->call('refreshStatus')
+        ->assertOk();
+
+    expect($backup->fresh())->toBeNull()
+        ->and(scheduleAuditEvent('ui.database.backup_schedule_deleted')->metadata['backup_uuid'])->toBe($backup->uuid);
+});

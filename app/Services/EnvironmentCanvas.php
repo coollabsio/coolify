@@ -108,6 +108,8 @@ class EnvironmentCanvas
                 $servers->put($server->id, $server);
             }
             unset($node['servers']);
+            // Other canvases keep the arrangement saved on the environment canvas inside each environment group.
+            $node['saved'] = $this->filterPositions($resource->environment?->canvas_positions ?? [], [$resource->uuid])[$resource->uuid] ?? null;
 
             return $node;
         })->values();
@@ -157,19 +159,19 @@ class EnvironmentCanvas
         $project = $environment->project;
         $environment->setRelation('project', $project);
         $applications = $environment->applications()
-            ->with(['destination.server.settings', 'additional_servers.settings', 'persistentStorages'])
+            ->with(['destination.server.settings', 'additional_servers.settings'])
             ->get();
         $services = $environment->services()
             ->with([
                 'server.settings',
                 'destination.server.settings',
-                'applications.persistentStorages',
-                'databases.persistentStorages',
+                'applications',
+                'databases',
             ])
             ->get();
         $databases = collect(self::DATABASE_RELATIONS)
             ->flatMap(fn (string $relation) => $environment->{$relation}()
-                ->with(['destination.server.settings', 'persistentStorages'])
+                ->with(['destination.server.settings'])
                 ->get());
 
         return collect()
@@ -251,7 +253,6 @@ class EnvironmentCanvas
             'kind' => $buildPack,
             'subtitle' => $this->subtitle([self::BUILD_PACK_NAMES[$buildPack] ?? str($buildPack)->headline()->value(), $detail]),
             'children' => [],
-            'volumes' => $application->persistentStorages->pluck('name')->filter()->values()->all(),
             'link' => $application->link(),
             'logo' => resource_logo($application),
             'servers' => collect([$server])->concat($extraServers)->filter()->all(),
@@ -285,12 +286,6 @@ class EnvironmentCanvas
             'kind' => null,
             'subtitle' => $this->subtitle(['Service', $containerCount.' '.str('container')->plural($containerCount)]),
             'children' => $children->all(),
-            'volumes' => $service->applications->concat($service->databases)
-                ->flatMap(fn ($child) => $child->persistentStorages->pluck('name'))
-                ->filter()
-                ->unique()
-                ->values()
-                ->all(),
             'link' => $service->link(),
             'logo' => resource_logo($service),
             'servers' => collect([$server])->filter()->all(),
@@ -316,7 +311,6 @@ class EnvironmentCanvas
             'kind' => $engine,
             'subtitle' => $this->subtitle([self::DATABASE_ENGINE_NAMES[$engine] ?? str($engine)->headline()->value(), $database->image]),
             'children' => [],
-            'volumes' => $database->persistentStorages->pluck('name')->filter()->values()->all(),
             'link' => $database->link(),
             'logo' => resource_logo($database),
             'servers' => collect([$server])->filter()->all(),

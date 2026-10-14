@@ -10,9 +10,9 @@ use Livewire\Component;
 class DeploymentsIndicator extends Component
 {
     /**
-     * Where the indicator is rendered: 'sidebar' (desktop sidebar footer) or 'mobile' (mobile top bar).
+     * Where the indicator is rendered: 'topbar' (desktop top bar) or 'mobile' (mobile top bar).
      */
-    public string $variant = 'sidebar';
+    public string $variant = 'topbar';
 
     #[Computed]
     public function deployments()

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\S3Storage;
+use App\Models\Server;
 use App\Rules\SafeWebhookUrl;
 use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
@@ -154,6 +155,47 @@ class FileDownloadStorageService
     public function delete(S3Storage $storage, string $key): void
     {
         $storage->filesystem()->delete($key);
+    }
+
+    /**
+     * Size in bytes of a file on the server host (for example a backup), or
+     * null when the file does not exist.
+     */
+    public static function hostFileSize(Server $server, string $path): ?int
+    {
+        $size = trim((string) instant_remote_process([self::buildHostFileSizeCommand($path)], $server));
+
+        return ctype_digit($size) ? (int) $size : null;
+    }
+
+    public static function buildHostFileSizeCommand(string $path): string
+    {
+        validateShellSafePath($path, 'download path');
+        $escaped = escapeshellarg($path);
+
+        return 'sh -c '.escapeshellarg('if [ -f '.$escaped.' ]; then stat -L -c %s '.$escaped.'; fi');
+    }
+
+    /**
+     * PUT a file on the server host to a presigned S3 URL.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public static function buildHostFileUploadCommand(string $path, string $url, array $headers): string
+    {
+        validateShellSafePath($path, 'download path');
+
+        return 'sh -c '.escapeshellarg('curl -fsS --retry 2 '.self::curlHeaderArgs($headers).' -T '.escapeshellarg($path).' '.escapeshellarg($url));
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    public static function curlHeaderArgs(array $headers): string
+    {
+        return collect($headers)
+            ->map(fn (string $value, string $name) => '-H '.escapeshellarg("{$name}: {$value}"))
+            ->implode(' ');
     }
 
     public static function contentDisposition(string $name): string

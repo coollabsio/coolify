@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
 use App\Traits\ListensToTeamChannel;
+use App\Traits\PreparesBackupDownloads;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -13,6 +14,7 @@ class BackupExecutions extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use PreparesBackupDownloads;
 
     public ?ScheduledDatabaseBackup $backup = null;
 
@@ -126,9 +128,25 @@ class BackupExecutions extends Component
         return true;
     }
 
-    public function download_file($exeuctionId)
+    public function download_file($executionId): void
     {
-        return redirect()->route('download.backup', $exeuctionId);
+        try {
+            $this->authorize('manageBackups', $this->database);
+            $execution = $this->backup->executions()->whereKey($executionId)->first();
+            if (! $execution) {
+                $this->dispatch('error', 'Backup execution not found.');
+
+                return;
+            }
+
+            $this->prepareBackupDownload(
+                $execution->local_storage_deleted ? null : $this->server(),
+                $execution->filename,
+                route('download.backup', $execution->id),
+            );
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function refreshBackupExecutions(): void
@@ -223,6 +241,8 @@ class BackupExecutions extends Component
 
     public function render()
     {
-        return view('livewire.project.database.backup-executions');
+        return view('livewire.project.database.backup-executions', [
+            's3Downloads' => $this->s3BackupDownloadsEnabled(),
+        ]);
     }
 }

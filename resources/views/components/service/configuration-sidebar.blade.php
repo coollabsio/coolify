@@ -22,7 +22,7 @@
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
-        ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
+        ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->map(fn (array $item): array => [
             ...$item,
@@ -39,7 +39,9 @@
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
         'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
-        'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
+        'Operations' => ['Resource Operations', 'Tags'],
+        // Always last, after a divider and without a group header.
+        'Danger Zone' => ['Danger Zone'],
     ];
 
     $groupedItems = collect($menuGroups)
@@ -53,7 +55,7 @@
     $activeGroup = (string) $groupedItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start"
+<x-main-nav-menu :back-href="route('dashboard')" back-label="Dashboard" back-title="Back to the dashboard"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
         x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"
@@ -62,6 +64,7 @@
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
+            @unless ($groupLabel === 'Danger Zone')
             <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
                 :aria-expanded="isOpen(@js($groupLabel))">
                 <span>{{ $groupLabel }}</span>
@@ -71,20 +74,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
                 </svg>
             </button>
-            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
+            @endunless
+            <div @class(['contents', 'xl:block' => $groupLabel === 'Danger Zone']) @unless ($groupLabel === 'Danger Zone') :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'" @endunless>
                 @foreach ($groupItems as $menuItem)
                     <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                         @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                        @if ($menuItem['label'] === 'Files')
-                            x-data="{ loading: false }"
-                            @click="if (!$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) loading = true"
-                            x-on:livewire:navigated.window="loading = false"
-                        @endif
                         href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                         @if ($menuItem['label'] === 'Files')
-                            <span x-show="loading" x-cloak><x-loading compact /></span>
                             <x-beta-badge class="ml-auto shrink-0" />
                         @endif
                         @if ($menuItem['hasWarning'] ?? false)
@@ -95,4 +93,4 @@
             </div>
         @endforeach
     </nav>
-</aside>
+</x-main-nav-menu>

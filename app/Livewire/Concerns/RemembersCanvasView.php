@@ -13,7 +13,7 @@ use Livewire\Attributes\Renderless;
  */
 trait RemembersCanvasView
 {
-    private const array CANVAS_VIEW_PAGES = ['servers', 'server_resources', 'projects', 'project', 'environment', 'tags', 'team_variables', 'project_variables', 'environment_variables', 'server_variables'];
+    private const array CANVAS_VIEW_PAGES = ['servers', 'server_resources', 'projects', 'project', 'environment', 'tags', 'team_variables', 'project_variables', 'environment_variables', 'server_variables', 'dashboard', 'dashboard_projects', 'dashboard_servers'];
 
     private const array LIST_VIEWS = ['table', 'grid', 'list'];
 
@@ -60,9 +60,13 @@ trait RemembersCanvasView
      */
     protected function listView(string $page, string $default): string
     {
-        $view = request()->query('view') ?? request()->cookie($this->viewCookieName($page));
+        foreach ([request()->query('view'), request()->cookie($this->viewCookieName($page))] as $view) {
+            if (in_array($view, ['table', 'grid'], true)) {
+                return $view;
+            }
+        }
 
-        return in_array($view, ['table', 'grid'], true) ? $view : $default;
+        return $default;
     }
 
     private function viewCookieName(string $page): string

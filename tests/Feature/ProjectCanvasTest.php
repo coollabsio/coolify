@@ -73,9 +73,11 @@ test('the project canvas shows the resources of every environment, grouped by en
         ->assertOk()
         ->assertJsonPath('title', 'Shop')
         ->assertJsonPath('can_edit', true)
+        ->assertJsonPath('can_move', false)
         ->assertJsonPath('layout', 'server')
         ->assertJsonPath('links.0.id', $link->uuid)
-        ->assertJsonPath('positions', [$live->uuid => ['x' => 40, 'y' => 80]]);
+        // Auto-placed: a position saved on one environment canvas does not fit next to the other environments.
+        ->assertJsonPath('positions', []);
 
     expect(collect($response->json('zones'))->pluck('name')->all())->toBe(['web-server'])
         ->and(collect($response->json('nodes'))->mapWithKeys(fn ($node) => [$node['name'] => $node['context']])->sortKeys()->all())->toBe([

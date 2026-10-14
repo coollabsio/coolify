@@ -14,8 +14,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Uploads a file browser download from the managed server to the instance
- * download S3 storage and stores a presigned link for the FileBrowser to open.
+ * Uploads a download from the managed server to the instance download S3
+ * storage and stores a presigned link for the Livewire component to open.
+ * The source is a path in $container, or a file on the server host (for
+ * example a backup) when $container is null.
  */
 class PrepareFileDownloadJob implements ShouldQueue
 {
@@ -29,7 +31,7 @@ class PrepareFileDownloadJob implements ShouldQueue
         public string $downloadId,
         public int $userId,
         public int $serverId,
-        public string $container,
+        public ?string $container,
         public string $path,
         public bool $isDir,
         public string $downloadName,
@@ -55,12 +57,16 @@ class PrepareFileDownloadJob implements ShouldQueue
             DeleteFileDownloadJob::dispatch($storage->id, $key)->delay(now()->addHours(FileDownloadStorageService::OBJECT_TTL_HOURS));
 
             $upload = $downloads->uploadUrl($storage, $key, $this->downloadName);
-            (new ContainerFilesystemService($server, $this->container))->uploadToS3($this->path, $this->isDir, $upload['url'], $upload['headers']);
+            if ($this->container === null) {
+                instant_remote_process([FileDownloadStorageService::buildHostFileUploadCommand($this->path, $upload['url'], $upload['headers'])], $server, timeout: 3600);
+            } else {
+                (new ContainerFilesystemService($server, $this->container))->uploadToS3($this->path, $this->isDir, $upload['url'], $upload['headers']);
+            }
 
             $this->store(['status' => 'ready', 'url' => $downloads->downloadUrl($storage, $key)]);
         } catch (\Throwable $e) {
             // The message can contain the S3 endpoint or a presigned URL; keep it in the log only.
-            Log::warning('File browser S3 download failed', ['download_id' => $this->downloadId, 'error' => $e->getMessage()]);
+            Log::warning('S3 download failed', ['download_id' => $this->downloadId, 'error' => $e->getMessage()]);
             $this->store(['status' => 'failed', 'message' => 'Download failed. The file could not be uploaded to the download storage. Try again, or ask your administrator to check the storage settings.']);
         }
     }

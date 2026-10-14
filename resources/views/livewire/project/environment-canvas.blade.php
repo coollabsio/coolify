@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ $environment->name }} > Canvas | Coolify
     </x-slot>
-    <div data-environment-canvas data-title="Environment canvas" data-project="{{ $project->uuid }}" data-environment="{{ $environment->uuid }}"
+    <div data-environment-canvas data-project="{{ $project->uuid }}" data-environment="{{ $environment->uuid }}"
         data-team="{{ $project->team_id }}" data-user="{{ auth()->id() }}"
         data-new="{{ auth()->user()->can('createAnyResource') ? route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) : '' }}"
         class="relative h-full" wire:ignore>

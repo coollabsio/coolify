@@ -11,7 +11,7 @@
 
             <div class="min-w-0">
                 <livewire:project.shared.storages.volume-backups :storage="$backup->backupable"
-                    :resource="$application" :section="$section"
+                    :resource="$application" :section="$section" :actions-in-header="true"
                     wire:key="volume-backup-{{ $backup->uuid }}-{{ $section }}" />
             </div>
         </div>

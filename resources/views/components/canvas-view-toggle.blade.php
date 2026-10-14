@@ -1,51 +1,49 @@
-@props(['listUrl', 'canvasUrl', 'onCanvas' => false, 'views' => null])
+@props(['listUrl' => null, 'canvasUrl' => null, 'onCanvas' => false, 'views' => null])
 @php
-    $item = 'flex size-7.5 items-center justify-center rounded-md transition-colors';
-    $idle = 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
+    $idle = 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg dark:hover:bg-white/[0.06] dark:hover:text-fg';
     $canvasItem = 'relative flex h-7.5 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors';
     $views ??= ['table' => ['Table view', 'unordered-list'], 'grid' => ['Grid view', 'grid']];
-    // One list view (no table / grid choice): the list page shows it selected.
+    // One list view (no table / grid choice): nothing to switch to on the list page.
     $singleList = count($views) === 1;
 @endphp
 {{-- Table / grid / canvas switcher. On the list page, table and grid switch the
-     parent's Alpine viewMode; on the canvas page they link back to the list
+     parent's Alpine viewMode; the canvas page shows one "List view" link back
      (?view= makes the list the remembered view again, see RemembersCanvasView).
-     Pages with one list view pass :views="['list' => [...]]". --}}
+     Pages with one list view pass :views="['list' => [...]]". Without a
+     canvasUrl it is only a table / grid switcher. --}}
+@if ($onCanvas || ! $singleList || filled($canvasUrl))
 <div {{ $attributes->merge(['class' => 'view-toggle']) }}>
-    @foreach ($views as $mode => [$label, $icon])
-        @if ($onCanvas)
-            <a href="{{ $listUrl }}?view={{ $mode }}" {{ wireNavigate() }} class="{{ $item }} {{ $idle }}"
-                aria-label="{{ $label }}" title="{{ $label }}">
-                <x-reicon :name="$icon" class="size-3.5" />
-            </a>
-        @elseif ($singleList)
-            <span class="{{ $item }} control-selected" aria-current="page" aria-label="{{ $label }}"
-                title="{{ $label }}">
-                <x-reicon :name="$icon" class="size-3.5" />
-            </span>
-        @else
-            <button type="button" x-on:click="setViewMode(@js($mode))" class="{{ $item }}"
-                :class="viewMode === @js($mode) ? 'control-selected' : @js($idle)"
-                aria-label="{{ $label }}" title="{{ $label }}">
-                <x-reicon :name="$icon" class="size-3.5" />
-            </button>
-        @endif
-    @endforeach
     @if ($onCanvas)
-        <span class="{{ $canvasItem }} control-selected" aria-current="page" title="Canvas view (beta)">
-            <x-reicon name="deploy-canvas" class="size-3.5" />
-            Canvas
-        </span>
-    @else
-        {{-- A label and a purple "Try it" badge, so people notice the canvas view. --}}
-        <a href="{{ $canvasUrl }}" {{ wireNavigate() }}
-            class="{{ $canvasItem }} {{ $idle }}" title="Canvas view (beta): see everything and how it connects">
-            <x-reicon name="deploy-canvas" class="size-3.5" />
-            Canvas
-            <span
-                class="ml-0.5 inline-flex items-center rounded-full bg-coollabs px-1.5 py-px text-[10px] leading-4 font-semibold text-white">
-                Try it
-            </span>
+        {{-- On the canvas only the way back: one labelled link to the list (its first view). --}}
+        @php [$label, $icon] = reset($views); @endphp
+        <a href="{{ $listUrl }}?view={{ array_key_first($views) }}" {{ wireNavigate() }} class="{{ $canvasItem }} {{ $idle }}"
+            title="List view">
+            <x-reicon :name="$icon" class="size-3.5" />
+            List view
         </a>
+    @else
+        {{-- Only the views you can switch to, with their names; the current one is not shown. --}}
+        @unless ($singleList)
+            @foreach ($views as $mode => [$label, $icon])
+                <button type="button" x-on:click="setViewMode(@js($mode))" x-show="viewMode !== @js($mode)" x-cloak
+                    class="{{ $canvasItem }} {{ $idle }}" title="{{ $label }}">
+                    <x-reicon :name="$icon" class="size-3.5" />
+                    {{ $label }}
+                </button>
+            @endforeach
+        @endunless
+        @if (filled($canvasUrl))
+            {{-- A label and a purple "Try it" badge, so people notice the canvas view. --}}
+            <a href="{{ $canvasUrl }}" {{ wireNavigate() }}
+                class="{{ $canvasItem }} {{ $idle }}" title="Canvas view (beta): see everything and how it connects">
+                <x-reicon name="deploy-canvas" class="size-3.5" />
+                Canvas
+                <span
+                    class="ml-0.5 inline-flex items-center rounded-full bg-coollabs px-1.5 py-px text-[10px] leading-4 font-semibold text-white">
+                    Try it
+                </span>
+            </a>
+        @endif
     @endif
 </div>
+@endif

@@ -2,7 +2,8 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Jobs\DatabaseBackupJob;
+use App\Livewire\Concerns\ManagesDatabaseBackup;
+use App\Livewire\Project\Database\Backup\Execution;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
@@ -21,10 +22,14 @@ class BackupEdit extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use ManagesDatabaseBackup;
 
     public ScheduledDatabaseBackup $backup;
 
     public string $section = 'general';
+
+    /** The page shows the backup actions in the top header bar instead. */
+    public bool $actionsInHeader = false;
 
     #[Locked]
     public $availableS3Storages;
@@ -96,7 +101,10 @@ class BackupEdit extends Component
     public function getListeners(): array
     {
         // Keep "Backup Now" in sync when the database starts/stops without a full page refresh.
-        $listeners = ['databaseUpdated' => 'refreshStatus'];
+        $listeners = [
+            'databaseUpdated' => 'refreshStatus',
+            'backupEnabledChanged' => 'syncBackupEnabled',
+        ];
 
         $user = Auth::user();
         if (! $user) {
@@ -124,6 +132,15 @@ class BackupEdit extends Component
             $this->refreshStatus();
         } catch (Exception $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function hydrate(): void
+    {
+        // Livewire restores a deleted backup as an empty model. Requests that arrive after the delete
+        // (for example status events before the redirect completes) must not render it.
+        if (! $this->backup->exists) {
+            $this->skipRender();
         }
     }
 
@@ -268,50 +285,9 @@ class BackupEdit extends Component
     public function backupNow()
     {
         try {
-            $this->authorize('manageBackups', $this->backup->database);
+            $this->status = $this->backup->database->refresh()->status;
 
-            $database = $this->backup->database->refresh();
-            $this->status = $database->status;
-            if ($database->id !== 0 && ! str($database->status)->startsWith('running')) {
-                $this->dispatch('error', 'The database must be running to start a backup.');
-
-                return;
-            }
-
-            DatabaseBackupJob::dispatch($this->backup);
-            $database = $this->backup->database;
-            auditLog('ui.database.backup_started', [
-                'team_id' => $database->team()?->id,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'backup_uuid' => $this->backup->uuid,
-            ]);
-            $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
-
-            if ($database instanceof ServiceDatabase) {
-                return redirect()->route('project.service.database.backup.executions', [
-                    'project_uuid' => $database->service->project()->uuid,
-                    'environment_uuid' => $database->service->environment->uuid,
-                    'service_uuid' => $database->service->uuid,
-                    'stack_service_uuid' => $database->uuid,
-                    'backup_uuid' => $this->backup->uuid,
-                ]);
-            }
-
-            // Instance databases (e.g. coolify-db) have no project/environment.
-            // Stay on the current page (settings.backup) instead of redirecting.
-            $project = $database->project();
-            $environment = $database->environment;
-            if (! $project || ! $environment) {
-                return null;
-            }
-
-            return redirect()->route('project.database.backup.executions', [
-                'project_uuid' => $project->uuid,
-                'environment_uuid' => $environment->uuid,
-                'database_uuid' => $database->uuid,
-                'backup_uuid' => $this->backup->uuid,
-            ]);
+            return $this->queueDatabaseBackup($this->backup);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -332,17 +308,16 @@ class BackupEdit extends Component
     public function toggleEnabled(): void
     {
         try {
-            $this->authorize('manageBackups', $this->backup->database);
-
-            $this->backupEnabled = ! $this->backupEnabled;
-            $this->backup->enabled = $this->backupEnabled;
-            $changedFields = auditChangedFields($this->backup);
-            $this->backup->save();
-            $this->auditBackupScheduleUpdated($changedFields);
-            $this->dispatch('success', $this->backupEnabled ? 'Backup enabled.' : 'Backup disabled.');
+            $this->backupEnabled = $this->toggleDatabaseBackup($this->backup);
+            $this->dispatch('backupEnabledChanged')->to(Execution::class);
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
+    }
+
+    public function syncBackupEnabled(): void
+    {
+        $this->backupEnabled = $this->backup->refresh()->enabled;
     }
 
     public function updatedS3StorageIds(): void

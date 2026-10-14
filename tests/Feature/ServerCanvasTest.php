@@ -110,27 +110,27 @@ test('one server canvas shows only that server, and links that leave it are hidd
         ->assertJsonPath('links', []);
 });
 
-test('the server canvas uses the card positions saved on the environment canvas', function () {
+test('the server canvas sends the card positions saved on the environment canvas with each card', function () {
     $app = serverCanvasApp($this->environment, $this->web, 'storefront');
-    $api = serverCanvasApp($this->environment, $this->db, 'orders-api');
-    $this->environment->forceFill(['canvas_positions' => [
-        $app->uuid => ['x' => 120, 'y' => 40],
-        $api->uuid => ['x' => 480, 'y' => 40],
-        'deleted-resource' => ['x' => 0, 'y' => 0],
-    ]])->save();
+    $other = serverCanvasApp($this->environment, $this->web, 'checkout');
+    $this->environment->forceFill(['canvas_positions' => [$app->uuid => ['x' => 120, 'y' => 40]]])->save();
 
-    serverCanvasSession($this, $this->admin, $this->team)
+    $nodes = collect(serverCanvasSession($this, $this->admin, $this->team)
         ->getJson('/canvas/api/servers/canvas')
         ->assertOk()
-        ->assertJsonPath('positions', [
-            $app->uuid => ['x' => 120, 'y' => 40],
-            $api->uuid => ['x' => 480, 'y' => 40],
-        ]);
+        ->assertJsonPath('can_edit', true)
+        ->assertJsonPath('can_move', false)
+        ->assertJsonPath('positions', [])
+        ->json('nodes'))->keyBy('id');
+
+    expect($nodes[$app->uuid]['saved'])->toBe(['x' => 120, 'y' => 40])
+        ->and($nodes[$other->uuid]['saved'])->toBeNull();
 
     serverCanvasSession($this, $this->admin, $this->team)
         ->getJson("/canvas/api/servers/{$this->web->uuid}/canvas")
         ->assertOk()
-        ->assertJsonPath('positions', [$app->uuid => ['x' => 120, 'y' => 40]]);
+        ->assertJsonPath('can_move', false)
+        ->assertJsonPath('positions', []);
 });
 
 test('members see the server canvas without server IPs and cannot edit it', function () {
@@ -322,4 +322,59 @@ test('only the one server canvas points to the unmanaged containers of its serve
         ->assertOk()->assertExactJson(['nodes' => []]);
     serverCanvasSession($this, $this->admin, $this->team)->getJson("/canvas/api/servers/{$foreign->uuid}/canvas/containers")
         ->assertNotFound();
+});
+
+test('server zones show host facts, the proxy and a usage endpoint only when metrics can be read', function () {
+    $this->web->forceFill([
+        'server_metadata' => ['os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 4, 'memory_bytes' => 8589934592, 'uptime_since' => '2026-10-01 10:00:00'],
+        'proxy' => ['type' => 'TRAEFIK', 'status' => 'running'],
+    ])->save();
+    $this->web->settings->forceFill(['is_reachable' => true, 'is_metrics_enabled' => true])->saveQuietly();
+    $this->db->settings->forceFill(['is_reachable' => true, 'is_metrics_enabled' => false])->saveQuietly();
+    $this->db->forceFill(['proxy' => ['type' => 'NONE']])->save();
+
+    $zones = collect(serverCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/servers/canvas')
+        ->assertOk()
+        ->json('zones'))->keyBy('name');
+
+    expect($zones['web-server']['details'])->toBe([
+        'os' => 'Ubuntu 24.04',
+        'arch' => 'x86_64',
+        'cpus' => 4,
+        'memory_bytes' => 8589934592,
+        'uptime_since' => '2026-10-01 10:00:00',
+        'proxy' => ['type' => 'TRAEFIK', 'status' => 'running'],
+        'usage_endpoint' => "/servers/{$this->web->uuid}/canvas/usage",
+    ])
+        ->and($zones['db-server']['details']['proxy'])->toBeNull()
+        ->and($zones['db-server']['details']['usage_endpoint'])->toBeNull();
+});
+
+test('the usage endpoint returns the latest Sentinel values and never another team server', function () {
+    $server = Mockery::mock($this->web)->makePartial();
+    $server->shouldReceive('getCpuMetrics')->andReturn([[1, 10.0], [2, 12.34]]);
+    $server->shouldReceive('getMemoryMetrics')->andReturn([[2, 40.0]]);
+    $server->shouldReceive('getDiskMetrics')->andThrow(new RuntimeException('no disk data'));
+
+    expect(app(ServerCanvas::class)->usage($server))->toBe(['cpu' => 12.3, 'memory' => 40.0, 'disk' => null]);
+
+    $this->web->settings->forceFill(['is_metrics_enabled' => false])->saveQuietly();
+    serverCanvasSession($this, $this->admin, $this->team)->getJson("/canvas/api/servers/{$this->web->uuid}/canvas/usage")
+        ->assertOk()->assertExactJson(['cpu' => null, 'memory' => null, 'disk' => null]);
+
+    $otherTeam = Team::factory()->create(['show_boarding' => false]);
+    $foreign = Server::factory()->create(['team_id' => $otherTeam->id]);
+    serverCanvasSession($this, $this->admin, $this->team)->getJson("/canvas/api/servers/{$foreign->uuid}/canvas/usage")
+        ->assertNotFound();
+});
+
+test('only admins may move the environment groups on the server canvas', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+
+    serverCanvasSession($this, $this->admin, $this->team)->getJson('/canvas/api/servers/canvas')
+        ->assertJsonPath('can_move_groups', true);
+    serverCanvasSession($this, $member, $this->team)->getJson('/canvas/api/servers/canvas')
+        ->assertJsonPath('can_move_groups', false);
 });

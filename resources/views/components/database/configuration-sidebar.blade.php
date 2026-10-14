@@ -23,7 +23,7 @@
         ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
         ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
-        ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'shield-alert'],
+        ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->map(fn (array $item): array => [
             ...$item,
@@ -37,7 +37,9 @@
         'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics'],
         'Deploy' => ['Servers'],
         'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
-        'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone'],
+        'Operations' => ['Resource Operations', 'Resource Limits', 'Tags'],
+        // Always last, after a divider and without a group header.
+        'Danger Zone' => ['Danger Zone'],
     ];
 
     $groupedItems = collect($menuGroups)
@@ -64,15 +66,36 @@
         : [];
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start"
+@php
+    // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
+    request()->attributes->set('mainNavContext', [
+        'label' => 'Dashboard',
+        'backHref' => route('dashboard'),
+        'backTitle' => 'Back to the dashboard',
+    ]);
+@endphp
+
+{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up). --}}
+@foreach (['page', 'main-nav'] as $placement)
+@if ($placement === 'main-nav')
+@teleport('#main-nav-context')
+<div class="nav-context-menu">
+@else
+<aside class="application-settings-navigation in-main-nav min-w-0 xl:self-start"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $databaseRouteParameters, ['project.database.configuration' => $pageSections])) }}">
+@endif
     <nav aria-label="Database settings"
         x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.database' })"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        @class([
+            'grid gap-0.5',
+            'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
+            'grid-cols-1' => $placement === 'main-nav',
+        ])>
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
+            @unless ($groupLabel === 'Danger Zone')
             <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
                 :aria-expanded="isOpen(@js($groupLabel))">
                 <span>{{ $groupLabel }}</span>
@@ -82,20 +105,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
                 </svg>
             </button>
-            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
+            @endunless
+            <div @class(['contents', 'xl:block' => $groupLabel === 'Danger Zone']) @unless ($groupLabel === 'Danger Zone') :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'" @endunless>
             @foreach ($groupItems as $menuItem)
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                    @if ($menuItem['label'] === 'Files')
-                        x-data="{ loading: false }"
-                        @click="if (!$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) loading = true"
-                        x-on:livewire:navigated.window="loading = false"
-                    @endif
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     @if ($menuItem['label'] === 'Files')
-                        <span x-show="loading" x-cloak><x-loading compact /></span>
                         <x-beta-badge class="ml-auto shrink-0" />
                     @endif
                 </a>
@@ -121,4 +139,10 @@
             </div>
         @endforeach
     </nav>
+@if ($placement === 'main-nav')
+</div>
+@endteleport
+@else
 </aside>
+@endif
+@endforeach

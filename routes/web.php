@@ -26,6 +26,7 @@ use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Dashboard\Canvas as DashboardCanvas;
 use App\Livewire\DeployCanvas;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
@@ -192,6 +193,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
     Route::get('/analytics', Analytics::class)->name('analytics');
     Route::get('/metrics', FleetMetrics::class)->name('metrics');
     Route::get('/canvas', DeployCanvas::class)->name('deploy-canvas');
@@ -220,8 +222,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/shared-variables/{scope}/{uuid}/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
         Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
         Route::get('/servers/canvas', [ServerCanvasController::class, 'index'])->middleware(['api.ability:read']);
+        Route::get('/dashboard/canvas', [ServerCanvasController::class, 'dashboard'])->middleware(['api.ability:read']);
         Route::get('/servers/{uuid}/canvas', [ServerCanvasController::class, 'show'])->middleware(['api.ability:read']);
         Route::get('/servers/{uuid}/canvas/containers', [ServerCanvasController::class, 'containers'])->middleware(['api.ability:read']);
+        Route::get('/servers/{uuid}/canvas/usage', [ServerCanvasController::class, 'usage'])->middleware(['api.ability:read']);
         Route::get('/servers/{server_uuid}/destinations', [DestinationsController::class, 'index_by_server'])->middleware(['api.ability:read']);
         Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
         Route::get('/github-apps/{github_app_id}/repositories', [GithubController::class, 'load_repositories'])->middleware(['api.ability:read']);
@@ -387,8 +391,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
         Route::get('/backups', ApplicationBackupIndex::class)->name('project.application.backup.index');
         Route::get('/backups/{backup_uuid}', ApplicationBackupShow::class)->name('project.application.backup.show');
-        Route::get('/backups/{backup_uuid}/s3', ApplicationBackupShow::class)->name('project.application.backup.s3');
-        Route::get('/backups/{backup_uuid}/retention', ApplicationBackupShow::class)->name('project.application.backup.retention');
+        // S3 and retention settings moved into the general page; keep old links working.
+        Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}/backups/{backup_uuid}');
+        Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}/backups/{backup_uuid}');
         Route::get('/backups/{backup_uuid}/executions', ApplicationBackupShow::class)->name('project.application.backup.executions');
         Route::get('/backups/{backup_uuid}/danger', ApplicationBackupShow::class)->name('project.application.backup.danger');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
@@ -410,7 +415,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
         Route::get('/files', FileBrowser::class)->name('project.application.files')->middleware('can.access.terminal');
-        Route::get('/tasks/{task_uuid}', ApplicationConfiguration::class)->name('project.application.scheduled-tasks');
+        // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
+        Route::get('/tasks/{task_uuid}', fn () => redirect()->route('project.application.scheduled-tasks.show', get_route_parameters()))->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
@@ -431,8 +437,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/files', FileBrowser::class)->name('project.database.files')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
-        Route::get('/backups/{backup_uuid}/s3', DatabaseBackupExecution::class)->name('project.database.backup.s3');
-        Route::get('/backups/{backup_uuid}/retention', DatabaseBackupExecution::class)->name('project.database.backup.retention');
+        // S3 and retention settings moved into the general page; keep old links working.
+        Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
+        Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
         Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
         Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
     });
@@ -447,8 +454,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/import-backup/{stack_service_uuid}', ServiceImportBackup::class)->name('project.service.import-backup.database')->middleware('can.update.resource');
         Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
         Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
-        Route::get('/storage-backups/{backup_uuid}/s3', Show::class)->name('project.service.volume-backups.s3');
-        Route::get('/storage-backups/{backup_uuid}/retention', Show::class)->name('project.service.volume-backups.retention');
+        // S3 and retention settings moved into the general page; keep old links working.
+        Route::redirect('/storage-backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups/{backup_uuid}');
+        Route::redirect('/storage-backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups/{backup_uuid}');
         Route::get('/storage-backups/{backup_uuid}/executions', Show::class)->name('project.service.volume-backups.executions');
         Route::get('/storage-backups/{backup_uuid}/danger', Show::class)->name('project.service.volume-backups.danger');
         Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
@@ -460,14 +468,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/files', FileBrowser::class)->name('project.service.files')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}', ServiceDatabaseBackups::class)->name('project.service.database.backup.show');
-        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/s3', ServiceDatabaseBackups::class)->name('project.service.database.backup.s3');
-        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/retention', ServiceDatabaseBackups::class)->name('project.service.database.backup.retention');
+        Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
+        Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
         Route::get('/{stack_service_uuid}/import', ServiceImportBackup::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
-        Route::get('/tasks/{task_uuid}', ServiceConfiguration::class)->name('project.service.scheduled-tasks');
+        // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
+        Route::get('/tasks/{task_uuid}', fn () => redirect()->route('project.service.scheduled-tasks.show', get_route_parameters()))->name('project.service.scheduled-tasks');
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
@@ -570,15 +579,29 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
-            } else {
-                $server = $execution->scheduledDatabaseBackup->database->destination->server;
+            if (! $execution->local_storage_deleted && filled($filename)) {
+                if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
+                    $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                } else {
+                    $server = $execution->scheduledDatabaseBackup->database->destination->server;
+                }
+
+                try {
+                    return streamBackupFromServer($server, $filename, 'application/octet-stream');
+                } catch (FileNotFoundException) {
+                    // Fall back to an S3 copy.
+                }
             }
 
-            return streamBackupFromServer($server, $filename, 'application/octet-stream');
-        } catch (FileNotFoundException) {
-            if (isset($execution) && $execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
+            // Only storages of the team that owns the database can serve the copy.
+            $s3DownloadUrl = is_null($execution_team_id)
+                ? null
+                : $execution->s3DownloadUrl($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
+            if ($s3DownloadUrl) {
+                return redirect()->away($s3DownloadUrl);
+            }
+
+            if ($execution->scheduledDatabaseBackup->disable_local_backup && $execution->scheduledDatabaseBackup->save_s3) {
                 return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
             }
 
@@ -605,17 +628,29 @@ Route::middleware(['auth'])->group(function () {
             if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
                 return response()->json(['message' => 'Permission denied.'], 403);
             }
-            if ($execution->local_storage_deleted || blank($execution->filename)) {
+            if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);
             }
 
-            $server = $execution->scheduledVolumeBackup->server();
-            if (! $server) {
+            $server = $execution->local_storage_deleted ? null : $execution->scheduledVolumeBackup->server();
+            if ($server) {
+                try {
+                    return streamBackupFromServer($server, $execution->filename, 'application/gzip');
+                } catch (FileNotFoundException) {
+                    // Fall back to an S3 copy.
+                }
+            }
+
+            // Only storages of the team that owns the backup can serve the copy.
+            $s3DownloadUrl = $execution->s3DownloadUrl($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
+            if ($s3DownloadUrl) {
+                return redirect()->away($s3DownloadUrl);
+            }
+
+            if (! $execution->local_storage_deleted && ! $server) {
                 return response()->json(['message' => 'Server not found.'], 404);
             }
 
-            return streamBackupFromServer($server, $execution->filename, 'application/gzip');
-        } catch (FileNotFoundException) {
             return response()->json(['message' => 'Backup not found locally on the server.'], 404);
         } catch (Throwable) {
             return response()->json(['message' => 'Failed to download backup.'], 500);

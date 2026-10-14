@@ -133,9 +133,9 @@ describe('GET canvas', function () {
                 'kind' => 'nixpacks',
                 'subtitle' => 'Nixpacks · main',
                 'children' => [],
-                'volumes' => ['web-data'],
                 'link' => $application->link(),
                 'logo' => ['src' => resource_logo_url('public-repo'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => 'https://web.example.com/favicon.ico'],
+                'saved' => ['x' => 10, 'y' => -20],
             ])
             ->and($nodes[$service->uuid])->toEqual([
                 'id' => $service->uuid,
@@ -151,9 +151,9 @@ describe('GET canvas', function () {
                     ['name' => 'ghost', 'type' => 'application', 'status' => 'running:healthy'],
                     ['name' => 'mysql', 'type' => 'database', 'status' => 'running:healthy'],
                 ],
-                'volumes' => [],
                 'link' => $service->link(),
                 'logo' => null,
+                'saved' => null,
             ])
             ->and($nodes[$database->uuid])->toMatchArray([
                 'type' => 'database',
@@ -162,8 +162,8 @@ describe('GET canvas', function () {
                 'urls' => [],
                 'kind' => 'postgresql',
                 'subtitle' => 'PostgreSQL · postgres:17-alpine',
-                'volumes' => ["postgres-data-{$database->uuid}"],
                 'logo' => ['src' => resource_logo_url('postgres'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null],
+                'saved' => null,
             ])
             ->and($response->getContent())->not->toContain('canvas-secret-password');
     });

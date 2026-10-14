@@ -68,8 +68,8 @@ export function leave() {
 
 // ── Actions ────────────────────────────────────────────────────────────
 
-/** use:pan on the viewport: wheel and pinch zoom, drag to pan. zoomLabel() is the zoom button. */
-export function pan(viewport, zoomLabel) {
+/** use:pan on the viewport: wheel and pinch zoom, drag to pan. */
+export function pan(viewport) {
   const world = viewport.querySelector('.cv-world');
   const edges = viewport.querySelector('.cv-edges');
   els.viewport = viewport;
@@ -79,8 +79,7 @@ export function pan(viewport, zoomLabel) {
     root: els.root,
     viewport,
     world,
-    // The button can sit in the app top bar (see dock), so it is looked up on each write.
-    zoomLabel: { set textContent(text) { const label = zoomLabel(); if (label) label.textContent = text; } },
+    zoomLabel: {}, // CanvasControls shows cv.view.z
     getView: () => cv.view,
     onChange: closeDropdown,
     canPan: e => [viewport, world, edges].includes(e.target),

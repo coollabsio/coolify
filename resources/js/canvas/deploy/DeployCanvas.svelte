@@ -7,11 +7,11 @@
   import Node from './Node.svelte';
   import PaletteItem from './PaletteItem.svelte';
   import RunPanel from './RunPanel.svelte';
+  import CanvasControls from '../CanvasControls.svelte';
   import { closeMenu, cv, dock, els, fit, hideResult, leave, pan, pickNext, PORT_Y, resetCanvas } from './state.svelte.js';
 
   // The deploy canvas: header, step palette, and the canvas with the step
   // cards. The state lives in state.svelte.js (init() runs before the mount).
-  let zoomLabel = $state();
   // Theme: same as Coolify (html.dark).
   let dark = $state(document.documentElement.classList.contains('dark'));
   // Palette: full or icons only ('coolify-canvas:collapsed').
@@ -77,18 +77,9 @@
         <!-- Opened from an environment's New resource page: back to that environment. -->
         <a class="cv-back button px-2!" href="/project/{cv.target.project}/environment/{cv.target.environment}" title="Back to the environment" aria-label="Back to the environment"><Icon name="back" cls="size-4" /></a>
       {/if}
-      <b class="shrink-0 text-[14px] font-semibold text-black dark:text-fg">Deploy canvas</b>
       <span class="shrink-0 rounded-full border border-coollabs/30 bg-coollabs/10 px-2 py-0.5 text-xs font-medium text-coollabs dark:border-warning/30 dark:bg-warning/15 dark:text-warning">Beta</span>
     </div>
     <div class="flex shrink-0 items-center gap-2">
-      <!-- Zoom controls, as on the environment canvas header. -->
-      <div class="flex items-center">
-        <button type="button" class="button px-2! rounded-r-none!" title="Zoom out" aria-label="Zoom out" onclick={() => els.pz.zoomTo(cv.view.z / 1.2)}><Icon name={ICONS.minus} cls="size-4" /></button>
-        <!-- Its text is the zoom level, written by panZoom. -->
-        <button bind:this={zoomLabel} type="button" class="button rounded-none! border-x-0! w-14 tabular-nums" title="Reset zoom to 100%" onclick={() => els.pz.zoomTo(1)}>100%</button>
-        <button type="button" class="button px-2! rounded-l-none!" title="Zoom in" aria-label="Zoom in" onclick={() => els.pz.zoomTo(cv.view.z * 1.2)}><Icon name={ICONS.plus} cls="size-4" /></button>
-      </div>
-      <button type="button" class="button px-2!" title="Fit to screen" aria-label="Fit to screen" onclick={fit}><Icon name={ICONS.fit} cls="size-4" />Fit</button>
       <button type="button" class="button" title="Start again with an empty canvas" onclick={askReset}>Reset</button>
     </div>
   </div>
@@ -115,7 +106,7 @@
   </aside>
 
   <section class="cv-island cv-stage">
-    <div class="cv-viewport" use:pan={() => zoomLabel}>
+    <div class="cv-viewport" use:pan>
       <div class="cv-world">
         <Edges />
         {#each cv.flow.nodes as n (n.id)}
@@ -143,6 +134,7 @@
         {/if}
       </div>
     </div>
+    <CanvasControls zoom={cv.view.z} onzoom={z => els.pz.zoomTo(z)} onfit={fit} />
     <RunPanel />
     {#if cv.menu}
       <div class="cv-menu" style:left="{cv.menu.left}px" style:top="{cv.menu.top}px">

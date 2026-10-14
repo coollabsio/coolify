@@ -3,7 +3,7 @@
 //
 // DOM-free: `node --test` imports this file.
 
-import { apart, BOX_GAP, MAX_ZOOM, MIN_ZOOM } from './canvas-core.js';
+import { apart, BOX_GAP, freeSpot, MAX_ZOOM, MIN_ZOOM } from './canvas-core.js';
 
 export const CARD_WIDTH = 260;
 export const COLUMN_GAP = 48;
@@ -11,8 +11,8 @@ export const ROW_GAP = 24;
 export const ZONE_GAP = 72;
 export const ZONE_PADDING = 24;
 export const ZONE_HEADER = 40;
+export const SERVER_ZONE_HEADER = 68; // server canvas: a second header row with host facts, proxy and usage
 export const MAX_CHILDREN = 5;
-export const MAX_VOLUMES = 3;
 export const MAX_ROWS = 6; // auto placement wraps a type into another column after this many cards
 export const NO_SERVER = 'No server';
 export const DOUBLE_CLICK_MS = 400;
@@ -25,6 +25,8 @@ export const isSource = node => node?.type === 'variable' || node?.type === 'tag
 const columnOf = node => COLUMNS[node?.type] ?? 0;
 const columnLeft = (originX, column) => originX + column * (CARD_WIDTH + COLUMN_GAP);
 const isPoint = p => !!p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y));
+/** Header height of a zone frame: server canvas zones show a second row of server details. */
+export const zoneHeader = zone => (zone?.details ? SERVER_ZONE_HEADER : ZONE_HEADER);
 const storedPositions = graph => (graph?.positions && !Array.isArray(graph.positions) ? graph.positions : {});
 
 // ── Pure helpers (tested) ─────────────────────────────────────────────
@@ -33,7 +35,7 @@ const storedPositions = graph => (graph?.positions && !Array.isArray(graph.posit
 export function estimateNodeHeight(node) {
   let height = 58; // padding + icon/name row
   if (node?.urls?.length) height += 20;
-  if (node?.extra_zones?.length || node?.volumes?.length) height += 28;
+  if (node?.extra_zones?.length) height += 28;
   const children = node?.children?.length || 0;
   if (children) height += 12 + Math.min(children, MAX_CHILDREN) * 20 + (children > MAX_CHILDREN ? 20 : 0);
   return height;
@@ -132,11 +134,26 @@ const contextGroups = nodes => {
 const byTypeAndName = (a, b) => columnOf(a) - columnOf(b) || String(a.name).localeCompare(String(b.name));
 
 /**
- * Card positions inside one group, from (0, 0). Linked cards form chains from
- * left to right (source before target, one column per step); every chain gets
- * its own rows. Cards without links follow in a grid of SINGLE_COLUMNS.
+ * Card positions inside one group, from (0, 0). Cards with a position saved on their environment
+ * canvas (node.saved) keep that arrangement; the other cards follow below them. Otherwise linked
+ * cards form chains from left to right (source before target, one column per step); every chain
+ * gets its own rows. Cards without links follow in a grid of SINGLE_COLUMNS.
  */
 export function layoutBlock(nodes, links = []) {
+  const saved = nodes.filter(n => isPoint(n.saved));
+  if (saved.length) {
+    const left = Math.min(...saved.map(n => Number(n.saved.x)));
+    const top = Math.min(...saved.map(n => Number(n.saved.y)));
+    const out = {};
+    for (const n of saved) out[n.id] = { x: Number(n.saved.x) - left, y: Number(n.saved.y) - top };
+    const width = Math.max(...saved.map(n => out[n.id].x)) + CARD_WIDTH;
+    const bottom = Math.max(...saved.map(n => out[n.id].y + estimateNodeHeight(n)));
+    const rest = nodes.filter(n => !out[n.id]);
+    if (!rest.length) return { positions: out, width, height: bottom };
+    const below = layoutBlock(rest, links);
+    for (const [id, p] of Object.entries(below.positions)) out[id] = { x: p.x, y: bottom + ROW_GAP + p.y };
+    return { positions: out, width: Math.max(width, below.width), height: bottom + ROW_GAP + below.height };
+  }
   const ids = new Set(nodes.map(n => n.id));
   const inside = links.filter(l => ids.has(l.source) && ids.has(l.target) && l.source !== l.target);
   const parent = new Map(nodes.map(n => [n.id, n.id]));
@@ -200,70 +217,70 @@ export function layoutBlock(nodes, links = []) {
   return { positions: out, width: columns * step - COLUMN_GAP, height: bottom };
 }
 
-/**
- * A project / environment group with cards saved on its environment canvas:
- * the same placement as that canvas (saved cards, then a grid below them),
- * moved so the top-left card starts at (0, 0). Groups without saved cards use layoutBlock.
- */
-export function layoutStoredBlock(nodes, stored, links = []) {
-  if (!nodes.some(n => isPoint(stored[n.id]))) return layoutBlock(nodes, links);
-  const zone = nodes[0].zone;
-  const placed = layoutGraph({ zones: [{ id: zone }], nodes: nodes.map(n => ({ ...n, zone })), positions: stored });
-  const minX = Math.min(...nodes.map(n => placed[n.id].x));
-  const minY = Math.min(...nodes.map(n => placed[n.id].y));
-  const positions = Object.fromEntries(nodes.map(n => [n.id, { x: placed[n.id].x - minX, y: placed[n.id].y - minY }]));
-  return {
-    positions,
-    origin: { x: minX, y: minY },
-    width: Math.max(...nodes.map(n => positions[n.id].x + CARD_WIDTH)),
-    height: Math.max(...nodes.map(n => positions[n.id].y + estimateNodeHeight(n))),
-  };
-}
+/** Server view: key of a project / environment group on one server ("<environment uuid>:<zone id>"). */
+export const groupKey = (nodes, zoneId) => {
+  const environment = nodes.find(n => n.environment?.uuid)?.environment?.uuid;
+  return environment && zoneId ? `${environment}:${zoneId}` : null;
+};
 
 /**
- * Top-left of the given cards where their environment canvas places them. A group saved for the first time
- * from the server view goes there, so it does not cover the cards of the environment on other servers.
+ * Server view: zones stack downwards. A group with cards saved on its environment canvas (node.saved) sits where
+ * those cards are, so the server canvas and the environment canvas share one position (a group that would
+ * leave the zone or cover another group moves to the nearest free spot). Other groups follow below,
+ * GROUPS_PER_ROW per row. When `groups` is given, it gets per group key its frame top-left, the zone's inner
+ * top-left, and `shift`: environment canvas position = server view position - shift.
  */
-function environmentOrigin(graph, nodes) {
-  const environment = nodes[0]?.environment?.uuid;
-  if (!environment) return { x: 0, y: 0 };
-  const placed = layoutGraph({
-    zones: graph.zones,
-    nodes: (graph.nodes || []).filter(n => n.environment?.uuid === environment),
-    positions: storedPositions(graph),
-  });
-  return { x: Math.min(...nodes.map(n => placed[n.id].x)), y: Math.min(...nodes.map(n => placed[n.id].y)) };
-}
-
-/**
- * Server view: zones stack downwards; inside a zone, one block per project / environment, GROUPS_PER_ROW per row.
- * When `offsets` is given, it gets per card the shift from its environment canvas position to its server view
- * position, so a moved card can be saved on its environment canvas.
- */
-export function layoutServerView(graph, offsets = null) {
-  const stored = storedPositions(graph);
+export function layoutServerView(graph, groups = null) {
   const out = {};
   let y = 0;
   for (const zone of zoneGroups(graph)) {
-    const innerTop = y + ZONE_HEADER + ZONE_PADDING;
+    const inner = { x: 0, y: y + zoneHeader(zone.zone) + ZONE_PADDING };
+    const blocks = contextGroups(zone.nodes).map(([, nodes]) => {
+      const saved = nodes.filter(n => isPoint(n.saved));
+      const block = layoutBlock(nodes, graph.links || []);
+      return {
+        key: groupKey(nodes, zone.id),
+        block,
+        size: { w: block.width + GROUP_PADDING * 2, h: GROUP_HEADER + GROUP_PADDING * 2 + block.height },
+        at: saved.length ? { x: Math.min(...saved.map(n => Number(n.saved.x))), y: Math.min(...saved.map(n => Number(n.saved.y))) } : null,
+      };
+    });
+    const pinned = blocks.filter(b => b.at).sort((a, b) => a.at.y - b.at.y || a.at.x - b.at.x);
+    // The environment canvas puts its first cards below a zone header; those land at the zone's top-left here.
+    const shift = { x: inner.x + GROUP_PADDING, y: inner.y + GROUP_HEADER + GROUP_PADDING - ZONE_HEADER - ZONE_PADDING };
+    const place = ({ key, block, size }, left, top) => {
+      for (const [id, p] of Object.entries(block.positions)) {
+        out[id] = { x: left + GROUP_PADDING + p.x, y: top + GROUP_HEADER + GROUP_PADDING + p.y };
+      }
+      if (groups && key) groups[key] = { x: left, y: top, inner, shift };
+      return top + size.h;
+    };
+    const taken = [];
+    const inside = b => b.x >= inner.x && b.y >= inner.y;
+    let bottom = inner.y;
+    for (const b of pinned) {
+      // Environment canvas positions can be left of or above the zone (negative coordinates): keep the group inside.
+      const wanted = {
+        x: Math.max(inner.x, b.at.x + shift.x - GROUP_PADDING),
+        y: Math.max(inner.y, b.at.y + shift.y - GROUP_HEADER - GROUP_PADDING),
+        ...b.size,
+      };
+      const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
+      taken.push(spot);
+      bottom = Math.max(bottom, place(b, spot.x, spot.y));
+    }
     let x = 0;
-    let rowTop = innerTop;
-    let rowBottom = innerTop;
-    contextGroups(zone.nodes).forEach(([, nodes], i) => {
+    let rowTop = pinned.length ? bottom + GROUP_GAP : inner.y;
+    let rowBottom = rowTop;
+    blocks.filter(b => !b.at).forEach((b, i) => {
       if (i > 0 && i % GROUPS_PER_ROW === 0) {
         x = 0;
         rowTop = rowBottom + GROUP_GAP;
       }
-      const block = layoutStoredBlock(nodes, stored, graph.links || []);
-      const origin = offsets ? (block.origin ?? environmentOrigin(graph, nodes)) : null;
-      for (const [id, p] of Object.entries(block.positions)) {
-        out[id] = { x: x + GROUP_PADDING + p.x, y: rowTop + GROUP_HEADER + GROUP_PADDING + p.y };
-        if (offsets) offsets[id] = { x: out[id].x - origin.x - p.x, y: out[id].y - origin.y - p.y };
-      }
-      x += block.width + GROUP_PADDING * 2 + GROUP_GAP;
-      rowBottom = Math.max(rowBottom, rowTop + GROUP_HEADER + GROUP_PADDING * 2 + block.height);
+      rowBottom = Math.max(rowBottom, place(b, x, rowTop));
+      x += b.size.w + GROUP_GAP;
     });
-    y = rowBottom + ZONE_PADDING + ZONE_GAP;
+    y = Math.max(bottom, rowBottom) + ZONE_PADDING + ZONE_GAP;
   }
   return out;
 }
@@ -326,6 +343,8 @@ export function groupFrames(nodes, positions, sizes = {}) {
     const minY = Math.min(...rects.map(r => r.y));
     frames.push({
       name,
+      key: groupKey(members, members[0].zone),
+      zone: members[0].zone,
       link: members[0].context_link,
       x: minX - GROUP_PADDING,
       y: minY - GROUP_PADDING - GROUP_HEADER,
@@ -366,9 +385,9 @@ export function zoneBoxes(graph, positions, sizes = {}) {
       zone: group.zone,
       nodes: group.nodes.map(n => n.id),
       x: minX - ZONE_PADDING,
-      y: minY - ZONE_PADDING - ZONE_HEADER,
+      y: minY - ZONE_PADDING - zoneHeader(group.zone),
       width: maxX - minX + ZONE_PADDING * 2,
-      height: maxY - minY + ZONE_PADDING * 2 + ZONE_HEADER,
+      height: maxY - minY + ZONE_PADDING * 2 + zoneHeader(group.zone),
     });
   }
   return boxes;
@@ -399,7 +418,7 @@ export function dragRules(graph, positions, sizes, id) {
   const groupSide = grouped ? GROUP_PADDING : 0;
   const groupTop = grouped ? GROUP_PADDING + GROUP_HEADER : 0;
   const side = ZONE_PADDING + groupSide;
-  const top = ZONE_PADDING + ZONE_HEADER + groupTop;
+  const top = ZONE_PADDING + zoneHeader(own?.zone) + groupTop;
   const zones = zoneBoxes(graph, positions, sizes).filter(z => !z.nodes.includes(id)).map(toBox);
   const groups = grouped ? groupFrames(own.nodes.filter(n => context(n) !== context(node)), positions, sizes).map(toBox) : [];
   const zoneMates = rects(own?.nodes || []);
@@ -472,6 +491,62 @@ export function statusTone(status) {
   if (state === 'degraded') return 'warn';
   if (state === 'running' || state === 'healthy') return health === 'unhealthy' ? 'warn' : 'ok';
   return 'idle';
+}
+
+export const READABLE_ZOOM = 0.6;
+const FIT_PAD = 48;
+
+/**
+ * View ({x, y, z}) that shows the content bounds in the free part of the viewport ({left, top, width, height}).
+ * `readable`: never below READABLE_ZOOM; content that does not fit then starts at its top-left,
+ * so the cards can be read and the user scrolls to the rest.
+ */
+export function fitView(bounds, area, readable = false) {
+  const w = bounds.maxX - bounds.minX;
+  const h = bounds.maxY - bounds.minY;
+  const room = { w: area.width - FIT_PAD * 2, h: area.height - FIT_PAD * 2 };
+  const whole = Math.min(room.w / w, room.h / h);
+  const z = Math.min(1.1, Math.max(readable ? READABLE_ZOOM : MIN_ZOOM, whole));
+  const x = w * z <= room.w ? area.left + (area.width - w * z) / 2 : area.left + FIT_PAD;
+  const y = h * z <= room.h ? area.top + (area.height - h * z) / 2 : area.top + FIT_PAD;
+  return { z, x: x - bounds.minX * z, y: y - bounds.minY * z };
+}
+
+/** Resource cards per status tone ({ok, warn, bad, busy, idle}); unmanaged containers are not counted. */
+export function statusSummary(nodes) {
+  const out = { ok: 0, warn: 0, bad: 0, busy: 0, idle: 0 };
+  for (const n of nodes || []) if (n.type !== 'container' && !isSource(n)) out[statusTone(n.status)]++;
+  return out;
+}
+
+/** "running:healthy" → "Running": the state word for the status text on a card. */
+export function statusWord(status) {
+  return statusLabel(status).replace(/\s*\(.*$/, '');
+}
+
+/** 1007820800 → "1 GB", 17179869184 → "16 GB". */
+export function formatMemory(bytes) {
+  if (!bytes) return null;
+  const gb = bytes / 1024 ** 3;
+  return `${gb < 10 ? Math.round(gb * 10) / 10 : Math.round(gb)} GB`;
+}
+
+/** Time since a "YYYY-MM-DD HH:MM:SS" (UTC) or ISO date, as "45m", "5h", "12d". */
+export function formatUptime(since, now = Date.now()) {
+  const at = Date.parse(String(since || '').replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(since || '') ? '' : 'Z'));
+  if (!Number.isFinite(at)) return null;
+  const minutes = Math.max(0, Math.floor((now - at) / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h`;
+  return `${Math.floor(minutes / 1440)}d`;
+}
+
+/**
+ * Ids of the server zones whose server is not reachable. The saved status of their resources is stale,
+ * so the canvas shows it as unknown. Zones with an icon (projects, connect view) are not servers.
+ */
+export function unreachableZones(graph) {
+  return new Set((graph?.zones || []).filter(z => !z.icon && z.is_reachable === false).map(z => z.id));
 }
 
 /** "running:healthy" → "Running (healthy)". */
@@ -587,6 +662,7 @@ export const TONE_DOT = {
 };
 // Outline icons, drawn from local paths.
 export const ICONS = {
+  chevron: ['M6 15l6-6 6 6'],
   application: ['M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z', 'M3 9h18', 'M9.5 13l-2 2 2 2', 'M14.5 13l2 2-2 2'],
   service: ['M12 4 3 8.5l9 4.5 9-4.5z', 'M3 12.5l9 4.5 9-4.5', 'M3 16.5l9 4.5 9-4.5'],
   database: ['M5 6c0-1.66 3.13-3 7-3s7 1.34 7 3-3.13 3-7 3-7-1.34-7-3z', 'M5 6v12c0 1.66 3.13 3 7 3s7-1.34 7-3V6', 'M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3'],

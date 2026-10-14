@@ -34,19 +34,17 @@
                 }));
             },
         }">
-        <div class="files-grid grid min-w-0 gap-8">
-            <div class="min-w-0">
-                @if ($type === 'application')
-                    <x-application.configuration-sidebar :application="$resource"
-                        current-route="project.application.files" />
-                @elseif ($type === 'service')
-                    <x-service.configuration-sidebar :service="$resource"
-                        current-route="project.service.files" />
-                @else
-                    <x-database.configuration-sidebar :database="$resource"
-                        current-route="project.database.files" />
-                @endif
-            </div>
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+            @if ($type === 'application')
+                <x-application.configuration-sidebar :application="$resource"
+                    current-route="project.application.files" />
+            @elseif ($type === 'service')
+                <x-service.configuration-sidebar :service="$resource"
+                    current-route="project.service.files" />
+            @else
+                <x-database.configuration-sidebar :database="$resource"
+                    current-route="project.database.files" />
+            @endif
 
             <div class="min-w-0">
     <x-application.settings-section title="Files"

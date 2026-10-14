@@ -1,4 +1,7 @@
-<div wire:init="refreshBackupExecutions">
+<div wire:init="refreshBackupExecutions" x-on:open-backup-download.window="window.location.href = $event.detail.url">
+    @if (count($pendingDownloads) > 0)
+        <div wire:poll.3s="checkDownloads" class="hidden"></div>
+    @endif
     @isset($backup)
         <section class="application-settings-section overflow-hidden">
             <div class="application-settings-section-header">
@@ -197,7 +200,11 @@
 @script
     <script>
         window.download_file = function(executionId) {
-            window.open('/download/backup/' + executionId, '_blank');
+            @if ($s3Downloads)
+                $wire.download_file(executionId);
+            @else
+                window.open('/download/backup/' + executionId, '_blank');
+            @endif
         }
     </script>
 @endscript

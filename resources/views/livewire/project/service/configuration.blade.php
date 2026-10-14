@@ -26,7 +26,7 @@
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
             ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
-            ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
+            ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'danger'],
         ])->filter(fn (array $item): bool => $item['visible'] ?? true)->map(fn (array $item): array => [
             ...$item,
             'active' => $currentRoute === $item['route']
@@ -38,7 +38,9 @@
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
             'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
-            'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
+            'Operations' => ['Resource Operations', 'Tags'],
+            // Always last, after a divider and without a group header.
+            'Danger Zone' => ['Danger Zone'],
         ];
 
         $groupedItems = collect($menuGroups)
@@ -61,7 +63,7 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-            <aside class="application-settings-navigation min-w-0 xl:self-start"
+            <x-main-nav-menu :back-href="route('dashboard')" back-label="Dashboard" back-title="Back to the dashboard"
                 data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
                 <nav aria-label="Service settings"
                     x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"
@@ -71,6 +73,7 @@
                             <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                                 aria-hidden="true"></div>
                         @endunless
+                        @unless ($groupLabel === 'Danger Zone')
                         <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
                             :aria-expanded="isOpen(@js($groupLabel))">
                             <span>{{ $groupLabel }}</span>
@@ -80,7 +83,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
                             </svg>
                         </button>
-                        <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
+                        @endunless
+                        <div @class(['contents', 'xl:block' => $groupLabel === 'Danger Zone']) @unless ($groupLabel === 'Danger Zone') :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'" @endunless>
                         @foreach ($groupItems as $menuItem)
                             <a @class([
                                 'menu-item',
@@ -111,7 +115,7 @@
                         </div>
                     @endforeach
                 </nav>
-            </aside>
+            </x-main-nav-menu>
 
             <div class="min-w-0">
                 @if ($currentRoute === 'project.service.configuration')
@@ -132,25 +136,7 @@
                                 </p>
                             </div>
                             <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
-                                <div
-                                    class="view-toggle">
-                                    <button type="button" x-on:click="setViewMode('table')"
-                                        class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                                        :class="viewMode === 'table'
-                                            ? 'control-selected'
-                                            : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                                        aria-label="Table view" title="Table view">
-                                        <x-reicon name="unordered-list" class="size-3.5" />
-                                    </button>
-                                    <button type="button" x-on:click="setViewMode('grid')"
-                                        class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                                        :class="viewMode === 'grid'
-                                            ? 'control-selected'
-                                            : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                                        aria-label="Grid view" title="Grid view">
-                                        <x-reicon name="grid" class="size-3.5" />
-                                    </button>
-                                </div>
+                                <x-canvas-view-toggle />
                                 <a class="button" target="_blank" href="{{ $service->documentation() }}">
                                     Documentation
                                     <x-reicon name="external-link" class="size-4" />
@@ -218,8 +204,6 @@
                     </div>
                 @elseif ($currentRoute === 'project.service.scheduled-tasks.show')
                     <livewire:project.shared.scheduled-task.all :resource="$service" />
-                @elseif ($currentRoute === 'project.service.scheduled-tasks')
-                    <livewire:project.shared.scheduled-task.show />
                 @elseif ($currentRoute === 'project.service.webhooks')
                     <livewire:project.shared.webhooks :resource="$service" />
                 @elseif ($currentRoute === 'project.service.resource-operations')
