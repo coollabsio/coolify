@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\SharedVariableCanvasController;
 use App\Http\Controllers\Api\TagCanvasController;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\FileBrowserDownloadController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
@@ -364,6 +365,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects', ProjectIndex::class)->name('project.index');
     Route::get('/projects/canvas', ProjectsCanvas::class)->name('project.canvas.index');
     Route::get('/project/{project_uuid}/icon', ProjectIconController::class)->name('project.icon');
+    Route::get('/files/download/{token}', FileBrowserDownloadController::class)->name('project.files.download')->middleware('can.access.terminal');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/canvas', ProjectCanvas::class)->name('project.canvas');

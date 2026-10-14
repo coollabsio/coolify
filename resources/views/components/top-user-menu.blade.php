@@ -21,7 +21,7 @@
     },
 }" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()"
     @click.outside="closePanel()">
-    <button type="button" @click="open ? closePanel() : openPanel()"
+    <button type="button" x-ref="userMenuButton" @click="open ? closePanel() : openPanel()"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
         @if ($sidebar) :class="collapsed ? 'w-8 px-0' : 'w-full'" @endif
         @class([
@@ -44,7 +44,9 @@
         </svg>
     </button>
 
+    {{-- In the sidebar the panel is fixed to the button, so the scrolling sidebar does not clip it. --}}
     <div x-show="open" x-cloak
+        @if ($sidebar) x-anchor.top-start.fixed.offset.4="$refs.userMenuButton" @endif
         x-transition:enter="transition ease-out duration-150"
         x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
         x-transition:leave="transition ease-in duration-100"
@@ -52,7 +54,6 @@
         @class([
             'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
             'right-0! left-auto!' => ! $sidebar,
-            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
             'origin-bottom-left' => $sidebar,
             'origin-top-right' => ! $sidebar,
         ])>

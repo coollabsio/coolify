@@ -2035,6 +2035,17 @@ html[data-theme="custom"] textarea:disabled {
     background: transparent;
 }
 
+/* Main sidebar: the menu and footer scroll as one unit on short or zoomed-in
+   screens. Hide the scrollbar so it does not take width from the narrow
+   collapsed rail and push the icons aside. */
+.sidebar-nav {
+    scrollbar-width: none; /* Firefox */
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
 /* Unified resource heading bar: hide tab-strip scrollbars; menus/actions stay overflow-visible for dropdowns */
 .resource-heading-navbar {
     overflow: visible;
@@ -5547,14 +5558,16 @@ html.dark .canvas-zoom-max {
         left: var(--floating-gap);
     }
 
-    html[data-nav-style="floating"] .app-sidebar > div > nav > .sticky {
+    html[data-nav-style="floating"] .app-sidebar > div > nav > .sidebar-footer {
         border-radius: 0 0 var(--floating-radius) var(--floating-radius);
     }
 
     html[data-nav-style="floating"] .app-main {
         margin-left: calc(var(--sidebar-w, 14rem) + var(--floating-gap));
-        /* The content top lines up with the sidebar and settings rail panels. */
-        padding-top: var(--floating-top);
+        /* The content top lines up with the sidebar and settings rail panels.
+           The cards draw their frame as a 1px ring outside the box, while the
+           panels use a 1px border inside it, so add 1px to match the edges. */
+        padding-top: calc(var(--floating-top) + 1px);
     }
 
     /* Full-bleed pages (canvases): no top padding gap, and the same gap as the panels. */

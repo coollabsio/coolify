@@ -313,27 +313,55 @@ it('rejects a symlink to an oversized file before reading its content', function
     }
 });
 
-it('removes a partial local download when scp fails', function () {
-    $localPath = null;
-    Process::fake(function ($process) use (&$localPath) {
-        if (str_contains($process->command, ' scp ')) {
-            preg_match("/'([^']+)'$/", $process->command, $matches);
-            $localPath = $matches[1];
-            file_put_contents($localPath, 'partial bytes');
+it('reads download type and size in one round trip', function (string $output, bool $isDir, int $size) {
+    Process::fake(['*' => Process::result(output: $output)]);
 
-            return Process::result(errorOutput: 'Permission denied', exitCode: 1);
+    $info = (new ContainerFilesystemService(fsServer(), 'app-123'))->downloadInfo('/app/target');
+
+    expect($info)->toBe(['isDir' => $isDir, 'size' => $size]);
+    Process::assertRanTimes(fn () => true, 1);
+})->with([
+    'file' => ['file 497', false, 497],
+    'folder in KiB' => ['dir 4', true, 4096],
+]);
+
+it('rejects a download target that does not exist', function () {
+    Process::fake(['*' => Process::result(output: '')]);
+
+    (new ContainerFilesystemService(fsServer(), 'app-123'))->downloadInfo('/app/missing');
+})->throws(RuntimeException::class, 'File not found.');
+
+it('builds download commands that write to stdout instead of a temp file', function () {
+    $svc = fsService();
+
+    expect($svc->buildDownloadCommand("/app/it's.txt", false))
+        ->toBe("docker exec 'app-123' cat -- ".escapeshellarg("/app/it's.txt"));
+    expect($svc->buildDownloadCommand('/app/dir', true))
+        ->toBe("docker exec 'app-123' tar czf - -C '/app/dir' .");
+});
+
+it('streams the remote command output to the writer in chunks', function () {
+    $server = fsServer();
+    $svc = new class($server, 'app-123') extends ContainerFilesystemService
+    {
+        public ?string $remoteCommand = null;
+
+        protected function sshCommand(string $command): string
+        {
+            $this->remoteCommand = $command;
+
+            return 'head -c 200000 /dev/zero';
         }
+    };
+    $received = '';
+    $chunks = 0;
 
-        return Process::result(output: 'file');
+    $svc->streamDownload('/app/a.bin', false, function (string $chunk) use (&$received, &$chunks) {
+        $received .= $chunk;
+        $chunks++;
     });
-    try {
-        expect(fn () => (new ContainerFilesystemService(fsServer(), 'app-123'))->download('/app/a.txt'))
-            ->toThrow(RuntimeException::class);
-        expect($localPath)->not->toBeNull();
-        expect(file_exists($localPath))->toBeFalse();
-    } finally {
-        if ($localPath !== null) {
-            @unlink($localPath);
-        }
-    }
+
+    expect($svc->remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'");
+    expect(strlen($received))->toBe(200000);
+    expect($chunks)->toBeGreaterThan(1);
 });

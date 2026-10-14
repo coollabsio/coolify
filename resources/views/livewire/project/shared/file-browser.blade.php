@@ -1,4 +1,7 @@
-<div wire:init="loadFiles">
+<div wire:init="loadFiles" x-on:open-file-download.window="window.location.href = $event.detail.url">
+    @if (count($pendingDownloads) > 0)
+        <div wire:poll.3s="checkDownloads" class="hidden"></div>
+    @endif
     <x-slot:title>
         {{ data_get_str($resource, 'name')->limit(10) }} > Files | Coolify
     </x-slot>
@@ -13,7 +16,24 @@
 
     {{-- Standard resource settings workspace (matches Logs/Configuration) so the
          heading spacing and sidebar behave identically to every other page. --}}
-    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0" x-data>
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0"
+        x-data="{
+            busy: null,
+            {{-- Show a label for the running action over the listing. The short
+                 delay skips the overlay for fast requests. --}}
+            run(label, action) {
+                const timer = setTimeout(() => this.busy = label, 150);
+                return Promise.resolve().then(action).catch(() => {}).finally(() => {
+                    clearTimeout(timer);
+                    this.busy = null;
+                });
+            },
+            uploadFile(file) {
+                return this.run('Uploading file...', () => new Promise((resolve, reject) => {
+                    this.$wire.upload('upload', file, () => this.$wire.uploadFile().then(resolve, reject), reject);
+                }));
+            },
+        }">
         <div class="files-grid grid min-w-0 gap-8">
             <div class="min-w-0">
                 @if ($type === 'application')
@@ -32,10 +52,14 @@
     <x-application.settings-section title="Files"
         helper="Browse and manage files inside the running container." :flush="true">
 
+        <x-slot:badges>
+            <x-beta-badge />
+        </x-slot:badges>
+
         <x-slot:actions>
             @if ($containerRunning && $filesLoaded)
                 <input type="file" class="hidden" x-ref="uploadInput"
-                    @change="if ($event.target.files.length) { $wire.upload('upload', $event.target.files[0], () => $wire.uploadFile()) }" />
+                    @change="if ($event.target.files.length) { uploadFile($event.target.files[0]); $event.target.value = '' }" />
                 <x-forms.button type="button" title="Upload a file to this folder" canGate="canAccessTerminal" :canResource="$resource"
                     wire:target="uploadFile" @click="$refs.uploadInput.click()">
                     Upload
@@ -61,7 +85,7 @@
                                     </button>
                                 </x-slot:content>
                                 <form x-data="{ name: '' }"
-                                    @submit.prevent="$wire.createFile(name); name=''; $dispatch('close-modal')"
+                                    @submit.prevent="run('Creating file...', () => $wire.createFile(name)); name=''; $dispatch('close-modal')"
                                     class="flex flex-col gap-4">
                                     <x-forms.input id="newFileName" label="File name" x-model="name"
                                         placeholder="config.yml" required />
@@ -79,7 +103,7 @@
                                     </button>
                                 </x-slot:content>
                                 <form x-data="{ name: '' }"
-                                    @submit.prevent="$wire.createDirectory(name); name=''; $dispatch('close-modal')"
+                                    @submit.prevent="run('Creating folder...', () => $wire.createDirectory(name)); name=''; $dispatch('close-modal')"
                                     class="flex flex-col gap-4">
                                     <x-forms.input id="newFolderName" label="Folder name" x-model="name"
                                         placeholder="plugins" required />
@@ -92,7 +116,7 @@
                     </template>
                 </div>
 
-                <x-forms.button type="button" wire:click="refresh" title="Refresh this folder">
+                <x-forms.button type="button" @click="run('Loading files...', () => $wire.refresh())" title="Refresh this folder">
                     Refresh
                 </x-forms.button>
             @endif
@@ -115,19 +139,28 @@
                 </x-slot:icon>
             </x-empty>
         @else
-            <div wire:loading.flex class="justify-center py-12">
-                <x-loading text="Loading files..." />
+            {{-- Keep the current listing visible while an action runs: blur it
+                 and show the action label (from run()) on top of it. --}}
+            <div class="relative">
+            <div x-show="busy" x-cloak class="absolute inset-0 z-10">
+                <div class="flex h-full items-start justify-center">
+                    <div class="sticky top-[40vh] mt-12 inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-[13px] text-neutral-500 shadow-sm ring-1 ring-black/5 dark:bg-coolgray-100 dark:text-fg-dim dark:ring-white/10">
+                        <x-loading />
+                        <span x-text="busy"></span>
+                    </div>
+                </div>
             </div>
-            <div wire:loading.remove>
+            <div x-bind:class="busy && 'pointer-events-none select-none blur-[2px] opacity-60'"
+                class="transition-[filter,opacity] duration-150 motion-reduce:transition-none">
             {{-- Container picker (services / multi-container) --}}
             @if (count($availableContainers) > 1)
                 <div class="flex flex-wrap items-center gap-2 border-b border-coollabs-hairline px-4 py-2">
                     <span class="text-xs text-coollabs-subtle">Container</span>
                     @foreach ($availableContainers as $name)
-                        <button type="button" x-on:click="$wire.selectContainer(@js($name))"
+                        <button type="button" x-on:click="run('Loading files...', () => $wire.selectContainer(@js($name)))"
                             @class([
                                 'button',
-                                'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $name === $container,
+                                'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-white/[0.08] dark:text-white dark:ring-white/15' => $name === $container,
                             ])>{{ $name }}</button>
                     @endforeach
                 </div>
@@ -141,7 +174,7 @@
                     @if ($loop->index > 1)
                         <span class="text-coollabs-subtle">/</span>
                     @endif
-                    <button type="button" x-on:click="$wire.goTo(@js($crumb['path']))"
+                    <button type="button" x-on:click="run('Loading files...', () => $wire.goTo(@js($crumb['path'])))"
                         @class([
                             'rounded-md px-1.5 py-0.5 hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]',
                             'text-current font-medium' => $loop->last,
@@ -156,8 +189,8 @@
             <div x-data="{ dragging: false }"
                 @dragover.prevent="dragging = true"
                 @dragleave.prevent="dragging = false"
-                @drop.prevent="dragging = false; if ($event.dataTransfer.files.length) { @this.upload('upload', $event.dataTransfer.files[0], () => $wire.uploadFile()) }"
-                :class="dragging ? 'ring-2 ring-coollabs/40 dark:ring-warning/40' : ''"
+                @drop.prevent="dragging = false; if ($event.dataTransfer.files.length) { uploadFile($event.dataTransfer.files[0]) }"
+                :class="dragging ? 'ring-2 ring-coollabs/40 dark:ring-white/30' : ''"
                 class="transition-[box-shadow] duration-150 ease-out motion-reduce:transition-none">
                 @if (count($entries) === 0)
                     <x-empty size="sm" title="This folder is empty"
@@ -181,13 +214,13 @@
                         @foreach ($entries as $entry)
                             <div wire:key="entry-{{ $entry['name'] }}" class="data-table-row file-table-grid">
                                 <div class="flex items-center">
-                                    <x-reicon :name="$entry['type'] === 'dir' ? 'folder' : 'file'"
-                                        class="size-4 {{ $entry['type'] === 'dir' ? 'text-coollabs dark:text-warning' : 'text-coollabs-subtle' }}" />
+                                    <x-reicon :name="$entry['type'] === 'dir' ? 'folder-filled' : 'file'"
+                                        class="size-4 {{ $entry['type'] === 'dir' ? 'text-coollabs dark:text-neutral-200' : 'text-coollabs-subtle opacity-70' }}" />
                                 </div>
                                 <div class="min-w-0">
                                     @if ($entry['type'] === 'dir')
-                                        <button type="button" x-on:click="$wire.open(@js($entry['name']))"
-                                            class="block w-full cursor-pointer truncate text-left font-medium hover:text-coollabs hover:underline dark:hover:text-warning">{{ $entry['name'] }}</button>
+                                        <button type="button" x-on:click="run('Loading files...', () => $wire.open(@js($entry['name'])))"
+                                            class="block w-full cursor-pointer truncate text-left font-medium hover:text-coollabs hover:underline dark:hover:text-white">{{ $entry['name'] }}</button>
                                     @else
                                         <span class="block truncate">{{ $entry['name'] }}</span>
                                     @endif
@@ -202,7 +235,7 @@
                                             </button>
                                         </x-slot:content>
                                         <form x-data="{ mode: @js($entry['perms']) }"
-                                            @submit.prevent="$wire.chmodEntry(@js($entry['name']), mode); $dispatch('close-modal')"
+                                            @submit.prevent="run('Updating permissions...', () => $wire.chmodEntry(@js($entry['name']), mode)); $dispatch('close-modal')"
                                             class="flex flex-col gap-4">
                                             <p class="text-sm text-coollabs-subtle">
                                                 Set the octal permission mode for
@@ -234,14 +267,15 @@
                                      through a component attribute double-encodes
                                      the quotes and breaks the handler. --}}
                                 <div class="flex items-center justify-end"
-                                    x-data="{ open: false, name: @js($entry['name']) }"
+                                    x-data="{ open: false, name: @js($entry['name']), isDir: @js($entry['type'] === 'dir') }"
                                     @keydown.escape.window="open = false">
                                     <div class="relative">
-                                        <x-forms.button type="button" title="Actions" x-ref="trigger"
+                                        <button type="button" title="Actions" aria-label="Actions" x-ref="trigger"
                                             x-on:click="open = !open" x-bind:aria-expanded="open"
-                                            x-bind:class="open && 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'">
-                                            <x-reicon name="dots-vertical" class="size-3.5" />
-                                        </x-forms.button>
+                                            x-bind:class="open && 'bg-black/5 text-current dark:bg-white/[0.08]'"
+                                            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-coollabs-subtle hover:bg-black/5 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs/40 dark:hover:bg-white/[0.06] dark:focus-visible:ring-white/30">
+                                            <x-reicon name="dots-horizontal" class="size-4" />
+                                        </button>
                                         <template x-teleport="body">
                                             <div x-show="open" x-cloak x-transition.opacity.duration.120ms
                                                 x-anchor.bottom-end.fixed.offset.4="$refs.trigger"
@@ -249,13 +283,13 @@
                                                 class="listbox-panel min-w-52! w-52! z-50!">
                                                 @if ($entry['type'] !== 'dir')
                                                     <button type="button" class="listbox-option"
-                                                        x-on:click="open = false; $wire.openEditor(name)">
+                                                        x-on:click="open = false; run('Opening file...', () => $wire.openEditor(name))">
                                                         <x-reicon name="file-content" class="size-3.5 shrink-0" />
                                                         <span class="min-w-0 flex-1 text-left">Edit</span>
                                                     </button>
                                                 @endif
                                                 <button type="button" class="listbox-option"
-                                                    x-on:click="open = false; $wire.download(name)">
+                                                    x-on:click="open = false; run(isDir ? 'Preparing folder download...' : 'Preparing file download...', () => $wire.download(name))">
                                                     <x-reicon name="download" class="size-3.5 shrink-0" />
                                                     <span class="min-w-0 flex-1 text-left">Download</span>
                                                 </button>
@@ -269,7 +303,7 @@
                                                         </button>
                                                     </x-slot:content>
                                                     <form x-data="{ newName: @js($entry['name']) }"
-                                                        @submit.prevent="$wire.renameEntry(name, newName); $dispatch('close-modal')"
+                                                        @submit.prevent="run('Renaming...', () => $wire.renameEntry(name, newName)); $dispatch('close-modal')"
                                                         class="flex flex-col gap-4">
                                                         <x-forms.input id="renameName-{{ $loop->index }}"
                                                             label="New name" x-model="newName" required />
@@ -295,7 +329,7 @@
                                                         </p>
                                                         <div class="flex justify-end">
                                                             <x-forms.button isError type="button" canGate="canAccessTerminal" :canResource="$resource"
-                                                                x-on:click="$wire.deleteEntry(name); $dispatch('close-modal')">Delete</x-forms.button>
+                                                                x-on:click="run(isDir ? 'Deleting folder...' : 'Deleting file...', () => $wire.deleteEntry(name)); $dispatch('close-modal')">Delete</x-forms.button>
                                                         </div>
                                                     </div>
                                                 </x-modal-input>
@@ -308,17 +342,19 @@
                     </div>
                 @endif
             </div>
+            </div>
+            </div>
 
             {{-- Editor modal (opens when a text file is loaded) --}}
             <x-modal-input title="Edit file" :wireOpen="'editorOpen'" :content="true" wireIgnore="false" isLarge>
                 <x-slot:content>
                     <span class="hidden"></span>
                 </x-slot:content>
-                <form wire:submit="saveEditor" class="flex flex-col gap-4">
+                <form @submit.prevent="run('Saving file...', () => $wire.saveEditor())" class="flex flex-col gap-4">
                     <div class="flex items-center justify-between gap-2">
                         <p class="truncate font-mono text-xs text-coollabs-subtle">{{ $editingPath }}</p>
                         @if ($editorLanguage)
-                            <span class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 font-mono text-[11px] text-coollabs dark:bg-warning/15 dark:text-warning">{{ $editorLanguage }}</span>
+                            <span class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 font-mono text-[11px] text-coollabs dark:bg-white/[0.08] dark:text-neutral-200">{{ $editorLanguage }}</span>
                         @endif
                     </div>
                     {{-- Monaco editor, kept mounted across opens (wire:ignore) and
@@ -392,7 +428,6 @@
                     </div>
                 </form>
             </x-modal-input>
-            </div>
         @endif
     </x-application.settings-section>
             </div>

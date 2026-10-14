@@ -169,6 +169,22 @@
                     </x-callout>
                 @endif
             </x-application.settings-section>
+
+            <x-application.settings-section id="file-download-storage-section" title="File downloads"
+                helper="Choose how files from the container file browser are downloaded. Streaming sends each file through this Coolify instance, up to 1 GB. With S3, the server uploads the file to the bucket and the browser downloads it from S3, up to 5 GB. S3 download links expire after 15 minutes, and the files are deleted after 6 hours.">
+                <div class="flex max-w-md flex-col gap-4">
+                    <x-forms.listbox id="file_download_storage" label="Download method" onChange="instantSave"
+                        :options="[
+                            ['value' => 'stream', 'label' => 'Stream through Coolify'],
+                            ...array_values(array_filter($avatar_storage_options, fn ($option) => $option['value'] !== 'local')),
+                        ]" />
+                </div>
+                <x-callout type="info" title="Bucket auto-delete rule" class="mt-4">
+                    When you select an S3 storage, Coolify adds a lifecycle rule that deletes objects under
+                    <span class="font-mono">coolify-file-downloads/</span> after 1 day, as a safety net. The selected
+                    storage must be reachable from your servers, and the S3 provider must support lifecycle rules.
+                </x-callout>
+            </x-application.settings-section>
         </form>
     </x-settings.layout>
 </div>

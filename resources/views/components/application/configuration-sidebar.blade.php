@@ -296,6 +296,7 @@
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                     @if ($menuItem['label'] === 'Files')
                                         <span x-show="loading" x-cloak><x-loading compact /></span>
+                                        <x-beta-badge class="ml-auto shrink-0" />
                                     @endif
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">

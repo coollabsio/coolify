@@ -85,6 +85,7 @@
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                         @if ($menuItem['label'] === 'Files')
                             <span x-show="loading" x-cloak><x-loading compact /></span>
+                            <x-beta-badge class="ml-auto shrink-0" />
                         @endif
                         @if ($menuItem['hasWarning'] ?? false)
                             <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>

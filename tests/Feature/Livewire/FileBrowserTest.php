@@ -1,24 +1,30 @@
 <?php
 
+use App\Http\Controllers\FileBrowserDownloadController;
+use App\Jobs\PrepareFileDownloadJob;
 use App\Livewire\Project\Shared\FileBrowser;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ContainerFilesystemService;
+use App\Services\FileDownloadStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Once;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 uses(RefreshDatabase::class);
 
@@ -353,42 +359,78 @@ it('uploads a file and clears the upload state', function () {
         ->assertDispatched('success', 'Uploaded.');
 });
 
-it('streams downloads and removes temporary files even if streaming never starts', function (bool $stream) {
+it('issues a one-time download token and redirects to the streaming route', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: 'dir 4'))]);
     $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
-    $tmp = tempnam(sys_get_temp_dir(), 'file-browser-').'.tar.gz';
-    file_put_contents($tmp, 'archive bytes');
-    $component = new class extends FileBrowser
-    {
-        public ContainerFilesystemService $filesystem;
 
-        protected function service(): ContainerFilesystemService
-        {
-            return $this->filesystem;
-        }
-    };
-    $component->resource = $database;
-    $component->container = $database->uuid;
-    $component->currentPath = '/data';
-    $component->filesystem = Mockery::mock(ContainerFilesystemService::class);
-    $component->filesystem->shouldReceive('download')->with('/data/folder')->andReturn($tmp);
-    try {
-        $response = $component->download('folder');
-        expect($response)->toBeInstanceOf(StreamedResponse::class);
-        expect($response->headers->get('content-disposition'))->toContain('folder.tar.gz');
-        if ($stream) {
-            ob_start();
-            $response->sendContent();
-            expect(ob_get_clean())->toBe('archive bytes');
-        } else {
-            app()->terminate();
-        }
-        expect(file_exists($tmp))->toBeFalse();
-    } finally {
-        @unlink($tmp);
-    }
-})->with([true, false]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'folder')
+        ->assertRedirectContains('/files/download/');
+
+    $token = Str::afterLast($component->effects['redirect'], '/');
+    expect(Cache::get(FileBrowserDownloadController::cacheKey($token)))->toMatchArray([
+        'user_id' => $this->admin->id,
+        'container' => $database->uuid,
+        'path' => '/data/folder',
+        'name' => 'folder.tar.gz',
+        'is_dir' => true,
+    ]);
+});
+
+it('refuses downloads above the size cap', function () {
+    $overCapKb = intdiv(ContainerFilesystemService::MAX_DOWNLOAD_SIZE, 1024) + 1;
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: "dir {$overCapKb}"))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'folder')
+        ->assertNoRedirect()
+        ->assertDispatched('error');
+});
+
+it('only lets the token owner use a download token, and only once', function () {
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $download = [
+        'user_id' => $this->admin->id,
+        'resource_type' => $database::class,
+        'resource_id' => $database->id,
+        'server_id' => $this->server->id,
+        'container' => $database->uuid,
+        'path' => '/data/a.txt',
+        'name' => 'a.txt',
+        'is_dir' => false,
+    ];
+    $otherAdmin = User::factory()->create();
+    $otherAdmin->teams()->attach($this->team, ['role' => 'admin']);
+
+    Cache::put(FileBrowserDownloadController::cacheKey('token-a'), $download, 60);
+    $this->actingAs($otherAdmin)->withSession(['currentTeam' => $this->team])
+        ->get(route('project.files.download', 'token-a'))
+        ->assertNotFound();
+    expect(Cache::has(FileBrowserDownloadController::cacheKey('token-a')))->toBeFalse();
+
+    $this->actingAs($this->admin)->withSession(['currentTeam' => $this->team])
+        ->get(route('project.files.download', 'unknown'))
+        ->assertNotFound();
+});
+
+it('blocks members from the download route', function () {
+    $this->actingAs($this->member)->withSession(['currentTeam' => $this->team])
+        ->get(route('project.files.download', 'any'))
+        ->assertForbidden();
+});
 
 it('denies resources outside the current team even when the user belongs to both teams', function () {
     $database = fbRunningDatabase($this->environment, $this->destination);
@@ -513,4 +555,142 @@ it('allows retrying a failed initial container lookup', function () {
         ->assertSet('filesLoaded', true)
         ->assertSet('loadFailed', false)
         ->assertSet('container', 'app-base');
+});
+
+function fbConfigureDownloadStorage(): S3Storage
+{
+    Team::factory()->create(['id' => 0]);
+    $storage = S3Storage::create([
+        'name' => 'Downloads',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'downloads',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+        'team_id' => 0,
+    ]);
+    InstanceSettings::find(0)->update(['file_download_s3_storage_id' => $storage->id]);
+    Once::flush();
+
+    return $storage;
+}
+
+it('queues an S3 upload instead of streaming when download storage is set', function () {
+    Bus::fake([PrepareFileDownloadJob::class]);
+    $storage = fbConfigureDownloadStorage();
+    $overStreamCapKb = intdiv(ContainerFilesystemService::MAX_DOWNLOAD_SIZE, 1024) + 1;
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: "dir {$overStreamCapKb}"))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'folder')
+        ->assertNoRedirect()
+        ->assertDispatched('info');
+
+    expect($component->get('pendingDownloads'))->toHaveCount(1);
+    Bus::assertDispatched(PrepareFileDownloadJob::class, fn (PrepareFileDownloadJob $job) => $job->downloadId === $component->get('pendingDownloads')[0]
+        && $job->userId === $this->admin->id
+        && $job->path === '/data/folder'
+        && $job->isDir
+        && $job->downloadName === 'folder.tar.gz'
+        && $job->s3StorageId === $storage->id);
+});
+
+it('refuses S3 downloads above the S3 size cap', function () {
+    Bus::fake([PrepareFileDownloadJob::class]);
+    fbConfigureDownloadStorage();
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: 'file '.(FileDownloadStorageService::MAX_SIZE + 1)))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'big.bin')
+        ->assertDispatched('error');
+    Bus::assertNotDispatched(PrepareFileDownloadJob::class);
+});
+
+it('opens a finished S3 download once and ignores entries of other users', function () {
+    Bus::fake([PrepareFileDownloadJob::class]);
+    fbConfigureDownloadStorage();
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: 'file 10'))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'a.txt');
+    $downloadId = $component->get('pendingDownloads')[0];
+    $cacheKey = PrepareFileDownloadJob::cacheKey($downloadId);
+
+    Cache::put($cacheKey, ['user_id' => $this->member->id, 'status' => 'ready', 'url' => 'https://s3.example.com/other'], 60);
+    $component->call('checkDownloads')
+        ->assertNotDispatched('open-file-download')
+        ->assertSet('pendingDownloads', [$downloadId]);
+
+    Cache::put($cacheKey, ['user_id' => $this->admin->id, 'status' => 'ready', 'url' => 'https://s3.example.com/get'], 60);
+    $component->call('checkDownloads')
+        ->assertDispatched('open-file-download', url: 'https://s3.example.com/get')
+        ->assertSet('pendingDownloads', []);
+    expect(Cache::has($cacheKey))->toBeFalse();
+});
+
+it('does not hand out S3 links after the user lost access to the resource', function () {
+    Bus::fake([PrepareFileDownloadJob::class]);
+    fbConfigureDownloadStorage();
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: 'file 10'))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'a.txt');
+    Cache::put(PrepareFileDownloadJob::cacheKey($component->get('pendingDownloads')[0]), ['user_id' => $this->admin->id, 'status' => 'ready', 'url' => 'https://s3.example.com/get'], 60);
+
+    $this->project->update(['team_id' => Team::factory()->create()->id]);
+
+    $component->call('checkDownloads')
+        ->assertForbidden()
+        ->assertNotDispatched('open-file-download');
+});
+
+it('limits how many S3 downloads a user can start', function () {
+    Bus::fake([PrepareFileDownloadJob::class]);
+    fbConfigureDownloadStorage();
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: 'file 10'))
+        ->push(Process::result(output: 'file 10'))
+        ->push(Process::result(output: 'file 10'))
+        ->push(Process::result(output: 'file 10'))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])->call('loadFiles');
+
+    foreach (range(1, 4) as $attempt) {
+        $component->call('download', 'a.txt');
+    }
+
+    expect($component->get('pendingDownloads'))->toHaveCount(3);
+    Bus::assertDispatchedTimes(PrepareFileDownloadJob::class, 3);
+    $component->assertDispatched('error', 'Too many downloads are in progress. Wait for them to finish, then try again.');
 });

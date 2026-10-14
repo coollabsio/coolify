@@ -2,19 +2,24 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Http\Controllers\FileBrowserDownloadController;
+use App\Jobs\PrepareFileDownloadJob;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use App\Services\ContainerFilesystemService;
+use App\Services\FileDownloadStorageService;
 use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileBrowser extends Component
 {
@@ -23,6 +28,9 @@ class FileBrowser extends Component
 
     #[Locked]
     public Model $resource;
+
+    /** Uploads to S3 hold a queue worker, so each user may only start a few. */
+    private const MAX_PENDING_S3_DOWNLOADS = 3;
 
     #[Locked]
     public string $type = '';
@@ -58,6 +66,10 @@ class FileBrowser extends Component
     public string $editorLanguage = '';
 
     public ?TemporaryUploadedFile $upload = null;
+
+    /** @var array<int, string> */
+    #[Locked]
+    public array $pendingDownloads = [];
 
     /** @var array<string, mixed> */
     public array $parameters = [];
@@ -261,26 +273,75 @@ class FileBrowser extends Component
         }
     }
 
-    public function download(string $name): ?StreamedResponse
+    public function download(string $name): void
     {
         $this->guard();
         try {
-            $localTmp = $this->service()->download($this->childPath($name));
+            $path = $this->childPath($name);
+            $target = $this->service()->downloadInfo($path);
+            $downloadName = $target['isDir'] ? $name.'.tar.gz' : $name;
+            $s3Storage = FileDownloadStorageService::configuredStorage();
+            $maxSize = $s3Storage ? FileDownloadStorageService::MAX_SIZE : ContainerFilesystemService::MAX_DOWNLOAD_SIZE;
+            if ($target['size'] > $maxSize) {
+                $this->dispatch('error', ($target['isDir'] ? 'This folder' : 'This file').' is larger than '.formatBytes($maxSize).' and cannot be downloaded here. Use the terminal or a volume backup instead.');
+
+                return;
+            }
+
+            if ($s3Storage) {
+                if (count($this->pendingDownloads) >= self::MAX_PENDING_S3_DOWNLOADS
+                    || ! RateLimiter::attempt('file-browser-s3-download:'.auth()->id(), 10, fn () => true, 3600)) {
+                    $this->dispatch('error', 'Too many downloads are in progress. Wait for them to finish, then try again.');
+
+                    return;
+                }
+                $downloadId = (string) Str::uuid();
+                $this->pendingDownloads[] = $downloadId;
+                PrepareFileDownloadJob::dispatch($downloadId, auth()->id(), $this->server()->id, $this->container, $path, $target['isDir'], $downloadName, $s3Storage->id);
+                $this->dispatch('info', 'Preparing '.$downloadName.'. The download starts when it is ready.');
+
+                return;
+            }
+
+            $token = Str::random(64);
+            Cache::put(FileBrowserDownloadController::cacheKey($token), [
+                'user_id' => auth()->id(),
+                'resource_type' => $this->resource::class,
+                'resource_id' => $this->resource->getKey(),
+                'server_id' => $this->server()->id,
+                'container' => $this->container,
+                'path' => $path,
+                'name' => $downloadName,
+                'is_dir' => $target['isDir'],
+            ], FileBrowserDownloadController::TOKEN_TTL_SECONDS);
+
+            $this->redirect(route('project.files.download', $token));
         } catch (\Throwable $e) {
             handleError($e, $this);
-
-            return null;
         }
-        app()->terminating(static fn () => @unlink($localTmp));
-        $downloadName = str_ends_with($localTmp, '.tar.gz') ? $name.'.tar.gz' : $name;
+    }
 
-        return response()->streamDownload(function () use ($localTmp) {
-            try {
-                readfile($localTmp);
-            } finally {
-                @unlink($localTmp);
+    /**
+     * Polled while S3 downloads are prepared. Opens each finished link once.
+     */
+    public function checkDownloads(): void
+    {
+        $this->authorizeFileAccess();
+        foreach ($this->pendingDownloads as $index => $downloadId) {
+            $result = Cache::get(PrepareFileDownloadJob::cacheKey($downloadId));
+            if (! is_array($result) || ($result['user_id'] ?? null) !== auth()->id()) {
+                continue;
             }
-        }, $downloadName);
+
+            unset($this->pendingDownloads[$index]);
+            Cache::forget(PrepareFileDownloadJob::cacheKey($downloadId));
+            if ($result['status'] === 'ready') {
+                $this->dispatch('open-file-download', url: $result['url']);
+            } else {
+                $this->dispatch('error', $result['message']);
+            }
+        }
+        $this->pendingDownloads = array_values($this->pendingDownloads);
     }
 
     /**

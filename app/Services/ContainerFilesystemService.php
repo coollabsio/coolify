@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Data\FileEntry;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\LocalFileVolume;
 use App\Models\Server;
 use Illuminate\Support\Str;
@@ -15,6 +16,9 @@ class ContainerFilesystemService
      * so keep inline content below that limit with room for command quoting.
      */
     private const MAX_INLINE_WRITE_SIZE = 64 * 1024;
+
+    /** Largest file, or uncompressed folder, the file browser may download. */
+    public const MAX_DOWNLOAD_SIZE = 1024 * 1024 * 1024;
 
     public function __construct(
         private Server $server,
@@ -280,18 +284,6 @@ class ContainerFilesystemService
         return 'file';
     }
 
-    public function isDirectory(string $path): bool
-    {
-        $escaped = $this->escapePath($path, 'stat path');
-        $result = trim((string) instant_remote_process(
-            [$this->dockerExecShell("[ -d {$escaped} ] && echo dir || echo file")],
-            $this->server,
-            throwError: false,
-        ));
-
-        return $result === 'dir';
-    }
-
     public function upload(string $localTmpPath, string $destPath): void
     {
         validateShellSafePath($destPath, 'upload path');
@@ -311,38 +303,108 @@ class ContainerFilesystemService
         }
     }
 
-    public function download(string $path): string
+    /**
+     * Inspect a download target in one round trip. Folder size is the
+     * uncompressed disk usage, so the archive is never larger than reported.
+     *
+     * @return array{isDir: bool, size: int}
+     *
+     * @throws \RuntimeException when the path does not exist
+     */
+    public function downloadInfo(string $path): array
+    {
+        $escaped = $this->escapePath($path, 'download path');
+        $cmd = 'if [ -d '.$escaped.' ]; then echo "dir $(du -sk '.$escaped.' | cut -f1)"; '
+            .'elif [ -e '.$escaped.' ]; then echo "file $(stat -L -c %s '.$escaped.')"; fi';
+
+        $raw = trim((string) instant_remote_process([$this->dockerExecShell($cmd)], $this->server));
+        [$kind, $size] = array_pad(explode(' ', $raw, 2), 2, '');
+        if (! in_array($kind, ['dir', 'file'], true) || ! ctype_digit($size)) {
+            throw new \RuntimeException('File not found.');
+        }
+
+        return [
+            'isDir' => $kind === 'dir',
+            'size' => $kind === 'dir' ? (int) $size * 1024 : (int) $size,
+        ];
+    }
+
+    public function buildDownloadCommand(string $path, bool $isDir): string
     {
         $escaped = $this->escapePath($path, 'download path');
         $escapedContainer = escapeshellarg($this->container);
-        $isDir = $this->isDirectory($path);
-        $serverTmp = '/tmp/coolify-download-'.Str::random(16).($isDir ? '.tar.gz' : '');
-        $escapedServerTmp = escapeshellarg($serverTmp);
-        $localTmp = storage_path('app/tmp/'.Str::random(16).($isDir ? '.tar.gz' : ''));
-        @mkdir(dirname($localTmp), 0755, true);
 
-        try {
-            if ($isDir) {
-                instant_remote_process(
-                    ["docker exec {$escapedContainer} sh -c ".escapeshellarg("cd {$escaped} && tar czf - .")." > {$escapedServerTmp}"],
-                    $this->server,
-                );
-            } else {
-                instant_remote_process(
-                    ["docker cp {$escapedContainer}:{$escaped} {$escapedServerTmp}"],
-                    $this->server,
-                );
-            }
-            instant_scp_from_server($serverTmp, $localTmp, $this->server);
-        } catch (\Throwable $e) {
-            @unlink($localTmp);
+        return $isDir
+            ? "docker exec {$escapedContainer} tar czf - -C {$escaped} ."
+            : "docker exec {$escapedContainer} cat -- {$escaped}";
+    }
 
-            throw $e;
-        } finally {
-            instant_remote_process(["rm -f {$escapedServerTmp}"], $this->server, throwError: false);
+    /**
+     * Pipe a file, or a folder as .tar.gz, from the container to $write in
+     * chunks. Nothing is stored on the Coolify host or the managed server.
+     *
+     * @param  callable(string): void  $write
+     */
+    public function streamDownload(string $path, bool $isDir, callable $write): void
+    {
+        $command = $this->buildDownloadCommand($path, $isDir);
+        if ($this->server->isNonRoot()) {
+            $command = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
         }
 
-        return $localTmp;
+        $process = proc_open($this->sshCommand($command), [1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        if (! is_resource($process)) {
+            throw new \RuntimeException('Could not start the download.');
+        }
+
+        try {
+            while (! feof($pipes[1])) {
+                $chunk = fread($pipes[1], 64 * 1024);
+                if ($chunk === false || connection_aborted()) {
+                    break;
+                }
+                if ($chunk !== '') {
+                    $write($chunk);
+                }
+            }
+        } finally {
+            fclose($pipes[1]);
+            proc_terminate($process);
+            proc_close($process);
+        }
+    }
+
+    /**
+     * Stage the file, or the folder as .tar.gz, on the managed server and PUT
+     * it to a presigned S3 URL. S3 needs a Content-Length, so a pipe without a
+     * known size cannot be uploaded directly. The temp file is always removed.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public function buildS3UploadCommand(string $path, bool $isDir, string $url, array $headers): string
+    {
+        $headerArgs = collect($headers)
+            ->map(fn (string $value, string $name) => '-H '.escapeshellarg("{$name}: {$value}"))
+            ->implode(' ');
+        $script = 'tmp=$(mktemp /tmp/coolify-download-XXXXXXXXXX) || exit 1; '
+            .'trap \'rm -f "$tmp"\' EXIT; '
+            .$this->buildDownloadCommand($path, $isDir).' > "$tmp" && '
+            .'curl -fsS --retry 2 '.$headerArgs.' -T "$tmp" '.escapeshellarg($url);
+
+        return 'sh -c '.escapeshellarg($script);
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    public function uploadToS3(string $path, bool $isDir, string $url, array $headers): void
+    {
+        instant_remote_process([$this->buildS3UploadCommand($path, $isDir, $url, $headers)], $this->server, timeout: 3600);
+    }
+
+    protected function sshCommand(string $command): string
+    {
+        return SshMultiplexingHelper::generateSshCommand($this->server, $command);
     }
 
     protected function escapePath(string $path, string $label): string
