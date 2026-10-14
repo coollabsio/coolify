@@ -17,6 +17,7 @@ use App\Services\ContainerFilesystemService;
 use App\Services\FileDownloadStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Process\Factory;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
@@ -244,7 +245,7 @@ it('refuses to open a binary or oversized file in the editor', function () {
         ->assertSet('editingPath', null);
 });
 
-it('rejects a client attempt to change the locked container property', function () {
+it('rejects client changes to container access state', function (string $property, mixed $value) {
     Process::fake(['*' => Process::sequence()
         ->push(Process::result(output: '/data'))   // defaultRoot
         ->push(Process::result(output: ''))]);      // initial list
@@ -255,8 +256,13 @@ it('rejects a client attempt to change the locked container property', function 
 
     Livewire::test(FileBrowser::class, ['resource' => $database])
         ->call('loadFiles')
-        ->set('container', 'someone-elses-container');
-})->throws(CannotUpdateLockedPropertyException::class);
+        ->set($property, $value);
+})->with([
+    ['container', 'someone-elses-container'],
+    ['type', 'service'],
+    ['containerRunning', false],
+    ['availableContainers', ['someone-elses-container']],
+])->throws(CannotUpdateLockedPropertyException::class);
 
 it('rechecks resource access before file operations', function (string $action, array $arguments) {
     Process::fake(['*' => Process::result(output: '')]);
@@ -268,6 +274,8 @@ it('rechecks resource access before file operations', function (string $action, 
     $this->project->update(['team_id' => $otherTeam->id]);
     $component->call($action, ...$arguments)->assertForbidden();
 })->with([
+    ['open', ['folder']],
+    ['goTo', ['/data']],
     ['refresh', []],
     ['loadFiles', []],
     ['selectContainer', ['unknown']],
@@ -443,15 +451,19 @@ it('denies resources outside the current team even when the user belongs to both
     Process::assertNothingRan();
 });
 
-it('does not use a container that stopped after mounting', function () {
+it('does not use a container that stopped after mounting', function (string $action, array $arguments) {
     Process::fake(['*' => Process::result(output: '')]);
     $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
     $component = Livewire::test(FileBrowser::class, ['resource' => $database])->call('loadFiles');
     $database->update(['status' => 'exited']);
-    $component->call('refresh');
-})->throws(RuntimeException::class, 'Container is not running.');
+    $component->call($action, ...$arguments);
+})->with([
+    ['open', ['folder']],
+    ['goTo', ['/data']],
+    ['refresh', []],
+])->throws(RuntimeException::class, 'Container is not running.');
 
 it('lists files for a running application and excludes stopped and preview containers', function () {
     $application = Application::factory()->create([
@@ -693,4 +705,66 @@ it('limits how many S3 downloads a user can start', function () {
     expect($component->get('pendingDownloads'))->toHaveCount(3);
     Bus::assertDispatchedTimes(PrepareFileDownloadJob::class, 3);
     $component->assertDispatched('error', 'Too many downloads are in progress. Wait for them to finish, then try again.');
+});
+
+it('blocks navigation before a container is selected', function (string $action, array $arguments) {
+    Process::fake();
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database]);
+
+    expect(fn () => $component->call($action, ...$arguments))
+        ->toThrow(RuntimeException::class, 'Container is not running.');
+    expect($component->instance()->currentPath)->toBe('');
+    Process::assertNothingRan();
+})->with([
+    ['open', ['folder']],
+    ['goTo', ['/data']],
+    ['refresh', []],
+]);
+
+it('reduces upload names to one filename component', function (string $name, string $expected) {
+    $component = new FileBrowser;
+    $sanitize = new ReflectionMethod(FileBrowser::class, 'sanitizeUploadName');
+
+    expect($sanitize->invoke($component, $name))->toBe($expected);
+})->with([
+    ['../../etc/cron.d/payload', 'payload'],
+    ['..\\..\\etc\\cron.d\\payload', 'payload'],
+    ['../nested\\folder/payload', 'payload'],
+    ["it's.txt", "it's.txt"],
+    ['.env', '.env'],
+    ['my file.txt', 'my file.txt'],
+]);
+
+it('rejects empty and all-dot upload names', function (string $name) {
+    $component = new FileBrowser;
+    $sanitize = new ReflectionMethod(FileBrowser::class, 'sanitizeUploadName');
+
+    expect(fn () => $sanitize->invoke($component, $name))
+        ->toThrow(RuntimeException::class, 'Invalid file name.');
+})->with(['', '/', '\\', '.', '..', '...', '../..', '..\\..']);
+
+it('refuses to save an opened file after its container identity changes', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))
+        ->push(Process::result(output: ''))
+        ->push(Process::result(output: "OK\n".base64_encode('before')))]);
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('openEditor', 'config.yml')
+        ->set('editorContent', 'after');
+
+    $database->update(['uuid' => (string) Str::uuid()]);
+    Process::swap(new Factory);
+    Process::fake();
+
+    expect(fn () => $component->call('saveEditor'))
+        ->toThrow(RuntimeException::class, 'Container is not running.');
+    expect($component->instance()->editingPath)->toBe('/data/config.yml');
+    Process::assertNothingRan();
 });
