@@ -42,11 +42,13 @@
                     <x-forms.input canGate="update" :canResource="$gitlab_app" id="name" label="Name" />
 
                     @if (! isCloud())
-                        <div class="lg:col-span-2 max-w-xs">
-                            <x-forms.checkbox canGate="update" :canResource="$gitlab_app" label="System wide"
-                                helper="If checked, this GitLab App will be available for everyone in this Coolify instance."
-                                instantSave id="isSystemWide" />
-                        </div>
+                        @can('makeSystemWide', \App\Models\GitlabApp::class)
+                            <div class="lg:col-span-2 max-w-xs">
+                                <x-forms.checkbox canGate="update" :canResource="$gitlab_app" label="System wide"
+                                    helper="If checked, this GitLab App will be available for everyone in this Coolify instance."
+                                    instantSave id="isSystemWide" />
+                            </div>
+                        @endcan
                         @if ($isSystemWide)
                             <div class="lg:col-span-2">
                                 <x-callout type="warning" title="Shared with every team">
@@ -283,7 +285,7 @@
                                 helper="Usually your GitLab URL with /api/v4 appended." />
                             <x-forms.input id="customUser" label="SSH user" />
                             <x-forms.input type="number" id="customPort" label="SSH port" />
-                            @if (! isCloud())
+                            @if (! isCloud() && auth()->user()->can('makeSystemWide', \App\Models\GitlabApp::class))
                                 <div class="max-w-xs lg:col-span-2">
                                     <x-forms.checkbox label="System wide" id="isSystemWide"
                                         helper="If checked, this GitLab App will be available for everyone in this Coolify instance." />
