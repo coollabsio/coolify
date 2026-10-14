@@ -3,12 +3,14 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Configuration extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $currentRoute;
 
@@ -28,13 +30,13 @@ class Configuration extends Component
 
     public function getListeners(): array
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
             'refreshServices' => 'refreshServices',
             'refresh' => 'refreshServices',
             'configurationChanged' => 'refreshServices',
-            "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'refreshServices',
+            ...$this->teamChannelListeners([
+                'ApplicationConfigurationChanged' => 'refreshServices',
+            ]),
         ];
     }
 

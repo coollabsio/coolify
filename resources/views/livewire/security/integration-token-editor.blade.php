@@ -7,7 +7,11 @@
                 <x-forms.input type="password" id="newToken"
                     label="{{ $integrationToken->provider === 'infisical' ? 'New client secret' : 'New API token' }}"
                     placeholder="Leave blank to keep the current token"
-                    helper="Paste a replacement token to rotate this credential." />
+                    helper="{{ match ($integrationToken->provider) {
+                        'infisical' => 'Paste a replacement client secret to rotate this credential. Required when you change the base URL or the client ID.',
+                        'vault' => 'Paste a replacement token to rotate this credential. Required when you change the base URL or the namespace.',
+                        default => 'Paste a replacement token to rotate this credential.',
+                    } }}" />
             </div>
         </div>
 
@@ -44,6 +48,13 @@
                     wire:model.live="automaticDns" canGate="update" :canResource="$integrationToken" />
                 <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
                     Create DNS records automatically when a new domain has one unambiguous matching credential.
+                </p>
+            </div>
+            <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                <x-forms.checkbox id="edit-proxied-dns" label="Proxy DNS records through Cloudflare" fullWidth
+                    wire:model.live="proxiedDns" canGate="update" :canResource="$integrationToken" />
+                <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                    Create new DNS records with the Cloudflare proxy on (orange cloud), so the server IP is not public. Existing records keep their proxy status.
                 </p>
             </div>
         @else

@@ -52,7 +52,7 @@ function githubPullRequestPayload(string $action, string $baseBranch): array
             'author_association' => 'OWNER',
             'head' => [
                 'ref' => 'feature/child',
-                'sha' => 'head-sha',
+                'sha' => 'e83c5163316f89bfbde7d9ab23ca2e25604af290',
             ],
             'base' => [
                 'ref' => $baseBranch,

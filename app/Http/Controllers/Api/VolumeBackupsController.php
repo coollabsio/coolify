@@ -35,13 +35,14 @@ use RuntimeException;
         new OA\Property(property: 'retention_days_s3', type: 'integer', default: 0, maximum: 2147483647, minimum: 0),
         new OA\Property(property: 'retention_max_storage_s3', type: 'number', format: 'float', default: 0, maximum: 9999999999, minimum: 0),
         new OA\Property(property: 'timeout', type: 'integer', default: ScheduledVolumeBackup::DEFAULT_TIMEOUT, minimum: 60, maximum: 36000),
+        new OA\Property(property: 'missing_backup_notification_days', type: 'integer', description: 'Alert after this many days without an execution; 0 disables alerts', default: 0, minimum: 0, maximum: 365),
     ],
     type: 'object',
     additionalProperties: false,
 )]
 #[OA\Schema(
     schema: 'VolumeBackupScheduleResponse',
-    required: ['uuid', 'message', 'storage_uuid', 'storage_type', 'frequency', 'enabled', 'save_s3', 'disable_local_backup', 'stop_during_backup', 'retention_amount_locally', 'retention_days_locally', 'retention_max_storage_locally', 'retention_amount_s3', 'retention_days_s3', 'retention_max_storage_s3', 'timeout'],
+    required: ['uuid', 'message', 'storage_uuid', 'storage_type', 'frequency', 'enabled', 'save_s3', 'disable_local_backup', 'stop_during_backup', 'retention_amount_locally', 'retention_days_locally', 'retention_max_storage_locally', 'retention_amount_s3', 'retention_days_s3', 'retention_max_storage_s3', 'timeout', 'missing_backup_notification_days'],
     properties: [
         new OA\Property(property: 'uuid', type: 'string'),
         new OA\Property(property: 'message', type: 'string'),
@@ -60,6 +61,7 @@ use RuntimeException;
         new OA\Property(property: 'retention_days_s3', type: 'integer'),
         new OA\Property(property: 'retention_max_storage_s3', type: 'number', format: 'float'),
         new OA\Property(property: 'timeout', type: 'integer'),
+        new OA\Property(property: 'missing_backup_notification_days', type: 'integer'),
     ],
     type: 'object',
 )]
@@ -197,6 +199,7 @@ class VolumeBackupsController extends Controller
             'retention_days_s3' => 'integer|min:0|max:2147483647',
             'retention_max_storage_s3' => 'numeric|min:0|max:9999999999',
             'timeout' => 'integer|min:60|max:36000',
+            'missing_backup_notification_days' => 'integer|min:0|max:365',
         ]);
         $errors = $validator->errors();
         $allowedFields = [
@@ -213,6 +216,7 @@ class VolumeBackupsController extends Controller
             'retention_days_s3',
             'retention_max_storage_s3',
             'timeout',
+            'missing_backup_notification_days',
         ];
 
         foreach (array_diff(array_keys($request->all()), $allowedFields) as $field) {
@@ -278,6 +282,9 @@ class VolumeBackupsController extends Controller
         ];
         if ($request->has('timeout')) {
             $attributes['timeout'] = $request->integer('timeout');
+        }
+        if ($request->has('missing_backup_notification_days')) {
+            $attributes['missing_backup_notification_days'] = $request->integer('missing_backup_notification_days');
         }
 
         $backup = $storage->scheduledBackups()->updateOrCreate([], $attributes);
@@ -445,6 +452,7 @@ class VolumeBackupsController extends Controller
             'retention_days_s3' => $backup->retention_days_s3,
             'retention_max_storage_s3' => $backup->retention_max_storage_s3,
             'timeout' => $backup->timeout,
+            'missing_backup_notification_days' => $backup->missing_backup_notification_days ?? 0,
         ];
     }
 

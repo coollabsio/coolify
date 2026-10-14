@@ -2,21 +2,22 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Status extends Component
 {
+    use ListensToTeamChannel;
+
     public $database;
 
     public function getListeners(): array
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'refreshStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'refreshStatus',
-        ];
+        return $this->teamChannelListeners([
+            'ServiceStatusChanged' => 'refreshStatus',
+            'ServiceChecked' => 'refreshStatus',
+        ]);
     }
 
     public function refreshStatus(): void
@@ -26,6 +27,12 @@ class Status extends Component
 
     public function render(): View
     {
-        return view('livewire.project.database.status');
+        return view('livewire.project.database.status', [
+            'healthcheckUrl' => route('project.database.healthcheck', [
+                'project_uuid' => $this->database->environment->project->uuid,
+                'environment_uuid' => $this->database->environment->uuid,
+                'database_uuid' => $this->database->uuid,
+            ]),
+        ]);
     }
 }

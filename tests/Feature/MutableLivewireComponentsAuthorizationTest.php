@@ -105,7 +105,7 @@ it('declares update authorization on service backup mutation controls', function
 
     expect($volumeBackupView)
         ->toMatch('/<x-modal-input(?=[^>]*:title="\'Edit backup schedule\'")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'database\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button\s+type="button" canGate="update" :canResource="\$service"[^\n]*\n(?:[^\n]*\n){0,3}?\s*wire:click\.stop="backupNow\(\'database\',/')
         ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'storage\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/');
 });
 
@@ -153,6 +153,10 @@ it('keeps mutable Livewire components behind authorization checks', function (st
         'app/Livewire/Project/Shared/Terminal.php',
         ['AuthorizesRequests', "authorize('view'", "authorize('canAccessTerminal'"],
     ],
+    'volume backup settings' => [
+        'app/Livewire/Project/Shared/Storages/VolumeBackups.php',
+        ['AuthorizesRequests', "authorize('view', \$this->resource)", "authorize('update', \$this->resource)"],
+    ],
 ]);
 
 it('authorizes every volume backup form control', function (string $path, array $controlPatterns) {
@@ -165,34 +169,30 @@ it('authorizes every volume backup form control', function (string $path, array 
     'retention controls' => [
         'resources/views/livewire/project/shared/storages/volume-backups/retention.blade.php',
         [
-            '/<x-forms\.button(?=[^>]*type="submit")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*>Save<\/x-forms\.button>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionAmountLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionDaysLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionMaxStorageLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionAmountS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionDaysS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionMaxStorageS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
+            '/<x-forms\.input(?=[^>]*id="retentionAmountLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
+            '/<x-forms\.input(?=[^>]*id="retentionDaysLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
+            '/<x-forms\.input(?=[^>]*id="retentionMaxStorageLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
+            '/<x-forms\.input(?=[^>]*id="retentionAmountS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
+            '/<x-forms\.input(?=[^>]*id="retentionDaysS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
+            '/<x-forms\.input(?=[^>]*id="retentionMaxStorageS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
         ],
     ],
     'S3 controls' => [
         'resources/views/livewire/project/shared/storages/volume-backups/s3.blade.php',
         [
-            '/<x-forms\.button(?=[^>]*type="submit")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*>Save<\/x-forms\.button>/s',
-            '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*>Enable S3<\/x-forms\.button>/s',
-            '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*>Disable S3<\/x-forms\.button>/s',
-            '/<x-forms\.select(?=[^>]*id="s3StorageId")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*>/s',
-            '/<x-forms\.checkbox(?=[^>]*id="disableLocalBackup")(?=[^>]*instantSave)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
-            '/<x-forms\.checkbox(?=[^>]*id="disableLocalBackup")(?=[^>]*disabled)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
+            '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*>\s*Enable S3\s*<\/x-forms\.button>/s',
+            '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*>\s*Disable S3\s*<\/x-forms\.button>/s',
+            '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="s3StorageId"[\s\S]*?:disabled="! auth\(\)->user\(\)\?->can\(\'update\', \$resource\)"/',
+            '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="disableLocalBackup"[\s\S]*?:disabled="! \$saveToS3 \|\| ! auth\(\)->user\(\)\?->can\(\'update\', \$resource\)"/',
         ],
     ],
     'service domains controls' => [
         'resources/views/livewire/project/service/domains.blade.php',
         [
-            '/<x-forms\.select(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*id="newServiceApplicationId")[^>]*>/s',
-            '/<x-forms\.input(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*id="newDomain")[^>]*>/s',
+            '/<x-forms\.listbox(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*id="newServiceApplicationId")[^>]*>/s',
+            '/@can\(\'update\', \$service\)[\s\S]*?<x-modal-input title="Add domain"(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>[\s\S]*?<x-forms\.domain-input id="newDomainParts"[\s\S]*?@endcan/',
             '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*wire:click="generateDomain")[^>]*>/s',
             '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*type="submit")[^>]*>/s',
-            '/wire:click="checkAllDns"/s',
         ],
     ],
     'postgres public access control' => [

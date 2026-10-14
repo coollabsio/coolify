@@ -88,7 +88,7 @@ test('delete redirects before dispatching resource cleanup after the response', 
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
 });
 
-test('delete succeeds without password for an oauth user', function () {
+test('delete succeeds without a password for a user with a linked oauth identity', function () {
     OauthIdentity::create([
         'user_id' => $this->user->id,
         'provider' => 'oidc',
@@ -97,11 +97,47 @@ test('delete succeeds without password for an oauth user', function () {
     ]);
 
     Livewire::test(Danger::class, ['resource' => $this->application])
+        ->set('projectUuid', $this->project->uuid)
+        ->set('environmentUuid', $this->environment->uuid)
         ->call('delete', '')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->assertRedirectToRoute('project.resource.index', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+        ]);
 
-    expect(Application::find($this->application->id))->not->toBeNull();
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($this->application));
+});
+
+test('delete still asks a user with a linked oauth identity for the typed confirmation but not for a password', function () {
+    OauthIdentity::create([
+        'user_id' => $this->user->id,
+        'provider' => 'oidc',
+        'issuer' => 'https://idp.example.com',
+        'provider_user_id' => 'oauth-user-id',
+    ]);
+
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->assertSee('x-model="userConfirmationText"', false)
+        ->assertSee('confirmWithText: true', false)
+        ->assertSee('confirmWithPassword: false', false)
+        ->assertDontSee('type="password"', false)
+        ->assertDontSee('Confirm with', false);
+});
+
+test('delete rejects an empty password for a user without a linked oauth identity', function () {
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->call('delete', '')
+        ->assertHasErrors('password')
+        ->assertReturned('The provided password is incorrect.');
+
+    Queue::assertNotPushed(DeleteResourceJob::class);
+});
+
+test('delete asks a user without a linked oauth identity for the password', function () {
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->assertSee('confirmWithPassword: true', false)
+        ->assertSee('type="password"', false);
 });
 
 test('delete applies selectedActions from checkbox state', function () {

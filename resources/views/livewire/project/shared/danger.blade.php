@@ -8,11 +8,11 @@
             default => 'resource',
         };
     @endphp
-    @if ($resource instanceof \App\Models\Service && !$resource->server?->isFunctional())
+    @if ($resource && !data_get($resource, 'destination.server')?->isFunctional())
         <x-callout type="warning" title="Server is not reachable" class="mb-4">
-            Coolify cannot remove or verify Docker resources on this server. The deletion dialog will default to
-            removing this service from Coolify only. Its containers, volumes, networks, and configuration files may
-            remain on the server.
+            Coolify cannot stop or remove Docker resources on this server. Deleting removes this {{ $resourceLabel }}
+            from Coolify only. Its containers, volumes, networks, and configuration files remain on the server and can
+            start again when the server is back.
         </x-callout>
     @endif
     <x-application.settings-section id="danger-zone-section" title="Danger zone"

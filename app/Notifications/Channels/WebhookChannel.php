@@ -20,6 +20,6 @@ class WebhookChannel
 
         $payload = $notification->toWebhook();
 
-        SendWebhookJob::dispatch($payload, $webhookSettings->webhook_url);
+        SendWebhookJob::dispatch($payload, $webhookSettings->webhook_url, data_get($notification, 'isTestNotification', false) ? null : $webhookSettings);
     }
 }

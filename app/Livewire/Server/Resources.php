@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Component;
@@ -12,6 +13,7 @@ use Livewire\WithPagination;
 class Resources extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
     use WithPagination;
 
     public int $perPage = 10;
@@ -39,11 +41,9 @@ class Resources extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'refreshStatus',
-        ];
+        return $this->teamChannelListeners([
+            'ApplicationStatusChanged' => 'refreshStatus',
+        ]);
     }
 
     public function startUnmanaged($id)

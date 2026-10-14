@@ -28,6 +28,17 @@ beforeEach(function () {
     ]);
 });
 
+/**
+ * The nginx label wraps an <x-helper> whose hidden tooltip also contains
+ * "custom Nginx configuration", so a plain assertSee() resolves to the hidden
+ * tooltip. Assert the section's visible action and the (case-sensitive) label source.
+ */
+function assertNginxConfigurationSectionVisible(mixed $page): mixed
+{
+    return $page->assertSee('Generate default')
+        ->assertSourceHas('Custom Nginx configuration');
+}
+
 // ---------------------------------------------------------------------------
 // Application: static / SPA / nginx
 // ---------------------------------------------------------------------------
@@ -45,7 +56,8 @@ it('shows site type control for nixpacks applications', function () {
 
     $page->assertSee('Site type')
         ->assertSee('Dynamic')
-        ->assertDontSee('Custom Nginx configuration')
+        ->assertDontSee('Generate default')
+        ->assertSourceMissing('Custom Nginx configuration')
         ->screenshot(filename: 'toggle-site-type-default-dynamic');
 });
 
@@ -61,7 +73,7 @@ it('enables static site and reveals custom nginx configuration', function () {
     $page = visit($url);
     selectListboxOption($page, 'siteType', 'Static', 2);
 
-    $page->assertSee('Custom Nginx configuration')
+    assertNginxConfigurationSectionVisible($page)
         ->assertSee('Web server')
         ->assertSee('nginx:alpine')
         ->screenshot(filename: 'toggle-site-type-static');
@@ -71,8 +83,7 @@ it('enables static site and reveals custom nginx configuration', function () {
         ->and($this->application->settings->is_spa)->toBeFalse();
 
     // Reload must keep static UI state.
-    visit($url)
-        ->assertSee('Custom Nginx configuration')
+    assertNginxConfigurationSectionVisible(visit($url))
         ->assertSee('Static')
         ->screenshot(filename: 'toggle-site-type-static-reloaded');
 });
@@ -90,7 +101,7 @@ it('switches to spa and generates spa nginx try_files config', function () {
     // Going straight to SPA (from dynamic) flips is_spa and regenerates nginx.
     selectListboxOption($page, 'siteType', 'SPA (single-page application)', 2.5);
 
-    $page->assertSee('Custom Nginx configuration')
+    assertNginxConfigurationSectionVisible($page)
         ->screenshot(filename: 'toggle-site-type-spa-nginx');
 
     $this->application->refresh();
@@ -116,7 +127,7 @@ it('switches from spa back to static and regenerates static nginx config', funct
 
     selectListboxOption($page, 'siteType', 'Static', 2.5);
 
-    $page->assertSee('Custom Nginx configuration')
+    assertNginxConfigurationSectionVisible($page)
         ->screenshot(filename: 'toggle-site-type-static-nginx-from-spa');
 
     $this->application->refresh();
@@ -137,11 +148,12 @@ it('returns to dynamic site type and hides nginx configuration section', functio
 
     $page = visit($url);
     selectListboxOption($page, 'siteType', 'Static', 2);
-    $page->assertSee('Custom Nginx configuration');
+    assertNginxConfigurationSectionVisible($page);
 
     selectListboxOption($page, 'siteType', 'Dynamic', 2);
 
-    $page->assertDontSee('Custom Nginx configuration')
+    $page->assertDontSee('Generate default')
+        ->assertSourceMissing('Custom Nginx configuration')
         ->screenshot(filename: 'toggle-site-type-back-to-dynamic');
 
     $this->application->refresh();

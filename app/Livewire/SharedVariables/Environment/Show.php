@@ -42,7 +42,7 @@ class Show extends Component
                 'is_literal' => $data['is_literal'],
                 'comment' => $data['comment'] ?? null,
                 'type' => 'environment',
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->project->team_id,
             ]);
             $this->environment->refresh();
             $this->getDevView();
@@ -76,10 +76,10 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
+        $canViewValues = auth()->user()?->isAdminOfTeam($this->project->team_id) ?? false;
 
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
+        return $variables->map(function ($item) use ($canViewValues) {
+            if (! $canViewValues) {
                 return "$item->key=(Hidden, only admins can view)";
             }
             if ($item->is_shown_once) {
@@ -167,7 +167,7 @@ class Show extends Component
                     'is_multiline' => false,
                     'is_literal' => false,
                     'type' => 'environment',
-                    'team_id' => currentTeam()->id,
+                    'team_id' => $this->project->team_id,
                 ]);
                 $count++;
             }

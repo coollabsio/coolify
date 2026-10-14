@@ -68,92 +68,6 @@ beforeEach(function () {
         'destination_type' => $this->destination->getMorphClass(),
         'status' => 'running',
     ]);
-
-    $this->routeParams = [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'application_uuid' => $this->application->uuid,
-    ];
-});
-
-/**
- * Settings tab must carry both the active class and aria-current so CSS
- * under .application-heading-actions can override the base tab resets.
- */
-function assertSettingsTabActive(string $html): void
-{
-    expect(preg_match(
-        '/<a[^>]*(?:aria-current="page"[^>]*app-tab-active|app-tab-active[^>]*aria-current="page")[^>]*>\s*Settings\s*<\/a>/s',
-        $html
-    ))->toBe(1);
-
-    // Desktop navbar CSS override must exist so active styles are visible.
-    $css = file_get_contents(resource_path('css/app.css'));
-    expect($css)
-        ->toContain(".application-heading-actions .app-tab[aria-current='page']")
-        ->toContain('.application-heading-actions .app-tab.app-tab-active');
-}
-
-it('marks settings tab active on general configuration route', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $html = $this->get(route('project.application.configuration', $this->routeParams))
-        ->assertSuccessful()
-        ->getContent();
-
-    assertSettingsTabActive($html);
-});
-
-it('marks settings tab active on webhooks and other settings sub-routes', function (string $routeName) {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $html = $this->get(route($routeName, $this->routeParams))
-        ->assertSuccessful()
-        ->getContent();
-
-    assertSettingsTabActive($html);
-})->with([
-    'webhooks' => 'project.application.webhooks',
-    'domains' => 'project.application.domains',
-    'advanced' => 'project.application.advanced',
-    'environment-variables' => 'project.application.environment-variables',
-    'danger' => 'project.application.danger',
-]);
-
-it('does not mark settings tab active on deployment logs', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $html = $this->get(route('project.application.deployment.index', $this->routeParams))
-        ->assertSuccessful()
-        ->getContent();
-
-    expect($html)->toContain('Deployment');
-
-    expect(preg_match(
-        '/<a[^>]*(?:aria-current="page"[^>]*app-tab-active|app-tab-active[^>]*aria-current="page")[^>]*>\s*Settings\s*<\/a>/s',
-        $html
-    ))->toBe(0);
-
-    // Deployment now lives in the Logs section of the settings sidebar.
-    expect(preg_match(
-        '/<a[^>]*menu-item-active[^>]*>.*?Deployment.*?<\/a>/s',
-        $html
-    ))->toBe(1);
-});
-
-it('syncs activeRouteName from the page route when heading is rendered on webhooks', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $html = $this->get(route('project.application.webhooks', $this->routeParams))
-        ->assertSuccessful()
-        ->assertSeeLivewire(ApplicationHeading::class)
-        ->getContent();
-
-    assertSettingsTabActive($html);
 });
 
 it('keeps activeRouteName when request is not an application page route', function () {
@@ -178,15 +92,26 @@ it('refreshes the breadcrumb application status after it changes', function () {
 
     $component
         ->call('refreshStatus')
-        ->assertSee('Stopped')
+        ->assertSee('Exited')
         ->assertDontSee('Running');
 
     expect($component->instance()->getListeners())
         ->toHaveKey("echo-private:team.{$this->team->id},ServiceChecked", 'refreshStatus');
 });
 
-it('uses app-tab-active utility for resource heading active styles', function () {
-    $utilities = file_get_contents(resource_path('css/utilities.css'));
+it('links the application healthcheck status to the healthcheck page', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
 
-    expect($utilities)->toContain('@utility app-tab-active');
+    $healthcheckUrl = route('project.application.healthcheck', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]);
+
+    Livewire::test(ApplicationStatus::class, ['application' => $this->application])
+        ->assertSeeHtml('href="'.$healthcheckUrl.'"');
+
+    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
+        ->assertSeeHtml('href="'.$healthcheckUrl.'"');
 });

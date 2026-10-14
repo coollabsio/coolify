@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database\Backup;
 
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use Livewire\Component;
 
@@ -43,7 +44,10 @@ class Execution extends Component
         $this->database = $database;
         $this->backup = $backup;
         $this->executions = $executions;
-        $this->s3s = currentTeam()->s3s;
+        $this->s3s = S3Storage::query()
+            ->where('team_id', $database->team()->id)
+            ->where('is_usable', true)
+            ->get();
         $this->parameters = get_route_parameters();
         $this->section = match (request()->route()?->getName()) {
             'project.database.backup.s3' => 's3',

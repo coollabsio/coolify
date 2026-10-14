@@ -67,6 +67,8 @@ class Create extends Component
                     $database = create_standalone_dragonfly($environment->id, $destination);
                 } elseif ($type->value() === 'clickhouse') {
                     $database = create_standalone_clickhouse($environment->id, $destination);
+                } elseif ($type->value() === 'sqlite') {
+                    $database = create_standalone_sqlite($environment->id, $destination);
                 }
 
                 return redirect()->route('project.database.configuration', [
@@ -76,7 +78,7 @@ class Create extends Component
                 ]);
             }
             if ($type->startsWith('one-click-service-')) {
-                $oneClickServiceName = $type->after('one-click-service-')->value();
+                $oneClickServiceName = resolve_service_template_key($type->after('one-click-service-')->value(), $services);
                 $oneClickService = data_get($services, "$oneClickServiceName.compose");
                 $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
                 if ($oneClickDotEnvs) {

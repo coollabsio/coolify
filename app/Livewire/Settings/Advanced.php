@@ -222,7 +222,7 @@ class Advanced extends Component
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -260,12 +260,32 @@ class Advanced extends Component
             }
             $this->authorize('update', $this->settings);
             $this->settings->domain_connect_private_key = null;
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->domain_connect_private_key = null;
             $this->dispatch('success', 'Domain Connect private key removed.');
         } catch (\Exception $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * Save the instance settings and record the changed field names (never their values).
+     */
+    private function saveAndAudit(): void
+    {
+        $changedFields = auditChangedFields($this->settings);
+        $this->settings->save();
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.instance.settings.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'section' => 'advanced',
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     private function normalizeDomainConnectPrivateKey(string $key): string

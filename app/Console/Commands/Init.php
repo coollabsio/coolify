@@ -257,10 +257,8 @@ class Init extends Command
                 $database = StandalonePostgresql::withTrashed()->find(0);
                 if ($database && $database->trashed()) {
                     $database->restore();
-                    $scheduledBackup = ScheduledDatabaseBackup::find(0);
-                    if (! $scheduledBackup) {
+                    if (! $database->scheduledBackups()->exists()) {
                         ScheduledDatabaseBackup::create([
-                            'id' => 0,
                             'enabled' => true,
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',

@@ -13,7 +13,7 @@ class ApplicationFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->unique()->name(),
+            'name' => fake()->unique()->words(2, true),
             'destination_id' => 1,
             'git_repository' => fake()->url(),
             'git_branch' => fake()->word(),

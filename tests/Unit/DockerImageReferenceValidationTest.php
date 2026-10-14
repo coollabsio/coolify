@@ -15,6 +15,9 @@ it('accepts valid docker registry image names', function (string $imageName) {
     'ghcr image' => 'ghcr.io/coollabsio/coolify',
     'repository component with repeated hyphens' => 'ghcr.io/acme/my--service',
     'registry with port' => 'registry.example.com:5000/team/app',
+    'IPv6 registry' => '[2a01:4f8::1]/team/app',
+    'IPv6 registry with port' => '[2a01:4f8::1]:5000/app',
+    'IPv4-mapped IPv6 registry' => '[::ffff:192.0.2.1]:5000/app',
     'digest marker used by existing dockerimage records' => 'nginx@sha256',
 ]);
 
@@ -29,6 +32,10 @@ it('rejects docker registry image names with shell metacharacters', function (st
     'newline' => "coolify/poc\nid",
     'space' => 'coolify/poc image',
     'tag in image-name-only field' => 'coolify/poc:latest',
+    'IPv6 registry with command substitution' => '[2a01:4f8::1$(id)]:5000/app',
+    'IPv6 registry with letters outside hex' => '[2a01:4f8::zz]/app',
+    'unclosed IPv6 registry' => '[2a01:4f8::1:5000/app',
+    'bare IPv6 registry' => '2a01:4f8::1/app',
 ]);
 
 it('accepts valid docker registry image tags', function (string $tag) {
@@ -66,6 +73,7 @@ it('accepts supported full docker image reference formats', function (string $im
     'image with sha256 digest' => 'nginx@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     'registry image with sha256 digest' => 'ghcr.io/user/app@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     'registry port image with tag' => 'localhost:5000/app:latest',
+    'IPv6 registry port image with tag' => '[2a01:4f8::1]:5000/app:latest',
 ]);
 
 it('rejects unsupported full docker image reference formats', function (string $imageReference) {

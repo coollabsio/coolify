@@ -96,13 +96,16 @@ function createPerfApplicationWithVolumes(int $volumeCount = 5): array
 it('renders volume rows inline without nested Livewire row components', function () {
     [$application] = createPerfApplicationWithVolumes(5);
 
-    $html = Livewire::test(All::class, ['resource' => $application])->html();
+    $component = Livewire::test(All::class, ['resource' => $application]);
 
-    expect($html)
+    expect($component->html())
         ->toContain('data-table')
-        ->toContain('openBackupModal')
         ->toContain('wire:submit="submit(')
         ->not->toContain('shared-configure-volume-backup-');
+
+    // The only nested components are the per-row backup forms, keyed by volume id.
+    expect(array_keys($component->snapshot['memo']['children']))
+        ->toBe($application->persistentStorages->map(fn ($storage) => "configure-volume-backup-{$storage->id}")->values()->all());
 });
 
 it('batches volume backup meta and exposes forms for every volume', function () {
@@ -144,19 +147,17 @@ it('updates a volume row from the parent All component', function () {
     expect($volume->fresh()->mount_path)->toBe('/data/updated');
 });
 
-it('mounts a single shared backup modal only after openBackupModal', function () {
+it('mounts a backup form per volume row keyed by the volume id', function () {
     [$application, $volume] = createPerfApplicationWithVolumes(3);
 
     $component = Livewire::test(All::class, ['resource' => $application]);
 
-    expect($component->html())
-        ->toContain('openBackupModal')
-        ->not->toContain('shared-configure-volume-backup-')
-        ->and($component->get('backupModalStorageId'))->toBeNull();
+    expect($component->snapshot['memo']['children'])
+        ->toHaveCount(3)
+        ->toHaveKey("configure-volume-backup-{$volume->id}");
 
     $component
-        ->call('openBackupModal', $volume->id)
-        ->assertSet('backupModalStorageId', $volume->id)
+        ->assertSee('Configure Volume Backup')
         ->assertSee('Frequency');
 });
 

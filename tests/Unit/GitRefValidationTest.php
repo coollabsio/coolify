@@ -4,6 +4,19 @@ use App\Models\Application;
 use App\Models\ApplicationSetting;
 
 /**
+ * Split a command into words the way /bin/sh does. The words are only printed,
+ * so a correctly quoted command cannot run any part of its payload.
+ *
+ * @return array<int, string>
+ */
+function gitRefShellWords(string $command): array
+{
+    $output = shell_exec('for word in '.$command.'; do printf "%s\\0" "$word"; done');
+
+    return explode("\0", rtrim((string) $output, "\0"));
+}
+
+/**
  * Tests for git ref validation.
  *
  * Ensures that git_commit_sha and related inputs are validated
@@ -98,9 +111,12 @@ describe('executeInDocker git log escaping', function () {
         $command = 'cd /workdir && git log -1 '.escapeshellarg($maliciousCommit).' --pretty=%B';
         $result = executeInDocker('test-container', $command);
 
-        // The malicious payload must not be able to break out of quoting
-        expect($result)->not->toContain('id;');
-        expect($result)->toContain("'HEAD'\\''");
+        // The whole git command stays one bash -c argument.
+        expect(gitRefShellWords($result))->toBe(['docker', 'exec', 'test-container', 'bash', '-c', $command]);
+
+        // Inside bash -c, the malicious payload stays one git log argument.
+        expect(gitRefShellWords(str($command)->after('&& ')->toString()))
+            ->toBe(['git', 'log', '-1', $maliciousCommit, '--pretty=%B']);
     });
 });
 
@@ -119,7 +135,6 @@ describe('buildGitCheckoutCommand escaping', function () {
         expect($result)->toContain("git checkout 'abc123'");
 
         $result = $method->invoke($app, "abc'; id; #");
-        expect($result)->not->toContain('id;');
-        expect($result)->toContain("git checkout 'abc'");
+        expect(gitRefShellWords($result))->toBe(['git', 'checkout', "abc'; id; #"]);
     });
 });

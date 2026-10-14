@@ -102,11 +102,16 @@
                                     portal />
                                 <button type="button" class="button shrink-0"
                                     wire:click="moveBackup({{ $backup->id }})">Move</button>
-                                <button type="button" class="button shrink-0 text-error"
-                                    wire:click="disableS3({{ $backup->id }})"
-                                    wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
-                                    Disable
-                                </button>
+                                <div wire:key="disableS3-{{ $backup->id }}">
+                                    <x-modal-confirmation title="Disable S3 for this backup schedule?"
+                                        submitAction="disableS3({{ $backup->id }})" :confirmWithText="false"
+                                        :confirmWithPassword="false" step2ButtonText="Disable S3"
+                                        :actions="['Backups from this schedule will no longer be uploaded to S3.']">
+                                        <x-slot:trigger>
+                                            <button type="button" class="button shrink-0 text-error">Disable</button>
+                                        </x-slot:trigger>
+                                    </x-modal-confirmation>
+                                </div>
                             </div>
                         </div>
                     @endforeach
@@ -142,11 +147,16 @@
                                 portal />
                             <button type="button" class="button shrink-0"
                                 wire:click="moveVolumeBackup({{ $backup->id }})">Move</button>
-                            <button type="button" class="button shrink-0 text-error"
-                                wire:click="disableVolumeS3({{ $backup->id }})"
-                                wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
-                                Disable
-                            </button>
+                            <div wire:key="disableVolumeS3-{{ $backup->id }}">
+                                <x-modal-confirmation title="Disable S3 for this backup schedule?"
+                                    submitAction="disableVolumeS3({{ $backup->id }})" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Disable S3"
+                                    :actions="['Backups from this schedule will no longer be uploaded to S3.']">
+                                    <x-slot:trigger>
+                                        <button type="button" class="button shrink-0 text-error">Disable</button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
+                            </div>
                         </div>
                     </div>
                 @endforeach

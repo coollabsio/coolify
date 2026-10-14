@@ -20,10 +20,9 @@ compact divided list, not legacy green check SVGs or fixed-width status rows.
 >   interactions while changing layout and presentation.
 > - Add or update tests when a UI change affects behavior. Follow the testing
 >   requirements in `AGENTS.md`.
-> - Validate Blade with `docker exec coolify php artisan view:cache`, then clear
->   it with `docker exec coolify php artisan view:clear`.
-> - Build frontend assets in the Vite container with
->   `docker exec coolify-vite npm run build`.
+> - Validate Blade with `./scripts/dev exec php artisan view:cache`, then clear
+>   it with `./scripts/dev exec php artisan view:clear`.
+> - Build frontend assets with `npm run build`.
 > - Use existing components before adding another styling abstraction.
 
 ---
@@ -42,7 +41,7 @@ The interface is compact and product-focused:
 - the Coolify purple brand accent in light mode;
 - the readable Coolify yellow accent in dark mode;
 - solid active-item fills (neutral black/white opacity), not accent gradients;
-  active state is the left accent rail plus a flat selected surface;
+  active state is a flat selected surface with no accent rail;
 - sentence-case labels and headings;
 - never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
   ASCII hyphen (`-`) for empty cells and separators.
@@ -59,17 +58,18 @@ and focus-visible controls retain the accent ring alongside the depth.
 Movement and depth-shadow changes transition over 80ms; color transitions keep
 the shared 120ms duration.
 Standard button labels use `capitalize`, giving each word an initial capital.
-Highlighted buttons mix the accent equally with black for a pronounced bottom
-edge, so custom theme colors produce a matching edge instead of a generic one.
-Dark mode matches the depth edge of neutral buttons to their regular border
-color. Highlighted buttons keep their dark, color-matched accent edge.
+Highlighted buttons use `--color-coollabs-300` for their bottom edge; the
+custom theme derives it from its bright color mixed with black, so custom
+colors keep a matching edge. Dark mode matches the depth edge of neutral
+buttons to their regular border color (`rgb(255 255 255 / 0.08)`).
 
 ---
 
 ## 2. Development and cascade notes
 
-PHP runs in the `coolify` container. The development app is normally available
-at `http://localhost:8000`, with Vite on port `5173`.
+PHP runs in this branch's Coolify container (`./scripts/dev exec …`). The main
+checkout serves the app at `http://localhost:8000` with Vite on `5173`;
+worktrees use the port block printed by `./scripts/dev urls`.
 
 `resources/css/app.css` still contains unlayered global element rules for
 headings, labels, and tables. Tailwind utilities are layered, so the
@@ -89,8 +89,8 @@ Important consequences:
 - add shared surface overrides to the unlayered block instead of stacking
   `!important` utilities;
 - listbox panels require ancestors with `overflow: visible`;
-- anchored cards use `scroll-margin-top: 7rem` to clear both fixed navigation
-  layers;
+- anchored cards use `scroll-margin-top: 7rem` to clear the fixed topbar and
+  the page's top padding;
 - modal shells reuse the layer-card classes but keep content-width sizing on
   desktop;
 - Alpine code inside quoted Blade attributes must not introduce conflicting
@@ -104,11 +104,11 @@ The surface ladder is defined in `resources/css/app.css`.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--coollabs-canvas` | 97% off-white | 10% neutral | page canvas (kept below card fills so cards lift) |
-| `--coollabs-elevated` | 98% neutral | 15% neutral | shells and card headers |
-| `--coollabs-base` | white | 17% neutral | nested card bodies |
-| `--coollabs-recessed` | 96% neutral | 20% neutral | inputs and listboxes |
-| `--coollabs-fill` | 92.2% neutral | 26.9% neutral | dividers and passive fills |
+| `--coollabs-canvas` | 97% off-white | 14.48% neutral | page canvas (kept below card fills so cards lift) |
+| `--coollabs-elevated` | 98% neutral | 20.02% neutral | shells and card headers |
+| `--coollabs-base` | white | 22.64% neutral | nested card bodies |
+| `--coollabs-recessed` | 96% neutral | 25.2% neutral | inputs and listboxes |
+| `--coollabs-fill` | 92.2% neutral | 29.31% neutral | dividers and passive fills |
 | `--coollabs-line` | translucent dark | 32% neutral | control borders |
 | `--coollabs-hairline` | 85.5% neutral | 32% neutral | shell rings (crisp enough to read as a card edge, ~1.5:1) |
 | `--coollabs-subtle` | 50% neutral | 70.8% neutral | labels and muted titles (light darkened for WCAG AA 4.5:1) |
@@ -137,17 +137,17 @@ The app shell is three distinct surface layers, not one flat color. Chrome
 lifts, content is the base, cards lift off the content:
 
 - **Content canvas** is the base layer: `bg-app` in dark (deepest,
-  `--color-app` `#0a0a0b`), `bg-gray-50` in light. The `<main>` content area
-  and page body use it.
+  `--color-app` `oklch(14.48% 0 0)`, sRGB 10), `bg-neutral-50` in light. The
+  `<main>` content area and page body use it.
 - **Sidebar and topbar chrome** use `bg-panel` in dark (`--color-panel`
-  `#141418`, a clear step lighter than the content canvas) and `bg-white` in
-  light, so the chrome reads as a separate panel from the content.
+  `oklch(19.13% 0 0)`, sRGB 20, a clear step lighter than the content canvas)
+  and `bg-white` in light, so the chrome reads as a separate panel from the content.
 
-Dark surface tokens are hex, not oklch. oklch lightness compresses toward pure
-black below ~15% (oklch(10%) renders as sRGB 3, oklch(15%) as sRGB 11), so oklch
-values there give no visible step between layers. The dark ladder is
-`--color-app` 10, `--coollabs-elevated` 22, `--coollabs-base` 28,
-`--coollabs-recessed` 34 (sRGB), which reads as distinct surfaces.
+Dark surface tokens are exact oklch equivalents of chosen sRGB steps. oklch
+lightness compresses toward pure black below ~15%, so do not pick dark values by
+round oklch percentages. The dark ladder is `--color-app` 10,
+`--coollabs-elevated` 22, `--coollabs-base` 28, `--coollabs-recessed` 34 (sRGB),
+which reads as distinct surfaces.
 
 Temperature: every panel is **pure neutral gray** (r=g=b), one consistent
 temperature across the sidebar, tables, cards, inputs, dividers, borders, and
@@ -171,60 +171,54 @@ color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
 
 - Main sidebar groups are compact, use outline Reicons, and keep a 32px row
   height.
-- Active sidebar rows are rounded pills (`rounded-md`) with an accent rail on
-  the left plus a solid neutral selected fill (`bg-black/5` light,
-  `bg-white/6` dark). Hover rows use the same radius. Do not use accent-tinted
-  gradients on nav rows; yellow washes look muddy on dark UI.
-- Nested items use a thin guide line with a visible active segment, not a thick
-  box border.
+- Active sidebar rows are rounded pills (`rounded-md`) with a solid neutral
+  selected fill (`bg-black/5` light, `bg-white/6` dark) and no accent rail.
+  Hover rows use the same radius. Do not use accent-tinted gradients on nav
+  rows; yellow washes look muddy on dark UI.
+- Nested items sit behind a thin 1px guide line (`.nav-children`) and use the
+  same selected pill, not a thick box border.
 - The update badge sits on the version row and uses a tiny fully rounded
   primary-action pill.
 
-### Layer-2 navigation
+### Resource navigation
 
-Application and server pages use the same fixed second navigation layer
-directly below the global topbar. Do not keep a large in-flow resource heading
-or legacy `.navbar-main` tabs on one resource type while using the compact
-layer-2 bar on another. Active tabs are a light brand fill:
-
-- purple tint in light mode;
-- yellow tint in dark mode;
-- no fully saturated tab background.
+Application, service, database, and server pages have no second navigation
+bar; content starts directly below the 48px global topbar. Every route in a
+resource family (settings pages, backups, logs, terminal, metrics, danger zone)
+is an entry in its grouped settings sidebar. Do not add a tab row, a large
+in-flow resource heading, or legacy `.navbar-main` tabs to one resource type.
 
 Keep route-derived active state in Blade/Livewire. Do not rely only on Alpine
 state because it can disappear after polling or a Livewire morph.
 
-The global topbar owns the current resource identity and its compact status
-badges. Layer 2 owns route tabs, resource links, and contextual action buttons
-only. If a resource is missing from `x-top-breadcrumb`, extend the global
-topbar instead of repeating its name or status summary in layer 2. Mobile
-resource navigation may repeat this context because the desktop global topbar
-is hidden there.
+The global topbar owns the current resource identity, its compact status
+badges, configuration warnings (`#configuration-warning-hud-slot`), and the
+resource actions (`#resource-action-hud-slot`). If a resource is missing from
+`x-top-breadcrumb`, extend the global topbar instead of repeating its name or
+status summary in the page. Below `xl` the resource heading repeats the name,
+status, and links in-flow because the desktop HUD is hidden there.
 
-Desktop resource lifecycle actions dock in `#resource-action-hud-slot` and
-use `<x-resource-heading-overflow>`. Show primary actions (Deploy, Redeploy,
-Restart, Stop) as sibling header buttons. Collapse that group into an Actions
-dropdown only when the remaining top-bar width cannot fit them (breadcrumb
-keeps a 200px floor). Infrequent operations live in a separate Advanced
-dropdown with the grid icon: force restart / force deploy / force cleanup
-on services, and Traefik dashboard / refresh proxy status on servers. Place
-Advanced immediately after Links, or first in the action cluster when there
-is no Links control. Application Deploy is a dropdown with Deploy and
-Deploy (without cache). A running service Restart control is a dropdown with
-Restart current version and Pull latest and restart. Mobile
-headings keep a full-width Actions dropdown because the desktop HUD is hidden
-below `xl`. Do not hide primary actions behind a menu on a wide desktop. Links
-stay a separate dropdown because the URL list is unbounded.
+Desktop resource actions dock in `#resource-action-hud-slot` (visible from
+`xl`) as one `<x-split-action>`. The main button is the primary action for the
+current state (Deploy, Restart, Start, Restart Proxy); the caret opens a menu
+with the secondary actions: Deploy (without cache) and Restart on applications,
+Pull latest and restart / Force Restart / Force Deploy / Force Cleanup
+Containers on services, Refresh Proxy Status on servers. Stop is the last menu
+item in the error color. Stop, restart, and removal items open the existing
+confirmation modals. Do not add a separate Advanced dropdown or collapse actions
+into an overflow menu. Place Links (`x-applications.links`, `x-services.links`)
+or the server Traefik Dashboard link immediately before the split action; Links
+stay a separate dropdown because the URL list is unbounded. Below `xl` the same
+split action renders full width under the in-flow resource name. A resource
+that cannot deploy yet shows a single Actions dropdown that explains why.
 
-Only add layer-2 tabs when they represent real sibling routes inside one
-context. Never repeat main-sidebar destinations such as Dashboard, Projects,
-Terminal, Servers, Sources, Destinations, or Storage as a second tab row. A
-single collection page does not need a tab just to fill the bar; keep its
-primary action in the page header instead. When tabs are useful, their left edge
-uses the same compact `pl-2` alignment as application navigation rather than
-the content container's wide horizontal padding.
+The only fixed tab strip left is `x-dashboard.navbar`, and it renders only when
+a page has at least two real sibling routes or header actions. Never repeat
+main-sidebar destinations such as Dashboard, Projects, Terminal, Servers,
+Sources, Destinations, or Storage as a tab row. A single collection page does
+not need a tab just to fill the bar; keep its primary action in the page header.
 
-A layer-2 tab must be active on the page that renders it. A bar whose only tab
+A tab must be active on the page that renders it. A bar whose only tab
 points at a different route reads as broken navigation, so project and
 environment pages (`project.show`, `project.edit`, `project.environment.edit`,
 `project.clone-me`) carry a plain page header with a 24px title and a 13px
@@ -232,11 +226,11 @@ muted summary instead of a bar. The environment identity and the way back to
 its resources already live in `x-top-breadcrumb`; do not restate them in a
 sub-header.
 
-The dashboard is a compact overview, not a metrics wall. Use two full-width
-sections that follow the projects-page grid pattern: projects first, then
-servers. Keep one `New` action in the page header and let its modal choose the
-resource type. Place active deployments above the resource grids as a compact,
-live-updating table rather than a metric card. Communicate server health with
+The dashboard is a compact overview, not a metrics wall. It has no page header:
+live active deployments come first as a compact table, followed by traffic
+analytics when a server has it enabled, then two full-width sections (Projects,
+then Servers) that follow the projects-page grid pattern. Each section uses
+`x-section-heading` linking to its full index. Communicate server health with
 the shared status badge.
 
 ### Top-level dashboard destinations
@@ -258,9 +252,9 @@ cards. Sources, destinations, S3 storage, private keys, and shared-variable
 scopes use this pattern.
 
 Top-level settings families such as Team, Notifications, Keys & Tokens, and
-instance Settings use a compact header followed by a small route-derived tab
-strip. The active tab uses the same purple-light/yellow-dark tint as resource
-tabs. Do not nest `<button>` elements inside tab links.
+instance Settings use their `*settings-layout` component: the same grouped,
+icon-led settings sidebar as resources, plus a `settings-mobile-header` title
+below `xl`. Do not nest `<button>` elements inside sidebar links.
 
 ### Route-family consistency
 
@@ -270,11 +264,10 @@ its index or most visible route:
 - index, create, detail, settings, logs, metrics, backup, execution, and danger
   routes must share the same navigation hierarchy and surface language;
 - main-sidebar collection routes use the global shell without duplicating those
-  destinations in a layer-2 tab row;
-- resource detail families use resource identity and status in the global
-  topbar, route tabs and actions in layer 2, and the grouped settings sidebar
-  only for the third level;
-- create and edit routes stay inside the same layer-2 family instead of
+  destinations in a tab row;
+- resource detail families use resource identity, status, and actions in the
+  global topbar, and put every sibling route in the grouped settings sidebar;
+- create and edit routes stay inside the same sidebar family instead of
   falling back to an isolated legacy page;
 - reusable partials, empty states, confirmation flows, and row editors must be
   updated with the page that exposes them;
@@ -292,40 +285,37 @@ content below the filter card.
 
 ### Settings workspace
 
-Application and server configuration pages use the same 210px grouped,
-icon-led sidebar and a full-width content column. The workspace is capped at
-1180px, the sidebar becomes sticky at `xl`, and the sidebar label and first
-content card start on the same visual line. Do not use the legacy
-`sub-menu-wrapper`, native mobile page selects, or an in-flow row of top-level
-tabs. Only show nested section anchors when a page has at least four useful
-sections.
+Application, service, database, server, and top-level settings pages use the
+same 210px grouped, icon-led sidebar and a full-width content column. From `xl`
+the sidebar is a fixed full-height rail below the topbar that tracks the main
+sidebar width, with its own fill, right hairline, filter input, and scroll. Below
+`xl` it becomes a wrapped grid of links above the content. Do not use the legacy
+`sub-menu-wrapper`, native mobile page selects, or a row of top-level tabs. Only
+show nested section anchors when a page has at least four useful sections.
 
 The shared workspace grid is:
 
 ```blade
-<div
-    class="application-settings-workspace mt-8 grid min-w-0 gap-8
-        xl:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-    <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
-        ...
-    </aside>
-    <div class="min-w-0 xl:mt-3">
-        ...
+<section class="application-settings-workspace w-full max-w-none">
+    <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-application.configuration-sidebar :application="$application" :current-route="$currentRoute" />
+        <div class="min-w-0">
+            ...
+        </div>
     </div>
-</div>
+</section>
 ```
 
-Instance Settings constrains both `x-settings.navbar` and the workspace to the
-same `max-w-[1180px]` shell.
+Instance Settings uses `x-settings.layout` with the same full-width workspace.
 
-**Page titles (global):** family H1s (`x-dashboard.navbar` with
-`titleOnDesktop="false"`, the default) hide at **lg+**, the same breakpoint as
-the desktop shell (main sidebar + fixed layer-2 tabs). Below `lg` the mobile
-topbar is used and the page title stays visible. Collection indexes (Servers,
-Projects, …) always keep their H1; stack title above actions on narrow widths
-so they never overlap. Resource in-flow names only render below `md` (when the
-fixed resource tab bar is hidden). Fixed layer-2 spacers must be `lg:h-12` to
-match the bar height. Do not put the H1 beside the settings sidebar.
+**Page titles (global):** `x-dashboard.navbar` H1s (`titleOnDesktop="false"`,
+the default) hide at **lg+** only when the page renders a fixed tab strip or
+actions; otherwise they stay visible. Collection indexes (Servers, Projects, …)
+always keep their H1; stack title above actions on narrow widths so they never
+overlap. Application, service, and database names render in-flow below `xl`
+(the desktop action HUD breakpoint), server names below `lg`, and settings
+families use `settings-mobile-header` below `xl`. Fixed tab-strip spacers must
+be `lg:h-12` to match the bar height. Do not put the H1 beside the settings sidebar.
 
 Standard content stack:
 
@@ -761,11 +751,11 @@ Use these as implementation references:
 |---|---|
 | Dashboard overview | `resources/views/livewire/dashboard.blade.php` |
 | Top-level collection cards | `resources/views/livewire/project/index.blade.php`, `resources/views/source/all.blade.php` |
-| Top-level family tabs | `resources/views/components/team/navbar.blade.php`, `resources/views/components/notification/navbar.blade.php` |
+| Top-level settings families | `resources/views/components/team/settings-layout.blade.php`, `resources/views/components/notification/settings-layout.blade.php` |
 | General settings and form anatomy | `resources/views/livewire/project/application/general.blade.php` |
 | Advanced settings | `resources/views/livewire/project/application/advanced.blade.php` |
-| Fixed layer-2 resource navigation | `resources/views/livewire/project/application/heading.blade.php`, `resources/views/livewire/server/navbar.blade.php` |
-| Grouped settings sidebar | `resources/views/livewire/project/application/configuration.blade.php`, `resources/views/components/server/sidebar.blade.php` |
+| Resource actions in the topbar | `resources/views/livewire/project/application/heading.blade.php`, `resources/views/components/split-action.blade.php`, `resources/views/livewire/server/navbar.blade.php` |
+| Grouped settings sidebar | `resources/views/components/application/configuration-sidebar.blade.php`, `resources/views/components/server/sidebar.blade.php` |
 | Dense environment table and footer | `resources/views/livewire/project/shared/environment-variable/all.blade.php` |
 | Standard table toolbar controls | `resources/views/components/table/*` |
 | Application metrics charts | `resources/views/livewire/project/shared/metrics.blade.php` |
@@ -795,7 +785,7 @@ oversized 200px status numbers.
 2. Read the current Blade and Livewire class before changing presentation.
 3. Preserve every existing action, authorization check, loading state, and
    confirmation.
-4. Add the correct dual navigation and scoped workspace/form class.
+4. Add the grouped settings sidebar and scoped workspace/form class.
 5. Convert meaningful groups to layer cards and use `gap-6`.
 6. Make the responsive column count match the controls visible in every state.
 7. Replace native selects and checkbox-style configuration with listboxes.
@@ -808,6 +798,6 @@ oversized 200px status numbers.
 14. Check fixed-nav anchor offsets and responsive stacking.
 15. Sweep every sibling route for legacy controls and shells.
 16. Run `git diff --check`.
-17. Compile Blade views in the `coolify` container.
-18. Build assets in `coolify-vite`.
+17. Compile Blade views with `./scripts/dev exec php artisan view:cache`.
+18. Build assets with `npm run build`.
 19. Hard-refresh and inspect the family routes in both themes.

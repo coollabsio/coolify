@@ -94,3 +94,14 @@ it('disables discord mention parsing regardless of content', function () {
         return $request['allowed_mentions'] === ['parse' => []];
     });
 });
+
+it('returns an error when the discord webhook fails', function () {
+    config()->set('constants.webhooks.feedback_discord_webhook', 'https://webhook.example.com/failing');
+    Http::fake(['webhook.example.com/*' => Http::response([], 500)]);
+
+    $response = $this->postJson('/api/feedback', [
+        'content' => 'This is a valid feedback message for testing purposes.',
+    ]);
+
+    $response->assertStatus(502);
+});

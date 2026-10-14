@@ -255,6 +255,13 @@ class Select extends Component
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
                 'logo' => asset('svgs/resources/clickhouse.svg'),
             ],
+            [
+                'id' => 'sqlite',
+                'name' => 'SQLite',
+                'description' => 'A lightweight relational database stored in a single file.',
+                'logo' => asset('svgs/resources/sqlite.svg'),
+                'experimental' => true,
+            ],
 
         ];
 
@@ -369,6 +376,7 @@ class Select extends Component
             case 'dragonfly':
             case 'clickhouse':
             case 'mongodb':
+            case 'sqlite':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {

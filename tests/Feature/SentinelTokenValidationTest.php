@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Server\Show;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
@@ -8,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -114,6 +116,20 @@ describe('ServerSetting::ensureValidSentinelToken', function () {
 
         expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
         expect($settings->fresh()->sentinel_token)->toBe($token);
+    });
+
+    it('loads the server page when the stored token cannot be decrypted', function () {
+        $settings = $this->server->settings;
+        DB::table('server_settings')->where('id', $settings->id)->update(['sentinel_token' => 'not-encrypted-junk']);
+
+        $this->actingAs($this->team->members()->first());
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+            ->assertOk()
+            ->assertSet('sentinelToken', $settings->fresh()->sentinel_token);
+
+        expect(ServerSetting::isValidSentinelToken($settings->fresh()->sentinel_token))->toBeTrue();
     });
 
     it('returns existing valid token without regenerating', function () {

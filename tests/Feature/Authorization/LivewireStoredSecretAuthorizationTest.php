@@ -2,9 +2,11 @@
 
 use App\Livewire\Security\PrivateKey\Show as PrivateKeyShow;
 use App\Livewire\Source\Github\Change as GithubAppChange;
+use App\Livewire\Storage\Form as StorageForm;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -115,3 +117,44 @@ function createGithubAppWithSecrets(Team $team, bool $isSystemWide = false): Git
         'is_system_wide' => $isSystemWide,
     ]);
 }
+
+function createS3StorageWithSecrets(Team $team): S3Storage
+{
+    return S3Storage::query()->create([
+        'team_id' => $team->id,
+        'name' => 'Backup storage',
+        'region' => 'us-east-1',
+        'key' => 'stored-access-key',
+        'secret' => 'stored-secret-key',
+        'bucket' => 'backups',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+    ]);
+}
+
+it('does not serialize S3 credentials for a member after any storage action', function () {
+    $storage = createS3StorageWithSecrets($this->team);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(StorageForm::class, ['storage' => $storage])
+        ->assertSet('key', '')
+        ->assertSet('secret', '')
+        ->call('submit')
+        ->assertSet('key', '')
+        ->assertSet('secret', '')
+        ->assertDontSee('stored-access-key')
+        ->assertDontSee('stored-secret-key');
+});
+
+it('keeps S3 credentials available to an owner who can update the storage', function () {
+    $storage = createS3StorageWithSecrets($this->team);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(StorageForm::class, ['storage' => $storage])
+        ->assertSet('key', 'stored-access-key')
+        ->assertSet('secret', 'stored-secret-key');
+});

@@ -26,6 +26,10 @@ class Create extends Component
 
     public bool $is_system_wide = false;
 
+    public bool $use_for_pull_request_previews = true;
+
+    public bool $use_for_github_runners = false;
+
     private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
 
     public function mount()
@@ -58,12 +62,16 @@ class Create extends Component
 
             $this->validate([
                 'name' => 'required|string',
-                'organization' => ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
+                'organization' => [$this->use_for_github_runners ? 'required' : 'nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
                 'api_url' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
                 'html_url' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
                 'custom_user' => 'required|string',
                 'custom_port' => 'required|int',
                 'is_system_wide' => 'required|bool',
+                'use_for_pull_request_previews' => 'required|bool',
+                'use_for_github_runners' => 'required|bool',
+            ], [
+                'organization.required' => 'GitHub Actions runners are registered at organization level. Enter the organization.',
             ]);
             $payload = [
                 'name' => $this->name,
@@ -80,7 +88,11 @@ class Create extends Component
                 session(['from' => session('from') + ['source_id' => $github_app->id]]);
             }
 
-            return redirectRoute($this, 'source.github.show', ['github_app_uuid' => $github_app->uuid]);
+            return redirectRoute($this, 'source.github.show', [
+                'github_app_uuid' => $github_app->uuid,
+                'previews' => (int) $this->use_for_pull_request_previews,
+                'runners' => (int) $this->use_for_github_runners,
+            ]);
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {

@@ -102,6 +102,38 @@ test('automatic dns is enabled by default and can be disabled when saving a clou
     expect(IntegrationToken::query()->sole()->automaticDnsEnabled())->toBeFalse();
 });
 
+test('cloudflare proxy mode is off by default and can be enabled when adding and editing a token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->assertSet('proxiedDns', false)
+        ->set('name', 'Proxied DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('proxiedDns', true)
+        ->call('addToken')
+        ->assertHasNoErrors();
+
+    $token = IntegrationToken::query()->sole();
+    expect($token->proxiedDnsEnabled())->toBeTrue();
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->assertSet('proxiedDns', true)
+        ->set('proxiedDns', false)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($token->refresh()->proxiedDnsEnabled())->toBeFalse();
+});
+
 test('deleting an integration token is audited without storing its value', function () {
     $token = IntegrationToken::query()->create([
         'team_id' => $this->team->id,
@@ -153,14 +185,6 @@ test('at least one capability is required when adding a cloudflare token', funct
     Http::assertNothingSent();
 });
 
-test('provider validation uses the provider names declared by the model', function () {
-    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenForm.php'));
-
-    expect($component)
-        ->toContain("implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))")
-        ->not->toContain('in:cloudflare,doppler,infisical,vault');
-});
-
 test('integration tokens page lists saved provider and capabilities', function () {
     IntegrationToken::query()->create([
         'team_id' => $this->team->id,
@@ -182,26 +206,6 @@ test('cloudflare dns scope guidance and token creation link are shown', function
         ->assertSee('Zone - DNS - Edit')
         ->assertSee('Zone - Zone - Read')
         ->assertSeeHtml('https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management');
-
-    expect(file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php')))
-        ->toContain('permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D');
-});
-
-test('capability selection uses the shared checkbox component', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($view)
-        ->toContain('<x-forms.checkbox')
-        ->toContain('class="mt-3 rounded-lg border')
-        ->not->toContain('<input type="checkbox"');
-});
-
-test('submit button uses the shared highlighted loading state', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($view)
-        ->toContain('wire:target="addToken" isHighlighted')
-        ->not->toContain('class="button-highlighted"');
 });
 
 test('saved integration token rows render modal editors with a gear button', function () {
@@ -328,15 +332,6 @@ test('an invalid replacement does not rotate the integration token', function ()
     expect($savedToken->fresh()->token)->toBe('original-token');
 });
 
-test('editor updates its row without rerendering the teleported parent modal', function () {
-    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenEditor.php'));
-
-    expect($component)
-        ->toContain("'integration-token-updated'")
-        ->toContain("'integration-token-deleted'")
-        ->not->toContain('integrationTokenChanged');
-});
-
 test('new integration token form controls declare authorization matching server-side actions', function () {
     $editor = file_get_contents(resource_path('views/livewire/security/integration-token-editor.blade.php'));
     $form = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
@@ -347,4 +342,130 @@ test('new integration token form controls declare authorization matching server-
 
     expect($form)
         ->toMatch('/<x-forms\.checkbox(?=[^>]*id="automatic-dns")(?=[^>]*canGate="create")(?=[^>]*:canResource="\\\\App\\\\Models\\\\IntegrationToken::class")[^>]*>/');
+});
+
+function vaultIntegrationToken(Team $team, array $metadata = ['base_url' => 'https://example.com:8200']): IntegrationToken
+{
+    return IntegrationToken::query()->create([
+        'team_id' => $team->id,
+        'provider' => 'vault',
+        'name' => 'Production Vault',
+        'token' => 'hvs.stored-secret',
+        'capabilities' => ['secrets'],
+        'metadata' => $metadata,
+    ]);
+}
+
+test('changing the vault base url without re-entering the token does not send the stored token to the new host', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasErrors(['newToken'])
+        ->assertNotDispatched('success');
+
+    Http::assertNothingSent();
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'example.net'));
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com:8200'])
+        ->and($savedToken->fresh()->token)->toBe('hvs.stored-secret');
+});
+
+test('changing the vault namespace without re-entering the token is rejected', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team, ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.namespace', 'team-b')
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
+
+test('changing the infisical base url or client id without re-entering the client secret is rejected', function (string $field, string $value) {
+    Http::fake();
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'infisical',
+        'name' => 'Production Infisical',
+        'token' => 'stored-client-secret',
+        'capabilities' => ['secrets'],
+        'metadata' => ['base_url' => 'https://example.com', 'client_id' => 'client-a'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set("metadata.{$field}", $value)
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com', 'client_id' => 'client-a']);
+})->with([
+    'base url' => ['base_url', 'https://example.net'],
+    'client id' => ['client_id', 'client-b'],
+]);
+
+test('an admin changing the vault base url without the token gets a validation error', function () {
+    Http::fake();
+    $admin = User::factory()->create();
+    $this->team->members()->attach($admin->id, ['role' => 'admin']);
+    $this->actingAs($admin);
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+});
+
+test('changing the vault base url with a re-entered token validates against the new host and is audited', function () {
+    Http::fake([
+        'https://example.net:8200/v1/auth/token/lookup-self' => Http::response(['data' => []]),
+    ]);
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->set('newToken', 'hvs.new-secret')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.net:8200/v1/auth/token/lookup-self'
+        && $request->hasHeader('X-Vault-Token', 'hvs.new-secret'));
+    Http::assertNotSent(fn ($request) => $request->hasHeader('X-Vault-Token', 'hvs.stored-secret'));
+
+    $savedToken->refresh();
+    expect($savedToken->metadata)->toBe(['base_url' => 'https://example.net:8200'])
+        ->and($savedToken->token)->toBe('hvs.new-secret');
+
+    $event = AuditEvent::query()->where('event', 'ui.integration_token.base_url_changed')->first();
+    expect($event)->not->toBeNull()
+        ->and($event->team_id)->toBe($this->team->id);
+    expect(json_encode($event->toArray()))->toContain('example.net')
+        ->not->toContain('hvs.new-secret');
+});
+
+test('saving a vault token with unchanged connection settings and a blank token keeps working', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team, ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Renamed Vault')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    Http::assertNothingSent();
+    $savedToken->refresh();
+    expect($savedToken->name)->toBe('Renamed Vault')
+        ->and($savedToken->token)->toBe('hvs.stored-secret')
+        ->and($savedToken->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
 });

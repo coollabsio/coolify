@@ -2,6 +2,9 @@
 
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Facades\Validator;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 // ── DB_IDENTIFIER_PATTERN ─────────────────────────────────────────────────────
 

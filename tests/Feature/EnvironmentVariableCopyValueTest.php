@@ -96,6 +96,9 @@ test('copies embedded, literal and unknown references as stored', function () {
 
 test('copies literal values without .env-style quoting', function () {
     $env = createEnvironmentVariable(['value' => 'pa$$word', 'is_literal' => true]);
+    // Variables saved before exact escaping still show the quoted .env form.
+    $env->uses_legacy_escaping = true;
+    $env->save();
 
     expect($env->real_value)->toBe("'pa\$\$word'");
     assertCopiedValue($env, 'pa$$word');
@@ -122,6 +125,22 @@ test('members get no copy button and no value', function () {
         ->call('copyValue')
         ->assertReturned(null);
 });
+
+test('members get no value after switching to a team they own', function (string $variableType) {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $ownedTeam = Team::factory()->create();
+    $ownedTeam->members()->attach($member, ['role' => 'owner']);
+    $this->actingAs($member);
+    $env = $variableType === 'shared'
+        ? SharedEnvironmentVariable::create(['key' => 'TEAM_WIDE', 'value' => 'team-wide-secret', 'type' => 'team', 'team_id' => $this->team->id])
+        : createEnvironmentVariable();
+
+    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application']);
+    session(['currentTeam' => $ownedTeam]);
+
+    $component->call('copyValue')->assertReturned(null);
+})->with(['application variable' => 'application', 'shared variable' => 'shared']);
 
 test('locked variables get no copy button and no value', function () {
     Livewire::test(Show::class, ['env' => createEnvironmentVariable(['is_shown_once' => true]), 'type' => 'application'])

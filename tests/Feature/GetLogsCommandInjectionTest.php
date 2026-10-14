@@ -11,7 +11,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Process\FakeProcessResult;
 use Illuminate\Support\Facades\Process;
 use Livewire\Attributes\Locked;
 use Livewire\Livewire;
@@ -92,9 +91,10 @@ describe('GetLogs Livewire action validation', function () {
             ->assertSee('All')
             ->assertSeeHtml('title="Show all logs"')
             ->call('showAllLogs')
-            ->assertSet('numberOfLines', -1);
+            ->assertSet('numberOfLines', -1)
+            ->assertReturned('all logs');
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n all'));
+        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n all -t test-container'));
     });
 
     test('getLogs marks ANSI-colored output truncated based on raw bytes', function () {
@@ -108,23 +108,15 @@ describe('GetLogs Livewire action validation', function () {
 
         expect(strlen($output))->toBe(GetLogs::MAX_DISPLAY_SIZE_BYTES + 1);
 
-        Process::shouldReceive('timeout')->once()->andReturnSelf();
-        Process::shouldReceive('run')->andReturnUsing(function (string $command, ?callable $callback = null) use ($output): FakeProcessResult {
-            if ($callback) {
-                $callback('out', $output);
-            }
-
-            return new FakeProcessResult(command: $command);
-        });
+        Process::fake(['*' => Process::result(output: $output)]);
 
         $component = new GetLogs;
         $component->server = $server;
         $component->resource = $this->application;
         $component->container = 'test-container';
         $component->showTimeStamps = false;
-        $component->getLogs(true);
 
-        expect($component->outputs)
+        expect($component->getLogs())
             ->toContain('[... Output truncated at 5MB limit ...]')
             ->not->toContain("\e[31m");
     });
@@ -145,7 +137,7 @@ describe('GetLogs Livewire action validation', function () {
             'container' => 'container;malicious-command',
         ])
             ->call('getLogs')
-            ->assertSet('outputs', 'Invalid container name.');
+            ->assertReturned('Invalid container name.');
     });
 
     test('getLogs rejects unauthorized server access', function () {
@@ -158,7 +150,7 @@ describe('GetLogs Livewire action validation', function () {
             'container' => 'test-container',
         ])
             ->call('getLogs')
-            ->assertSet('outputs', 'Unauthorized.');
+            ->assertReturned('Unauthorized.');
     });
 
     test('downloadAllLogs returns empty for invalid container name', function () {
@@ -192,17 +184,117 @@ describe('GetLogs Livewire action validation', function () {
     });
 });
 
-describe('GetLogs stream polling', function () {
-    test('streaming logs polls when log panel is not collapsible', function () {
+describe('GetLogs browser-rendered output', function () {
+    beforeEach(function () {
+        $this->server->settings->fill([
+            'is_reachable' => true,
+            'is_usable' => true,
+            'force_disabled' => false,
+        ])->save();
+        $this->functionalServer = Server::with('settings')->findOrFail($this->server->id);
+    });
+
+    test('getLogs returns timestamped output without storing it in component state', function () {
+        Process::fake(['*' => Process::result(output: "2026-09-28T10:00:02Z second\n2026-09-28T10:00:01Z first")]);
+
+        $component = Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->set('showTimeStamps', false)
+            ->call('getLogs')
+            ->assertReturned("2026-09-28T10:00:01Z first\n2026-09-28T10:00:02Z second");
+
+        expect($component->instance())->not->toHaveProperty('outputs');
+        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n 100 -t test-container'));
+    });
+
+    test('getLogs only requests new lines when streaming from a timestamp', function () {
+        Process::fake(['*' => Process::result(output: '2026-09-28T10:00:03Z new')]);
+
         Livewire::test(GetLogs::class, [
-            'server' => $this->server,
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->call('getLogs', '2026-09-28T10:00:02.123456789Z')
+            ->assertReturned('2026-09-28T10:00:03Z new');
+
+        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs --since 2026-09-28T10:00:02.123456789Z -t test-container'));
+    });
+
+    test('getLogs prefixes the streaming command with sudo for non-root servers', function () {
+        $this->functionalServer->update(['user' => 'ubuntu']);
+        Process::fake(['*' => Process::result(output: '')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer->fresh(['settings']),
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])->call('getLogs', '2026-09-28T10:00:02Z');
+
+        Process::assertRan(fn ($process) => str_contains($process->command, '(sudo docker logs --since 2026-09-28T10:00:02Z -t test-container) 2>&1 | head -c'));
+    });
+
+    test('getLogs ignores a since value that is not a docker timestamp', function (string $since) {
+        Process::fake(['*' => Process::result(output: 'logs')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])->call('getLogs', $since);
+
+        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n 100 -t test-container')
+            && ! str_contains($process->command, '--since'));
+    })->with([
+        'command substitution' => ['2026-09-28T10:00:02Z$(id)'],
+        'shell separator' => ['2026-09-28T10:00:02Z; id'],
+        'relative duration' => ['10m'],
+    ]);
+
+    test('copyLogs keeps line order and omits timestamps when timestamps are hidden', function () {
+        Process::fake(['*' => Process::result(output: "zeta\nalpha")]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->set('showTimeStamps', false)
+            ->call('copyLogs')
+            ->assertReturned("zeta\nalpha");
+
+        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n 100 test-container'));
+    });
+
+    test('copyLogs returns empty for unauthorized server', function () {
+        $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $otherServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->call('copyLogs')
+            ->assertReturned('');
+    });
+
+    test('streaming does not render log lines or poll through Livewire', function () {
+        Process::fake(['*' => Process::result(output: '2026-09-28T10:00:01Z secret-looking line')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
             'resource' => $this->application,
             'container' => 'coolify-sentinel',
             'collapsible' => false,
         ])
-            ->assertDontSeeHtml('wire:poll.2000ms="getLogs(true)"')
             ->call('toggleStreamLogs')
-            ->assertSeeHtml('wire:poll.2000ms="getLogs(true)"');
+            ->assertSet('streamLogs', true)
+            ->call('getLogs')
+            ->assertDontSeeHtml('wire:poll')
+            ->assertDontSee('secret-looking line');
     });
 });
 

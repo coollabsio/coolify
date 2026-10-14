@@ -11,7 +11,9 @@ use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -19,9 +21,12 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use RuntimeException;
 
 class ResourceOperations extends Component
 {
@@ -48,8 +53,9 @@ class ResourceOperations extends Component
         $parameters = get_route_parameters();
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
-        $this->projects = Project::ownedByCurrentTeamCached();
-        $servers = currentTeam()->servers()->get();
+        $teamId = $this->resourceTeamId();
+        $this->projects = Project::query()->where('team_id', $teamId)->orderByRaw('LOWER(name)')->get();
+        $servers = Server::query()->where('team_id', $teamId)->get();
         $this->servers = $servers->reject(fn ($server) => $server->isBuildServer());
         $this->buildServers = $servers->filter(fn ($server) => $server->isBuildServer());
     }
@@ -71,13 +77,13 @@ class ResourceOperations extends Component
 
             $new_environment = $this->resource->environment;
             if ($environment_id !== null) {
-                $new_environment = Environment::ownedByCurrentTeam()->find($environment_id);
+                $new_environment = $this->findResourceTeamEnvironment($environment_id);
                 if (! $new_environment) {
                     return $this->addError('environment_id', 'Environment not found.');
                 }
             }
 
-            $new_destination = find_resource_destination_for_current_team($destination_uuid);
+            $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
                 return $this->addError('destination_id', 'Destination not found.');
             }
@@ -116,7 +122,8 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneRedis::class ||
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
-                $this->resource->getMorphClass() === StandaloneClickhouse::class
+                $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
@@ -161,6 +168,8 @@ class ResourceOperations extends Component
                         $newName = 'keydb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
                         $newName = 'dragonfly-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'sqlite-data-')) {
+                        $newName = 'sqlite-data-'.$new_resource->uuid;
                     } else {
                         if (str_starts_with($volume->name, $this->resource->uuid)) {
                             $newName = str($volume->name)->replace($this->resource->uuid, $new_resource->uuid);
@@ -220,7 +229,7 @@ class ResourceOperations extends Component
                         'uuid' => $uuid,
                         'database_id' => $new_resource->id,
                         'database_type' => $new_resource->getMorphClass(),
-                        'team_id' => currentTeam()->id,
+                        'team_id' => $this->resourceTeamId(),
                     ]);
                     $newBackup->save();
                 }
@@ -238,6 +247,8 @@ class ResourceOperations extends Component
                     ])->fill($payload);
                     $newEnvironmentVariable->save();
                 }
+
+                $this->resource->cloneSecretManagerLinkTo($new_resource);
 
                 $route = route('project.database.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
@@ -277,7 +288,7 @@ class ResourceOperations extends Component
                     ])->fill([
                         'uuid' => new_public_id(),
                         'service_id' => $new_resource->id,
-                        'team_id' => currentTeam()->id,
+                        'team_id' => $this->resourceTeamId(),
                     ]);
                     $newTask->save();
                 }
@@ -294,6 +305,8 @@ class ResourceOperations extends Component
                     ]);
                     $newEnvironmentVariable->save();
                 }
+
+                $this->resource->cloneSecretManagerLinkTo($new_resource);
 
                 foreach ($new_resource->applications() as $application) {
                     $application->fill([
@@ -400,9 +413,12 @@ class ResourceOperations extends Component
     {
         try {
             $this->authorize('update', $this->resource);
-            $new_environment = Environment::ownedByCurrentTeam()->findOrFail($environment_id);
+            $new_environment = $this->findResourceTeamEnvironment($environment_id);
+            if (! $new_environment) {
+                return $this->addError('environment_id', 'Environment not found.');
+            }
             $this->resource->fill([
-                'environment_id' => $environment_id,
+                'environment_id' => $new_environment->id,
             ])->save();
             if ($this->resource->type() === 'application') {
                 $route = route('project.application.configuration', [
@@ -439,7 +455,7 @@ class ResourceOperations extends Component
         try {
             $this->authorize('update', $this->resource);
 
-            $new_destination = find_resource_destination_for_current_team($destination_uuid);
+            $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
                 return $this->addError('destination_id', 'Destination not found.');
             }
@@ -490,6 +506,32 @@ class ResourceOperations extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function resourceTeamId(): int
+    {
+        return $this->resource->team()?->id ?? throw new RuntimeException('The resource has no team.');
+    }
+
+    /** Cloning and moving stay inside the resource team; the session team can differ after a team switch. */
+    private function findResourceTeamEnvironment(int|string|null $environmentId): ?Environment
+    {
+        return Environment::query()
+            ->whereRelation('project', 'team_id', $this->resourceTeamId())
+            ->find($environmentId);
+    }
+
+    private function findResourceTeamDestination(?string $uuid): StandaloneDocker|SwarmDocker|null
+    {
+        if (blank($uuid)) {
+            return null;
+        }
+
+        $teamId = $this->resourceTeamId();
+        $destination = StandaloneDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first()
+            ?? SwarmDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first();
+
+        return $destination?->server?->canHostResources() ? $destination : null;
     }
 
     public function render()

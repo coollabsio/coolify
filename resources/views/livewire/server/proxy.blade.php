@@ -37,6 +37,10 @@
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
                         <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
+                    @elseif ($server->hasPendingProxyConfiguration())
+                        <x-callout type="warning" title="Restart required">
+                            Restart the proxy to apply TLS certificate changes.
+                        </x-callout>
                     @else
                         <div class="flex items-start gap-3">
                             <div
@@ -76,101 +80,13 @@
                                 label="Redirect URL"
                                 helper="Leave empty to keep a custom 503 response without redirecting." />
                         @endif
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="letsencrypt"
+                                id="certificateResolver" label="Certificate resolver"
+                                helper="Traefik certificate resolver for generated HTTPS routes. Leave empty if Traefik uses your own certificates (for example Cloudflare Origin CA certificates in a dynamic configuration). Redeploy resources to apply the change." />
+                        @endif
                     </div>
                 </x-application.settings-section>
-
-                @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                    <x-application.settings-section id="server-proxy-certificates-section" title="TLS certificates"
-                        x-init="$wire.loadTraefikCertificates()"
-                        helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority.">
-                        <x-slot:actions>
-                            <x-forms.button type="button" wire:click="loadTraefikCertificates"
-                                wire:loading.attr="disabled" wire:target="loadTraefikCertificates">
-                                Refresh
-                            </x-forms.button>
-                        </x-slot:actions>
-
-                        <div wire:loading.flex wire:target="loadTraefikCertificates"
-                            class="min-h-24 items-center justify-center">
-                            <x-loading text="Loading TLS certificates…" />
-                        </div>
-
-                        <div wire:loading.remove wire:target="loadTraefikCertificates">
-                            @if ($traefikCertificatesLoaded && count($traefikCertificates) === 0)
-                                <x-empty size="sm" title="No TLS certificates found"
-                                    description="Traefik's ACME storage does not contain certificate entries."
-                                    icon-name="security" />
-                            @elseif (count($traefikCertificates) > 0)
-                                <div class="overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full min-w-3xl">
-                                            <thead>
-                                                <tr>
-                                                    <th>Domain</th>
-                                                    <th>Resolver</th>
-                                                    <th>Alternative names</th>
-                                                    <th>Expires</th>
-                                                    <th><span class="sr-only">Actions</span></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach ($traefikCertificates as $certificate)
-                                                    <tr wire:key="traefik-certificate-{{ $certificate['id'] }}">
-                                                        <td class="font-medium text-neutral-950 dark:text-fg">
-                                                            {{ $certificate['main_domain'] }}
-                                                        </td>
-                                                        <td>
-                                                            <span class="font-mono text-xs">{{ $certificate['resolver'] }}</span>
-                                                            @if ($certificate['store'])
-                                                                <span class="text-xs text-neutral-500 dark:text-fg-dim">
-                                                                    ({{ $certificate['store'] }})
-                                                                </span>
-                                                            @endif
-                                                        </td>
-                                                        <td>
-                                                            @if (count($certificate['sans']) > 0)
-                                                                <div class="flex max-w-md flex-wrap gap-1">
-                                                                    @foreach ($certificate['sans'] as $domain)
-                                                                        <span
-                                                                            class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.06] dark:text-fg-dim">
-                                                                            {{ $domain }}
-                                                                        </span>
-                                                                    @endforeach
-                                                                </div>
-                                                            @else
-                                                                <span class="text-neutral-500 dark:text-fg-dim">None</span>
-                                                            @endif
-                                                        </td>
-                                                        <td>
-                                                            {{ $certificate['expires_at'] ?? 'Unknown' }}
-                                                        </td>
-                                                        <td class="text-right">
-                                                            @can('update', $server)
-                                                                <x-modal-confirmation title="Delete TLS Certificate?"
-                                                                    buttonTitle="Delete"
-                                                                    submitAction="deleteTraefikCertificate({{ $certificate['id'] }})"
-                                                                    :actions="[
-                                                                        'Delete the certificate for '.$certificate['main_domain'].' from acme.json.',
-                                                                        'Restart Traefik before the running proxy stops using the certificate.',
-                                                                    ]"
-                                                                    confirmationText="{{ $certificate['main_domain'] }}"
-                                                                    confirmationLabel="Confirm by entering the domain"
-                                                                    shortConfirmationLabel="Domain"
-                                                                    step2ButtonText="Delete Certificate"
-                                                                    isErrorButton :confirmWithPassword="false"
-                                                                    :confirmWithText="true" />
-                                                            @endcan
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-                    </x-application.settings-section>
-                @endif
 
                 @php
                     $proxyTitle =
@@ -214,6 +130,9 @@
                                     v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
                                     for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
                                     to production servers.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
                             @if ($this->newerTraefikBranchAvailable)
@@ -223,11 +142,15 @@
                                     changes before upgrading.
                                 </x-callout>
                             @endif
+                        @elseif ($this->outdatedCaddyImage)
+                            <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
-                        <div wire:loading.flex wire:target="loadProxyConfiguration"
-                            class="min-h-32 items-center justify-center">
-                            <x-loading text="Loading proxy configuration…" />
+                        <div wire:loading.flex wire:target="loadProxyConfiguration" role="status"
+                            class="mt-4 hidden flex-col gap-2">
+                            <span class="sr-only">Loading proxy configuration</span>
+                            <x-skeleton class="h-2.5 w-56 rounded-full" />
+                            <x-skeleton class="h-96 w-full rounded-lg" />
                         </div>
 
                         @if ($proxySettings)

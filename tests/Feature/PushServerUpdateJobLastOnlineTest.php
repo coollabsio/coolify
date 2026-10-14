@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\ServiceChecked;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Environment;
 use App\Models\Project;
@@ -8,6 +9,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
@@ -224,6 +226,7 @@ test('partial sentinel snapshots do not trigger missing tcp proxy recovery', fun
 
     $server = $database->destination->server;
     Queue::fake();
+    Event::fake([ServiceChecked::class]);
 
     $data = [
         'snapshot' => [
@@ -251,4 +254,60 @@ test('partial sentinel snapshots do not trigger missing tcp proxy recovery', fun
 
     expect($database->status)->toBe('running:healthy');
     Queue::assertNothingPushed();
+});
+
+test('sentinel push broadcasts ServiceChecked to the server team after updating statuses', function (bool $complete) {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'exited',
+    ]);
+
+    $server = $database->destination->server;
+    Event::fake([ServiceChecked::class]);
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => $complete,
+        ],
+        'containers' => [
+            [
+                'name' => $database->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.type' => 'database',
+                    'com.docker.compose.service' => $database->uuid,
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    expect($database->refresh()->status)->toBe('running:healthy');
+    Event::assertDispatched(ServiceChecked::class, fn (ServiceChecked $event) => $event->teamId === $team->id);
+})->with([
+    'complete snapshot' => true,
+    'partial snapshot' => false,
+]);
+
+test('sentinel push does not broadcast ServiceChecked for an empty partial snapshot', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+    ]);
+
+    $server = $database->destination->server;
+    Event::fake([ServiceChecked::class]);
+
+    $job = new PushServerUpdateJob($server, [
+        'snapshot' => ['version' => 1, 'complete' => false],
+        'containers' => [],
+    ]);
+    $job->handle();
+
+    Event::assertNotDispatched(ServiceChecked::class);
 });

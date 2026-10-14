@@ -60,6 +60,10 @@ services:
       DEVELOPMENT_QEMU_SLOT: "${DEVELOPMENT_QEMU_SLOT:-}"
       DEVELOPMENT_QEMU_DOCKER_NETWORK: "${COMPOSE_PROJECT_NAME:-coolify-dev}"
       DEVELOPMENT_QEMU_COOLIFY_CONTAINER: "${COMPOSE_PROJECT_NAME:-coolify-dev}"
+      # Host paths of the volumes that testing-host mounts at /data/coolify and /data/coolify/backups.
+      # Coolify uses them only for the testing-host server (it shares the host Docker daemon), not for KVM servers.
+      DEV_COOLIFY_DATA_VOLUME: "${COMPOSE_PROJECT_NAME:-coolify-dev}_coolify_data"
+      DEV_COOLIFY_BACKUPS_VOLUME: "${COMPOSE_PROJECT_NAME:-coolify-dev}_backups_data"
     healthcheck:
       test: curl -sf http://127.0.0.1:8080/api/health || exit 1
       interval: 5s

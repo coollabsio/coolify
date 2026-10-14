@@ -83,6 +83,25 @@ test('quoted legacy labels are also replaced', function () {
     expect($labels)->toBe(['traefik.enable=false', 'coolify.managed=true', 'coolify.proxy=true']);
 });
 
+test('only the traefik service is changed when another proxy service has the same labels', function (bool $swarm, bool $whoamiFirst) {
+    $whoami = Yaml::dump(['whoami' => ['image' => 'traefik/whoami', 'labels' => [
+        'traefik.enable=true',
+        'traefik.http.routers.whoami.rule=Host(`whoami.example.com`)',
+        'traefik.http.services.traefik.loadbalancer.server.port=8080',
+    ]]], 10, 2);
+    $whoami = preg_replace('/^/m', '  ', rtrim($whoami))."\n";
+    $configuration = $whoamiFirst
+        ? str_replace("services:\n", "services:\n".$whoami, legacyTraefikConfiguration(swarm: $swarm))
+        : legacyTraefikConfiguration(swarm: $swarm).$whoami;
+
+    $fixed = removeLegacyTraefikDashboardLabels($configuration);
+    $parsed = Yaml::parse($fixed);
+
+    expect(data_get($parsed, $swarm ? 'services.traefik.deploy.labels' : 'services.traefik.labels'))->toBe(['traefik.enable=false', 'coolify.managed=true', 'coolify.proxy=true'])
+        ->and(data_get($parsed, 'services.whoami'))->toBe(data_get(Yaml::parse($configuration), 'services.whoami'))
+        ->and($fixed)->toContain('# my custom comment');
+})->with(['standalone' => false, 'swarm' => true])->with(['whoami after traefik' => false, 'whoami before traefik' => true]);
+
 test('a dashboard router that the user changed is kept', function (array $extraLabels) {
     $configuration = legacyTraefikConfiguration($extraLabels);
 

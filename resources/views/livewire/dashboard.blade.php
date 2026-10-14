@@ -15,6 +15,23 @@
     @endphp
 
     <div class="flex min-w-0 flex-col gap-8">
+        @if ($pendingInvitations->isNotEmpty())
+            <div class="flex min-w-0 flex-col gap-2">
+                @foreach ($pendingInvitations as $invitation)
+                    <x-callout type="info" title="Pending team invitation"
+                        wire:key="dashboard-invitation-{{ $invitation->uuid }}">
+                        <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                            <span class="min-w-0">Team <span class="font-semibold">{{ $invitation->team->name }}</span>
+                                invited you as {{ ucfirst($invitation->role) }}.</span>
+                            <a href="{{ route('team.invitation.show', $invitation->uuid) }}" class="button shrink-0">
+                                Review invitation
+                            </a>
+                        </div>
+                    </x-callout>
+                @endforeach
+            </div>
+        @endif
+
         <livewire:dashboard.active-deployments />
 
         @if ($hasTrafficAnalytics)
@@ -27,7 +44,7 @@
 
             @if ($dashboardProjects->isEmpty())
                 <x-empty title="No projects yet"
-                    description="Use New to create your first deployment workspace."
+                    description="Create your first deployment workspace from Projects."
                     icon-name="projects" size="sm" />
             @else
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -45,6 +62,7 @@
                                 $project->mongodbs_count,
                                 $project->mysqls_count,
                                 $project->mariadbs_count,
+                                $project->sqlites_count,
                             ])->sum();
                         @endphp
 
@@ -65,14 +83,16 @@
                                         <x-reicon name="projects" class="size-4" />
                                     @endif
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h3
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                         {{ $project->name }}
                                     </h3>
-                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $project->description }}
-                                    </p>
+                                    @if (filled($project->description))
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $project->description }}
+                                        </p>
+                                    @endif
                                 </div>
                             </div>
 
@@ -186,14 +206,16 @@
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h3
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                         {{ $server->name }}
                                     </h3>
-                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $server->description }}
-                                    </p>
+                                    @if (filled($server->description))
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $server->description }}
+                                        </p>
+                                    @endif
                                 </div>
                                 @if ($serverStatusType !== 'success')
                                     <span data-tooltip="{{ $serverStatus }}"

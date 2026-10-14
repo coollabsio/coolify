@@ -3,8 +3,8 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
-use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 
@@ -75,14 +75,9 @@ class CheckDomainDns
             }
 
             try {
-                $query = app()->make(DNSQuery::class, [
-                    'server' => $dnsServer,
-                    'port' => 53,
-                    'timeout' => min(5, (int) floor($remainingNanoseconds / 1_000_000_000)),
-                ]);
-                $records = $query->query($host, $type);
+                $records = queryDnsServer($dnsServer, $host, $type, min(5, (int) floor($remainingNanoseconds / 1_000_000_000)));
 
-                if ($records === false || $query->hasError()) {
+                if ($records === false) {
                     continue;
                 }
 
@@ -92,7 +87,7 @@ class CheckDomainDns
                     }
 
                     $receivedAddressRecord = true;
-                    if (isCloudflareIp($record->getData()) || ($expectedIp && $record->getData() === $expectedIp)) {
+                    if (isCloudflareIp($record->getData()) || ($expectedIp && DnsRecordHints::sameAddress($record->getData(), $expectedIp))) {
                         return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
                     }
                 }
@@ -103,7 +98,7 @@ class CheckDomainDns
 
         if (! $receivedAddressRecord && hrtime(true) < $deadline) {
             foreach ($this->resolveWithSystemDns($host, $type) as $resolvedIp) {
-                if (isCloudflareIp($resolvedIp) || ($expectedIp && $resolvedIp === $expectedIp)) {
+                if (isCloudflareIp($resolvedIp) || ($expectedIp && DnsRecordHints::sameAddress($resolvedIp, $expectedIp))) {
                     return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
                 }
             }

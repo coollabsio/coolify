@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\GitlabApp;
+use App\Models\PrivateKey;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -81,6 +82,13 @@ function gitlabApi(GitlabApp $source, string $endpoint, string $method = 'get', 
         'data' => collect($response->json()),
         'total' => (int) $response->header('x-total', 0),
     ];
+}
+
+function gitlabAppPrivateKey(GitlabApp $source): ?PrivateKey
+{
+    $privateKey = $source->privateKey;
+
+    return $privateKey?->team_id === $source->team_id ? $privateKey : null;
 }
 
 function generateGitlabCloneToken(GitlabApp $source): string

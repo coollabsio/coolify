@@ -44,6 +44,7 @@ it('does not generate commit links from incomplete repository URLs', function (s
 })->with([
     'missing host' => 'https://',
     'missing scheme' => 'github.com/coollabsio/coolify',
+    'git protocol' => 'git://git.example.com/coollabsio/coolify.git',
 ]);
 
 it('converts scp-style remotes with generic usernames into https repository links', function (string $repository, string $expectedBranch, string $expectedCommits, string $expectedWebhook) {

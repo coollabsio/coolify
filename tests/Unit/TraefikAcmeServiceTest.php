@@ -73,3 +73,18 @@ it('rejects invalid files and unknown certificate identifiers', function () {
         ->and(fn () => $service->deleteCertificate(traefikAcmeFixture(), 'letsencrypt', 'missing'))
         ->toThrow(RuntimeException::class, 'could not be found');
 });
+
+it('reads the expiry date from the base64-encoded PEM chain Traefik stores', function () {
+    $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+    $certificate = openssl_csr_sign(openssl_csr_new(['commonName' => 'example.com'], $key), null, $key, 30);
+    openssl_x509_export($certificate, $pem);
+    $expiresAt = gmdate('Y-m-d H:i:s', openssl_x509_parse($pem)['validTo_time_t']);
+
+    $contents = json_encode(['letsencrypt' => ['Certificates' => [[
+        'domain' => ['main' => 'example.com'],
+        'certificate' => base64_encode($pem),
+        'key' => base64_encode('key'),
+    ]]]], JSON_THROW_ON_ERROR);
+
+    expect(app(TraefikAcmeService::class)->certificates($contents)[0]['expires_at'])->toBe($expiresAt);
+});

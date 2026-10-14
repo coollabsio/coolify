@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\ServerReachabilityChanged;
+use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Channels\EmailChannel;
@@ -28,7 +29,6 @@ it('sends Unreachable notification when threshold reached and not yet notified',
     $this->server->settings()->update(['is_reachable' => false]);
     $this->server->forceFill([
         'unreachable_count' => 2,
-        'unreachable_notification_sent' => false,
     ])->save();
 
     ServerReachabilityChanged::dispatch($this->server->fresh());
@@ -41,7 +41,6 @@ it('does not send Unreachable on first transient failure (count=1)', function ()
     $this->server->settings()->update(['is_reachable' => false]);
     $this->server->forceFill([
         'unreachable_count' => 1,
-        'unreachable_notification_sent' => false,
     ])->save();
 
     ServerReachabilityChanged::dispatch($this->server->fresh());
@@ -53,8 +52,8 @@ it('does not send Unreachable when already notified', function () {
     $this->server->settings()->update(['is_reachable' => false]);
     $this->server->forceFill([
         'unreachable_count' => 5,
-        'unreachable_notification_sent' => true,
     ])->save();
+    NotificationThrottle::record($this->server, Unreachable::class);
 
     ServerReachabilityChanged::dispatch($this->server->fresh());
 
@@ -65,8 +64,8 @@ it('sends Reachable notification on recovery when previously notified', function
     $this->server->settings()->update(['is_reachable' => true]);
     $this->server->forceFill([
         'unreachable_count' => 0,
-        'unreachable_notification_sent' => true,
     ])->save();
+    NotificationThrottle::record($this->server, Unreachable::class);
 
     $fresh = $this->server->fresh();
     expect($fresh->unreachable_notification_sent)->toBeTrue();
@@ -82,7 +81,6 @@ it('does not send Reachable when never notified', function () {
     $this->server->settings()->update(['is_reachable' => true]);
     $this->server->forceFill([
         'unreachable_count' => 0,
-        'unreachable_notification_sent' => false,
     ])->save();
 
     ServerReachabilityChanged::dispatch($this->server->fresh());
@@ -94,7 +92,6 @@ it('routes Unreachable notification through EmailChannel when email toggle is on
     $this->server->settings()->update(['is_reachable' => false]);
     $this->server->forceFill([
         'unreachable_count' => 2,
-        'unreachable_notification_sent' => false,
     ])->save();
 
     ServerReachabilityChanged::dispatch($this->server->fresh());

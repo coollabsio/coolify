@@ -1,99 +1,106 @@
-# Routing & Controllers Best Practices
+# Routing and Controller Best Practices
 
 ## Use Implicit Route Model Binding
 
-Let Laravel resolve models automatically from route parameters.
+Let Laravel resolve models from route parameters when the default lookup and missing-model behavior fit the endpoint.
 
-Incorrect:
+Instead of manual lookup:
+
 ```php
-public function show(int $id)
+public function show(int $id): View
 {
     $post = Post::findOrFail($id);
+
+    return view('posts.show', ['post' => $post]);
 }
 ```
 
-Correct:
+Use route model binding:
+
 ```php
-public function show(Post $post)
+public function show(Post $post): View
 {
     return view('posts.show', ['post' => $post]);
 }
 ```
 
-## Use Scoped Bindings for Nested Resources
+## Scope Nested Bindings
 
-Enforce parent-child relationships automatically.
+Use scoped bindings when a nested resource must belong to its parent. This constrains model resolution; it does not replace authorization.
 
 ```php
 Route::get('/users/{user}/posts/{post}', function (User $user, Post $post) {
-    // $post is automatically scoped to $user
+    // The resolved post belongs to the resolved user.
 })->scopeBindings();
 ```
 
-## Use Resource Controllers
+## Use Resource Routes for Resourceful Actions
 
-Use `Route::resource()` or `apiResource()` for RESTful endpoints.
+Use `Route::resource()` or `Route::apiResource()` when the endpoint follows Laravel's resource-controller actions. Define explicit routes when the behavior does not fit that vocabulary.
 
 ```php
 Route::resource('posts', PostController::class);
-// In routes/api.php — the /api prefix is applied automatically
-Route::apiResource('posts', Api\PostController::class);
+
+// Alternatively, for an API-only resource:
+Route::apiResource('posts', ApiPostController::class);
 ```
 
-## Keep Controllers Thin
+`apiResource()` omits the HTML-oriented `create` and `edit` routes. It does not itself add an `/api` prefix; that prefix comes from the application's API route configuration.
 
-Aim for under 10 lines per method. Extract business logic to action or service classes.
+## Organize Controllers Around Resources
 
-Incorrect:
+As a general default, organize each controller around one resource and use Laravel's standard resource actions: `index`, `show`, `create`, `store`, `edit`, `update`, and `destroy`. This keeps routes predictable and prevents controllers from accumulating unrelated behavior.
+
+When a controller needs a custom action such as `publish`, `approve`, or `archive`, first consider whether that behavior represents a separate resource. A focused resource controller gives the behavior its own authorization, validation, and middleware boundary.
+
+Custom action on the primary controller:
+
 ```php
-public function store(Request $request)
+Route::post('/podcasts/{podcast}/publish', [PodcastController::class, 'publish']);
+```
+
+The published podcast modeled as a resource:
+
+```php
+Route::post('/published-podcasts/{podcast}', [PublishedPodcastController::class, 'store'])
+    ->name('published-podcasts.store');
+
+Route::delete('/published-podcasts/{podcast}', [PublishedPodcastController::class, 'destroy'])
+    ->name('published-podcasts.destroy');
+```
+
+```php
+class PublishedPodcastController extends Controller
 {
-    $validated = $request->validate([...]);
-    if ($request->hasFile('image')) {
-        $request->file('image')->move(public_path('images'));
+    public function store(Podcast $podcast): RedirectResponse
+    {
+        $podcast->publish();
+
+        return back();
     }
-    $post = Post::create($validated);
-    $post->tags()->sync($validated['tags']);
-    event(new PostCreated($post));
+
+    public function destroy(Podcast $podcast): RedirectResponse
+    {
+        $podcast->unpublish();
+
+        return back();
+    }
+}
+```
+
+Treat a custom verb as a design signal, not proof that another controller is required. Use query parameters for simple filtering, and keep an explicit action route when modeling the operation as a resource would obscure the domain or conflict with established project conventions.
+
+## Keep Controllers Focused on HTTP Concerns
+
+Controllers should coordinate HTTP input, authorization, validation, an application operation, and the response. Extract substantial or reusable business logic, but do not introduce an action or service merely to satisfy an arbitrary line limit.
+
+```php
+public function store(StorePostRequest $request, CreatePostAction $create): RedirectResponse
+{
+    $post = $create->handle($request->validated());
+
     return redirect()->route('posts.show', $post);
 }
 ```
 
-Correct:
-```php
-public function store(StorePostRequest $request, CreatePostAction $create)
-{
-    $post = $create->execute($request->validated());
-
-    return redirect()->route('posts.show', $post);
-}
-```
-
-## Type-Hint Form Requests
-
-Type-hinting Form Requests triggers automatic validation and authorization before the method executes.
-
-Incorrect:
-```php
-public function store(Request $request): RedirectResponse
-{
-    $validated = $request->validate([
-        'title' => ['required', 'max:255'],
-        'body' => ['required'],
-    ]);
-
-    Post::create($validated);
-
-    return redirect()->route('posts.index');
-}
-```
-
-Correct:
-```php
-public function store(StorePostRequest $request): RedirectResponse
-{
-    Post::create($request->validated());
-
-    return redirect()->route('posts.index');
-}
-```
+A form request can perform validation and authorization before the controller runs. Do not repeat its rules in the controller. Keep simple, endpoint-specific validation inline when extraction would not improve reuse or clarity; see the validation rules for detailed guidance.

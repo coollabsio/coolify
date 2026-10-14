@@ -268,11 +268,25 @@ class TeamController extends Controller
         }
 
         $this->authorize('update', $team);
-        $validated = $request->validate([
+
+        $allowedFields = ['is_build_server_fallback_enabled'];
+        $validator = customApiValidator($request->all(), [
             'is_build_server_fallback_enabled' => ['required', 'boolean'],
         ]);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
 
-        $team->update($validated);
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $team->update($validator->validated());
 
         return response()->json($this->removeSensitiveData($team));
     }

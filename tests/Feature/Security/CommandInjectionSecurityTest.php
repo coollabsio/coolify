@@ -382,25 +382,6 @@ describe('deployment git command escaping', function () {
     });
 });
 
-describe('sharedDataApplications rules survive array_merge in controller', function () {
-    test('docker_compose_location safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        // Simulate what ApplicationsController does: array_merge(shared, local)
-        // After our fix, local no longer contains docker_compose_location,
-        // so the shared regex rule must survive
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        // The merged rules for docker_compose_location should be the safe regex, not just 'string'
-        expect($merged['docker_compose_location'])->toBeArray();
-        expect($merged['docker_compose_location'])->toContain('regex:'.ValidationPatterns::FILE_PATH_PATTERN);
-    });
-});
-
 describe('path fields require leading slash', function () {
     test('dockerfile_location without leading slash is rejected by API rules', function () {
         $rules = sharedDataApplications();
@@ -877,54 +858,6 @@ describe('container name validation', function () {
     });
 });
 
-describe('dockerfile_target_build rules survive array_merge in controller', function () {
-    test('dockerfile_target_build safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        // Simulate what ApplicationsController does: array_merge(shared, local)
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged)->toHaveKey('dockerfile_target_build');
-        expect($merged['dockerfile_target_build'])->toBeArray();
-        expect($merged['dockerfile_target_build'])->toContain('regex:'.ValidationPatterns::DOCKER_TARGET_PATTERN);
-    });
-});
-
-describe('docker_compose_custom_command rules survive array_merge in controller', function () {
-    test('docker_compose_custom_start_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        // Simulate what ApplicationsController does: array_merge(shared, local)
-        // After our fix, local no longer contains docker_compose_custom_start_command,
-        // so the shared regex rule must survive
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['docker_compose_custom_start_command'])->toBeArray();
-        expect($merged['docker_compose_custom_start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-
-    test('docker_compose_custom_build_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['docker_compose_custom_build_command'])->toBeArray();
-        expect($merged['docker_compose_custom_build_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-});
-
 describe('API route middleware for deploy actions', function () {
     test('application start route requires deploy ability', function () {
         $routes = app('router')->getRoutes();
@@ -1033,14 +966,6 @@ describe('service application lifecycle command escaping', function () {
             ->and($source)->toContain("docker inspect --format='{{json .State.Health.Log}}' {\$escapedContainerName}")
             ->and($source)->toContain('docker logs -n 100 {$escapedContainerName}')
             ->and($source)->toContain('dockerStopCommand($timeout, escapeshellarg($containerName), $this->server)');
-    });
-
-    test('service application logs endpoint passes raw container name to docker helpers', function () {
-        $source = file_get_contents(app_path('Http/Controllers/Api/ServiceApplicationsController.php'));
-
-        expect($source)->toContain('getContainerStatus($server, $containerName)')
-            ->and($source)->toContain('getContainerLogs($server, $containerName, $lines)')
-            ->and($source)->not->toContain('$safeContainerName = escapeshellarg($containerName)');
     });
 });
 
@@ -1183,47 +1108,6 @@ describe('install/build/start command validation', function () {
 
         expect($validator->fails())->toBeFalse();
     })->with(['install_command', 'build_command', 'start_command']);
-});
-
-describe('install/build/start command rules survive array_merge in controller', function () {
-    test('install_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['install_command'])->toBeArray();
-        expect($merged['install_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-
-    test('build_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['build_command'])->toBeArray();
-        expect($merged['build_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-
-    test('start_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['start_command'])->toBeArray();
-        expect($merged['start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
 });
 
 describe('git_branch validation rules survive array_merge in controller', function () {

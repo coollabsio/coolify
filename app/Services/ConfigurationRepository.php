@@ -37,7 +37,7 @@ class ConfigurationRepository
             $this->config->set('mail.mailers.smtp', [
                 'transport' => 'smtp',
                 'scheme' => $mailerOptions['scheme'],
-                'host' => $settings->smtp_host,
+                'host' => filled($settings->smtp_host) ? formatHostForUrl($settings->smtp_host) : $settings->smtp_host,
                 'port' => $settings->smtp_port,
                 'encryption' => $mailerOptions['encryption'],
                 'username' => $settings->smtp_username,
@@ -60,10 +60,5 @@ class ConfigurationRepository
         if (app()->bound('mail.manager')) {
             Mail::purge();
         }
-    }
-
-    public function disableSshMux(): void
-    {
-        $this->config->set('constants.ssh.mux_enabled', false);
     }
 }
