@@ -892,6 +892,10 @@ function profile_avatar_url(User $user): string
         }
     }
 
+    if (auth()->check() && $user->id !== auth()->id()) {
+        return route('team.member.avatar', ['user_id' => $user->id, 'v' => $user->updated_at->timestamp]);
+    }
+
     return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
 }
 
@@ -907,6 +911,21 @@ function project_icon_url(Project $project): string
     return route('project.icon', [
         'project_uuid' => $project->uuid,
         'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function team_avatar_url(Team $team): string
+{
+    if ($team->avatar_storage_type === 's3') {
+        $url = s3_image_url($team->avatar_s3_storage_id, $team->avatar_path, $team->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('team.avatar', [
+        'team_id' => $team->id,
+        'v' => $team->updated_at->timestamp,
     ]);
 }
 
@@ -4601,6 +4620,10 @@ function settingsSearchItems(iterable $groupedItems, array $routeParameters, arr
 
     foreach ($groupedItems as $groupLabel => $groupItems) {
         foreach ($groupItems as $item) {
+            if ($item['disabled'] ?? false) {
+                continue;
+            }
+
             $href = route($item['route'], $routeParameters);
             $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
 

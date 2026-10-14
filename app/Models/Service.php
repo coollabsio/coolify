@@ -255,6 +255,15 @@ class Service extends BaseModel
             return 'starting:unhealthy';
         }
 
+        return $this->containerStatus();
+    }
+
+    /**
+     * The aggregate status of the stored container statuses, without the running start check.
+     * Callers that check starting services in bulk use it to avoid a query per service.
+     */
+    public function containerStatus(): ?string
+    {
         $applications = $this->applications;
         $databases = $this->databases;
 

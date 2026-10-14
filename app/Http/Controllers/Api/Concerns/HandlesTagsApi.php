@@ -121,8 +121,8 @@ trait HandlesTagsApi
             return response()->json(['message' => 'Tag not found on resource.'], 404);
         }
 
+        // The tag stays, also without resources.
         $resource->tags()->detach($tag->id);
-        $tag->deleteIfOrphaned();
 
         return response()->json(['message' => 'Tag removed.']);
     }

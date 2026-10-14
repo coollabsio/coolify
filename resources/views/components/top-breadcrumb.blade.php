@@ -85,7 +85,7 @@
     $currentTag = $tags->firstWhere('name', $tagName);
     $dashboardContext = match (true) {
         request()->routeIs('dashboard') => 'Dashboard',
-        request()->routeIs('project.index') => 'Projects',
+        request()->routeIs('project.index', 'project.canvas.index') => 'Projects',
         request()->routeIs('terminal') => 'Terminal',
         request()->routeIs('server.*') => 'Servers',
         request()->routeIs('source.*') => 'Sources',
