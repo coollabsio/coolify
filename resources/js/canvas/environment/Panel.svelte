@@ -72,7 +72,7 @@
 {/snippet}
 
 {#snippet shell(title, iconSource, body, footer)}
-  <aside class="absolute top-3 right-3 bottom-3 z-20 flex w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-white/[0.08] dark:bg-panel" style:top={top || null} data-ec-panel>
+  <aside class="absolute top-3 right-3 bottom-3 z-20 flex w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-white/[0.08] dark:bg-panel" style:top={top || null} data-ec-panel>
     <div class="flex items-center gap-2.5 px-4 py-3">
       <div class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
         {#if typeof iconSource === 'string'}<Icon name={iconSource} class="size-4" />{:else}<NodeIcon node={iconSource} />{/if}

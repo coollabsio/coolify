@@ -5483,7 +5483,8 @@ html.dark .canvas-zoom-max {
 @media (min-width: 1024px) {
     html[data-nav-style="floating"] {
         --floating-gap: 0.5rem;
-        --floating-radius: 12px;
+        /* Same radius as the content cards (.application-settings-section). */
+        --floating-radius: 8px;
         --floating-line: oklch(0% 0 0 / 0.09);
         /* Bottom edge of the top bar panel plus one gap. */
         --floating-top: calc(3rem + var(--floating-gap) * 2);
