@@ -82,11 +82,12 @@ trait BuildsResponse
      * Recursively remove sensitive keys from any nested array structure.
      *
      * @param  array<array-key, mixed>  $data
+     * @param  array<int, string>  $publicKeys  Identifiers required by management actions.
      * @return array<array-key, mixed>
      */
-    protected function scrubSensitive(array $data): array
+    protected function scrubSensitive(array $data, array $publicKeys = []): array
     {
-        $deny = array_flip($this->sensitiveKeys);
+        $deny = array_flip(array_diff($this->sensitiveKeys, $publicKeys));
 
         $walk = function ($value) use (&$walk, $deny) {
             if (! is_array($value)) {

@@ -13617,58 +13617,6 @@
                 ]
             }
         },
-        "\/enable": {
-            "post": {
-                "summary": "Enable API",
-                "description": "Enable API (only with root permissions).",
-                "operationId": "enable-api",
-                "responses": {
-                    "200": {
-                        "description": "Enable API.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "API enabled."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "You are not allowed to enable the API.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "You are not allowed to enable the API."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "\/disable": {
             "post": {
                 "summary": "Disable API",
@@ -15984,9 +15932,6 @@
                     "content": {
                         "application\/json": {
                             "schema": {
-                                "required": [
-                                    "private_key"
-                                ],
                                 "properties": {
                                     "name": {
                                         "type": "string"
