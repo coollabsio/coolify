@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Server\StartSentinel;
 use App\Livewire\Fleet\Metrics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\Support\ConcurrentMetricsClient;
 
@@ -379,4 +381,42 @@ it('repairs the Sentinel token before creating worker clients', function () {
     $token = $server->settings->fresh()->sentinel_token;
     expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
     expect($token)->not->toBe('invalid token');
+});
+
+it('enables metrics on each eligible server of the team from the empty state', function () {
+    Queue::fake();
+    $first = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $second = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $build = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $build->settings->update(['server_role' => 'build', 'is_build_server' => true]);
+    $foreign = Server::factory()->create(['team_id' => Team::factory()->create()->id, 'private_key_id' => $this->privateKey->id]);
+
+    $component = Livewire::test(TestableMetrics::class)
+        ->assertSee('Enable metrics on 2 servers')
+        ->call('enableMetrics');
+
+    expect($first->settings->fresh()->is_metrics_enabled)->toBeTruthy();
+    expect($second->settings->fresh()->is_metrics_enabled)->toBeTruthy();
+    expect($build->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    expect($foreign->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    StartSentinel::assertPushed(2);
+
+    expect(array_column($component->get('serverRows'), 'uuid'))->toEqualCanonicalizing([$first->uuid, $second->uuid]);
+    $component->assertDontSee('No server metrics yet');
+});
+
+it('does not let a team member enable metrics', function () {
+    Queue::fake();
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(TestableMetrics::class)
+        ->assertSee('No server metrics yet')
+        ->assertDontSee('Enable metrics on '.$server->name)
+        ->call('enableMetrics');
+
+    expect($server->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    StartSentinel::assertNotPushed();
 });

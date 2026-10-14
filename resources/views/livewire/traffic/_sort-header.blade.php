@@ -8,10 +8,11 @@
                             hides on small screens passes `hidden <breakpoint>:inline-flex`
     @param ?string $title   tooltip
     @param ?bool   $text    true for a text column: left-aligned, first sort ascending
+    @param ?string $dir     first sort direction, when it differs from the default of the alignment
 --}}
 @php
     $text = $text ?? false;
-    $firstDir = $text ? 'asc' : 'desc';
+    $firstDir = $dir ?? ($text ? 'asc' : 'desc');
     $class = $class ?? '';
     // `hidden` and `inline-flex` on one element conflict, so add the display only when the caller sets none.
     $display = str_contains($class, 'hidden') ? '' : 'inline-flex';
