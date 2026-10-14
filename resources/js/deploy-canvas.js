@@ -114,6 +114,45 @@ const templateOptions = () => {
   return serviceTemplates;
 };
 
+// The logo of a source step: the one resource_logo() (bootstrap/helpers/services.php) and the
+// New resource page show for what it creates. Service logos come from the page
+// (deploy-canvas.blade.php). Null keeps the step's glyph.
+// The page gives versioned URLs (resource_logo_url()), so a changed logo is not loaded from the cache.
+let resourceLogos = null;
+const resourceLogoUrl = name => {
+  if (!resourceLogos) {
+    try { resourceLogos = JSON.parse(globalThis.document?.querySelector('[data-deploy-canvas-resource-logos]')?.textContent || '{}'); } catch { resourceLogos = {}; }
+  }
+  return resourceLogos[name] ?? `/svgs/resources/${name}.svg`;
+};
+const resourceLogo = (name, hasDark = false) => ({
+  src: resourceLogoUrl(name), dark: hasDark ? resourceLogoUrl(`${name}-dark`) : null, fallback: null, padded: false,
+});
+const DATABASE_LOGOS = { postgresql: 'postgres' };
+let serviceLogos = null;
+const serviceLogo = key => {
+  if (!serviceLogos) {
+    try { serviceLogos = JSON.parse(document.querySelector('[data-deploy-canvas-service-logos]')?.textContent || '{}'); } catch { serviceLogos = {}; }
+  }
+  const logo = serviceLogos[key];
+  return logo ? { src: logo[0], dark: null, fallback: logo[1], padded: true } : null;
+};
+export function logoOf(n) {
+  const d = n.data || {};
+  switch (n.type) {
+    case 'git':
+      if (d.buildPack === 'dockerfile') return resourceLogo('dockerfile');
+      if (d.buildPack === 'dockercompose') return resourceLogo('docker-compose');
+      if (d.mode === 'github') return resourceLogo('github-app', true);
+      return resourceLogo(d.mode === 'key' ? 'deploy-key' : 'public-repo');
+    case 'image': return resourceLogo('docker-image');
+    case 'dockerfile': return resourceLogo('dockerfile');
+    case 'service': return d.mode === 'compose' ? resourceLogo('docker-compose') : (d.type ? serviceLogo(d.type) : null);
+    case 'database': return d.engine ? resourceLogo(DATABASE_LOGOS[d.engine] ?? d.engine, ['keydb', 'dragonfly'].includes(d.engine)) : null;
+    default: return null;
+  }
+}
+
 export const TYPES = {
   start: {
     title: 'Start', sub: 'Which project and environment', stage: 'start', icon: ICONS.start,

@@ -1,5 +1,5 @@
 <script>
-  import { ICONS, nextOf, onlyOption, planOf, prevOf, resourceLabel, sourceAbove, TYPES } from '../../deploy-canvas.js';
+  import { ICONS, logoOf, nextOf, onlyOption, planOf, prevOf, resourceLabel, sourceAbove, TYPES } from '../../deploy-canvas.js';
   import Field from './Field.svelte';
   import Icon from './Icon.svelte';
   import { cv, dragNode, removeNode, runFlow, startConnect, track } from './state.svelte.js';
@@ -11,6 +11,11 @@
   const t = $derived(TYPES[n.type]);
   const st = $derived(cv.runState[n.id]);
   const plan = $derived(planOf(cv.flow));
+  // The logo of what the step creates (engine, template, build); a logo that fails to load
+  // shows its fallback, then the step's glyph.
+  const logo = $derived(logoOf(n));
+  let broken = $state({});
+  const logoSrc = $derived(logo && (broken[logo.src] ? logo.fallback : logo.src));
   const fields = $derived(t.fields.filter(f => !f.show || f.show(n.data)));
   // Start, Deploy and the first Server stay.
   const removable = $derived(n.type !== 'start' && n.type !== 'deploy' && n.id !== 'server');
@@ -48,7 +53,14 @@
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="cv-node-head" onpointerdown={e => dragNode(n, e)}>
-    <i><Icon name={t.icon} /></i>
+    <i class:cv-logo={logoSrc && !broken[logoSrc]} class:padded={logo?.padded}>
+      {#if logoSrc && !broken[logoSrc]}
+        <img class:cv-light={logo.dark} alt="" src={logoSrc} onerror={() => (broken[logoSrc] = true)} />
+        {#if logo.dark}<img class="cv-dark-only" alt="" src={logo.dark} />{/if}
+      {:else}
+        <Icon name={t.icon} />
+      {/if}
+    </i>
     <div><b>{t.title}</b><small>{t.sub}</small></div>
     {#if removable}
       <button class="cv-x" title="Remove step" onpointerdown={stop} onclick={() => removeNode(n.id)}><Icon name={ICONS.x} /></button>

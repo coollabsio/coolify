@@ -135,7 +135,7 @@ describe('GET canvas', function () {
                 'children' => [],
                 'volumes' => ['web-data'],
                 'link' => $application->link(),
-                'logo' => ['src' => asset('svgs/resources/public-repo.svg'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => 'https://web.example.com/favicon.ico'],
+                'logo' => ['src' => resource_logo_url('public-repo'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => 'https://web.example.com/favicon.ico'],
             ])
             ->and($nodes[$service->uuid])->toEqual([
                 'id' => $service->uuid,
@@ -163,7 +163,7 @@ describe('GET canvas', function () {
                 'kind' => 'postgresql',
                 'subtitle' => 'PostgreSQL · postgres:17-alpine',
                 'volumes' => ["postgres-data-{$database->uuid}"],
-                'logo' => ['src' => asset('svgs/resources/postgres.svg'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null],
+                'logo' => ['src' => resource_logo_url('postgres'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null],
             ])
             ->and($response->getContent())->not->toContain('canvas-secret-password');
     });

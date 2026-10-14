@@ -37,6 +37,18 @@ test('team members can open the deploy canvas', function () {
         ->assertSee('data-deploy-canvas', false);
 });
 
+test('the deploy canvas page lists the service template logos for the service step', function () {
+    $this->team->members()->attach($this->user->id, ['role' => 'member']);
+    $template = get_service_templates()->first(fn ($template) => filled(data_get($template, 'logo')) && basename(data_get($template, 'logo')) !== 'default.webp');
+    $key = get_service_templates()->search($template);
+
+    $html = actingInCanvasTeam($this, $this->team)->withoutVite()->get('/canvas')->assertOk()->getContent();
+
+    preg_match('/<script type="application\/json" data-deploy-canvas-service-logos>(.*?)<\/script>/s', $html, $matches);
+    $logos = json_decode($matches[1] ?? '', true);
+    expect($logos[$key][0])->toBe(service_logo_urls(data_get($template, 'logo'))['logo']);
+});
+
 test('guests cannot call the canvas api', function () {
     $this->getJson('/canvas/api/projects')->assertUnauthorized();
 });

@@ -3152,6 +3152,17 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+@media (min-width: 1536px) {
+    .deployment-table-embedded .deployment-table-grid {
+        grid-template-columns: 6.5rem minmax(0, 1fr) 6.5rem;
+    }
+
+    .deployment-table-embedded .deployment-table-grid > :nth-child(2),
+    .deployment-table-embedded .deployment-table-grid > :nth-child(n + 5) {
+        display: none;
+    }
+}
+
 .dashboard-deployment-table-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
 }
@@ -5205,8 +5216,10 @@ a.command-palette-item:focus-visible {
 
 /* Navigation items: each sidebar icon sits in a framed 32px tile with the 3D
    depth of .button, like the canvas tool rail. Only the tile reacts; the row
-   has no background. Applies to both navigation styles. */
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle) {
+   has no background. Applies to both navigation styles. Appearance →
+   Navigation items → Flat sets data-nav-items="flat" on <html> and turns these
+   rules off, which brings back the plain rows. */
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) {
     height: 2.5rem;
     padding-left: 0.25rem;
 }
@@ -5216,62 +5229,62 @@ html :is(.menu-item, .menu-subitem):not(.sidebar-toggle) {
    In the utilities layer so it can beat the search row's !bg-* utilities
    (a layered !important wins over an unlayered one). */
 @layer utilities {
-    html :is(.menu-item, .menu-subitem):not(.sidebar-toggle),
-    html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover {
+    html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle),
+    html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover {
         background-color: transparent !important;
     }
 
     /* The expanded Search field keeps its input fill (see .menu-search below). */
-    html nav:not(.sidebar-collapsed) .menu-search.menu-item {
+    html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search.menu-item {
         background-color: var(--color-neutral-100) !important;
     }
 
-    html nav:not(.sidebar-collapsed) .menu-search.menu-item:hover {
+    html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search.menu-item:hover {
         background-color: var(--color-neutral-200) !important;
     }
 
-    html.dark nav:not(.sidebar-collapsed) .menu-search.menu-item {
+    html.dark:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search.menu-item {
         background-color: oklch(100% 0 0 / 0.04) !important;
     }
 
-    html.dark nav:not(.sidebar-collapsed) .menu-search.menu-item:hover {
+    html.dark:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search.menu-item:hover {
         background-color: oklch(100% 0 0 / 0.07) !important;
     }
 
     @media (max-width: 1023.98px) {
-        html nav.sidebar-collapsed .menu-search.menu-item {
+        html:where(:not([data-nav-items="flat"])) nav.sidebar-collapsed .menu-search.menu-item {
             background-color: var(--color-neutral-100) !important;
         }
 
-        html.dark nav.sidebar-collapsed .menu-search.menu-item {
+        html.dark:where(:not([data-nav-items="flat"])) nav.sidebar-collapsed .menu-search.menu-item {
             background-color: oklch(100% 0 0 / 0.04) !important;
         }
     }
 }
 
 /* The current item's tile takes the accent, like the active tab pill. */
-html :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
     color: var(--color-coollabs);
     border-color: color-mix(in oklab, var(--color-coollabs) 45%, transparent) !important;
     --button-depth-color: color-mix(in oklab, var(--color-coollabs) 45%, transparent) !important;
 }
 
-html.dark :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
     color: var(--color-warning);
     border-color: color-mix(in oklab, var(--color-warning) 40%, transparent) !important;
     --button-depth-color: color-mix(in oklab, var(--color-warning) 35%, transparent) !important;
 }
 
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible {
     outline: none;
 }
 
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible .menu-item-icon {
     outline: 1px solid var(--color-accent);
     outline-offset: 2px;
 }
 
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
     box-sizing: content-box;
     width: 1rem;
     height: 1rem;
@@ -5286,33 +5299,33 @@ html :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
     transition: border-color 120ms, background-color 120ms, box-shadow 80ms, transform 80ms;
 }
 
-html.dark :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
     --button-depth-color: rgb(255 255 255 / 0.08);
 }
 
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon {
     transform: translateY(-1px);
     box-shadow: 0 3px 0 var(--button-depth-color);
 }
 
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):active .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):active .menu-item-icon {
     transform: translateY(2px);
     box-shadow: none;
 }
 
-html.dark :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
     border-color: oklch(100% 0 0 / 0.09);
     background: oklch(100% 0 0 / 0.04);
 }
 
-html :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
-html :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
+html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
     border-color: oklch(0% 0 0 / 0.18);
     background: #fff;
 }
 
-html.dark :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
-html.dark :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
     border-color: oklch(100% 0 0 / 0.18);
     background: oklch(100% 0 0 / 0.08);
 }
@@ -5320,13 +5333,13 @@ html.dark :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
 /* Search keeps its original input look while the sidebar is expanded (always on
    mobile, where the rail never collapses). Only the collapsed rail shows the 3D tile.
    The icon resets use .menu-search.menu-item to beat the html.dark tile rules. */
-html nav:not(.sidebar-collapsed) .menu-search {
+html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search {
     height: 2rem;
     padding-left: 0.625rem;
 }
 
-html nav:not(.sidebar-collapsed) .menu-search.menu-item .menu-item-icon,
-html nav:not(.sidebar-collapsed) .menu-search.menu-item:is(:hover, :active, :focus-visible) .menu-item-icon {
+html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search.menu-item .menu-item-icon,
+html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search.menu-item:is(:hover, :active, :focus-visible) .menu-item-icon {
     box-sizing: border-box;
     width: 1rem;
     height: 1rem;
@@ -5339,18 +5352,18 @@ html nav:not(.sidebar-collapsed) .menu-search.menu-item:is(:hover, :active, :foc
     opacity: 0.9;
 }
 
-html nav:not(.sidebar-collapsed) .menu-search:focus-visible {
+html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-search:focus-visible {
     outline: 1px solid var(--color-accent);
 }
 
 @media (max-width: 1023.98px) {
-    html nav.sidebar-collapsed .menu-search {
+    html:where(:not([data-nav-items="flat"])) nav.sidebar-collapsed .menu-search {
         height: 2rem;
         padding-left: 0.625rem;
     }
 
-    html nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon,
-    html nav.sidebar-collapsed .menu-search.menu-item:is(:hover, :active, :focus-visible) .menu-item-icon {
+    html:where(:not([data-nav-items="flat"])) nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon,
+    html:where(:not([data-nav-items="flat"])) nav.sidebar-collapsed .menu-search.menu-item:is(:hover, :active, :focus-visible) .menu-item-icon {
         box-sizing: border-box;
         width: 1rem;
         height: 1rem;
@@ -5366,7 +5379,7 @@ html nav:not(.sidebar-collapsed) .menu-search:focus-visible {
 
 @media (min-width: 1024px) {
     /* The collapsed rail is 64px wide with 40px of content: center the 32px tile. */
-    html .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+    html:where(:not([data-nav-items="flat"])) .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
         padding-left: 0.25rem;
         padding-right: 0.25rem;
     }
@@ -5470,6 +5483,13 @@ html.dark .canvas-zoom-max {
         max-width: calc(100vw - var(--floating-gap) * 2);
     }
 
+    /* The bar is opaque here, so it needs no blur. Without the backdrop filter
+       the bar is no longer the containing block for fixed children, which lets
+       the resource actions panel below sit against the screen edge. */
+    html[data-nav-style="floating"] .app-topbar {
+        backdrop-filter: none;
+    }
+
     /* The panel border replaces the inner dividers of the top bar. */
     html[data-nav-style="floating"] .app-topbar > div {
         border-bottom-width: 0;
@@ -5522,6 +5542,11 @@ html.dark .canvas-zoom-max {
         background-position: var(--canvas-dots-position, 0 0);
     }
 
+    /* The deploy canvas Steps panel starts at the same height as the sidebar. */
+    html[data-nav-style="floating"] .app-main-full .cv-root {
+        padding-top: var(--floating-top);
+    }
+
     html[data-nav-style="floating"] .app-main-full :is([data-ec-viewport], .cv-viewport) {
         background-image: none;
     }
@@ -5541,6 +5566,28 @@ html.dark .canvas-zoom-max {
 }
 
 @media (min-width: 1280px) {
+    /* Resource actions (Links, Deploy, …) float as their own panel at the top
+       right. The top bar panel stops one gap before it (the header publishes
+       --resource-actions-w). */
+    html[data-nav-style="floating"] #resource-action-hud-slot:not(:empty) {
+        position: fixed;
+        top: var(--floating-gap);
+        right: var(--floating-gap);
+        height: 3rem;
+        padding: 0 0.5rem;
+        border: 1px solid var(--floating-line);
+        border-radius: var(--floating-radius);
+        background-color: #fff;
+    }
+
+    html.dark[data-nav-style="floating"] #resource-action-hud-slot:not(:empty) {
+        background-color: var(--color-panel);
+    }
+
+    html[data-nav-style="floating"] .app-topbar:has(#resource-action-hud-slot:not(:empty)) {
+        max-width: calc(100vw - var(--floating-gap) * 3 - var(--resource-actions-w, 0px));
+    }
+
     html[data-nav-style="floating"] .application-settings-navigation {
         top: var(--floating-top);
         left: calc(var(--sidebar-w, 14rem) + var(--floating-gap) * 2);

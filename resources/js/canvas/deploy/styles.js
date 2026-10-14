@@ -74,6 +74,12 @@ const CSS = `
   /* Icon tiles: the neutral 32px tile of Coolify's collection cards. */
   .cv-item i, .cv-node-head i { display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border: 1px solid var(--cv-line); border-radius: 8px; background: light-dark(#fafafa, rgb(255 255 255 / 0.04)); color: light-dark(#737373, var(--color-fg-dim, #c4c4c4)); }
   .cv-item i svg { width: 1rem; height: 1rem; }
+  /* A resource logo fills the tile, like the environment canvas cards. */
+  .cv-node-head i.cv-logo { overflow: hidden; }
+  .cv-node-head i.cv-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .cv-node-head i.cv-logo.padded img { padding: 0.25rem; }
+  .cv-node-head .cv-dark-only, .cv-root.cv-dark .cv-node-head .cv-light { display: none; }
+  .cv-root.cv-dark .cv-node-head .cv-dark-only { display: block; }
   /* Palette tiles use the app's 3D button depth (app.css .button): a 2px ledge,
      a lift on hover, and a press on click. */
   /* Only the tile reacts; the row itself has no hover background. */

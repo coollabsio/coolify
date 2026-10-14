@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freeSpot } from './canvas-core.js';
-import { canFollow, domainList, fresh, onlyOption, parseEnvVars, planOf, splitImage, targetFrom, uniqueLabels, withDeploy, withoutSecrets, withTarget } from './deploy-canvas.js';
+import { canFollow, domainList, fresh, logoOf, onlyOption, parseEnvVars, planOf, splitImage, targetFrom, uniqueLabels, withDeploy, withoutSecrets, withTarget } from './deploy-canvas.js';
 
 test('splits the tag out of an image name', () => {
     assert.deepEqual(splitImage('nginx:alpine', 'latest'), { name: 'nginx', tag: 'alpine' });
@@ -158,4 +158,21 @@ test('finds a corner spot when two cards block the way', () => {
         assert.ok(apart, 'the spot does not touch a card');
     }
     assert.deepEqual(spot, { x: 60, y: 116, w: 100, h: 100 });
+});
+
+test('shows the logo of what a source step creates, like the rest of Coolify', () => {
+    const src = (type, data) => logoOf(node('n', type, data))?.src ?? null;
+    assert.equal(src('image', {}), '/svgs/resources/docker-image.svg');
+    assert.equal(src('dockerfile', {}), '/svgs/resources/dockerfile.svg');
+    assert.equal(src('database', { engine: 'postgresql' }), '/svgs/resources/postgres.svg');
+    assert.equal(src('database', { engine: 'mysql' }), '/svgs/resources/mysql.svg');
+    assert.equal(logoOf(node('n', 'database', { engine: 'keydb' })).dark, '/svgs/resources/keydb-dark.svg');
+    assert.equal(src('git', { mode: 'public', buildPack: 'railpack' }), '/svgs/resources/public-repo.svg');
+    assert.equal(src('git', { mode: 'github', buildPack: 'railpack' }), '/svgs/resources/github-app.svg');
+    assert.equal(src('git', { mode: 'key', buildPack: 'railpack' }), '/svgs/resources/deploy-key.svg');
+    assert.equal(src('git', { mode: 'public', buildPack: 'dockerfile' }), '/svgs/resources/dockerfile.svg');
+    assert.equal(src('service', { mode: 'compose' }), '/svgs/resources/docker-compose.svg');
+    // No engine or template yet, or a step that creates nothing: the step keeps its glyph.
+    assert.equal(src('database', {}), null);
+    assert.equal(src('server', {}), null);
 });

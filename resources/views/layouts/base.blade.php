@@ -33,6 +33,7 @@
             const themeColor = localStorage.themeColor || '#6b16ed';
             const customMode = localStorage.customMode || 'dark';
             document.documentElement.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
+            document.documentElement.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
             const isDark = theme === 'dark'
                 || (theme === 'custom' && customMode === 'dark')
                 || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -52,6 +53,7 @@
             customMode: localStorage.getItem('customMode') || 'dark',
             pageWidth: localStorage.getItem('pageWidth') || 'centered',
             navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
+            navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
             themeColorFrame: null,
             pickerOpen: false,
             init() {
@@ -85,6 +87,11 @@
                 this.navStyle = style;
                 localStorage.setItem('navStyle', style);
                 document.documentElement.dataset.navStyle = style;
+            },
+            setNavItems(style) {
+                this.navItems = style;
+                localStorage.setItem('navItems', style);
+                document.documentElement.dataset.navItems = style;
             },
             previewThemeColor(color) {
                 this.themeColor = color;

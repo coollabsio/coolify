@@ -39,6 +39,18 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 /**
+ * The URL of a logo in public/svgs/resources. The file's modification time is the version, so
+ * browsers load a changed logo instead of their cached copy.
+ */
+function resource_logo_url(string $name): string
+{
+    $path = "svgs/resources/{$name}.svg";
+    $modifiedAt = is_file(public_path($path)) ? filemtime(public_path($path)) : false;
+
+    return asset($path).($modifiedAt ? "?v={$modifiedAt}" : '');
+}
+
+/**
  * The logo of a resource, the same one shown on the "New resource" page: the database engine,
  * the service template, or how the application is built. Null when there is no specific logo.
  *
@@ -51,8 +63,8 @@ function resource_logo(Model $resource): ?array
 {
     $resourceLogo = function (string $name, bool $hasDarkVariant = false): array {
         return [
-            'src' => asset("svgs/resources/{$name}.svg"),
-            'dark' => $hasDarkVariant ? asset("svgs/resources/{$name}-dark.svg") : null,
+            'src' => resource_logo_url($name),
+            'dark' => $hasDarkVariant ? resource_logo_url("{$name}-dark") : null,
             'fallback' => null,
             'padded' => false,
             'favicon' => null,

@@ -13,15 +13,15 @@ beforeEach(function () {
 
 test('databases get the logo of their engine', function () {
     expect(resource_logo(new StandalonePostgresql))
-        ->toBe(['src' => asset('svgs/resources/postgres.svg'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null])
+        ->toBe(['src' => resource_logo_url('postgres'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null])
         ->and(resource_logo(new StandaloneKeydb))
-        ->toBe(['src' => asset('svgs/resources/keydb.svg'), 'dark' => asset('svgs/resources/keydb-dark.svg'), 'fallback' => null, 'padded' => false, 'favicon' => null]);
+        ->toBe(['src' => resource_logo_url('keydb'), 'dark' => resource_logo_url('keydb-dark'), 'fallback' => null, 'padded' => false, 'favicon' => null]);
 });
 
 test('applications get the logo of how they are built', function (string $buildPack, ?string $sourceType, string $logo) {
     $application = (new Application)->forceFill(['build_pack' => $buildPack, 'source_type' => $sourceType]);
 
-    expect(resource_logo($application)['src'])->toBe(asset("svgs/resources/{$logo}.svg"));
+    expect(resource_logo($application)['src'])->toBe(resource_logo_url($logo));
 })->with([
     ['nixpacks', null, 'public-repo'],
     ['railpack', GithubApp::class, 'github-app'],
@@ -62,3 +62,10 @@ test('applications with a domain get the favicon of their first domain', functio
     ['app.example.com', null],
     ['https://*.example.com', null],
 ]);
+
+test('resource logo URLs carry the file modification time, so browsers load changed logos', function () {
+    $modifiedAt = filemtime(public_path('svgs/resources/docker-image.svg'));
+
+    expect(resource_logo_url('docker-image'))->toBe(asset('svgs/resources/docker-image.svg')."?v={$modifiedAt}")
+        ->and(resource_logo_url('missing-logo'))->toBe(asset('svgs/resources/missing-logo.svg'));
+});

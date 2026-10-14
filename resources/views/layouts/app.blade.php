@@ -59,6 +59,9 @@
             {{-- ============ DESKTOP TOP BAR ============ --}}
             <header
                 x-data="{ resourceActionsOpen: false }"
+                {{-- Floating style: the resource actions are a separate panel at the top right.
+                     Publish its width so the top bar panel stops before it. --}}
+                x-init="new ResizeObserver(([entry]) => $el.style.setProperty('--resource-actions-w', entry.borderBoxSize[0].inlineSize + 'px')).observe($refs.resourceActions)"
                 @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
                 :class="{ 'z-[1000]': resourceActionsOpen }"
                 class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
@@ -96,7 +99,7 @@
                     <div id="page-toolbar-slot" class="flex shrink-0 items-center empty:hidden"></div>
                     <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
                     {{-- Resource actions dock here on desktop. --}}
-                    <div id="resource-action-hud-slot" class="hidden shrink-0 items-center xl:flex"></div>
+                    <div id="resource-action-hud-slot" x-ref="resourceActions" class="hidden shrink-0 items-center xl:flex"></div>
                 </div>
             </header>
 
