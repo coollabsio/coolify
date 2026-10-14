@@ -54,12 +54,10 @@ Route::post('/feedback', [OtherController::class, 'feedback'])
     ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.token.team', 'api.ability:write'],
+    'middleware' => ['api.ip.allowed', 'auth:sanctum', 'api.token.team', 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
-    Route::get('/enable', [OtherController::class, 'post_required']);
     Route::get('/disable', [OtherController::class, 'post_required']);
-    Route::post('/enable', [OtherController::class, 'enable_api']);
     Route::post('/disable', [OtherController::class, 'disable_api']);
     Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
     Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);

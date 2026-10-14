@@ -2,6 +2,8 @@
 
 use App\Jobs\ApplicationDeploymentJob;
 use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Servers\CoolifyServer;
+use App\Mcp\Tools\CoolifyHelp;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -145,7 +147,6 @@ test('tools/list includes new read tools and lifecycle tools', function () {
         'list_resources',
         'list_deployments',
         'get_deployment',
-        'get_logs',
         'list_env_keys',
         'list_storages',
         'list_destinations',
@@ -164,10 +165,8 @@ test('tools/list includes new read tools and lifecycle tools', function () {
         'list_application_previews',
         'list_shared_env_keys',
         'coolify_help',
-        'control',
-        'deploy',
-        'cancel_deployment',
     );
+    expect($names)->not->toContain('control', 'deploy', 'cancel_deployment', 'get_logs');
 });
 
 test('database backup tools scope schedules by database type and id', function () {
@@ -1621,9 +1620,7 @@ test('get_logs requires sensitive read ability', function () {
         'uuid' => $this->application->uuid,
     ]);
 
-    $response->assertOk();
-    expect($response->json('result.isError'))->toBeTrue()
-        ->and($response->json('result.content.0.text'))->toContain('read:sensitive');
+    expect($response->json('error.message'))->toBe('Tool [get_logs] not found.');
 });
 
 test('team members cannot retrieve logs with sensitive read ability', function () {
@@ -1696,11 +1693,48 @@ test('get_logs returns structured choices when service has multiple containers',
         ->and(json_encode($body['data']['message'] ?? ''))->not->toContain('"uuid"');
 });
 
-test('coolify_help returns catalog intents', function () {
-    $response = mcpReadCall('coolify_help', ['intent' => 'essentials']);
+test('coolify_help lists only the tools this token can see', function () {
+    $response = mcpReadCall('coolify_help');
     $response->assertOk();
     $body = mcpReadJson($response);
-    expect($body['data']['catalog']['essentials']['tools'])->toContain('search_resources', 'control');
+
+    expect($body['data']['read_tools'])->toHaveKeys(['search_resources', 'list_applications'])
+        ->and($body['data']['read_tools'])->not->toHaveKey('get_logs')
+        ->and($body['data']['change_tools'])->not->toHaveKeys(['control', 'manage_project', 'create_application'])
+        ->and($body['data']['recipes'])->toHaveKey('deploy_app_from_git');
+});
+
+test('coolify_help topic returns recipe steps and marks tools the token cannot use', function () {
+    $body = mcpReadJson(mcpReadCall('coolify_help', ['topic' => 'deploy_app_from_git']));
+    $steps = collect($body['data']['steps'])->keyBy('tool');
+
+    expect($steps['list_projects']['available'])->toBeTrue()
+        ->and($steps['create_application']['available'])->toBeFalse()
+        ->and($steps['create_application']['action'])->toBe('public');
+});
+
+test('coolify_help search filters tools and rejects unknown topics', function () {
+    $body = mcpReadJson(mcpReadCall('coolify_help', ['search' => 'deployment']));
+    expect($body['data']['read_tools'])->toHaveKeys(['list_deployments', 'get_deployment'])
+        ->and($body['data']['read_tools'])->not->toHaveKey('list_servers');
+
+    app('auth')->forgetGuards();
+    $unknown = mcpReadCall('coolify_help', ['topic' => 'nope']);
+    expect($unknown->json('result.isError'))->toBeTrue();
+});
+
+test('coolify_help recipes only name registered tools and actions', function () {
+    $tools = collect(CoolifyServer::TOOLS)->mapWithKeys(fn (string $class) => [app($class)->name() => app($class)]);
+
+    foreach (CoolifyHelp::RECIPES as $recipe) {
+        foreach ($recipe['steps'] as $step) {
+            expect($tools)->toHaveKey($step['tool']);
+            if (isset($step['action'])) {
+                $actions = (new ReflectionMethod($tools[$step['tool']], 'actions'))->invoke($tools[$step['tool']]);
+                expect($actions)->toHaveKey($step['action']);
+            }
+        }
+    }
 });
 
 test('list_unhealthy_resources sample_only returns summary and samples', function () {
@@ -1720,12 +1754,11 @@ test('control and deploy require deploy ability', function () {
         'action' => 'start',
         'uuid' => $this->application->uuid,
     ]);
-    $denied->assertOk();
-    expect($denied->json('result.isError'))->toBeTrue();
-    expect($denied->json('result.content.0.text'))->toContain('Missing required permissions');
+    expect($denied->json('error.message'))->toBe('Tool [control] not found.');
 
+    app('auth')->forgetGuards();
     $deployDenied = mcpReadCall('deploy', ['uuid' => $this->application->uuid]);
-    expect($deployDenied->json('result.isError'))->toBeTrue();
+    expect($deployDenied->json('error.message'))->toBe('Tool [deploy] not found.');
 });
 
 test('control stop requires confirm', function () {

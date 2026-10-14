@@ -68,6 +68,18 @@ trait ResolvesTeam
         return Response::error("Missing required permissions: {$ability}");
     }
 
+    /**
+     * Destructive tools must call this so agents cannot cause damage or downtime without an explicit confirm=true.
+     */
+    protected function ensureConfirmed(Request $request, string $action): ?Response
+    {
+        if (filter_var($request->get('confirm'), FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        return $this->mcpError($request, "{$action} requires confirm=true.");
+    }
+
     protected function resolveTeamId(Request $request): ?int
     {
         $user = $request->user();
