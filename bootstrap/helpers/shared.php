@@ -2661,6 +2661,7 @@ function deduplicateAllowlist(array $entries): array
 
 function get_public_ips()
 {
+    $settings = InstanceSettings::get();
     try {
         [$first, $second] = Process::concurrently(function (Pool $pool) {
             $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
@@ -2675,7 +2676,9 @@ function get_public_ips()
 
                 return;
             }
-            InstanceSettings::get()->update(['public_ipv4' => $ipv4]);
+            if (! $settings->public_ipv4) {
+                $settings->update(['public_ipv4' => $ipv4]);
+            }
         }
     } catch (Exception $e) {
         echo "Error: {$e->getMessage()}\n";
@@ -2690,7 +2693,9 @@ function get_public_ips()
 
                 return;
             }
-            InstanceSettings::get()->update(['public_ipv6' => $ipv6]);
+            if (! $settings->public_ipv6) {
+                $settings->update(['public_ipv6' => $ipv6]);
+            }
         }
     } catch (Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
