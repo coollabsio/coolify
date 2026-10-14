@@ -107,7 +107,9 @@
                 @endif
                 @if ($is_mcp_server_enabled)
                     <x-callout type="info" title="MCP endpoint" class="mt-4">
-                        <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
+                        <span class="inline-flex items-center gap-1 align-middle"><code>{{ url('/mcp') }}</code><x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" /></span>
+                        uses bearer tokens from
+                        <a href="{{ route('security.api-tokens') }}" class="underline" {{ wireNavigate() }}>Security → API Tokens</a>.
                     </x-callout>
                 @endif
             </x-application.settings-section>
