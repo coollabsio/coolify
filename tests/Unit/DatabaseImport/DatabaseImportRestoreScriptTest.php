@@ -260,6 +260,7 @@ printf '%s|%s|%s\\n' '{$client}' "\$*" "\$header" >> {$escapedLog}
 if [ -n "\${STUB_FAIL_MATCH:-}" ]; then
     case "\$*" in *"\$STUB_FAIL_MATCH"*) exit 1 ;; esac
 fi
+case "\$*" in *"SELECT datname FROM pg_database"*) printf '%s\\n' "\${STUB_DATABASES:-}" ;; esac
 case "\$*" in *rolsuper*) printf '%s\\n' "\${STUB_ROLSUPER-t}" ;; esac
 exit 0
 SH);
@@ -552,24 +553,30 @@ test('rejects unsupported single PostgreSQL backups before calling any client', 
     'binary garbage' => ['garbage', 'Unsupported PostgreSQL backup format'],
 ]);
 
-test('restores PostgreSQL backups containing all databases after checking the format', function (string $fixture, array $restoreCall) {
-    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), dumpAll: true);
+test('restores PostgreSQL backups containing all databases after checking the format', function (string $fixture, array $restoreCall, array $environment, string $user) {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), dumpAll: true, env: $environment + ['STUB_DATABASES' => 'app']);
 
     $recreate = [
-        ['psql', '', ['-U postgres -d template1 -Atc', 'rolsuper']],
-        ['psql', '', ['-U postgres -c', 'pg_terminate_backend']],
-        ['psql', '', ['-U postgres -t -c', 'SELECT datname FROM pg_database']],
-        ['createdb', '', ['-U postgres app']],
+        ['psql', '', ["-U {$user} -d template1 -Atc", 'rolsuper']],
+        ['psql', '', ["-U {$user} -d template1 -c", 'pg_terminate_backend']],
+        ['psql', '', ["-U {$user} -d template1 -t -c", 'SELECT datname FROM pg_database']],
+        ['dropdb', '', ["-U {$user} --maintenance-db=template1 --if-exists app"]],
+        ['createdb', '', ["-U {$user} app"]],
     ];
     $inspect = $restoreCall[0] === 'pg_restore' ? [['pg_restore', 'PGDMP', ['-l']]] : [];
 
     expect($run['exit'])->toBe(0, $run['stderr']);
+    $restoreCall[2] = ["-U {$user} -d app"];
     restoreScriptExpectCalls($run['calls'], [...$inspect, ...$recreate, $restoreCall]);
 })->with([
     'custom archive' => ['pg-custom', ['pg_restore', 'PGDMP', ['-U postgres -d app']]],
     'gzip custom archive' => ['pg-custom-gz', ['pg_restore', 'PGDMP', ['-U postgres -d app']]],
     'plain SQL' => ['pg-sql', ['psql', '-- Po', ['-U postgres -d app']]],
     'gzip SQL' => ['pg-sql-gz', ['psql', '-- Po', ['-U postgres -d app']]],
+])->with([
+    'POSTGRES_USER' => [[], 'postgres'],
+    'PGUSER' => [['POSTGRES_USER' => null, 'PGUSER' => 'custom_user'], 'custom_user'],
+    'POSTGRESQL_USERNAME' => [['POSTGRES_USER' => null, 'POSTGRESQL_USERNAME' => 'bitnami'], 'bitnami'],
 ]);
 
 test('rejects unsupported PostgreSQL backups containing all databases before dropping anything', function () {

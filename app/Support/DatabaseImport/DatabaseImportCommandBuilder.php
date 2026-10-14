@@ -267,8 +267,8 @@ else
   fail 'Unsupported PostgreSQL backup format. Use a pg_dump archive (custom or tar format) or an SQL file. Nothing was changed.'
 fi
 check_superuser
-psql -U "$pg_user" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" || exit 1
-psql -U "$pg_user" -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U "$pg_user" --if-exists {} || exit 1
+psql -U "$pg_user" -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" || exit 1
+psql -U "$pg_user" -d template1 -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U "$pg_user" --maintenance-db=template1 --if-exists {} || exit 1
 createdb -U "$pg_user" "$db" || exit 1
 if [ "$kind" = archive ]; then
   stream | pg_restore -U "$pg_user" -d "$db"

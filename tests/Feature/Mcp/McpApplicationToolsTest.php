@@ -255,6 +255,41 @@ test('create_application instant_deploy needs the deploy ability', function () {
 
 // manage_application
 
+test('manage_application accepts scalar and null unused path parameters', function (mixed $destinationUuid) {
+    $response = mcpAppCall(mcpAppToken($this->user), 'manage_application', [
+        'action' => 'update',
+        'uuid' => $this->application->uuid,
+        'destination_uuid' => $destinationUuid,
+        'data' => ['name' => 'changed'],
+    ]);
+
+    $response->assertOk()->assertJsonMissingPath('error');
+    expect(mcpAppIsError($response))->toBeFalse()
+        ->and($this->application->fresh()->name)->toBe('changed');
+})->with([
+    'string' => ['unused'],
+    'integer' => [123],
+    'float' => [1.5],
+    'boolean' => [false],
+    'null' => [null],
+]);
+
+test('manage_application rejects non-scalar unused path parameters before updating', function (mixed $destinationUuid) {
+    $response = mcpAppCall(mcpAppToken($this->user), 'manage_application', [
+        'action' => 'update',
+        'uuid' => $this->application->uuid,
+        'destination_uuid' => $destinationUuid,
+        'data' => ['name' => 'changed'],
+    ]);
+
+    $response->assertOk()->assertJsonPath('result.isError', true)->assertJsonMissingPath('error');
+    expect(mcpAppText($response))->toContain('destination_uuid must be a string.')
+        ->and($this->application->fresh()->name)->toBe('mine');
+})->with([
+    'array' => [['invalid']],
+    'object' => [(object) ['uuid' => 'invalid']],
+]);
+
 test('manage_application updates, clones and moves an application of the token team', function () {
     $token = mcpAppToken($this->user);
 

@@ -104,6 +104,9 @@ abstract class RestActionTool extends Tool
         foreach (array_keys($this->pathParams()) as $param) {
             $value = $request->get($param);
             if ($value !== null) {
+                if (! is_scalar($value)) {
+                    return $this->mcpError($request, "{$param} must be a string.");
+                }
                 $pathParams[$param] = $value;
             }
         }
