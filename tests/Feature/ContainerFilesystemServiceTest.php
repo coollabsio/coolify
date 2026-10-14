@@ -62,7 +62,10 @@ it('builds a listing command with a single stat call, escaped path and container
         // Must embed a REAL tab, not a literal backslash-t: stat -c does not
         // expand \t, so a literal escape would break the tab-delimited parse.
         ->toContain("%F\t%s")
-        ->not->toContain('%F\\t%s');
+        ->not->toContain('%F\\t%s')
+        // find batches names, so a huge folder cannot overflow the argument limit like a glob.
+        ->toContain('find . ! -name . -prune -exec stat -c')
+        ->not->toContain('* .*');
 });
 
 it('rejects an unsafe listing path', function () {
@@ -83,6 +86,17 @@ it('parses a tab-delimited listing into sorted FileEntry rows', function () {
     expect($entries[0]->type)->toBe('dir');
     expect($entries[1]->name)->toBe('.env');
     expect($entries[2]->name)->toBe('README.md');
+});
+
+it('strips the ./ prefix that find adds to listed names', function () {
+    $raw = implode("\n", [
+        "directory\t0\t1\t755\troot\troot\t./src",
+        "regular file\t5\t2\t644\troot\troot\t./.env",
+    ]);
+
+    $names = array_map(fn ($entry) => $entry->name, fsService()->parseListing($raw));
+
+    expect($names)->toBe(['src', '.env']);
 });
 
 it('parses an empty listing to an empty array', function () {

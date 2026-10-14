@@ -29,18 +29,20 @@ class ContainerFilesystemService
     {
         $escapedPath = $this->escapePath($path, 'list path');
 
-        // Emit the whole directory in ONE stat call instead of a per-entry loop
-        // (three stat forks each). %F is the human file type ("directory",
+        // Emit the whole directory through batched stat calls (one for most folders)
+        // instead of a per-entry loop. %F is the human file type ("directory",
         // "symbolic link", "regular file"), mapped to a token by parseListing.
         // Fields: type<TAB>size<TAB>mtime<TAB>perms<TAB>owner<TAB>group<TAB>name.
         // A real tab is embedded in the format because stat's -c does NOT expand
         // a backslash \t escape (unlike printf) - it would emit the literal text.
-        // `* .*` covers hidden files; parseListing drops the . and .. rows.
-        // Names containing a tab/newline are skipped by parseListing (v1 scope).
+        // POSIX `find ... -prune -exec {} +` lists hidden files without recursing
+        // and batches names, so a huge directory cannot overflow the argument
+        // limit like a `* .*` glob would. Names arrive as ./name; parseListing
+        // strips that prefix. Names containing a tab/newline are skipped (v1 scope).
         $tab = "\t";
         $format = '%F'.$tab.'%s'.$tab.'%Y'.$tab.'%a'.$tab.'%U'.$tab.'%G'.$tab.'%n';
         $inner = 'cd '.$escapedPath.' 2>/dev/null || exit 0; '
-            .'stat -c "'.$format.'" -- * .* 2>/dev/null';
+            .'find . ! -name . -prune -exec stat -c "'.$format.'" -- {} + 2>/dev/null';
 
         return $this->dockerExecShell($inner);
     }
@@ -249,8 +251,11 @@ class ContainerFilesystemService
             } else {
                 continue;
             }
-            // stat lists the directory itself and its parent; skip them.
-            if ($name === '.' || $name === '..') {
+            // find prefixes names with ./; a name itself can never contain a slash.
+            if (str_starts_with($name, './')) {
+                $name = substr($name, 2);
+            }
+            if ($name === '' || $name === '.' || $name === '..') {
                 continue;
             }
             $entries[] = new FileEntry(
