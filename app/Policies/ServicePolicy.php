@@ -109,16 +109,6 @@ class ServicePolicy
         return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
-    /**
-     * Determine whether the user can access the terminal.
-     */
-    public function accessTerminal(User $user, Service $service): bool
-    {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
-    }
-
     private function getTeamId(Service $service): ?int
     {
         return $service->team()?->id;
