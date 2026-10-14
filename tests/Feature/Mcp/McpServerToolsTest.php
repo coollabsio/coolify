@@ -602,7 +602,7 @@ test('manage_git_source cannot change or delete GitHub apps of another team, inc
 ])->with(['update', 'delete']);
 
 test('manage_git_source creates, updates, and deletes a GitLab app without returning secrets', function () {
-    $token = mcpSrvToken($this->user, ['root']);
+    $token = mcpSrvToken($this->user, ['read', 'write']);
 
     $create = mcpSrvCall($token, 'manage_git_source', ['action' => 'create', 'resource' => 'gitlab', 'data' => [
         'name' => 'mcp-gitlab', 'html_url' => 'https://gitlab.com', 'client_secret' => 'GL_CLIENT_SECRET_VALUE', 'webhook_token' => 'GL_WEBHOOK_TOKEN_VALUE',
@@ -613,13 +613,20 @@ test('manage_git_source creates, updates, and deletes a GitLab app without retur
     $app = GitlabApp::where('name', 'mcp-gitlab')->sole();
     expect($app->team_id)->toBe($this->team->id);
 
-    $update = mcpSrvCall($token, 'manage_git_source', ['action' => 'update', 'resource' => 'gitlab', 'source_id' => (string) $app->id, 'data' => ['name' => 'renamed-gitlab']]);
+    $list = mcpSrvCall($token, 'manage_git_source', ['action' => 'list', 'resource' => 'gitlab']);
+    expect(mcpSrvIsError($list))->toBeFalse()
+        ->and(mcpSrvText($list))->not->toContain('GL_CLIENT_SECRET_VALUE')
+        ->and(mcpSrvText($list))->not->toContain('GL_WEBHOOK_TOKEN_VALUE');
+    $sourceId = collect(mcpSrvData($list))->firstWhere('name', 'mcp-gitlab')['id'];
+    expect($sourceId)->not->toBeNull();
+
+    $update = mcpSrvCall($token, 'manage_git_source', ['action' => 'update', 'resource' => 'gitlab', 'source_id' => (string) $sourceId, 'data' => ['name' => 'renamed-gitlab']]);
     expect(mcpSrvIsError($update))->toBeFalse(mcpSrvText($update))
         ->and(mcpSrvText($update))->not->toContain('GL_CLIENT_SECRET_VALUE')
         ->and(mcpSrvText($update))->not->toContain('GL_WEBHOOK_TOKEN_VALUE')
         ->and($app->fresh()->name)->toBe('renamed-gitlab');
 
-    $delete = mcpSrvCall($token, 'manage_git_source', ['action' => 'delete', 'resource' => 'gitlab', 'source_id' => (string) $app->id, 'confirm' => true]);
+    $delete = mcpSrvCall($token, 'manage_git_source', ['action' => 'delete', 'resource' => 'gitlab', 'source_id' => (string) $sourceId, 'confirm' => true]);
     expect(mcpSrvIsError($delete))->toBeFalse(mcpSrvText($delete))
         ->and(GitlabApp::find($app->id))->toBeNull();
 });

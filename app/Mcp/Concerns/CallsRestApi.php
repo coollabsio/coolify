@@ -38,7 +38,7 @@ trait CallsRestApi
     /**
      * Response keys that are never returned to MCP clients, whatever the token abilities are.
      */
-    private string $neverReturnKeyPattern = '/(private_key|secret|api_key|license_key|user_key|webhook_url|^password$|smtp_password|(^|_)token$)/i';
+    private string $neverReturnKeyPattern = '/(private_key|secret|api_key|license_key|user_key|webhook_url|password|^(internal|external)_db_url$|(^|_)token$)/i';
 
     private const MAX_BODY_BYTES = 1_048_576;
 
@@ -130,7 +130,9 @@ trait CallsRestApi
             $decoded = $this->removeNeverReturnedKeys($decoded);
             // Some REST write responses include credentials (for example database URLs) for write-only tokens.
             if ($subRequest->attributes->get('can_read_sensitive') !== true) {
-                $decoded = $this->scrubSensitive($decoded);
+                // REST management actions use the record id for follow-up updates and deletes.
+                // Keep foreign IDs and credentials filtered; read tools still omit record IDs.
+                $decoded = $this->scrubSensitive($decoded, ['id']);
             }
         }
 
@@ -157,7 +159,7 @@ trait CallsRestApi
     {
         $out = [];
         foreach ($data as $key => $value) {
-            if (is_string($key) && is_string($value) && preg_match($this->neverReturnKeyPattern, $key) === 1) {
+            if (is_string($key) && preg_match($this->neverReturnKeyPattern, $key) === 1) {
                 continue;
             }
             $out[$key] = is_array($value) ? $this->removeNeverReturnedKeys($value) : $value;

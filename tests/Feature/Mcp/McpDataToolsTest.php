@@ -176,13 +176,15 @@ function mcpDataS3(Team $team): S3Storage
 
 // create_database
 
-test('create_database creates a database in the token team and never returns connection URLs', function () {
-    $response = mcpDataCall(mcpDataToken($this->user), 'create_database', ['action' => 'postgresql', 'data' => [
+test('create_database creates a database in the token team and never returns connection URLs', function (array $abilities) {
+    $response = mcpDataCall(mcpDataToken($this->user, $abilities), 'create_database', ['action' => 'postgresql', 'data' => [
         'project_uuid' => $this->mine['project']->uuid,
         'environment_uuid' => $this->mine['environment']->uuid,
         'server_uuid' => $this->mine['server']->uuid,
         'name' => 'from-mcp',
         'postgres_password' => 'VeryS3cretPass',
+        'is_public' => true,
+        'public_port' => 15432,
     ]]);
 
     expect(mcpDataIsError($response))->toBeFalse();
@@ -191,8 +193,14 @@ test('create_database creates a database in the token team and never returns con
     expect($database->name)->toBe('from-mcp')
         ->and($database->environment_id)->toBe($this->mine['environment']->id)
         ->and(mcpDataText($response))->not->toContain('VeryS3cretPass')
-        ->and(mcpDataText($response))->not->toContain('internal_db_url');
-});
+        ->and(mcpDataText($response))->not->toContain('internal_db_url')
+        ->and(mcpDataText($response))->not->toContain('external_db_url')
+        ->and(mcpDataText($response))->not->toContain('postgres_password');
+})->with([
+    'write' => [['write']],
+    'root' => [['root']],
+    'write and read:sensitive' => [['write', 'read:sensitive']],
+]);
 
 test('create_database rejects a project, server, or destination of another team', function (string $field) {
     $own = $this->mine;
@@ -656,21 +664,23 @@ test('manage_shared_env creates, updates, and deletes shared variables in the to
 
     $create = mcpDataCall($token, 'manage_shared_env', ['action' => 'create', 'resource' => $resource, 'data' => ['key' => 'SHARED_MCP', 'value' => 'shared-value']] + $args);
     expect(mcpDataIsError($create))->toBeFalse();
+    $envId = mcpDataJson($create)['data']['id'];
+    expect($envId)->not->toBeNull();
     $env = SharedEnvironmentVariable::where('key', 'SHARED_MCP')->sole();
     expect($env->team_id)->toBe($this->team->id)
         ->and($env->type)->toBe($resource);
 
-    $update = mcpDataCall($token, 'manage_shared_env', ['action' => 'update', 'resource' => $resource, 'env_id' => (string) $env->id, 'data' => ['value' => 'updated-value']] + $args);
+    $update = mcpDataCall($token, 'manage_shared_env', ['action' => 'update', 'resource' => $resource, 'env_id' => (string) $envId, 'data' => ['value' => 'updated-value']] + $args);
     expect(mcpDataIsError($update))->toBeFalse()
         ->and($env->fresh()->value)->toBe('updated-value')
         ->and(mcpDataText($update))->not->toContain('updated-value');
 
-    $denied = mcpDataCall($token, 'manage_shared_env', ['action' => 'delete', 'resource' => $resource, 'env_id' => (string) $env->id] + $args);
+    $denied = mcpDataCall($token, 'manage_shared_env', ['action' => 'delete', 'resource' => $resource, 'env_id' => (string) $envId] + $args);
     expect(mcpDataIsError($denied))->toBeTrue()
         ->and(mcpDataText($denied))->toContain('confirm=true')
         ->and($env->fresh())->not->toBeNull();
 
-    $deleted = mcpDataCall($token, 'manage_shared_env', ['action' => 'delete', 'resource' => $resource, 'env_id' => (string) $env->id, 'confirm' => true] + $args);
+    $deleted = mcpDataCall($token, 'manage_shared_env', ['action' => 'delete', 'resource' => $resource, 'env_id' => (string) $envId, 'confirm' => true] + $args);
     expect(mcpDataIsError($deleted))->toBeFalse()
         ->and(SharedEnvironmentVariable::find($env->id))->toBeNull();
 })->with(['team', 'project', 'environment', 'server']);
