@@ -300,6 +300,8 @@
             </div>
         </section>
 
+        <livewire:profile.passkeys />
+
         <section class="application-settings-section">
             <div class="application-settings-section-header">
                 <div>

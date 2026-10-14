@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Project\Shared\HealthChecks;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
@@ -88,6 +89,56 @@ it('uses escapeshellarg on the constructed URL', function () {
     // escapeshellarg wraps in single quotes
     expect($result)->toContain("'http://my-app.local:80/api/health'");
 });
+
+it('builds the healthcheck URL with brackets for an IPv6 host', function (string $host, string $expectedUrl) {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_host' => $host,
+        'health_check_port' => '8080',
+        'health_check_path' => '/health',
+    ]);
+
+    expect($result)->toContain("'{$expectedUrl}'")
+        ->and($result)->not->toContain('localhost');
+})->with([
+    'loopback' => ['::1', 'http://[::1]:8080/health'],
+    'bracketed loopback' => ['[::1]', 'http://[::1]:8080/health'],
+    'global address' => ['2A01:4F8:0::1', 'http://[2a01:4f8::1]:8080/health'],
+]);
+
+it('falls back to localhost for an invalid IPv6-like healthcheck host', function (string $host) {
+    $result = callGenerateHealthcheckCommands(['health_check_host' => $host]);
+
+    expect($result)->toContain("'http://localhost:80/'");
+})->with([
+    'too many colons' => [':::1'],
+    'shell injection in brackets' => ['[::1];id'],
+    'unclosed bracket' => ['[::1'],
+]);
+
+it('keeps IPv4 and hostname healthcheck hosts unchanged', function (string $host) {
+    $result = callGenerateHealthcheckCommands(['health_check_host' => $host, 'health_check_port' => '3000']);
+
+    expect($result)->toContain("'http://{$host}:3000/'");
+})->with(['localhost', '127.0.0.1', 'my-app.local']);
+
+it('validates the health check host in the health checks form', function (string $host, bool $passes) {
+    $rules = (new ReflectionMethod(HealthChecks::class, 'rules'))->invoke(new HealthChecks);
+
+    $validator = Validator::make(['healthCheckHost' => $host], ['healthCheckHost' => $rules['healthCheckHost']]);
+
+    expect($validator->passes())->toBe($passes);
+})->with([
+    'localhost' => ['localhost', true],
+    'hostname' => ['my-app.local', true],
+    'IPv4' => ['127.0.0.1', true],
+    'IPv6 loopback' => ['::1', true],
+    'bracketed IPv6 loopback' => ['[::1]', true],
+    'IPv6 address' => ['2a01:4f8::1', true],
+    'invalid IPv6' => [':::1', false],
+    'unclosed bracket' => ['[::1', false],
+    'shell metacharacters' => ['localhost; id #', false],
+    'IPv6 with shell metacharacters' => ['[::1];id', false],
+]);
 
 it('validates health_check_host rejects shell metacharacters via API rules', function () {
     $rules = sharedDataApplications();

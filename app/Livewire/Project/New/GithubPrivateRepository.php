@@ -7,6 +7,7 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
+use App\Traits\HasRepositoryDetection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,7 @@ use Livewire\Component;
 class GithubPrivateRepository extends Component
 {
     use AuthorizesRequests;
+    use HasRepositoryDetection;
 
     public $current_step = 'github_apps';
 
@@ -151,6 +153,8 @@ class GithubPrivateRepository extends Component
         $this->selected_branch_name = $this->branches->contains('name', $defaultBranch)
             ? $defaultBranch
             : data_get($this->branches, '0.name', 'main');
+
+        $this->detectRepository();
     }
 
     protected function loadBranchByPage()
@@ -171,6 +175,15 @@ class GithubPrivateRepository extends Component
 
         $this->total_branches_count = count($json);
         $this->branches = $this->branches->concat(collect($json));
+    }
+
+    protected function applicationForDetection(): Application
+    {
+        return $this->unsavedApplicationForDetection(
+            str($this->selected_repository_owner)->trim()->toString().'/'.str($this->selected_repository_repo)->trim()->toString(),
+            $this->selected_branch_name,
+            $this->github_app,
+        );
     }
 
     public function submit()
@@ -205,7 +218,7 @@ class GithubPrivateRepository extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
-            $application = new Application([
+            $application_init = [
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => str($this->selected_repository_owner)->trim()->toString().'/'.str($this->selected_repository_repo)->trim()->toString(),
@@ -219,22 +232,30 @@ class GithubPrivateRepository extends Component
                 'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
                 'source_type' => $this->github_app->getMorphClass(),
-            ]);
+            ];
+
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application_init['health_check_enabled'] = false;
+            }
+            if ($this->build_pack === 'dockerfile' && $dockerfileLocation = $this->selectedDockerfileLocation()) {
+                $application_init['dockerfile_location'] = $dockerfileLocation;
+            }
+            if ($this->build_pack === 'dockercompose') {
+                $application_init['docker_compose_location'] = $this->docker_compose_location;
+            }
+
+            $application = new Application($application_init);
             $application->save();
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
-                $application->health_check_enabled = false;
-            }
-            if ($this->build_pack === 'dockercompose') {
-                $application['docker_compose_location'] = $this->docker_compose_location;
-            }
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
 
             $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
+
+            $this->importDetectedEnvironmentVariables($application);
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

@@ -376,27 +376,14 @@ describe('API mutation audit logging', function () {
         expect($response->status())->toBeIn([201, 422]);
     });
 
-    test('enable_api denial for non-root team emits warning audit event', function () {
+    test('POST /api/v1/enable no longer exists', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
         auth()->forgetGuards();
 
-        $auditChannel = Mockery::mock();
-        $auditChannel->shouldReceive('warning')
-            ->atLeast()
-            ->once()
-            ->with('api.instance.enable_denied', Mockery::any());
-
-        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
-        Log::shouldReceive('warning')->andReturnNull();
-        Log::shouldReceive('info')->andReturnNull();
-        Log::shouldReceive('error')->andReturnNull();
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$token,
-        ])->postJson('/api/v1/enable');
-
-        $response->assertStatus(403);
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/v1/enable')
+            ->assertNotFound();
     });
 
     test('project creation records api.project.created audit event', function () {

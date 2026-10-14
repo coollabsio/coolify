@@ -33,7 +33,7 @@ it('shows an empty state when there are no tags', function () {
     Livewire::test(Show::class)
         ->assertSee('Tags')
         ->assertSee('No tags yet')
-        ->assertSee('Open a resource and add a tag to start grouping related deployments.');
+        ->assertSee('Create a tag, then connect it to resources to group related deployments.');
 });
 
 it('shows a card grid overview when tags exist and none is selected', function () {

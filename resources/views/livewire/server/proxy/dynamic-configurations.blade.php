@@ -34,10 +34,8 @@
                 </div>
 
                 <div x-init="$wire.initLoadDynamicConfigurations" class="contents">
-                    <div wire:loading wire:target="initLoadDynamicConfigurations"
-                        class="rounded-lg border border-neutral-200 p-6 dark:border-white/[0.08]">
-                        <x-loading text="Loading dynamic configurations…" />
-                    </div>
+                    <x-skeleton.settings-sections wire:loading.flex wire:target="initLoadDynamicConfigurations"
+                        label="Loading dynamic configurations" />
 
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)

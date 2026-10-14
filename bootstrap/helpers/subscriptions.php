@@ -85,6 +85,12 @@ function allowedPathsForUnsubscribedAccounts()
         // Account basics stay available without a paid plan.
         'profile',
         'profile/appearance',
+        'profile/passkeys/confirm',
+        'user/confirm-password',
+        'user/passkeys',
+        'user/passkeys/options',
+        'passkeys/confirm',
+        'passkeys/confirm/options',
     ];
 }
 function allowedPathsForBoardingAccounts()

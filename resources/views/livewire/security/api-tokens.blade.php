@@ -5,18 +5,20 @@
 
     <x-security.settings-layout>
 
-    @if (!$isApiEnabled)
+    @if (!$isApiEnabled && !$isMcpEnabled)
         <div class="application-settings-form">
             <x-application.settings-section title="API disabled"
                 description="Enable the Coolify API before creating access tokens.">
                 <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
-                    size="sm">
-                    <x-slot:actions>
-                        <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                            Open settings
-                        </a>
-                    </x-slot:actions>
+                    description="{{ isInstanceAdmin() ? 'Enable API access in instance settings to issue tokens.' : 'Ask an instance admin to enable API access.' }}"
+                    icon-name="keys" size="sm">
+                    @if (isInstanceAdmin())
+                        <x-slot:actions>
+                            <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
+                                Enable API access
+                            </a>
+                        </x-slot:actions>
+                    @endif
                 </x-empty>
             </x-application.settings-section>
         </div>
@@ -30,6 +32,11 @@
         @endphp
 
         <div class="application-settings-form flex flex-col gap-6">
+            @if (!$isApiEnabled)
+                <x-callout type="info" title="REST API disabled">
+                    Tokens work only for the MCP endpoint <code>{{ url('/mcp') }}</code> until API access is enabled.
+                </x-callout>
+            @endif
             @can('create', App\Models\PersonalAccessToken::class)
                 <form wire:submit="addNewToken">
                     <x-application.settings-section title="New API token">

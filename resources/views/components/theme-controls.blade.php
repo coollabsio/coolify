@@ -61,6 +61,44 @@
                 </svg>
             </button>
         @endforeach
+        <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
+        <div class="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
+            Navigation
+        </div>
+        @foreach ([
+            ['value' => 'default', 'label' => 'Default'],
+            ['value' => 'floating', 'label' => 'Floating'],
+        ] as $option)
+            <button type="button" @click="setNavStyle('{{ $option['value'] }}')"
+                class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                <span>{{ $option['label'] }}</span>
+                <svg x-show="navStyle === '{{ $option['value'] }}'"
+                    class="size-3.5 text-black dark:text-fg" viewBox="0 0 12 12" fill="none"
+                    aria-hidden="true">
+                    <path d="{{ $checkPath }}" stroke="currentColor" stroke-width="1.4"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+        @endforeach
+        <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
+        <div class="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
+            Navigation items
+        </div>
+        @foreach ([
+            ['value' => '3d', 'label' => '3D'],
+            ['value' => 'flat', 'label' => 'Flat'],
+        ] as $option)
+            <button type="button" @click="setNavItems('{{ $option['value'] }}')"
+                class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                <span>{{ $option['label'] }}</span>
+                <svg x-show="navItems === '{{ $option['value'] }}'"
+                    class="size-3.5 text-black dark:text-fg" viewBox="0 0 12 12" fill="none"
+                    aria-hidden="true">
+                    <path d="{{ $checkPath }}" stroke="currentColor" stroke-width="1.4"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+        @endforeach
     </div>
 @else
     {{-- Full card grid for the Appearance settings page. --}}
@@ -174,6 +212,106 @@
                                 <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
                                 <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
                                     x-show="pageWidth === '{{ $option['value'] }}'" x-cloak />
+                            </div>
+                            <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
+                        </div>
+                    </button>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Navigation style</h2>
+                    <p>Choose how the top bar and sidebars sit on the page.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body grid gap-3 sm:grid-cols-2">
+                @foreach ([
+                    ['value' => 'default', 'label' => 'Default', 'description' => 'Top bar and sidebars run edge to edge.'],
+                    ['value' => 'floating', 'label' => 'Floating', 'description' => 'Framed panels float on a dotted backdrop, like the canvas.'],
+                ] as $option)
+                    <button type="button" @click="setNavStyle('{{ $option['value'] }}')"
+                        class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
+                        :class="navStyle === '{{ $option['value'] }}'
+                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                            : ''">
+                        @php($floating = $option['value'] === 'floating')
+                        <div @class([
+                            'flex h-20 border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.07] dark:bg-black/15',
+                            'gap-1.5 p-1.5' => $floating,
+                        ])>
+                            <div @class([
+                                'flex flex-col items-center gap-1.5 bg-white px-2 py-2 dark:bg-white/[0.04]',
+                                'rounded-lg border border-neutral-200 dark:border-white/[0.08]' => $floating,
+                                'border-r border-neutral-200 dark:border-white/[0.07]' => ! $floating,
+                            ])>
+                                @foreach (['servers', 'projects'] as $icon)
+                                    <span class="flex size-6 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                        <x-reicon :name="$icon" class="size-3.5" />
+                                    </span>
+                                @endforeach
+                            </div>
+                            <div @class([
+                                'h-5 flex-1 bg-white dark:bg-white/[0.04]',
+                                'rounded-lg border border-neutral-200 dark:border-white/[0.08]' => $floating,
+                                'border-b border-neutral-200 dark:border-white/[0.07]' => ! $floating,
+                            ])></div>
+                        </div>
+                        <div class="p-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
+                                <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
+                                    x-show="navStyle === '{{ $option['value'] }}'" x-cloak />
+                            </div>
+                            <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
+                        </div>
+                    </button>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Navigation items</h2>
+                    <p>Choose how the main sidebar shows its items.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body grid gap-3 sm:grid-cols-2">
+                @foreach ([
+                    ['value' => '3d', 'label' => '3D', 'description' => 'Each icon sits in a raised tile that lifts on hover.'],
+                    ['value' => 'flat', 'label' => 'Flat', 'description' => 'Plain rows with a highlight for the current page.'],
+                ] as $option)
+                    <button type="button" @click="setNavItems('{{ $option['value'] }}')"
+                        class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
+                        :class="navItems === '{{ $option['value'] }}'
+                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                            : ''">
+                        @php($tiles = $option['value'] === '3d')
+                        <div class="flex h-20 flex-col justify-center gap-1.5 border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">
+                            @foreach (['servers', 'projects'] as $icon)
+                                <div @class([
+                                    'flex items-center gap-2 rounded-md text-neutral-500 dark:text-fg-dim',
+                                    'px-1.5 py-1' => ! $tiles,
+                                    'bg-neutral-200/70 dark:bg-white/[0.08]' => ! $tiles && $loop->first,
+                                ])>
+                                    <span @class([
+                                        'flex items-center justify-center',
+                                        'size-6 rounded-md border border-neutral-200 bg-white shadow-[0_2px_0_rgb(0_0_0/0.22)] dark:border-white/[0.09] dark:bg-white/[0.04] dark:shadow-[0_2px_0_rgb(255_255_255/0.08)]' => $tiles,
+                                    ])>
+                                        <x-reicon :name="$icon" class="size-3.5" />
+                                    </span>
+                                    <span class="h-1.5 w-16 rounded-full bg-neutral-200 dark:bg-white/10"></span>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="p-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
+                                <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
+                                    x-show="navItems === '{{ $option['value'] }}'" x-cloak />
                             </div>
                             <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
                         </div>

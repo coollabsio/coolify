@@ -30,6 +30,8 @@ class IntegrationTokenEditor extends Component
 
     public bool $automaticDns = true;
 
+    public bool $proxiedDns = false;
+
     public function mount(string $integration_token_uuid): void
     {
         $this->integrationToken = IntegrationToken::ownedByCurrentTeam()
@@ -43,18 +45,32 @@ class IntegrationTokenEditor extends Component
         $this->metadata = $this->integrationToken->metadata ?? [];
         $this->loadZones();
         $this->automaticDns = $this->integrationToken->automaticDnsEnabled();
+        $this->proxiedDns = $this->integrationToken->proxiedDnsEnabled();
+    }
+
+    /**
+     * Cloudflare Tunnel setup also writes DNS records, so selecting `tunnel` also selects `dns`.
+     */
+    public function updatedCapabilities(): void
+    {
+        if (in_array('tunnel', $this->capabilities, true) && ! in_array('dns', $this->capabilities, true)) {
+            $this->capabilities[] = 'dns';
+        }
     }
 
     protected function rules(): array
     {
-        $allowedCapability = $this->integrationToken->provider === 'cloudflare' ? 'dns' : 'secrets';
-
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'newToken' => ['nullable', 'string'],
-            'capabilities' => ['required', 'array', 'min:1'],
-            'capabilities.*' => ['required', 'in:'.$allowedCapability],
+            'capabilities' => ['required', 'array', 'min:1', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_array($value) && in_array('tunnel', $value, true) && ! in_array('dns', $value, true)) {
+                    $fail('Cloudflare Tunnel also needs the DNS capability.');
+                }
+            }],
+            'capabilities.*' => ['required', 'in:'.implode(',', IntegrationToken::allowedCapabilities($this->integrationToken->provider))],
             'automaticDns' => ['boolean'],
+            'proxiedDns' => ['boolean'],
         ];
 
         if ($this->integrationToken->provider === 'infisical') {
@@ -90,6 +106,11 @@ class IntegrationTokenEditor extends Component
                 unset($metadata['automatic_dns']);
             } else {
                 $metadata['automatic_dns'] = false;
+            }
+            if ($validated['proxiedDns']) {
+                $metadata['proxied_dns'] = true;
+            } else {
+                unset($metadata['proxied_dns']);
             }
         }
         $storedMetadata = $this->integrationToken->metadata ?? [];

@@ -38,6 +38,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -72,6 +73,7 @@ use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
 use PurplePixie\PhpDns\DNSQuery;
+use PurplePixie\PhpDns\DNSResult;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -890,6 +892,10 @@ function profile_avatar_url(User $user): string
         }
     }
 
+    if (auth()->check() && $user->id !== auth()->id()) {
+        return route('team.member.avatar', ['user_id' => $user->id, 'v' => $user->updated_at->timestamp]);
+    }
+
     return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
 }
 
@@ -905,6 +911,21 @@ function project_icon_url(Project $project): string
     return route('project.icon', [
         'project_uuid' => $project->uuid,
         'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function team_avatar_url(Team $team): string
+{
+    if ($team->avatar_storage_type === 's3') {
+        $url = s3_image_url($team->avatar_s3_storage_id, $team->avatar_path, $team->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('team.avatar', [
+        'team_id' => $team->id,
+        'v' => $team->updated_at->timestamp,
     ]);
 }
 
@@ -1494,19 +1515,9 @@ function sslip(Server $server)
     if (isDev() && $server->id === 0) {
         return 'http://127.0.0.1.sslip.io';
     }
-    if ($server->ip === 'host.docker.internal') {
-        $baseIp = base_ip();
+    $ip = $server->ip === 'host.docker.internal' ? base_ip() : $server->ip;
 
-        return "http://$baseIp.sslip.io";
-    }
-    // ipv6
-    if (str($server->ip)->contains(':')) {
-        $ipv6 = str($server->ip)->replace(':', '-');
-
-        return "http://{$ipv6}.sslip.io";
-    }
-
-    return "http://{$server->ip}.sslip.io";
+    return 'http://'.sslipHostLabel($ip).'.sslip.io';
 }
 
 function service_templates_cache_key(): string
@@ -1725,10 +1736,14 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
-function sanitizeLogsForExport(string $text): string
+/**
+ * Redact log text before it leaves Coolify (copy, download, API, MCP).
+ *
+ * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Resource values to hide, usually from EnvironmentVariable::logRedactionSecretsFor().
+ */
+function sanitizeLogsForExport(string $text, array $secrets = []): string
 {
-    // All sanitization is now handled by remove_iip()
-    return remove_iip($text);
+    return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
 }
 
 function getTopLevelNetworks(Service|Application $resource): Collection
@@ -2352,10 +2367,8 @@ function validateDNSEntry(string $fqdn, Server $server)
     $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            $query = createDnsQuery($dns_server);
-            $results = $query->query($host, $type);
-            if ($results === false || $query->hasError()) {
-            } else {
+            $results = queryDnsServer($dns_server, $host, $type);
+            if ($results !== false) {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
                         if (isCloudflareIp($result->getData())) {
@@ -2376,13 +2389,38 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function createDnsQuery(string $dnsServer): DNSQuery
+function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DNSQuery
 {
     return app()->make(DNSQuery::class, [
-        'server' => $dnsServer,
+        'server' => formatHostForUrl($dnsServer),
         'port' => 53,
-        'timeout' => 5,
+        'timeout' => $timeout,
+        'udp' => $udp,
     ]);
+}
+
+/**
+ * Query one DNS server for one record type. When the UDP answer is truncated (TC bit),
+ * retry over TCP: resolvers such as 1.1.1.1 can truncate even small answers, and the
+ * records would otherwise be silently dropped.
+ *
+ * @return iterable<int, DNSResult>|false
+ */
+function queryDnsServer(string $dnsServer, string $host, string $type, int $timeout = 5): iterable|false
+{
+    $query = createDnsQuery($dnsServer, $timeout);
+    $records = $query->query($host, $type);
+
+    if ($records === false && str_contains($query->getLasterror(), 'too big for UDP')) {
+        $query = createDnsQuery($dnsServer, $timeout, udp: false);
+        $records = $query->query($host, $type);
+    }
+
+    if ($records === false || $query->hasError()) {
+        return false;
+    }
+
+    return $records;
 }
 
 function isCloudflareIp(string $ip): bool
@@ -2398,6 +2436,72 @@ function isCloudflareIp(string $ip): bool
     ];
 
     return ipMatch($ip, $cloudflareIps);
+}
+
+/**
+ * The one stored form of an IP address: no spaces, no brackets, and IPv6 in its short lower-case
+ * form (2A01:04F8::0001 becomes 2a01:4f8::1). IPv4 addresses and hostnames stay as they are.
+ */
+function normalizeIpAddress(string $value): string
+{
+    $value = trim($value);
+    $withoutBrackets = trim($value, '[]');
+    if (filter_var($withoutBrackets, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+        return inet_ntop(inet_pton($withoutBrackets));
+    }
+
+    return $value;
+}
+
+/**
+ * The host for a URL or a "host:port" value: an IPv6 address gets brackets ([2a01:4f8::1]), so
+ * that its colons are not read as the port. Other hosts stay as they are.
+ */
+function formatHostForUrl(string $host): string
+{
+    $normalized = normalizeIpAddress($host);
+
+    return filter_var($normalized, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "[{$normalized}]" : $normalized;
+}
+
+/**
+ * Hetzner gives an IPv6 network (2a01:4f8:c016:bd23::/64), not an address. The server uses the
+ * first address of the network (2a01:4f8:c016:bd23::1).
+ */
+function hetznerServerIpv6(?string $network): ?string
+{
+    if (blank($network)) {
+        return null;
+    }
+    $address = str($network)->before('/')->value();
+    if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+        return null;
+    }
+    if (str_contains($network, '/')) {
+        $address = inet_ntop(inet_pton($address) | inet_pton('::1'));
+    }
+
+    return normalizeIpAddress($address);
+}
+
+/**
+ * The sslip.io label for an IP address. IPv6 colons become dashes, and a "0" is added where the
+ * address starts or ends with "::", because a DNS label cannot start or end with a dash.
+ */
+function sslipHostLabel(string $ip): string
+{
+    $ip = normalizeIpAddress($ip);
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+        return $ip;
+    }
+    if (str_starts_with($ip, '::')) {
+        $ip = '0'.$ip;
+    }
+    if (str_ends_with($ip, '::')) {
+        $ip .= '0';
+    }
+
+    return str_replace(':', '-', $ip);
 }
 
 function ipMatch($ip, $cidrs, &$match = null)
@@ -2508,8 +2612,8 @@ function checkIPAgainstAllowlist($ip, $allowlist)
                 return true;
             }
 
-            // Direct IP comparison
-            if ($ip === $allowed) {
+            // Direct IP comparison; IPv6 can be written in more than one form
+            if (normalizeIpAddress((string) $ip) === normalizeIpAddress((string) $allowed)) {
                 return true;
             }
         }
@@ -2722,6 +2826,42 @@ function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deplo
 function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
+}
+
+function decodeBase64EncodedLabels(string $value): ?string
+{
+    if (! isBase64Encoded($value)) {
+        return null;
+    }
+
+    $decoded = base64_decode($value, true);
+    if ($decoded === false) {
+        return null;
+    }
+    $labels = $decoded;
+
+    while ($decoded !== '' && isBase64Encoded($decoded)) {
+        $next = base64_decode($decoded, true);
+        if ($next === false) {
+            break;
+        }
+        $decoded = $next;
+        if (mb_detect_encoding($decoded, 'UTF-8', true) !== false) {
+            $lines = preg_split('/\r\n|\n|\r/', $decoded);
+            if ($lines === false) {
+                break;
+            }
+            $containsOnlyLabels = collect($lines)
+                ->filter(fn (string $line) => $line !== '')
+                ->every(fn (string $line) => str_contains($line, '=') && ! str_starts_with($line, '='));
+
+            if ($containsOnlyLabels) {
+                $labels = $decoded;
+            }
+        }
+    }
+
+    return mb_detect_encoding($labels, 'UTF-8', true) === false ? null : $labels;
 }
 function customApiValidator(Collection|array $item, array $rules, array $messages = [])
 {
@@ -3372,6 +3512,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection,
                                         domainPortOverrides: $domainPortOverrides,
+                                        certificate_resolver: $resource->server->traefikCertificateResolver(data_get($savedService, 'traefik_certificate_resolver')),
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -3409,6 +3550,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection,
                                 domainPortOverrides: $domainPortOverrides,
+                                certificate_resolver: $resource->server->traefikCertificateResolver(data_get($savedService, 'traefik_certificate_resolver')),
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -4183,6 +4325,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
+                                            certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
                                         )
                                     );
                                     break;
@@ -4223,6 +4366,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,
+                                    certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -4476,6 +4620,10 @@ function settingsSearchItems(iterable $groupedItems, array $routeParameters, arr
 
     foreach ($groupedItems as $groupLabel => $groupItems) {
         foreach ($groupItems as $item) {
+            if ($item['disabled'] ?? false) {
+                continue;
+            }
+
             $href = route($item['route'], $routeParameters);
             $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
 
@@ -4677,7 +4825,7 @@ function parseScpStyleGitUrl(?string $gitRepository): ?array
         return null;
     }
 
-    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>[^:]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
+    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>\[[0-9A-Fa-f:.]+\]|[^:\[\]]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
         return null;
     }
 
@@ -5119,6 +5267,8 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
             continue;
         }
 
+        $passthroughKeys = extractDockerComposePassthroughKeys($environment);
+
         // Convert environment variables to key-value format
         $environment = convertToKeyValueCollection($environment);
 
@@ -5128,11 +5278,181 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
                 'value' => $value,
                 'comment' => $envComments[$key] ?? null,
                 'service_name' => $serviceName,
+                'is_passthrough' => $passthroughKeys->contains($key),
             ]);
         }
     }
 
     return $hardcodedVars;
+}
+
+/** @return Collection<int, string> */
+function extractDockerComposePassthroughKeys(mixed $environment): Collection
+{
+    return collect($environment)
+        ->map(function (mixed $value, mixed $key): ?string {
+            if (is_numeric($key)) {
+                return is_string($value) && ! str_contains($value, '=') ? $value : null;
+            }
+
+            return $value === null ? (string) $key : null;
+        })
+        ->filter()
+        ->unique()
+        ->values();
+}
+
+/** @return Collection<int, string> */
+function extractDockerComposeEnvironmentVariableReferences(mixed $value): Collection
+{
+    if (! is_string($value) || ! str_contains($value, '$')) {
+        return collect();
+    }
+
+    preg_match_all('/(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)/', $value, $bracedMatches);
+    preg_match_all('/(?<!\$)\$(?!\{)([A-Za-z_][A-Za-z0-9_]*)/', $value, $bareMatches);
+
+    return collect([...$bracedMatches[1], ...$bareMatches[1]])
+        ->unique()
+        ->values();
+}
+
+/** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+function dockerComposeEnvironmentVariableInfo(?string $dockerCompose, string $key): ?array
+{
+    if (blank($dockerCompose)) {
+        return null;
+    }
+
+    $services = [];
+    $default = null;
+    $operator = null;
+    $required = false;
+
+    foreach (extractHardcodedEnvironmentVariables($dockerCompose) as $assignment) {
+        $value = $assignment['value'] ?? null;
+        $isPassthrough = ($assignment['is_passthrough'] ?? false) && $assignment['key'] === $key;
+        if (! $isPassthrough && ! extractDockerComposeEnvironmentVariableReferences($value)->contains($key)) {
+            continue;
+        }
+
+        if (filled($assignment['service_name'] ?? null)) {
+            $services[] = $assignment['service_name'];
+        }
+
+        if (is_string($value)) {
+            $offset = 0;
+            while (($referenceStart = strpos($value, '${', $offset)) !== false) {
+                if ($referenceStart > 0 && $value[$referenceStart - 1] === '$') {
+                    $offset = $referenceStart + 2;
+
+                    continue;
+                }
+
+                $balancedReference = extractBalancedBraceContent(substr($value, $referenceStart));
+                if ($balancedReference === null) {
+                    break;
+                }
+
+                $splitReference = splitOnOperatorOutsideNested($balancedReference['content']);
+                if ($splitReference !== null && $splitReference['variable'] === $key) {
+                    $matchedOperator = $splitReference['operator'];
+                    $operator ??= $matchedOperator;
+                    if (str_contains($matchedOperator, '-')) {
+                        $default ??= $splitReference['default'];
+                    }
+                    $required = $required || str_contains($matchedOperator, '?');
+                }
+
+                $offset = $referenceStart + 2;
+            }
+        }
+    }
+
+    if ($services === []) {
+        return null;
+    }
+
+    return [
+        'services' => array_values(array_unique($services)),
+        'default' => $default,
+        'operator' => $operator,
+        'required' => $required,
+    ];
+}
+
+function dockerComposeEnvironmentVariableIsRequired(?string $dockerCompose, string $key): bool
+{
+    if (blank($dockerCompose)) {
+        return false;
+    }
+
+    $key = preg_quote($key, '/');
+
+    return preg_match('/(?<!\$)\$\{'.$key.'(?::\?|\?)/', $dockerCompose) === 1;
+}
+
+function dockerComposeEnvironmentVariableShouldBeUnset(?string $dockerCompose, string $key, ?string $value): bool
+{
+    if ($value !== null || blank($dockerCompose)) {
+        return false;
+    }
+
+    $assignments = extractHardcodedEnvironmentVariables($dockerCompose);
+    if ($assignments->contains(fn (array $assignment): bool => $assignment['key'] === $key && $assignment['is_passthrough'])) {
+        return true;
+    }
+
+    return extractDockerComposeEnvironmentVariableReferences($dockerCompose)->contains($key);
+}
+
+/** @param Collection<int, EnvironmentVariable> $environmentVariables */
+function preserveLegacyDockerComposeNullAssignments(Collection $environment, Collection $environmentVariables): Collection
+{
+    foreach ($environmentVariables as $environmentVariable) {
+        if (! $environmentVariable->preservesLegacyComposeNull() || ! $environment->has($environmentVariable->key)) {
+            continue;
+        }
+
+        $key = $environmentVariable->key;
+        $value = $environment->get($key);
+        if ($value === null || $value === '$'.$key) {
+            $environment->put($key, '');
+
+            continue;
+        }
+        if (! is_string($value) || ! str_starts_with($value, '${')) {
+            continue;
+        }
+        $reference = extractBalancedBraceContent($value);
+        if ($reference === null || $reference['end'] !== strlen($value) - 1) {
+            continue;
+        }
+        $split = splitOnOperatorOutsideNested($reference['content']);
+        if (($split['variable'] ?? $reference['content']) === $key) {
+            $environment->put($key, '');
+        }
+    }
+
+    return $environment;
+}
+
+function syncDockerComposeEnvironmentVariableRequiredState(Application|Service $resource): void
+{
+    $dockerCompose = $resource->docker_compose_raw ?? $resource->docker_compose;
+
+    $environmentVariables = $resource->environment_variables()->get();
+    if ($resource instanceof Application) {
+        $environmentVariables = $environmentVariables->concat($resource->environment_variables_preview()->get());
+    }
+
+    $environmentVariables->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
+        $isRequired = ! $environmentVariable->preservesLegacyComposeNull()
+            && dockerComposeEnvironmentVariableIsRequired($dockerCompose, $environmentVariable->key);
+        if ((bool) $environmentVariable->is_required !== $isRequired) {
+            $environmentVariable->update(['is_required' => $isRequired]);
+        }
+    });
 }
 
 /**

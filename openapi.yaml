@@ -62,9 +62,9 @@ paths:
               properties:
                 pull_request_id:
                   type: integer
+                  example: 42
                   maximum: 2147483647
                   minimum: 1
-                  example: 42
                 pull_request_html_url:
                   type: [string, 'null']
                   example: 'https://github.com/org/repo/pull/42'
@@ -572,6 +572,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -592,6 +595,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -981,6 +988,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1001,6 +1011,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1390,6 +1404,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1410,6 +1427,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1740,6 +1761,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1760,6 +1784,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2076,6 +2104,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2096,6 +2127,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2585,6 +2620,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2605,6 +2643,10 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -4401,7 +4443,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Get all backups for a database'
+          description: 'Get all backups for a database. Each backup includes s3_storage_uuid (primary S3 destination) and s3_storage_uuids (every S3 destination, primary first).'
           content:
             application/json:
               schema:
@@ -4452,7 +4494,11 @@ paths:
                   default: false
                 s3_storage_uuid:
                   type: string
-                  description: 'S3 storage UUID (required if save_s3 is true)'
+                  description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true.'
+                s3_storage_uuids:
+                  type: array
+                  items: { type: string }
+                  description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 databases_to_backup:
                   type: string
                   description: 'Comma separated list of databases to backup'
@@ -4777,6 +4823,9 @@ paths:
                   description: 'Healthcheck start period in seconds.'
                   minimum: 0
                   default: 5
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'
               type: object
       responses:
         '200':
@@ -4875,7 +4924,11 @@ paths:
                   description: 'Whether data is saved in s3 or not'
                 s3_storage_uuid:
                   type: string
-                  description: 'S3 storage UUID'
+                  description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay.'
+                s3_storage_uuids:
+                  type: array
+                  items: { type: string }
+                  description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 backup_now:
                   type: boolean
                   description: 'Whether to take a backup now or not'
@@ -5960,7 +6013,7 @@ paths:
       tags:
         - Databases
       summary: 'List backup executions'
-      description: 'Get all executions for a specific backup configuration.'
+      description: 'Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.'
       operationId: list-backup-executions
       parameters:
         -
@@ -5984,7 +6037,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { type: string }, status: { type: string } }, type: object } }
+                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }, type: object } }
                 type: object
         '404':
           description: 'Backup configuration not found.'
@@ -7099,8 +7152,8 @@ paths:
                   maxLength: 255
                 network:
                   type: string
-                  maxLength: 255
                   pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+                  maxLength: 255
                 type:
                   type: string
                   enum: [standalone, swarm]
@@ -8681,35 +8734,6 @@ paths:
       security:
         -
           bearerAuth: []
-  /enable:
-    post:
-      summary: 'Enable API'
-      description: 'Enable API (only with root permissions).'
-      operationId: enable-api
-      responses:
-        '200':
-          description: 'Enable API.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'API enabled.' }
-                type: object
-        '403':
-          description: 'You are not allowed to enable the API.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'You are not allowed to enable the API.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-      security:
-        -
-          bearerAuth: []
   /disable:
     post:
       summary: 'Disable API'
@@ -10189,8 +10213,6 @@ paths:
         content:
           application/json:
             schema:
-              required:
-                - private_key
               properties:
                 name:
                   type: string
@@ -10823,6 +10845,7 @@ paths:
                   redirect_enabled: { type: boolean, example: true }
                   redirect_url: { type: [string, 'null'], example: 'https://example.com' }
                   generate_exact_labels: { type: boolean, example: false }
+                  traefik_certificate_resolver: { description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.', type: [string, 'null'], example: letsencrypt }
                   configuration: { description: 'Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.', type: [string, 'null'] }
                 type: object
         '401':
@@ -10838,7 +10861,7 @@ paths:
       tags:
         - Servers
       summary: 'Update server proxy'
-      description: 'Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.'
+      description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.'
       operationId: update-server-proxy
       parameters:
         -
@@ -10861,6 +10884,9 @@ paths:
                   type: [string, 'null']
                 generate_exact_labels:
                   type: boolean
+                traefik_certificate_resolver:
+                  description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'
+                  type: [string, 'null']
                 proxy_type:
                   description: 'Proxy type (case-insensitive).'
                   type: string
@@ -10878,6 +10904,7 @@ paths:
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
+                  traefik_certificate_resolver: { type: [string, 'null'] }
                   configuration: { type: [string, 'null'] }
                 type: object
         '401':
@@ -11608,6 +11635,9 @@ paths:
                   type: [boolean, 'null']
                 is_gzip_enabled:
                   type: [boolean, 'null']
+                traefik_certificate_resolver:
+                  description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'
+                  type: [string, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
                 is_force_https_enabled:
@@ -12398,6 +12428,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  default: true
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 tags:
                   type: array
                   items: { type: string }
@@ -12584,6 +12618,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  default: true
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
               type: object
       responses:
         '200':
@@ -14947,8 +14985,8 @@ components:
       properties:
         frequency:
           type: string
-          maxLength: 255
           example: '0 2 * * *'
+          maxLength: 255
         enabled:
           type: boolean
           default: true
@@ -14962,9 +15000,15 @@ components:
           type: boolean
           default: false
         s3_storage_uuid:
+          description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.'
           type:
             - string
             - 'null'
+        s3_storage_uuids:
+          description: 'UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.'
+          type: array
+          items:
+            type: string
         retention_amount_locally:
           type: integer
           default: 7
@@ -15052,9 +15096,15 @@ components:
         stop_during_backup:
           type: boolean
         s3_storage_uuid:
+          description: 'Primary S3 destination.'
           type:
             - string
             - 'null'
+        s3_storage_uuids:
+          description: 'Every S3 destination, primary first.'
+          type: array
+          items:
+            type: string
         retention_amount_locally:
           type: integer
         retention_days_locally:
@@ -15525,6 +15575,10 @@ components:
           type: boolean
         is_gzip_enabled:
           type: boolean
+        traefik_certificate_resolver:
+          type: string
+          nullable: true
+          description: 'Traefik certificate resolver override. Null uses the server setting, "none" uses no resolver.'
         is_stripprefix_enabled:
           type: boolean
         connect_to_docker_network:
@@ -15553,6 +15607,9 @@ components:
           type: boolean
         use_build_secrets:
           type: boolean
+        redact_all_env_values_in_logs:
+          type: boolean
+          description: 'Hide every environment variable value in logs. When false, only locked values are hidden.'
         inject_build_args_to_dockerfile:
           type: boolean
         include_source_commit_in_build:
@@ -15859,6 +15916,10 @@ components:
             - full
             - anonymized
             - 'off'
+        traefik_certificate_resolver:
+          type: string
+          nullable: true
+          description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'
         is_reachable:
           type: boolean
         is_sentinel_enabled:
@@ -15968,6 +16029,9 @@ components:
         is_container_label_escape_enabled:
           type: boolean
           description: 'The flag to enable the container label escape.'
+        redact_all_env_values_in_logs:
+          type: boolean
+          description: 'Hide every environment variable value in logs. When false, only locked values are hidden.'
         is_container_label_readonly_enabled:
           type: boolean
           description: 'The flag to enable the container label readonly.'

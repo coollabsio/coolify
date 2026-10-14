@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
@@ -14,6 +15,7 @@ class Resources extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use RemembersCanvasView;
     use WithPagination;
 
     public int $perPage = 10;
@@ -143,6 +145,9 @@ class Resources extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
+            }
+            if ($this->prefersCanvasView('server_resources')) {
+                return $this->redirectRoute('server.canvas', ['server_uuid' => $this->server->uuid], navigate: true);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

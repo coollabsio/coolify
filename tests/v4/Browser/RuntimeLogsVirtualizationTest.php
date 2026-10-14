@@ -124,3 +124,61 @@ it('streams only new lines and appends them to the loaded log', function () {
 
     $page->screenshot(filename: 'runtime-logs-virtualized-stream');
 });
+
+it('falls back to the default level filters when the saved filters are invalid', function () {
+    $page = visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertSee('Dashboard');
+
+    $page->script('localStorage.setItem("coolify-log-filters", "{")');
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->assertSee('log line 00001');
+
+    // A valid saved preference is still applied.
+    $page->script('localStorage.setItem("coolify-log-filters", JSON.stringify({ info: false }))');
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->wait(1)
+        ->assertDontSee('log line 00001');
+
+    $page->screenshot(filename: 'runtime-logs-invalid-saved-filters');
+});
+
+it('shows compact text lines in text view and remembers the choice', function () {
+    $page = visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertSee('Dashboard')
+        ->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs");
+
+    $page->assertSee('log line 00001')
+        ->click('[title="View Options"]')
+        ->click('button:visible:has-text("Text view")')
+        ->wait(0.3);
+
+    $page->screenshot(filename: 'runtime-logs-view-menu');
+
+    expect($page->script('document.querySelector("[data-log-line]").getBoundingClientRect().height'))->toBeLessThan(24);
+
+    // Rows rendered before the switch are measured again, so no gaps stay between lines.
+    expect($page->script('(() => {
+        const rows = [...document.querySelectorAll(".runtime-log-virtual-row")].sort((a, b) => a.dataset.index - b.dataset.index);
+        return rows.slice(1).every((row, i) => row.getBoundingClientRect().top - rows[i].getBoundingClientRect().bottom < 1);
+    })()'))->toBeTrue();
+
+    // Rows do not open details in text view.
+    $page->click('[title="View Options"]')
+        ->click('log line 00001')
+        ->wait(0.3);
+
+    expect($page->script('document.querySelectorAll(".runtime-log-detail").length'))->toBe(0);
+
+    $page->screenshot(filename: 'runtime-logs-text-view');
+
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->assertSee('log line 00001');
+
+    expect($page->script('document.getElementById("logs").classList.contains("runtime-log-text-view")'))->toBeTrue();
+});

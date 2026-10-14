@@ -73,7 +73,24 @@ class StartDevelopmentQemuVm
             return;
         }
 
-        $this->runOrFail(($state === 'paused' ? 'virsh resume ' : 'virsh start ').escapeshellarg($domain));
+        if ($state === 'paused') {
+            $this->runOrFail('virsh resume '.escapeshellarg($domain));
+
+            return;
+        }
+
+        $this->applyMemory($domain);
+        $this->runOrFail('virsh start '.escapeshellarg($domain));
+    }
+
+    /**
+     * Sets the configured memory on a stopped VM, so VMs created with a larger size shrink on their next start.
+     */
+    private function applyMemory(string $domain): void
+    {
+        $memory = (int) config('development-qemu.memory').'M';
+        $this->runOrFail(sprintf('virsh setmaxmem %s %s --config', escapeshellarg($domain), $memory));
+        $this->runOrFail(sprintf('virsh setmem %s %s --config', escapeshellarg($domain), $memory));
     }
 
     private function destroyVm(string $domain): void

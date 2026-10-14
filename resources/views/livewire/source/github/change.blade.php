@@ -3,6 +3,10 @@
         {{ $github_app->name ?: 'GitHub App' }} | Sources | Coolify
     </x-slot>
 
+    @if (session('error'))
+        <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
+    @endif
+
     @if (data_get($github_app, 'app_id'))
         @php
             $githubAppRouteParameters = ['github_app_uuid' => $github_app->uuid];
@@ -134,6 +138,7 @@
                                             label="Organization" placeholder="Personal account when empty" />
 
                                         @if (!isCloud())
+                                            @can('makeSystemWide', \App\Models\GithubApp::class)
                                             <div class="lg:col-span-2">
                                                 <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
@@ -142,6 +147,7 @@
                                                     helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
                                                     :disabled="!auth()->user()->can('update', $github_app)" />
                                             </div>
+                                            @endcan
                                             @if ($isSystemWide)
                                                 <div class="lg:col-span-2">
                                                     <x-callout type="warning" title="Shared with every team">

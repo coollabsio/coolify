@@ -120,7 +120,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->where('status', GithubRunnerStatus::Provisioning)
                 ->update([
                     'status' => GithubRunnerStatus::Failed,
-                    'error_message' => "Could not start a runner after {$attempt} attempts: {$e->getMessage()}",
+                    'error_message' => remove_iip("Could not start a runner after {$attempt} attempts: {$e->getMessage()}"),
                     'completed_at' => now(),
                 ]);
             CleanupGithubRunnerJob::dispatch($execution->id);
@@ -140,7 +140,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 'runner_name' => null,
                 'runner_id' => null,
                 'ready_at' => null,
-                'error_message' => "Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}",
+                'error_message' => remove_iip("Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}"),
             ]);
         if (! $retried) {
             return;

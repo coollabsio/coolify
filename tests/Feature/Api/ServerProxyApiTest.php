@@ -152,6 +152,37 @@ test('PATCH /api/v1/servers/{uuid}/proxy updates redirect and label settings wit
         ->and((bool) $server->settings->generate_exact_labels)->toBeTrue();
 });
 
+test('PATCH /api/v1/servers/{uuid}/proxy updates the Traefik certificate resolver', function (?string $input, ?string $expected) {
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/servers/{$this->server->uuid}/proxy")
+        ->assertOk()
+        ->assertJsonPath('traefik_certificate_resolver', 'letsencrypt');
+
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
+            'traefik_certificate_resolver' => $input,
+        ])
+        ->assertOk()
+        ->assertJsonPath('traefik_certificate_resolver', $expected);
+
+    expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBe($expected);
+})->with([
+    'custom resolver' => ['cloudflare', 'cloudflare'],
+    'no resolver' => [null, null],
+    'empty resolver' => ['', null],
+]);
+
+test('PATCH /api/v1/servers/{uuid}/proxy rejects unsafe certificate resolver names', function () {
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
+            'traefik_certificate_resolver' => 'letsencrypt.acme=x',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBe('letsencrypt');
+});
+
 test('PATCH /api/v1/servers/{uuid}/proxy rejects unknown fields', function () {
     $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [

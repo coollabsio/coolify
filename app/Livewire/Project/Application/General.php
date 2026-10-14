@@ -460,7 +460,7 @@ class General extends Component
             $this->portsMappings = $this->application->ports_mappings;
             $this->customNetworkAliases = $this->application->custom_network_aliases;
             $this->dockerfile = $this->application->dockerfile;
-            $this->dockerfileLocation = $this->application->dockerfile_location;
+            $this->dockerfileLocation = $this->application->dockerfile_location ?? ($this->buildPack === 'dockerfile' ? '/Dockerfile' : null);
             $this->dockerfileTargetBuild = $this->application->dockerfile_target_build;
             $this->dockerRegistryImageName = $this->application->docker_registry_image_name;
             $this->dockerRegistryImageTag = $this->application->docker_registry_image_tag;

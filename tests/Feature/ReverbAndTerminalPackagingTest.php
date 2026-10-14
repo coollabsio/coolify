@@ -113,8 +113,8 @@ it('runs Reverb and terminal websocket services inside the Coolify containers', 
         ->toContain('exec node /terminal/terminal-server.js')
         ->and(file_exists(base_path(dirname($dockerfile)."/etc/s6-overlay/s6-rc.d/reverb/dependencies.d/{$dependencyService}")))->toBeTrue()
         ->and(file_exists(base_path(dirname($dockerfile)."/etc/s6-overlay/s6-rc.d/terminal-server/dependencies.d/{$dependencyService}")))->toBeTrue()
-        ->and(file_exists(base_path(dirname($dockerfile).'/etc/s6-overlay/s6-rc.d/user/contents.d/reverb')))->toBeTrue()
-        ->and(file_exists(base_path(dirname($dockerfile).'/etc/s6-overlay/s6-rc.d/user/contents.d/terminal-server')))->toBeTrue();
+        ->and(file_exists(base_path(dirname($dockerfile).'/etc/s6-overlay/user-bundles.d/user/contents.d/reverb')))->toBeTrue()
+        ->and(file_exists(base_path(dirname($dockerfile).'/etc/s6-overlay/user-bundles.d/user/contents.d/terminal-server')))->toBeTrue();
 })->with([
     'production image' => ['docker/production/Dockerfile', 'init-script'],
     'development image' => ['docker/development/Dockerfile', 'init-setup'],

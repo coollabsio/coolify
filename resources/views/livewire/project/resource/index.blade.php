@@ -149,27 +149,9 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle
+                        :list-url="route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])"
+                        :canvas-url="route('project.environment.canvas', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])" />
                 </div>
             </div>
 
@@ -193,16 +175,8 @@
                             {{ wireNavigate() }} class="absolute inset-0" :aria-label="`Open ${item.name}`"></a>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                <template x-if="item.type === 'application'">
-                                    <x-reicon name="browser-code" class="size-4" />
-                                </template>
-                                <template x-if="item.type === 'database'">
-                                    <x-reicon name="database" class="size-4" />
-                                </template>
-                                <template x-if="item.type === 'service'">
-                                    <x-reicon name="layers" class="size-4" />
-                                </template>
+                                class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <span class="contents" x-html="item.logoHtml"></span>
                             </div>
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-1.5">
@@ -211,9 +185,9 @@
                                         class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
                                 </div>
-                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    <span x-show="item.description" x-text="item.description"></span>
-                                </p>
+                                <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
+                                    x-show="item.description?.trim()"
+                                    x-text="item.description"></p>
                                 <div class="mobile-resource-domain min-w-0">
                                     <template x-if="item.fqdn">
                                         <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
@@ -287,16 +261,8 @@
 
                             <div class="flex items-start gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <template x-if="item.type === 'application'">
-                                        <x-reicon name="browser-code" class="size-4" />
-                                    </template>
-                                    <template x-if="item.type === 'database'">
-                                        <x-reicon name="database" class="size-4" />
-                                    </template>
-                                    <template x-if="item.type === 'service'">
-                                        <x-reicon name="layers" class="size-4" />
-                                    </template>
+                                    class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <span class="contents" x-html="item.logoHtml"></span>
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex min-w-0 items-center gap-1.5">
@@ -353,7 +319,7 @@
             serverFilters: [],
             statusFilters: [],
             sortBy: 'name-asc',
-            viewMode: localStorage.getItem('environment-resource-view') || 'table',
+            viewMode: @js($this->listView('environment', 'table')),
             filterOpen: false,
             sortOpen: false,
             page: 1,
@@ -522,7 +488,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 this.page = 1;
-                localStorage.setItem('environment-resource-view', mode);
+                this.$wire.saveListView('environment', mode);
             },
             statusState(item) {
                 if (item.restartLimitReached) {

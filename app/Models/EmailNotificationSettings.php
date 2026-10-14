@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 
 class EmailNotificationSettings extends Model
 {
+    use TracksDeliveryFailures;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -92,5 +95,16 @@ class EmailNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Email';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->smtp_enabled = false;
+        $this->resend_enabled = false;
     }
 }

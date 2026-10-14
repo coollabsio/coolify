@@ -175,7 +175,7 @@ test('backup edit keeps the S3 storage of the backup team when given a foreign l
     expect($backup->fresh()->s3_storage_id)->toBe($ownS3->id)
         ->and($backup->fresh()->save_s3)->toBeTruthy();
 
-    $component->set('s3StorageId', $foreignS3->id)->call('instantSave');
+    $component->set('s3StorageIds', [$foreignS3->id])->call('instantSave');
     expect($backup->fresh()->s3_storage_id)->toBe($ownS3->id);
 });
 

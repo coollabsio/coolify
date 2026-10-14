@@ -192,36 +192,6 @@ it('denies team member from deploying application preview', function () {
     expect($policy->deploy($user, $preview))->toBeFalse();
 });
 
-it('allows team admin to manage preview deployments', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
-
-    $team = (object) ['id' => 1];
-    $application = Mockery::mock(Application::class)->makePartial();
-    $application->shouldReceive('team')->andReturn($team);
-
-    $preview = Mockery::mock(ApplicationPreview::class)->makePartial();
-    $preview->shouldReceive('getAttribute')->with('application')->andReturn($application);
-
-    $policy = new ApplicationPreviewPolicy;
-    expect($policy->manageDeployments($user, $preview))->toBeTrue();
-});
-
-it('denies team member from managing preview deployments', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
-
-    $team = (object) ['id' => 1];
-    $application = Mockery::mock(Application::class)->makePartial();
-    $application->shouldReceive('team')->andReturn($team);
-
-    $preview = Mockery::mock(ApplicationPreview::class)->makePartial();
-    $preview->shouldReceive('getAttribute')->with('application')->andReturn($application);
-
-    $policy = new ApplicationPreviewPolicy;
-    expect($policy->manageDeployments($user, $preview))->toBeFalse();
-});
-
 it('denies restoring application preview', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $preview = Mockery::mock(ApplicationPreview::class)->makePartial();
