@@ -16,6 +16,7 @@
         ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
         ['label' => 'Runtime Logs', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.database.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+        ['label' => 'Files', 'route' => 'project.database.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
         ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
@@ -33,7 +34,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics'],
         'Deploy' => ['Servers'],
         'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
         'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone'],
@@ -85,9 +86,18 @@
             @foreach ($groupItems as $menuItem)
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                    @if ($menuItem['label'] === 'Files')
+                        x-data="{ loading: false }"
+                        @click="if (!$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) loading = true"
+                        x-on:livewire:navigated.window="loading = false"
+                    @endif
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                    @if ($menuItem['label'] === 'Files')
+                        <span x-show="loading" x-cloak><x-loading compact /></span>
+                        <x-beta-badge class="ml-auto shrink-0" />
+                    @endif
                 </a>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
                     <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"

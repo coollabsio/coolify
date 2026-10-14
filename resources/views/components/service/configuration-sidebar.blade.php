@@ -16,6 +16,7 @@
         ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
         ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+        ['label' => 'Files', 'route' => 'project.service.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Analytics', 'route' => 'project.service.analytics', 'icon' => 'analytics'],
         ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
@@ -36,7 +37,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
         'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
     ];
@@ -74,9 +75,18 @@
                 @foreach ($groupItems as $menuItem)
                     <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                         @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                        @if ($menuItem['label'] === 'Files')
+                            x-data="{ loading: false }"
+                            @click="if (!$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) loading = true"
+                            x-on:livewire:navigated.window="loading = false"
+                        @endif
                         href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                        @if ($menuItem['label'] === 'Files')
+                            <span x-show="loading" x-cloak><x-loading compact /></span>
+                            <x-beta-badge class="ml-auto shrink-0" />
+                        @endif
                         @if ($menuItem['hasWarning'] ?? false)
                             <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                         @endif

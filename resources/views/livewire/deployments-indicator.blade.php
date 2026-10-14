@@ -6,12 +6,15 @@
         @php
             $deploymentLabel = $this->deploymentCount.' '.Str::plural('deployment', $this->deploymentCount);
         @endphp
-        {{-- Deployment list: opens beside the sidebar on desktop. On mobile the root is not positioned,
+        {{-- Deployment list: opens beside the sidebar on desktop, fixed to its button so the
+             scrolling sidebar does not clip it. On mobile the root is not positioned,
              so the list anchors to the sticky top bar and spans its width. --}}
         <div x-show="expanded" x-cloak x-transition.opacity.duration.150ms
+            @if ($variant === 'sidebar') x-anchor.right-end.fixed.offset.20="$refs.deploymentsButton" @endif
             @class([
-                'surface-popover absolute z-60 overflow-hidden rounded-xl',
-                'bottom-0 left-full ml-5 w-[22rem]' => $variant === 'sidebar',
+                'surface-popover z-60 overflow-hidden rounded-xl',
+                'w-[22rem]' => $variant === 'sidebar',
+                'absolute' => $variant === 'mobile',
                 'inset-x-4 top-full mt-2' => $variant === 'mobile',
             ])>
             <div class="max-h-96 space-y-1 overflow-y-auto p-2 scrollbar">
@@ -71,7 +74,7 @@
         </div>
 
         @if ($variant === 'sidebar')
-            <button type="button" x-on:click="expanded = !expanded" title="{{ $deploymentLabel }}"
+            <button type="button" x-ref="deploymentsButton" x-on:click="expanded = !expanded" title="{{ $deploymentLabel }}"
                 aria-label="Active deployments" :aria-expanded="expanded.toString()"
                 class="menu-item w-full text-left text-coollabs dark:text-warning"
                 :class="[collapsed && 'lg:justify-center lg:px-0', expanded && 'menu-item-active']">

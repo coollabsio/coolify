@@ -2035,6 +2035,17 @@ html[data-theme="custom"] textarea:disabled {
     background: transparent;
 }
 
+/* Main sidebar: the menu and footer scroll as one unit on short or zoomed-in
+   screens. Hide the scrollbar so it does not take width from the narrow
+   collapsed rail and push the icons aside. */
+.sidebar-nav {
+    scrollbar-width: none; /* Firefox */
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
 /* Unified resource heading bar: hide tab-strip scrollbars; menus/actions stay overflow-visible for dropdowns */
 .resource-heading-navbar {
     overflow: visible;
@@ -2649,6 +2660,51 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .env-table-grid {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+/* File browser: icon, name, perms, size, modified, actions.
+   Every column is a fixed width except the flexible name column, so the
+   header grid and each row grid resolve identical tracks and stay aligned
+   (an `auto` column would size to its own content per row and drift). */
+.file-table-grid {
+    grid-template-columns: 1.75rem minmax(10rem, 1fr) 5rem 6rem 6rem 5rem 11rem 10rem;
+}
+
+@media (max-width: 768px) {
+    .data-table-header.file-table-grid {
+        display: none;
+    }
+
+    .data-table-row.file-table-grid {
+        grid-template-columns: 1.75rem minmax(0, 1fr) 10rem;
+        gap: 0.75rem;
+    }
+
+    /* Hide perms, owner, group, size and modified columns on small screens */
+    .data-table-row.file-table-grid > :nth-child(3),
+    .data-table-row.file-table-grid > :nth-child(4),
+    .data-table-row.file-table-grid > :nth-child(5),
+    .data-table-row.file-table-grid > :nth-child(6),
+    .data-table-row.file-table-grid > :nth-child(7) {
+        display: none;
+    }
+}
+
+/* File browser Monaco editor container: fixed viewport-relative height with a
+   rounded, hairline-framed surface that matches the rest of the settings UI. */
+.file-editor-monaco {
+    height: 60vh;
+    min-height: 320px;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px var(--coollabs-line);
+}
+
+/* Reserve the full settings sidebar width on desktop. */
+@media (min-width: 1280px) {
+    .files-grid {
+        grid-template-columns: calc(210px + 2.5rem) minmax(0, 1fr);
+    }
 }
 
 .environment-table-scroll {
@@ -5502,14 +5558,16 @@ html.dark .canvas-zoom-max {
         left: var(--floating-gap);
     }
 
-    html[data-nav-style="floating"] .app-sidebar > div > nav > .sticky {
+    html[data-nav-style="floating"] .app-sidebar > div > nav > .sidebar-footer {
         border-radius: 0 0 var(--floating-radius) var(--floating-radius);
     }
 
     html[data-nav-style="floating"] .app-main {
         margin-left: calc(var(--sidebar-w, 14rem) + var(--floating-gap));
-        /* The content top lines up with the sidebar and settings rail panels. */
-        padding-top: var(--floating-top);
+        /* The content top lines up with the sidebar and settings rail panels.
+           The cards draw their frame as a 1px ring outside the box, while the
+           panels use a 1px border inside it, so add 1px to match the edges. */
+        padding-top: calc(var(--floating-top) + 1px);
     }
 
     /* Full-bleed pages (canvases): no top padding gap, and the same gap as the panels. */
@@ -5600,7 +5658,7 @@ html.dark .canvas-zoom-max {
     }
 
     /* Full page width: the content starts one gap after the settings rail. */
-    html[data-nav-style="floating"] .app-main-wide :has(> .application-settings-navigation) {
+    html[data-nav-style="floating"] .app-main-wide :is(:has(> .application-settings-navigation), .files-grid) {
         grid-template-columns: calc(210px + 2.5rem) minmax(0, 1fr);
         column-gap: var(--floating-gap);
     }
