@@ -4,6 +4,8 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -195,13 +197,20 @@ function generateGithubToken(GithubApp $source, string $type)
     return match ($type) {
         'jwt' => $jwt,
         'installation' => (function () use ($source, $jwt) {
+            // GitHub sometimes answers with a 5xx page or drops the connection; a new token request is harmless.
             $response = Http::GitSource($source->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
-            ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+            ])->retry(
+                3,
+                fn (int $attempt) => $attempt * 1000,
+                fn (Throwable $exception) => $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->serverError()),
+                throw: false,
+            )->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
-                $error = data_get($response->json(), 'message', 'no error message found');
+                $error = data_get($response->json(), 'message', "HTTP {$response->status()}");
                 if ($error === 'Not Found') {
                     $error = 'Repository not found. Is it moved or deleted?';
                 }

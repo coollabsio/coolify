@@ -3182,13 +3182,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function clone_repository()
     {
-        $importCommands = $this->generate_git_import_commands();
         $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
         $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->commit}) to {$this->basedir}.");
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        $this->execute_remote_command(...$this->gitCommandDefinitions($importCommands));
+        $this->import_repository();
         $this->create_workdir();
         $this->execute_remote_command(
             [
@@ -3203,6 +3202,37 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
             );
+        }
+    }
+
+    /**
+     * SSH exits with 255 when the connection drops, which can happen during a long clone. Git exits with
+     * 128 for its own errors, so only 255 is retried. The interrupted clone can still run in the helper
+     * container, so stop it and remove the partial checkout before cloning again.
+     */
+    private function import_repository(): void
+    {
+        $maxAttempts = config('constants.ssh.max_retries');
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $this->execute_remote_command(...$this->gitCommandDefinitions($this->generate_git_import_commands()));
+
+                return;
+            } catch (DeploymentException $e) {
+                if ($e->getCode() !== 255 || $attempt >= $maxAttempts) {
+                    throw $e;
+                }
+
+                $delay = $this->calculateRetryDelay($attempt - 1);
+                $this->application_deployment_queue->addLogEntry('Lost the SSH connection while importing the repository. Retrying in '.$delay.'s (attempt '.($attempt + 1)."/{$maxAttempts}).", 'stderr');
+                Sleep::for($delay)->seconds();
+                $this->execute_remote_command([
+                    executeInDocker($this->deployment_uuid, 'pkill git; rm -rf '.escapeshellarg($this->basedir)),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ]);
+            }
         }
     }
 
