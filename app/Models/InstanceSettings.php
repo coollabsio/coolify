@@ -104,6 +104,12 @@ class InstanceSettings extends Model
 
     protected static function booted(): void
     {
+        static::creating(function ($settings) {
+            if (blank($settings->getAttributes()['auto_update_frequency'] ?? null)) {
+                $settings->auto_update_frequency = self::randomAutoUpdateFrequency();
+            }
+        });
+
         static::created(function () {
             Once::flush();
         });
@@ -119,6 +125,14 @@ class InstanceSettings extends Model
                 );
             }
         });
+    }
+
+    /**
+     * Daily auto update at a random minute after midnight, so instances do not all pull images from the registry in the same second.
+     */
+    public static function randomAutoUpdateFrequency(): string
+    {
+        return random_int(0, 59).' 0 * * *';
     }
 
     public function isPasswordRegistrationAllowed(): bool
