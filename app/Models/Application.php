@@ -971,11 +971,11 @@ class Application extends BaseModel
                     $additional_servers_status = $this->additional_servers->pluck('pivot.status');
                     foreach ($additional_servers_status as $status) {
                         $server_status = str($status)->before(':')->value();
-                        $server_health = str($status)->after(':')->value() ?? 'unhealthy';
+                        $server_health = str($status)->contains(':') ? str($status)->after(':')->value() : null;
                         if ($main_server_status !== $server_status) {
                             $complex_status = 'degraded';
                         }
-                        if ($main_server_health !== $server_health) {
+                        if ($server_health !== null && $main_server_health !== $server_health) {
                             $complex_health = 'unhealthy';
                         }
                     }
