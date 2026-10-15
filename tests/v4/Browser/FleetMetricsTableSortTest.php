@@ -71,13 +71,12 @@ beforeEach(function () {
     app()->bind(SentinelMetricsClient::class, fn ($app, array $parameters) => new FakeBrowserFleetMetricsClient($parameters['server']));
 });
 
-/** The visible row names of one metrics table, in the order they show on screen. */
+/** The visible row names of one metrics table, in DOM order (the order focus and screen readers follow). */
 function visibleFleetMetricsRowNames(mixed $page, string $section): array
 {
     return $page->script(<<<JS
         [...document.querySelectorAll('#{$section} [data-row]')]
             .filter((row) => getComputedStyle(row).display !== 'none')
-            .sort((a, b) => a.getBoundingClientRect().y - b.getBoundingClientRect().y)
             .map((row) => JSON.parse(row.dataset.row).name)
     JS);
 }

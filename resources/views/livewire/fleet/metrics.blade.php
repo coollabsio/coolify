@@ -261,7 +261,7 @@ $serverListboxOptions = array_merge(
                         @endphp
                         {{-- Offline servers have no values, so they stay last in each sort. --}}
                         <div wire:key="fleet-server-{{ $row['uuid'] }}" data-row="{{ json_encode($sortValues) }}" @unless ($row['online']) data-pinned @endunless
-                            x-show="shown($el)" :style="{ order: rank($el) }"
+                            x-show="shown($el)"
                             class="data-table-row fleet-servers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
                             <div class="flex min-w-0 items-center gap-2">
                                 <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}"
@@ -338,7 +338,7 @@ $serverListboxOptions = array_merge(
                             @endphp
                             <div wire:key="fleet-container-{{ $c['serverUuid'] ?? $c['server'] }}-{{ $c['id'] }}"
                                 data-row="{{ json_encode(['name' => $meta['name'], 'server' => $c['server'], 'value' => $metricOf($c)]) }}"
-                                x-show="shown($el)" :style="{ order: rank($el) }"
+                                x-show="shown($el)"
                                 class="data-table-row fleet-containers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
                                 <div class="self-center text-center text-[12px] tabular-nums text-neutral-400 dark:text-fg-faint">{{ $loop->iteration }}</div>
                                 <div class="flex min-w-0 flex-col">

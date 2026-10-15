@@ -50,13 +50,12 @@ beforeEach(function () {
     app()->bind(SentinelTrafficClient::class, fn () => new FakeBrowserSortTrafficClient($server));
 });
 
-/** The first visible path rows, in the order they show on screen. */
+/** The first visible path rows, in DOM order (the order focus and screen readers follow). */
 function visiblePathNames(mixed $page): array
 {
     return $page->script(<<<'JS'
         [...document.querySelectorAll('#analytics-paths-section [data-row]')]
             .filter((row) => getComputedStyle(row).display !== 'none')
-            .sort((a, b) => a.getBoundingClientRect().y - b.getBoundingClientRect().y)
             .slice(0, 3)
             .map((row) => JSON.parse(row.dataset.row).name.trim())
     JS);
