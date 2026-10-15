@@ -913,7 +913,7 @@ services:
                 kong: 'contains(string!(.appname), "supabase-kong")'
                 auth: 'contains(string!(.appname), "supabase-auth")'
                 rest: 'contains(string!(.appname), "supabase-rest")'
-                realtime: 'contains(string!(.appname), "supabase-realtime")'
+                realtime: 'contains(string!(.appname), "realtime-dev")'
                 storage: 'contains(string!(.appname), "supabase-storage")'
                 functions: 'contains(string!(.appname), "supabase-edge-functions")'
                 db: 'contains(string!(.appname), "supabase-db")'
