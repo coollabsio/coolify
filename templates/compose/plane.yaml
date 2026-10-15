@@ -229,10 +229,11 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: rabbitmq-diagnostics -q check_port_connectivity
       interval: 30s
       timeout: 30s
       retries: 3
+      start_period: 60s
 
   # Comment this if you using any external s3 compatible storage
   plane-minio:
