@@ -1,8 +1,8 @@
 // Client-side sort and paging for the traffic analytics lists. Each row carries
-// its sort values as JSON in `data-row`. The rows are moved into sorted DOM order,
-// so focus and screen readers follow the order on screen. Livewire morphs keyed
-// rows back into server order and can add or remove rows, so the rows are sorted
-// again after each morph.
+// its sort values as JSON in `data-row`. Rows are moved in the DOM, so keyboard
+// and screen-reader order match the visual order. A Livewire morph puts the rows
+// back in server order (they are keyed) and can add or remove rows, so the rows
+// are sorted again after it.
 function compareValues(a, b) {
     if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
@@ -83,9 +83,11 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
             // Pinned rows (the "Other" remainder) stay last in each sort, then rows without a value.
             rows.sort((a, b) => a.pinned - b.pinned || a.missing - b.missing || compareValues(a.value, b.value) * sign || a.index - b.index);
             rows.forEach((row, rank) => ranks.set(row.el, rank));
-            // Move only when the order changed: a move fires the observer again, and moving a focused link blurs it.
+            // All rows share one parent. Move them only when the order changed: the mutation
+            // that the move causes then finds them sorted, and a focused link is not blurred.
             if (rows.some((row, rank) => row.index !== rank)) {
                 rows.forEach((row) => row.el.parentElement.appendChild(row.el));
+                observer?.takeRecords();
             }
 
             this.total = rows.length;
@@ -93,14 +95,9 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
             this.tick++;
         },
 
-        rank(el) {
-            this.tick;
-
-            return ranks.get(el) ?? 0;
-        },
-
         shown(el) {
-            const rank = this.rank(el);
+            this.tick;
+            const rank = ranks.get(el) ?? 0;
 
             return rank >= this.page * this.per && rank < (this.page + 1) * this.per;
         },

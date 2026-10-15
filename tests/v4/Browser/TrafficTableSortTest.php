@@ -50,14 +50,23 @@ beforeEach(function () {
     app()->bind(SentinelTrafficClient::class, fn () => new FakeBrowserSortTrafficClient($server));
 });
 
-/** The first visible path rows, in DOM order (the order focus and screen readers follow). */
-function visiblePathNames(mixed $page): array
+/**
+ * The first visible path rows in DOM order, which is the keyboard and
+ * screen-reader order. Returns null when the screen order is different.
+ */
+function visiblePathNames(mixed $page): ?array
 {
     return $page->script(<<<'JS'
-        [...document.querySelectorAll('#analytics-paths-section [data-row]')]
-            .filter((row) => getComputedStyle(row).display !== 'none')
-            .slice(0, 3)
-            .map((row) => JSON.parse(row.dataset.row).name.trim())
+        (() => {
+            const rows = [...document.querySelectorAll('#analytics-paths-section [data-row]')]
+                .filter((row) => getComputedStyle(row).display !== 'none');
+            const ys = rows.map((row) => row.getBoundingClientRect().y);
+            if (ys.some((y, i) => i > 0 && y <= ys[i - 1])) {
+                return null;
+            }
+
+            return rows.slice(0, 3).map((row) => JSON.parse(row.dataset.row).name.trim());
+        })()
     JS);
 }
 

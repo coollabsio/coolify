@@ -55,10 +55,11 @@
 <x-application.settings-section id="analytics-country-section" title="Locations"
     helper="Request volume by visitor country and city for the selected range." flush
     x-data="{
-        view: localStorage.getItem('traffic-geo-view') === 'cities' ? 'cities' : 'countries',
+        // Storage can be blocked (sandboxed iframe, privacy mode, full quota); the switch then works without saving.
+        view: (() => { try { return localStorage.getItem('traffic-geo-view') === 'cities' ? 'cities' : 'countries'; } catch (e) { return 'countries'; } })(),
         setView(next) {
             this.view = next;
-            localStorage.setItem('traffic-geo-view', next);
+            try { localStorage.setItem('traffic-geo-view', next); } catch (e) {}
         },
         globe() {
             const canvas = document.getElementById('{{ $globeId }}');
