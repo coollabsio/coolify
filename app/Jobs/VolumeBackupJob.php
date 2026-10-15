@@ -291,10 +291,16 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @return array<int, string>
      */
+    /**
+     * Containers can exit and be removed (e.g. `--rm` backup helpers) between `docker ps` and
+     * `docker inspect`. Skip those, but still fail when an existing container cannot be inspected.
+     *
+     * @return array<int, string>
+     */
     private function containersUsingVolume(string $source, Server $server): array
     {
         $output = instant_remote_process(
-            ["containers=\$(docker ps -q) || exit 1; for container in \$containers; do paused=\$(docker inspect --format '{{.State.Paused}}' \"\$container\") || exit 1; [ \"\$paused\" = true ] && continue; mounts=\$(docker inspect --format '{{range .Mounts}}{{println .Source}}{{println .Name}}{{end}}' \"\$container\") || exit 1; if printf '%s\\n' \"\$mounts\" | grep -Fqx -- ".escapeshellarg($source).'; then echo "$container"; fi; done'],
+            ["containers=\$(docker ps -q) || exit 1; for container in \$containers; do mounts=\$(docker inspect --format '{{if not .State.Paused}}{{range .Mounts}}{{println .Source}}{{println .Name}}{{end}}{{end}}' \"\$container\" 2>/dev/null) || { remaining=\$(docker ps -aq --filter \"id=\$container\") || exit 1; [ -z \"\$remaining\" ] && continue; docker inspect \"\$container\" >/dev/null; exit 1; }; if printf '%s\\n' \"\$mounts\" | grep -Fqx -- ".escapeshellarg($source).'; then echo "$container"; fi; done'],
             $server,
             disableMultiplexing: true,
         );
