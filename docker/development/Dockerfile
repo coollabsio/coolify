@@ -71,6 +71,7 @@ RUN apk add --no-cache \
     git-lfs \
     jq \
     lsof \
+    procps \
     vim
 
 # Install PHP extensions

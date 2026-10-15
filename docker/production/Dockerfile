@@ -136,6 +136,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     git-lfs \
     jq \
     lsof \
+    procps \
     vim
 
 # Install PHP extensions
