@@ -1497,7 +1497,25 @@ function sslip(Server $server)
     }
     $ip = $server->ip === 'host.docker.internal' ? base_ip() : $server->ip;
 
-    return 'http://'.sslipHostLabel($ip).'.sslip.io';
+    return 'http://'.sslipHostLabel(resolveHostToIp($ip)).'.sslip.io';
+}
+
+/**
+ * Resolve a hostname to its IPv4 (or else IPv6) address. sslip.io only answers for names that
+ * contain an IP address. Returns the input unchanged if it is already an IP or does not resolve.
+ */
+function resolveHostToIp(string $host): string
+{
+    if (filter_var(normalizeIpAddress($host), FILTER_VALIDATE_IP) !== false) {
+        return $host;
+    }
+    $ipv4 = gethostbyname($host);
+    if (filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+        return $ipv4;
+    }
+    $ipv6 = data_get(@dns_get_record($host, DNS_AAAA), '0.ipv6');
+
+    return is_string($ipv6) && $ipv6 !== '' ? $ipv6 : $host;
 }
 
 function service_templates_cache_key(): string
