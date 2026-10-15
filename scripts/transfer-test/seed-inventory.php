@@ -1,9 +1,10 @@
 <?php
 
 /**
- * Seed a rich transfer-demo inventory on the current Coolify instance.
- * Run: php artisan tinker scripts/seed-transfer-demo.php
- * Or:  ./scripts/dev exec php artisan tinker --execute "require 'scripts/seed-transfer-demo.php';"
+ * Seed a rich transfer-demo inventory on the current Coolify instance, in the database only: a server
+ * "transfer-full-demo" on the testing-host container with many resource types. Nothing is deployed.
+ * For live transfers between two instances, use the other scripts of scripts/transfer-test (see README.md).
+ * Run: ./scripts/dev exec php artisan tinker --execute "require 'scripts/transfer-test/seed-inventory.php';"
  */
 
 use App\Models\Application;
