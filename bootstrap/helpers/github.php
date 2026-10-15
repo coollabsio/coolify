@@ -417,7 +417,12 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
             return null;
         }
 
-        return $files->pluck('filename')->filter()->values()->toArray();
+        // A renamed file also changes its previous path.
+        return $files->flatMap(fn (mixed $file): array => [data_get($file, 'filename'), data_get($file, 'previous_filename')])
+            ->filter(fn (mixed $filename): bool => is_string($filename) && $filename !== '')
+            ->unique()
+            ->values()
+            ->toArray();
     } catch (Exception $e) {
         return null;
     }

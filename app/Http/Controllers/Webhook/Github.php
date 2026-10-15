@@ -484,6 +484,9 @@ class Github extends Controller
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$branch'.");
                 }
+                if ($applications->contains(fn (Application $application): bool => filled($application->watch_paths))) {
+                    $changed_files = $this->githubPushComparedFiles($github_app, $payload) ?? $changed_files;
+                }
             }
             if ($x_github_event === 'pull_request') {
                 if ($action !== 'closed') {
@@ -618,6 +621,35 @@ class Github extends Controller
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Files that the push changes between its before and after commits, from
+     * the GitHub compare API.
+     *
+     * The file lists of the pushed commits are not the net change: a merge
+     * commit names the files that it changes relative to its first parent,
+     * also when the push does not change them. Returns null for a new branch,
+     * a missing repository name or an API failure; the caller then uses the
+     * file lists of the pushed commits.
+     *
+     * @return Collection<int, string>|null
+     *
+     * @throws InvalidWebhookPayloadException When the before or after value is not a commit SHA.
+     */
+    private function githubPushComparedFiles(GithubApp $githubApp, mixed $payload): ?Collection
+    {
+        $before = $this->webhookCommitSha($payload, 'before');
+        $after = $this->webhookCommitSha($payload, 'after');
+        $fullName = $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
+        if ($before === null || $after === null || $fullName === null || preg_match('/\A0+\z/', $before) === 1) {
+            return null;
+        }
+
+        [$owner, $repo] = explode('/', $fullName, 2);
+        $files = getGithubCommitRangeFiles($githubApp, $owner, $repo, $before, $after);
+
+        return $files === null ? null : collect($files);
     }
 
     /**
