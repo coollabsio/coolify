@@ -6,9 +6,9 @@
             ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3'],
         ],
         'Instance' => [
-            ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
-            ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
+            ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
+            ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
         ],
     ];
 @endphp

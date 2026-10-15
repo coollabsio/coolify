@@ -153,9 +153,9 @@
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->is('settings')],
                             ['label' => 'Advanced', 'icon' => 'grid', 'href' => route('settings.advanced'), 'active' => request()->is('settings/advanced')],
                             ['label' => 'Updates', 'icon' => 'refresh3', 'href' => route('settings.updates'), 'active' => request()->is('settings/updates')],
-                            ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup'), 'sectionStart' => true],
+                            ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*'), 'sectionStart' => true],
                             ['label' => 'Email', 'icon' => 'mail', 'href' => route('settings.email'), 'active' => request()->is('settings/email')],
-                            ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*')],
+                            ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup')],
                         ]],
                     ],
                 ])->map(fn (array $items) => collect($items)
