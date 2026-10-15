@@ -254,14 +254,15 @@ $appListboxOptions = array_merge(
                             icon-name="unordered-list" />
                     @else
                         @php $maxAppRequests = max(1, (int) collect($topApps)->max('requests')); @endphp
-                        <div x-data="{ page: 0, per: 10, total: {{ count($topApps) }} }">
-                            <div class="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.07] dark:text-fg-dim">
-                                <span class="min-w-0 flex-1">Application / service</span>
-                                <span class="hidden w-16 shrink-0 text-right sm:inline" title="Request volume relative to the busiest row in this list">Volume</span>
-                                <span class="w-16 shrink-0 text-right">Requests</span>
-                                <span class="hidden w-16 shrink-0 text-right sm:inline" title="Total response data sent">Bandwidth</span>
+                        <div x-data="trafficTable()">
+                            <div class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Application / service', 'text' => true, 'class' => 'min-w-0 flex-1'])
+                                <span class="hidden w-16 shrink-0 sm:inline" aria-hidden="true"></span>
+                                @include('livewire.traffic._sort-header', ['column' => 'requests', 'label' => 'Requests', 'class' => 'w-16 shrink-0'])
+                                @include('livewire.traffic._sort-header', ['column' => 'bytesOut', 'label' => 'Bandwidth', 'class' => 'hidden w-16 shrink-0 sm:inline-flex', 'title' => 'Total response data sent'])
                                 <span class="size-3.5 shrink-0" aria-hidden="true"></span>
                             </div>
+                            <div class="flex flex-col">
                             @foreach ($topApps as $row)
                                 @php
                                     $appHref = $row['link'] ?? null;
@@ -269,11 +270,9 @@ $appListboxOptions = array_merge(
                                 @endphp
                                 <{{ $appHref ? 'a' : 'div' }} wire:key="analytics-app-{{ $row['uuid'] }}"
                                     @if ($appHref) href="{{ $appHref }}" {{ wireNavigate() }} @endif
-                                    x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
-                                    @class([
-                                        'flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]',
-                                        'transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.03]' => $appHref,
-                                    ])>
+                                    data-row="{{ json_encode(['name' => (string) $row['name'], 'requests' => (int) $row['requests'], 'bytesOut' => (int) $row['bandwidth']]) }}"
+                                    x-show="shown($el)"
+                                    class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
                                     <span class="flex min-w-0 flex-1 items-baseline gap-1.5">
                                         <span class="truncate text-[12px] text-black dark:text-fg">{{ $row['name'] }}</span>
                                         @if (! empty($row['isService']))
@@ -299,6 +298,7 @@ $appListboxOptions = array_merge(
                                     @endif
                                 </{{ $appHref ? 'a' : 'div' }}>
                             @endforeach
+                            </div>
                             @include('livewire.traffic._pager')
                         </div>
                     @endif
@@ -312,14 +312,12 @@ $appListboxOptions = array_merge(
             @include('livewire.traffic._paths-list', ['paths' => $topPaths])
         </x-application.settings-section>
 
-        {{-- Countries --}}
-        <x-application.settings-section id="analytics-country-section" title="Countries"
-            helper="Request volume by visitor country for the selected range." flush>
-            @include('livewire.traffic._geo', [
-                'countries' => data_get($breakdowns, 'country', []),
-                'attribution' => $attribution,
-            ])
-        </x-application.settings-section>
+        {{-- Locations (countries and cities) --}}
+        @include('livewire.traffic._geo', [
+            'countries' => data_get($breakdowns, 'country', []),
+            'cities' => trafficCityRows(data_get($breakdowns, 'city', [])),
+            'attribution' => $attribution,
+        ])
 
         {{-- Requests by device type (donut) + HTTP versions / cache / status. --}}
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">

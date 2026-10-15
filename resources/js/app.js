@@ -3,6 +3,7 @@ import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
+import './traffic-table.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';

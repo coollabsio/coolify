@@ -5743,6 +5743,115 @@ function deviceLabel(?string $device): string
 }
 
 /**
+ * Prepare aggregated `city` breakdown rows (`CC|subdivision|City`, from
+ * TrafficAnalyticsAggregator::breakdowns(), not raw Sentinel rows) for display,
+ * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
+ * "BE, Germany"). `CC||` (sent by older Sentinel builds) is an unknown city of
+ * that country. `__other__` and malformed values are merged into one "Other"
+ * row, which stays last. Returns [] when no row has a real city.
+ *
+ * @param  iterable<int, array{value?: string, requests?: int, bytesOut?: int, lat?: float, lon?: float}>  $rows
+ * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
+ */
+function trafficCityRows(iterable $rows): array
+{
+    $out = [];
+    $hasCity = false;
+
+    foreach ($rows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests <= 0) {
+            continue;
+        }
+
+        $value = (string) data_get($row, 'value', '');
+        $parts = explode('|', $value, 3);
+        $parts[0] = strtoupper($parts[0]);
+        $isCityKey = count($parts) === 3 && preg_match('/^[A-Z]{2}$/', $parts[0]) === 1;
+
+        $key = '__other__';
+        $country = '';
+        $label = 'Other';
+        $name = 'Other';
+        $detail = '';
+        $lat = null;
+        $lon = null;
+
+        if ($isCityKey) {
+            [$country, $subdivision, $city] = array_map('trim', $parts);
+            $key = $value;
+
+            if ($city === '') {
+                $label = 'Unknown, '.$country;
+                $name = 'Unknown';
+                $detail = countryName($country);
+            } else {
+                $hasCity = true;
+                $region = preg_match('/^[A-Z]{2,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
+                $label = $city.', '.$region.$country;
+                $name = $city;
+                $detail = $region.countryName($country);
+
+                $rawLat = data_get($row, 'lat');
+                $rawLon = data_get($row, 'lon');
+                if (is_numeric($rawLat) && is_numeric($rawLon)) {
+                    $lat = (float) $rawLat;
+                    $lon = (float) $rawLon;
+                }
+            }
+        }
+
+        $out[$key] ??= ['key' => $key, 'country' => $country, 'label' => $label, 'name' => $name, 'detail' => $detail, 'requests' => 0, 'bytesOut' => 0, 'lat' => $lat, 'lon' => $lon];
+        $out[$key]['requests'] += $requests;
+        $out[$key]['bytesOut'] += (int) data_get($row, 'bytesOut', 0);
+    }
+
+    if (! $hasCity) {
+        return [];
+    }
+
+    $other = $out['__other__'] ?? null;
+    unset($out['__other__']);
+    $out = array_values($out);
+    usort($out, fn (array $a, array $b): int => $b['requests'] <=> $a['requests']);
+
+    return $other === null ? $out : [...$out, $other];
+}
+
+/**
+ * Marker data for the analytics globe, one set for each view of the Locations
+ * card: a marker per country with a valid ISO-A2 code, and a marker per city
+ * that has coordinates.
+ *
+ * @param  iterable<int, mixed>  $countryRows
+ * @param  iterable<int, mixed>  $cityRows
+ * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
+ */
+function trafficGeoMarkers(iterable $countryRows, iterable $cityRows): array
+{
+    $countries = [];
+    foreach ($countryRows as $row) {
+        $code = strtoupper((string) data_get($row, 'value', ''));
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests > 0 && preg_match('/^[A-Z]{2}$/', $code) === 1) {
+            $countries[] = ['code' => $code, 'requests' => $requests];
+        }
+    }
+
+    $cities = [];
+    foreach ($cityRows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        $lat = data_get($row, 'lat');
+        $lon = data_get($row, 'lon');
+        if ($requests > 0 && is_numeric($lat) && is_numeric($lon)) {
+            $cities[] = ['lat' => (float) $lat, 'lon' => (float) $lon, 'requests' => $requests];
+        }
+    }
+
+    return ['countries' => $countries, 'cities' => $cities];
+}
+
+/**
  * Resolve an ISO 3166-1 alpha-2 country code to its English country name.
  *
  * Uses a bundled ISO 3166-1 lookup so the result is deterministic and does not
