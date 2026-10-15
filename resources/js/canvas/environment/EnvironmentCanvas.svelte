@@ -17,6 +17,7 @@
     filterGraph,
     filterOptions,
     fitView,
+    GROUP_GAP,
     GROUP_HEADER,
     GROUP_PADDING,
     groupByUse,
@@ -86,6 +87,10 @@
   const interactions = new Set(); // active drags; refetches wait until they end
   let deferred = null;
   const unsaved = {};
+  // Saved moves stay on the canvas until a load that started after the save returns them, so an older
+  // response (a poll or status refresh during the drag or the request) cannot put the cards back for a moment.
+  const settling = { positions: {}, saved: {} }; // id -> { at, after: load number the save finished at }
+  let loads = 0;
   let reloadQueued = false;
   let fitted = false;
   let destroyed = false;
@@ -547,13 +552,14 @@
     track(header, ev => {
       if (!moved && Math.hypot(ev.clientX - origin.cx, ev.clientY - origin.cy) < 4) return;
       const wanted = { ...box, x: Math.max(meta.inner.x, box.x + (ev.clientX - origin.cx) / view.z), y: Math.max(meta.inner.y, box.y + (ev.clientY - origin.cy) / view.z) };
-      const spot = freeSpot(wanted, others, BOX_GAP, fits);
+      // Same gap as layoutServerView, so a reload does not move the group.
+      const spot = freeSpot(wanted, others, GROUP_GAP, fits);
       if (!spot) return;
       moved = true;
       for (const id of ids) positions[id] = { x: starts[id].x + spot.x - box.x, y: starts[id].y + spot.y - box.y };
     }, () => {
-      end('group');
       if (moved) saveGroup(ids, meta.shift);
+      end('group');
     });
   }
 
@@ -563,10 +569,13 @@
    */
   async function saveGroup(ids, shift) {
     const saved = Object.fromEntries(ids.map(id => [id, { x: Math.round(positions[id].x - shift.x), y: Math.round(positions[id].y - shift.y) }]));
+    hold(settling.saved, saved);
     try {
       await api('PATCH', `${environmentBase(nodeById(ids[0]))}/positions`, { positions: saved });
-      if (!destroyed) applyGraph({ ...full, nodes: full.nodes.map(n => (saved[n.id] ? { ...n, saved: saved[n.id] } : n)) });
+      settle(settling.saved, saved);
+      if (!destroyed) applyGraph(full);
     } catch (e) {
+      release(settling.saved, saved);
       if (destroyed) return;
       toast(e.message, true);
       load({ quiet: true });
@@ -663,19 +672,34 @@
     const ids = Object.keys(batch);
     if (!ids.length || !graph) return;
     const rounded = Object.fromEntries(ids.map(id => [id, { x: Math.round(batch[id].x), y: Math.round(batch[id].y) }]));
-    const forget = () => {
-      for (const id of ids) if (unsaved[id] === batch[id]) delete unsaved[id];
-    };
+    hold(settling.positions, rounded);
+    for (const id of ids) if (unsaved[id] === batch[id]) delete unsaved[id];
     try {
       await api('PATCH', `${base}/positions`, { positions: rounded }, options);
+      settle(settling.positions, rounded);
       if (graph && !destroyed) patchGraph({ positions: { ...(graph.positions || {}), ...rounded } });
-      forget();
     } catch (e) {
-      forget();
+      release(settling.positions, rounded);
       if (destroyed) return;
       toast(e.message, true);
       load({ quiet: true });
     }
+  }
+
+  /** Keeps moves that are being saved on the canvas (see settling). */
+  function hold(map, moves) {
+    for (const [id, at] of Object.entries(moves)) map[id] = { at, after: Infinity };
+  }
+  /** The save is done: loads that start from now on return the moves, so they can replace them. */
+  function settle(map, moves) {
+    for (const id of Object.keys(moves)) if (map[id]?.at === moves[id]) map[id].after = loads;
+  }
+  function release(map, moves) {
+    for (const id of Object.keys(moves)) if (map[id]?.at === moves[id]) delete map[id];
+  }
+  /** A load that started after the save returned the saved moves. */
+  function dropSettled(started) {
+    for (const map of Object.values(settling)) for (const [id, entry] of Object.entries(map)) if (entry.after < started) delete map[id];
   }
 
   // ── Data ──
@@ -694,8 +718,10 @@
     next.nodes ||= [];
     next.links ||= [];
     next.positions = next.positions && !Array.isArray(next.positions) ? next.positions : {};
-    // Local moves that are not saved yet stay where the user put them.
-    next.positions = { ...next.positions, ...Object.fromEntries(Object.entries(unsaved).map(([id, p]) => [id, { x: p.x, y: p.y }])) };
+    // Local moves that are not saved yet (or not loaded back yet) stay where the user put them.
+    const kept = Object.fromEntries(Object.entries(settling.positions).map(([id, s]) => [id, s.at]));
+    next.positions = { ...next.positions, ...kept, ...Object.fromEntries(Object.entries(unsaved).map(([id, p]) => [id, { x: p.x, y: p.y }])) };
+    if (Object.keys(settling.saved).length) next.nodes = next.nodes.map(n => (settling.saved[n.id] ? { ...n, saved: settling.saved[n.id].at } : n));
     full = next;
     const shown = groupByUse(filterGraph(next, filter));
     groupMeta = {};
@@ -727,8 +753,10 @@
       return;
     }
     loading = true;
+    const started = ++loads;
     try {
       const next = await api('GET', base);
+      dropSettled(started);
       if (next && containers) next.nodes = [...(next.nodes || []), ...containers];
       applyGraph(next);
       if (!quiet && fitted && next) toast('Canvas refreshed.');

@@ -456,7 +456,8 @@ export function dragRules(graph, positions, sizes, id) {
   return {
     others: [...rects(graph.nodes), ...zones.map(z => room(z, side, top)), ...groups.map(g => room(g, groupSide, groupTop))],
     fits: box => zones.every(z => apart(frameAround([...zoneMates, box], side, top), z, BOX_GAP))
-      && (!grouped || groups.every(g => apart(frameAround([...groupMates, box], groupSide, groupTop), g, BOX_GAP))),
+      // Same gap between groups as layoutServerView, so a reload does not move the group.
+      && (!grouped || groups.every(g => apart(frameAround([...groupMates, box], groupSide, groupTop), g, GROUP_GAP))),
   };
 }
 

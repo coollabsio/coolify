@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CARD_WIDTH,
+  GROUP_GAP,
   MAX_ROWS,
   COLUMN_GAP,
   ROW_GAP,
@@ -584,6 +585,39 @@ test('server view: a dragged card stops before its group covers another group', 
   const positions = dragOnto(g, layoutGraph(g), 'a', 'c');
   const [f1, f2] = groupFrames(g.nodes, positions);
   assert.ok(apart(f1, f2), 'the project / environment frames do not overlap');
+});
+
+test('server view: a group dropped as close to another group as a drag allows stays there after a reload', () => {
+  const nodes = [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'application', 'z1', 'staging')];
+  const g = { layout: 'server', zones: [{ id: 'z1', name: 'web' }], nodes, links: [] };
+  const groups = {};
+  const before = layoutServerView(g, groups);
+  const [prod, staging] = groupFrames(nodes, before);
+  // Drag the staging group to the left of the prod group: it stops at the gap the drag keeps.
+  const box = { x: staging.x, y: staging.y, w: staging.width, h: staging.height };
+  const others = [{ x: prod.x, y: prod.y, w: prod.width, h: prod.height }];
+  const { inner } = groups[groupKey([nodes[1]], 'z1')];
+  const spot = freeSpot({ ...box, x: prod.x + 40 }, others, GROUP_GAP, b => b.x >= inner.x && b.y >= inner.y);
+  const dropped = { ...before, b: { x: before.b.x + spot.x - box.x, y: before.b.y + spot.y - box.y } };
+  const shift = id => groups[groupKey([nodes.find(n => n.id === id)], 'z1')].shift;
+  const saved = Object.fromEntries(nodes.map(n => [n.id, { x: dropped[n.id].x - shift(n.id).x, y: dropped[n.id].y - shift(n.id).y }]));
+  const after = layoutServerView({ ...g, nodes: nodes.map(n => ({ ...n, saved: saved[n.id] })) });
+  assert.deepEqual(after, dropped);
+});
+
+test('server view: a dragged card keeps its group as far from another group as the layout does', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [srv('a', 'application', 'Shop / prod'), srv('c', 'application', 'Blog / prod')],
+    links: [],
+    positions: {},
+  };
+  const before = layoutServerView(g);
+  const { others, fits } = dragRules(g, before, {}, 'a');
+  const start = { ...before.a, w: CARD_WIDTH, h: estimateNodeHeight(g.nodes[0]) };
+  // The layout puts the groups GROUP_GAP apart: a card cannot move its group closer to the other one.
+  assert.equal(freeSpot({ ...start, x: start.x - 10 }, others, undefined, fits), null);
 });
 
 test('groupKey: a group with only an empty-environment placeholder has no key, so it cannot be moved', () => {
