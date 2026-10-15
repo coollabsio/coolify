@@ -110,6 +110,10 @@ it('validates SSH URLs when allowed', function () {
         'custom-user@git.example.com:organization/repository.git',
         'custom-user@git.example.com:2222/organization/repository.git',
         'enterprise-user@enterprise.ghe.com:organization/repository.git',
+        'ssh://git@gitea.example.local:2222/myuser/my-repository.git',
+        'ssh://git@github.com/user/repo.git',
+        'ssh://git@192.168.1.10:22/~user/repo.git',
+        'ssh://git@[2001:db8::10]:2222/group/project.git',
     ];
 
     foreach ($validUrls as $url) {
@@ -133,6 +137,7 @@ it('rejects SSH URLs when not allowed', function () {
         'git@github.com:user/repo.git',
         'git@gitlab.com:user/repo.git',
         'custom-user@git.example.com:organization/repository.git',
+        'ssh://git@gitea.example.com:2222/organization/repository.git',
     ];
 
     foreach ($invalidUrls as $url) {
@@ -371,6 +376,11 @@ it('rejects invalid URL formats', function () {
         'ftp://github.com/user/repo',
         'file:///path/to/repo',
         'ssh://github.com/user/repo',
+        'ssh://git@github.com',
+        'ssh://git@github.com:2222',
+        'ssh://git@github.com:port/user/repo.git',
+        'ssh://git@github.com:2222:user/repo.git',
+        'ssh://git@[not-an-ip]:2222/user/repo.git',
         'https://',
         'http://',
         'git@',

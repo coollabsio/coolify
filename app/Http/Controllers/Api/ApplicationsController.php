@@ -1547,7 +1547,7 @@ class ApplicationsController extends Controller
                 $application->domain_port_overrides = $domainPortOverrides;
             }
             $gitRepository = $application->git_repository;
-            $httpsRepository = scpStyleGitUrlToHttps($gitRepository);
+            $httpsRepository = sshGitUrlToHttps($gitRepository);
             if (is_string($httpsRepository)) {
                 $gitRepository = $httpsRepository;
                 $application->git_repository = $httpsRepository;

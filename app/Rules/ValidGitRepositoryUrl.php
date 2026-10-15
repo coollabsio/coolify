@@ -29,7 +29,7 @@ class ValidGitRepositoryUrl implements ValidationRule
 
         // Brackets are only allowed around an IPv6 host, so check the rest of the URL without it.
         $valueWithoutIpv6Host = preg_replace_callback(
-            '/^((?:https?|git):\/\/|[a-zA-Z0-9._-]+@)\[([0-9A-Fa-f:.]+)\]/',
+            '/^((?:https?|git):\/\/|(?:ssh:\/\/)?[a-zA-Z0-9._-]+@)\[([0-9A-Fa-f:.]+)\]/',
             fn (array $matches): string => filter_var($matches[2], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? $matches[1].'ipv6-host' : $matches[0],
             $value,
         );
@@ -98,6 +98,19 @@ class ValidGitRepositoryUrl implements ValidationRule
 
                 return;
             }
+        } elseif (str_starts_with($value, 'ssh://')) {
+            if (! $this->allowSSH) {
+                $fail('SSH URLs are not allowed.');
+
+                return;
+            }
+
+            // Validate ssh:// URL format (ssh://user@host[:port]/user/repo.git)
+            if (! preg_match('/^ssh:\/\/[a-zA-Z0-9._-]+@(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+)(:[0-9]{1,5})?\/[a-zA-Z0-9\-_\/.~]+$/', $value)) {
+                $fail('The :attribute is not a valid SSH repository URL.');
+
+                return;
+            }
         } elseif (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
             // Validate HTTP(S) URL
             if (! filter_var($value, FILTER_VALIDATE_URL)) {
@@ -160,7 +173,7 @@ class ValidGitRepositoryUrl implements ValidationRule
                 return;
             }
         } else {
-            $fail('The :attribute must start with https://, http://, git://, or be an SSH URL (user@host:path).');
+            $fail('The :attribute must start with https://, http://, git://, ssh://, or be an SSH URL (user@host:path).');
 
             return;
         }

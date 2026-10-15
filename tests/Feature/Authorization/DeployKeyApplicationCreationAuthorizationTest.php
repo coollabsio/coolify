@@ -85,6 +85,20 @@ test('admin can select and create an application with a key owned by the current
     expect(Application::query()->sole()->private_key_id)->toBe($this->privateKey->id);
 });
 
+test('deploy key application keeps an ssh url with a custom port', function () {
+    actAsDeployKeyUser($this->admin, $this->team);
+
+    deployKeyComponent()
+        ->call('setPrivateKey', $this->privateKey->id)
+        ->set('repository_url', 'ssh://git@gitea.example.local:2222/myuser/my-repository.git')
+        ->set('branch', 'main')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Application::query()->sole()->git_repository)
+        ->toBe('ssh://git@gitea.example.local:2222/myuser/my-repository.git');
+});
+
 test('member cannot invoke the deploy key selection action directly', function () {
     actAsDeployKeyUser($this->member, $this->team);
     $this->withoutExceptionHandling();

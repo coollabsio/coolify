@@ -137,7 +137,7 @@ class PublicGitRepository extends Component
                 throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
             }
 
-            $httpsRepositoryUrl = scpStyleGitUrlToHttps($this->repository_url);
+            $httpsRepositoryUrl = sshGitUrlToHttps($this->repository_url);
             if (is_string($httpsRepositoryUrl)) {
                 $this->repository_url = $httpsRepositoryUrl;
             }

@@ -731,7 +731,7 @@ class Application extends BaseModel
 
                     return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
                 }
-                $httpsRepository = $this->httpsUrlFromScpStyleGitRepository();
+                $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     if (str($this->git_repository)->contains('bitbucket')) {
                         return "{$httpsRepository}/src/{$this->git_branch}{$base_dir}";
@@ -752,7 +752,7 @@ class Application extends BaseModel
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
                 }
-                $httpsRepository = $this->httpsUrlFromScpStyleGitRepository();
+                $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     return "{$httpsRepository}/settings/hooks";
                 }
@@ -769,7 +769,7 @@ class Application extends BaseModel
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
-                $httpsRepository = $this->httpsUrlFromScpStyleGitRepository();
+                $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     return "{$httpsRepository}/commits/{$this->git_branch}";
                 }
@@ -790,11 +790,9 @@ class Application extends BaseModel
         }
 
         $git_repository = $this->git_repository;
-        $httpsRepository = scpStyleGitUrlToHttps($git_repository);
+        $httpsRepository = sshGitUrlToHttps($git_repository);
         if (is_string($httpsRepository)) {
             $git_repository = $httpsRepository;
-        } elseif (str($this->git_repository)->startsWith('ssh://')) {
-            $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
         }
 
         if (! filter_var($git_repository, FILTER_VALIDATE_URL) || ! in_array(parse_url($git_repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
@@ -809,9 +807,9 @@ class Application extends BaseModel
         return $url->__toString();
     }
 
-    private function httpsUrlFromScpStyleGitRepository(): ?string
+    private function httpsUrlFromSshGitRepository(): ?string
     {
-        $httpsRepository = scpStyleGitUrlToHttps($this->git_repository);
+        $httpsRepository = sshGitUrlToHttps($this->git_repository);
 
         if (! is_string($httpsRepository)) {
             return null;

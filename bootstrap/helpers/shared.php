@@ -4816,8 +4816,15 @@ function parseScpStyleGitUrl(?string $gitRepository): ?array
     ];
 }
 
-function scpStyleGitUrlToHttps(?string $gitRepository): ?string
+function sshGitUrlToHttps(?string $gitRepository): ?string
 {
+    if (is_string($gitRepository) && str_starts_with($gitRepository, 'ssh://')) {
+        $host = parse_url($gitRepository, PHP_URL_HOST);
+        $path = ltrim((string) parse_url($gitRepository, PHP_URL_PATH), '/');
+
+        return filled($host) && $path !== '' ? "https://{$host}/{$path}" : null;
+    }
+
     $parts = parseScpStyleGitUrl($gitRepository);
 
     if ($parts === null) {
@@ -4833,8 +4840,8 @@ function gitRepositorySlug(?string $gitRepository): string
         return '';
     }
 
-    if (($scp = parseScpStyleGitUrl($gitRepository)) !== null) {
-        $gitRepository = $scp['path'];
+    if (($httpsRepository = sshGitUrlToHttps($gitRepository)) !== null) {
+        $gitRepository = (string) parse_url($httpsRepository, PHP_URL_PATH);
     } elseif (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
         $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
     }

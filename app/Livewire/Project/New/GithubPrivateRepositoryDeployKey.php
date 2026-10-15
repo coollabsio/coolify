@@ -229,6 +229,15 @@ class GithubPrivateRepositoryDeployKey extends Component
             return;
         }
 
+        // Keep ssh:// URLs as-is so a custom SSH port is preserved for deployments.
+        if (str_starts_with($this->repository_url, 'ssh://')) {
+            $this->git_host = parse_url($this->repository_url, PHP_URL_HOST);
+            $this->git_repository = $this->repository_url;
+            $this->git_source = 'other';
+
+            return;
+        }
+
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
