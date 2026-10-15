@@ -51,11 +51,11 @@
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password"
                         label="Instance public IPv4"
-                        helper="Set this when Coolify cannot detect the correct public IPv4 address."
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Clear it and restart Coolify to detect it again."
                         placeholder="1.2.3.4" autocomplete="new-password" />
                     <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password"
                         label="Instance public IPv6"
-                        helper="Set this when Coolify cannot detect the correct public IPv6 address."
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Clear it and restart Coolify to detect it again."
                         placeholder="2001:db8::1" autocomplete="new-password" />
                 </div>
             </x-application.settings-section>

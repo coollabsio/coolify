@@ -2677,38 +2677,39 @@ function deduplicateAllowlist(array $entries): array
     return $result;
 }
 
-function get_public_ips()
+/**
+ * Detect the instance public IPs with ifconfig.io. Only empty settings are filled, so an address saved in Settings is kept.
+ */
+function get_public_ips(): void
 {
     try {
-        [$first, $second] = Process::concurrently(function (Pool $pool) {
-            $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
-            $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
-        });
-        $ipv4 = $first->output();
-        if ($ipv4) {
-            $ipv4 = trim($ipv4);
-            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
-            if ($validate_ipv4 == false) {
-                echo "Invalid ipv4: $ipv4\n";
-
-                return;
-            }
-            InstanceSettings::get()->update(['public_ipv4' => $ipv4]);
+        $settings = InstanceSettings::get();
+        $versions = array_filter(
+            ['public_ipv4' => 4, 'public_ipv6' => 6],
+            fn (string $column) => blank($settings->$column),
+            ARRAY_FILTER_USE_KEY,
+        );
+        if ($versions === []) {
+            return;
         }
-    } catch (Exception $e) {
-        echo "Error: {$e->getMessage()}\n";
-    }
-    try {
-        $ipv6 = $second->output();
-        if ($ipv6) {
-            $ipv6 = trim($ipv6);
-            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
-            if ($validate_ipv6 == false) {
-                echo "Invalid ipv6: $ipv6\n";
 
-                return;
+        $results = Process::concurrently(function (Pool $pool) use ($versions) {
+            foreach ($versions as $column => $version) {
+                $pool->as($column)->path(__DIR__)->command("curl -{$version}s https://ifconfig.io");
             }
-            InstanceSettings::get()->update(['public_ipv6' => $ipv6]);
+        });
+
+        foreach ($versions as $column => $version) {
+            $ip = trim($results[$column]->output());
+            if ($ip === '') {
+                continue;
+            }
+            if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) === false) {
+                echo "Invalid ipv{$version}: $ip\n";
+
+                continue;
+            }
+            $settings->update([$column => $ip]);
         }
     } catch (Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
