@@ -154,9 +154,10 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
     }
 
     /**
-     * Reap a detected orphan process. When orphan reaping is disabled (the
-     * default), the orphan is only logged — a dry-run mode that lets operators
-     * verify what would be killed before enabling it for real.
+     * Reap a detected orphan process. When orphan reaping is disabled
+     * (SSH_MUX_ORPHAN_REAP_ENABLED=false, the default), the orphan is only
+     * logged — a dry-run mode that lets operators verify what would be killed
+     * before enabling it for real.
      *
      * @param  array{pid: string, ppid: string, etimes: int, args: string}  $process
      */
@@ -255,8 +256,9 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
     /**
      * Close and delete a stale mux socket file. When orphan reaping is disabled
-     * (the default), the file is only logged — a dry-run mode that lets operators
-     * verify what would be removed before enabling it for real.
+     * (SSH_MUX_ORPHAN_REAP_ENABLED=false, the default), the file is only logged —
+     * a dry-run mode that lets operators verify what would be removed before
+     * enabling it for real.
      */
     private function removeMultiplexFile(string $muxFile, string $reason): void
     {
