@@ -271,7 +271,7 @@ $appListboxOptions = array_merge(
                                 <{{ $appHref ? 'a' : 'div' }} wire:key="analytics-app-{{ $row['uuid'] }}"
                                     @if ($appHref) href="{{ $appHref }}" {{ wireNavigate() }} @endif
                                     data-row="{{ json_encode(['name' => (string) $row['name'], 'requests' => (int) $row['requests'], 'bytesOut' => (int) $row['bandwidth']]) }}"
-                                    x-show="shown($el)" :style="{ order: rank($el) }"
+                                    x-show="shown($el)"
                                     class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
                                     <span class="flex min-w-0 flex-1 items-baseline gap-1.5">
                                         <span class="truncate text-[12px] text-black dark:text-fg">{{ $row['name'] }}</span>

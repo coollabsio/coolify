@@ -49,7 +49,7 @@
                 @endphp
                 <div wire:key="{{ $keyPrefix }}-{{ md5($domain."\n".$pathStr) }}"
                     data-row="{{ json_encode($sort) }}" @if ($isOther) data-pinned @endif
-                    x-show="shown($el)" :style="{ order: rank($el) }"
+                    x-show="shown($el)"
                     class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
                     @if ($isOther)
                         <span class="min-w-0 flex-1 truncate text-[12px] text-neutral-500 dark:text-fg-dim"

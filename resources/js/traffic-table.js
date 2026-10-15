@@ -1,7 +1,8 @@
 // Client-side sort and paging for the traffic analytics lists. Each row carries
-// its sort values as JSON in `data-row`. Rows keep their DOM order; the rank is
-// applied with CSS `order`, so Livewire can still morph them. A morph resets the
-// inline styles and can add or remove rows, so the rows are ranked again after it.
+// its sort values as JSON in `data-row`. Rows are moved in the DOM, so keyboard
+// and screen-reader order match the visual order. A Livewire morph puts the rows
+// back in server order (they are keyed) and can add or remove rows, so the rows
+// are sorted again after it.
 function compareValues(a, b) {
     if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
@@ -80,20 +81,21 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
             // Pinned rows (the "Other" remainder) stay last in each sort.
             rows.sort((a, b) => a.pinned - b.pinned || compareValues(a.value, b.value) * sign || a.index - b.index);
             rows.forEach((row, rank) => ranks.set(row.el, rank));
+            // All rows share one parent. Move them only when the order changed, so the
+            // mutation that the move causes finds them sorted and stops.
+            if (rows.some((row, rank) => row.index !== rank)) {
+                rows.forEach((row) => row.el.parentElement.appendChild(row.el));
+                observer?.takeRecords();
+            }
 
             this.total = rows.length;
             this.page = Math.min(this.page, Math.max(0, Math.ceil(this.total / this.per) - 1));
             this.tick++;
         },
 
-        rank(el) {
-            this.tick;
-
-            return ranks.get(el) ?? 0;
-        },
-
         shown(el) {
-            const rank = this.rank(el);
+            this.tick;
+            const rank = ranks.get(el) ?? 0;
 
             return rank >= this.page * this.per && rank < (this.page + 1) * this.per;
         },

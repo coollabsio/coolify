@@ -47,7 +47,7 @@
                 @endphp
                 <div wire:key="analytics-{{ $dimension }}-{{ md5($value) }}"
                     data-row="{{ json_encode(['name' => $display, 'requests' => $requests, 'bytesOut' => $bytesOut]) }}" @if ($isOther) data-pinned @endif
-                    x-show="shown($el)" :style="{ order: rank($el) }"
+                    x-show="shown($el)"
                     class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
                     @if ($dimension === 'referer' && $host)
                         <img src="{{ refererFaviconUrl($host) }}" alt="" loading="lazy" width="16" height="16"
