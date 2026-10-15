@@ -968,24 +968,61 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $composeFile;
     }
 
+    /**
+     * Pulls the registry images of the Compose services before the current deployment stops. Images that
+     * this deployment builds are not pulled: a pull fails for an image that is only local, and a pull of
+     * an image that is also in a registry replaces the new build with the old registry image.
+     */
     private function pull_docker_compose_images(): void
     {
+        if ($this->docker_compose_custom_build_command && ! $this->use_build_server) {
+            $this->application_deployment_queue->addLogEntry('Skipping the image pull before stopping the current deployment, because the custom build command can build images outside of Docker Compose.');
+
+            return;
+        }
+
+        $services = $this->registry_image_compose_services();
+        if ($services->isEmpty()) {
+            return;
+        }
+
         $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
 
+        $services = $services->map(fn (string $service) => escapeshellarg($service))->implode(' ');
         if ($this->use_build_server) {
             $this->write_deployment_configurations();
             $this->server = $this->mainServer;
             $workdir = $this->application->workdir();
-            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
+            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
         } else {
             $workdir = $this->workdir;
-            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}");
         }
 
         $this->execute_remote_command([
             $command,
             'hidden' => true,
         ]);
+    }
+
+    /**
+     * Returns the names of the Compose services that get their image from a registry. A service with a
+     * `build` section, or a service that uses the image of such a service, gets its image from the build.
+     *
+     * @return Collection<int, string>
+     */
+    private function registry_image_compose_services(): Collection
+    {
+        $services = collect(data_get(Yaml::parse($this->generated_docker_compose), 'services', []));
+        $builtImages = $services->filter(fn ($service) => filled(data_get($service, 'build')))->pluck('image')->filter();
+
+        return $services
+            ->filter(fn ($service) => filled(data_get($service, 'image'))
+                && blank(data_get($service, 'build'))
+                && ! $builtImages->contains(data_get($service, 'image')))
+            ->keys()
+            ->map(fn ($service) => (string) $service)
+            ->values();
     }
 
     /**
