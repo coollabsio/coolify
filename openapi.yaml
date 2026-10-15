@@ -2239,15 +2239,6 @@ paths:
           application/json:
             schema:
               properties:
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name.'
                 github_app_uuid:
                   type: string
                   description: 'The Github App UUID.'
@@ -2260,9 +2251,6 @@ paths:
                 ports_exposes:
                   type: string
                   description: 'The ports to expose.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, railpack, static, dockerfile, dockercompose]
