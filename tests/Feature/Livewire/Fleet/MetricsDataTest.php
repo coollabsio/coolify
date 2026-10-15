@@ -74,6 +74,8 @@ class ProcessTestableMetrics extends Metrics
 }
 
 beforeEach(function () {
+    // The settings hook starts Sentinel when metrics turn on. A sync queue would run it and make a real SSH call.
+    Queue::fake();
     Concurrency::setDefaultInstance('sync');
     StubMetricsClient::$summaries = [];
     StubMetricsClient::$containers = [];
@@ -383,13 +385,22 @@ it('repairs the Sentinel token before creating worker clients', function () {
     expect($token)->not->toBe('invalid token');
 });
 
+/** A server that Coolify can reach, with metrics off. */
+function reachableServerWithoutMetrics(int $teamId, PrivateKey $privateKey): Server
+{
+    $server = Server::factory()->create(['team_id' => $teamId, 'private_key_id' => $privateKey->id]);
+    $server->settings->forceFill(['is_reachable' => true, 'is_usable' => true])->saveQuietly();
+
+    return $server;
+}
+
 it('enables metrics on each eligible server of the team from the empty state', function () {
-    Queue::fake();
-    $first = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $second = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $build = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $first = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $second = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $build = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
     $build->settings->update(['server_role' => 'build', 'is_build_server' => true]);
-    $foreign = Server::factory()->create(['team_id' => Team::factory()->create()->id, 'private_key_id' => $this->privateKey->id]);
+    $unreachable = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $foreign = reachableServerWithoutMetrics(Team::factory()->create()->id, $this->privateKey);
 
     $component = Livewire::test(TestableMetrics::class)
         ->assertSee('Enable metrics on 2 servers')
@@ -398,6 +409,7 @@ it('enables metrics on each eligible server of the team from the empty state', f
     expect($first->settings->fresh()->is_metrics_enabled)->toBeTruthy();
     expect($second->settings->fresh()->is_metrics_enabled)->toBeTruthy();
     expect($build->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    expect($unreachable->settings->fresh()->is_metrics_enabled)->toBeFalsy();
     expect($foreign->settings->fresh()->is_metrics_enabled)->toBeFalsy();
     StartSentinel::assertPushed(2);
 
@@ -406,8 +418,7 @@ it('enables metrics on each eligible server of the team from the empty state', f
 });
 
 it('does not let a team member enable metrics', function () {
-    Queue::fake();
-    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
     $member = User::factory()->create();
     $member->teams()->attach($this->team, ['role' => 'member']);
     $this->actingAs($member);

@@ -112,7 +112,8 @@ class Metrics extends Component
     }
 
     /**
-     * Servers that can report metrics, have them off, and that the user can change.
+     * Servers that can report metrics, have them off, are reachable, and that the user can change.
+     * An unreachable server cannot start Sentinel, so it stays out.
      *
      * @param  Collection<int, Server>  $teamServers
      * @return Collection<int, Server>
@@ -122,7 +123,8 @@ class Metrics extends Component
         return $teamServers
             ->filter(fn (Server $server) => ! $server->isMetricsEnabled()
                 && $server->isSentinelEnabled()
-                && auth()->user()->can('update', $server))
+                && auth()->user()->can('update', $server)
+                && $server->isFunctional())
             ->values();
     }
 

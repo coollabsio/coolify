@@ -15,7 +15,8 @@ class FakeBrowserFleetMetricsClient extends SentinelMetricsClient
     {
         $usage = [
             'alpha' => ['cpu' => 10.0, 'memUsed' => 80],
-            'bravo' => ['cpu' => 90.0, 'memUsed' => 20],
+            // bravo runs an older Sentinel that does not send the load.
+            'bravo' => ['cpu' => 90.0, 'memUsed' => 20, 'load1' => null],
         ][$this->server->name] ?? null;
 
         // charlie does not answer.
@@ -64,7 +65,7 @@ beforeEach(function () {
     }
     foreach ($servers as $server) {
         // Saved quietly, so the settings hook does not start Sentinel.
-        $server->settings->forceFill(['is_metrics_enabled' => true])->saveQuietly();
+        $server->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
     }
 
     app()->bind(SentinelMetricsClient::class, fn ($app, array $parameters) => new FakeBrowserFleetMetricsClient($parameters['server']));
@@ -97,6 +98,16 @@ it('sorts the servers and containers tables when a column header is selected', f
     expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['alpha', 'bravo', 'charlie']);
 
     // A second click reverses the direction. The offline server stays last.
+    $page->click('#metrics-servers-section button[title="Sort by memory"]');
+    expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['bravo', 'alpha', 'charlie']);
+
+    // A server without a value stays after the servers with one, in both directions.
+    $page->click('#metrics-servers-section button[title="Sort by load"]');
+    expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['alpha', 'bravo', 'charlie']);
+    $page->click('#metrics-servers-section button[title="Sort by load"]');
+    expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['alpha', 'bravo', 'charlie']);
+
+    $page->click('#metrics-servers-section button[title="Sort by memory"]');
     $page->click('#metrics-servers-section button[title="Sort by memory"]');
     expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['bravo', 'alpha', 'charlie']);
 

@@ -74,11 +74,13 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
                     values = {};
                 }
 
-                return { el, index, pinned: 'pinned' in el.dataset ? 1 : 0, value: values[this.key] ?? '' };
+                const value = values[this.key] ?? null;
+
+                return { el, index, pinned: 'pinned' in el.dataset ? 1 : 0, missing: value === null ? 1 : 0, value };
             });
 
-            // Pinned rows (the "Other" remainder) stay last in each sort.
-            rows.sort((a, b) => a.pinned - b.pinned || compareValues(a.value, b.value) * sign || a.index - b.index);
+            // Pinned rows (the "Other" remainder) stay last in each sort, then rows without a value.
+            rows.sort((a, b) => a.pinned - b.pinned || a.missing - b.missing || compareValues(a.value, b.value) * sign || a.index - b.index);
             rows.forEach((row, rank) => ranks.set(row.el, rank));
 
             this.total = rows.length;
