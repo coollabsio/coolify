@@ -155,7 +155,7 @@
                     <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
                         :options="$avatar_storage_options" />
                     <x-forms.input id="image_cdn_url" label="Image CDN URL"
-                        helper="Optional public CDN URL for profile pictures and project icons stored on S3. Leave empty to use the S3 endpoint." placeholder="https://images.example.com" />
+                        helper="Optional public URL (for example a CDN or public bucket domain) that serves profile pictures and project icons stored on S3. Leave empty to serve them through Coolify." placeholder="https://images.example.com" />
                 </div>
                 @if (count($avatar_storage_options) === 1)
                     <x-callout type="info" title="No usable S3 storage configured" class="mt-4">
