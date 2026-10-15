@@ -5701,13 +5701,14 @@ function deviceLabel(?string $device): string
 }
 
 /**
- * Prepare Sentinel `city` breakdown rows (`CC|subdivision|City`) for display,
+ * Prepare aggregated `city` breakdown rows (`CC|subdivision|City`, from
+ * TrafficAnalyticsAggregator::breakdowns(), not raw Sentinel rows) for display,
  * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
  * "BE, Germany"). `CC||` (sent by older Sentinel builds) is an unknown city of
  * that country. `__other__` and malformed values are merged into one "Other"
  * row, which stays last. Returns [] when no row has a real city.
  *
- * @param  iterable<int, mixed>  $rows
+ * @param  iterable<int, array{value?: string, requests?: int, bytesOut?: int, lat?: float, lon?: float}>  $rows
  * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
  */
 function trafficCityRows(iterable $rows): array
