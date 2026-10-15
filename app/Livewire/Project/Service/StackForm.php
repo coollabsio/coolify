@@ -183,6 +183,7 @@ class StackForm extends Component
             $this->dispatch('refreshEnvs')->to(EditCompose::class);
             $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('refreshServices');
+            $this->dispatch('refreshStorages');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
             // On error, refresh from database to restore clean state
