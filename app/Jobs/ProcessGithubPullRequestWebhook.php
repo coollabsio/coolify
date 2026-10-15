@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
@@ -127,21 +128,34 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Get changed files for watch path filtering
-        $changed_files = collect();
+        // Get changed files for watch path filtering (null means the full list is unknown)
+        $changed_files = [];
 
         if ($this->action === 'synchronize' && $this->beforeSha && $this->afterSha) {
             // For synchronize events, get files changed between before and after commits
-            $changed_files = collect(getGithubCommitRangeFiles($githubApp, $owner, $repo, $this->beforeSha, $this->afterSha));
+            $changed_files = getGithubCommitRangeFiles($githubApp, $owner, $repo, $this->beforeSha, $this->afterSha);
         } elseif ($this->action === 'opened' || $this->action === 'reopened') {
             // For opened/reopened events, get all files in the PR
-            $changed_files = collect(getGithubPullRequestFiles($githubApp, $owner, $repo, $this->pullRequestId));
+            $changed_files = getGithubPullRequestFiles($githubApp, $owner, $repo, $this->pullRequestId);
         }
 
         // Apply watch path filtering
-        $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-        if (! $is_watch_path_triggered && ! blank($application->watch_paths)) {
-            return;
+        if (! blank($application->watch_paths)) {
+            $logContext = [
+                'application_uuid' => $application->uuid,
+                'pull_request_id' => $this->pullRequestId,
+                'action' => $this->action,
+            ];
+
+            if (is_null($changed_files)) {
+                Log::warning('Could not get the full list of changed files from GitHub. Deploying the pull request preview without the watch paths check.', $logContext);
+            } elseif (! $application->isWatchPathsTriggered(collect($changed_files))) {
+                Log::info('Skipped GitHub pull request preview deployment because no changed file matches the watch paths.', $logContext + [
+                    'changed_files_count' => count($changed_files),
+                ]);
+
+                return;
+            }
         }
 
         // Create ApplicationPreview if not exists

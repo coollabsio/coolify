@@ -260,6 +260,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $source = data_get($this->application, 'source');
         if ($source) {
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
+            // Share one source instance so the job reuses its in-memory GitHub installation token.
+            $this->application->setRelation('source', $this->source);
         }
         $this->server = Server::find($this->application_deployment_queue->server_id);
         $this->timeout = $this->server->settings->dynamic_timeout;
