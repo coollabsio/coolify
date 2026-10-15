@@ -282,7 +282,7 @@ it('shows the copy status of each destination in the execution lists', function 
     }
 
     Livewire::test(BackupExecutions::class, ['backup' => $databaseBackup])
-        ->assertSeeInOrder(['First S3 Available', 'Second S3 Failed'])
+        ->assertSeeInOrder(['First S3', 'Second S3 failed'])
         ->assertSee('Access denied')
         ->assertSee('Delete the selected backup permanently from every S3 storage');
 

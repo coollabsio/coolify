@@ -2,6 +2,9 @@
     @if (count($pendingDownloads) > 0)
         <div wire:poll.3s="checkDownloads" class="hidden"></div>
     @endif
+    @if ($executions->onFirstPage())
+        <div wire:poll.5000ms class="hidden"></div>
+    @endif
     @if ($selectedExecution)
         <x-modal-input title="Backup execution" wireOpen="executionModalOpen" :wireIgnore="false" isLarge>
             <x-slot:content><span></span></x-slot:content>

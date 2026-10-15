@@ -9,8 +9,8 @@
     @auth
         <div x-data="{
             open: false,
-            // New users start collapsed.
-            collapsed: localStorage.getItem('sidebarCollapsed') !== 'false',
+            // New users start expanded.
+            collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
             pageWidth: localStorage.getItem('pageWidth') || 'centered',
             sidebarReady: false,
             init() {

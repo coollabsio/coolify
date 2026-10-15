@@ -77,7 +77,7 @@
         [
             'label' => 'Sentinel',
             'route' => 'server.sentinel',
-            'active' => request()->routeIs('server.sentinel', 'server.sentinel.*'),
+            'active' => $activeMenu === 'sentinel',
             'icon' => 'shield-star',
             'group' => 'Platform',
             'visible' => ! $server->isSwarm() && $server->canHostResources() && auth()->user()?->can('viewSentinel', $server),
@@ -85,8 +85,8 @@
             'warning' => $server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
             'tracks_sentinel_status' => true,
             'children' => [
-                ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
-                ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],
+                ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
+                ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => $activeSubMenu === 'logs', 'icon' => 'file-content'],
             ],
         ],
         [
@@ -182,13 +182,13 @@
         [
             'label' => 'Security',
             'route' => 'server.security.patches',
-            'active' => request()->routeIs('server.security.*'),
+            'active' => $activeMenu === 'security',
             'icon' => 'shield-alert',
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
             'children' => [
-                ['label' => 'Server Patching', 'route' => 'server.security.patches', 'active' => request()->routeIs('server.security.patches'), 'icon' => 'bandage'],
-                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => request()->routeIs('server.security.terminal-access'), 'icon' => 'browser-terminal', 'navigate' => false],
+                ['label' => 'Server Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage'],
+                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
             ],
         ],
         [

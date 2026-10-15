@@ -1,4 +1,4 @@
-@props(['service', 'currentRoute', 'navOnly' => false])
+@props(['service', 'currentRoute', 'navOnly' => false, 'storageSections' => collect()])
 
 @php
     $serviceRouteParameters = [
@@ -89,6 +89,19 @@
                             <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                         @endif
                     </a>
+                    @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
+                        <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                            x-data="{ activeSection: '' }">
+                            @foreach ($storageSections as $section)
+                                <button type="button" class="menu-subitem"
+                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                    @click="activeSection = '{{ $section['id'] }}'; window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                    <span class="menu-item-label truncate text-left"
+                                        title="{{ $section['label'] }}">{{ $section['label'] }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
                 @endforeach
             </div>
         @endforeach

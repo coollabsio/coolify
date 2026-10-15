@@ -6,6 +6,7 @@ use App\Livewire\Concerns\ManagesDatabaseBackup;
 use App\Livewire\Project\Database\BackupEdit;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,7 @@ use Livewire\Features\SupportRedirects\Redirector;
 class Execution extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
     use ManagesDatabaseBackup;
 
     public $database;
@@ -42,7 +44,13 @@ class Execution extends Component
             $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = '$refresh';
         }
 
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners([
+                'ServiceChecked' => '$refresh',
+                'ServiceStatusChanged' => '$refresh',
+            ]),
+        ];
     }
 
     public function mount()

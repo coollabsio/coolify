@@ -17,6 +17,9 @@
         @endcan
     @endif
     @if ($section === 'executions')
+        @if ($backup && $executions->onFirstPage())
+            <div wire:poll.5000ms class="hidden"></div>
+        @endif
         @include('livewire.project.shared.storages.volume-backups.executions')
     @elseif ($section === 'danger')
         @include('livewire.project.shared.storages.volume-backups.danger')

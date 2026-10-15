@@ -11,6 +11,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
 use App\Traits\PreparesBackupDownloads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -25,6 +26,7 @@ use Throwable;
 class VolumeBackups extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
     use PreparesBackupDownloads;
     use WithPagination;
 
@@ -71,6 +73,15 @@ class VolumeBackups extends Component
     public int $missingBackupNotificationDays = 0;
 
     public int $perPage = 10;
+
+    public function getListeners(): array
+    {
+        if ($this->section !== 'executions') {
+            return [];
+        }
+
+        return $this->teamChannelListeners(['BackupCreated' => '$refresh']);
+    }
 
     public function updatedPerPage(): void
     {

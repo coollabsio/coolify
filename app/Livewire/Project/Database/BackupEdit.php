@@ -115,7 +115,10 @@ class BackupEdit extends Component
 
         return [
             ...$listeners,
-            ...$this->teamChannelListeners(['ServiceChecked' => 'refreshStatus']),
+            ...$this->teamChannelListeners([
+                'ServiceChecked' => 'refreshStatus',
+                'ServiceStatusChanged' => 'refreshStatus',
+            ]),
         ];
     }
 

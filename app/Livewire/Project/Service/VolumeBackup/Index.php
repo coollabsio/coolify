@@ -45,6 +45,7 @@ class Index extends Component
             'modalClosed' => 'closeScheduleModal',
             ...$this->teamChannelListeners([
                 'ServiceChecked' => '$refresh',
+                'ServiceStatusChanged' => '$refresh',
                 'BackupCreated' => '$refresh',
             ]),
         ];

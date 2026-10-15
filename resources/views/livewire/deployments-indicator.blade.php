@@ -2,7 +2,7 @@
      polling for the copy hidden by the current breakpoint (a display:none element has no box). --}}
 <div wire:poll.3000ms.visible x-data="{ expanded: false }" x-on:click.outside="expanded = false"
     x-on:keydown.escape.window="expanded = false" @class(['relative' => $variant === 'topbar'])>
-    @if ($this->deploymentCount > 0)
+    @if ($this->deploymentCount > 0 && ! $this->isOnlyCurrentApplicationDeploying)
         @php
             $deploymentLabel = $this->deploymentCount.' '.Str::plural('deployment', $this->deploymentCount);
         @endphp
