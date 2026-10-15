@@ -2684,36 +2684,44 @@ function get_public_ips(): void
 {
     try {
         $settings = InstanceSettings::get();
-        $versions = array_filter(
-            ['public_ipv4' => 4, 'public_ipv6' => 6],
-            fn (string $column) => blank($settings->$column),
-            ARRAY_FILTER_USE_KEY,
-        );
-        if ($versions === []) {
+        $columns = array_values(array_filter(['public_ipv4', 'public_ipv6'], fn (string $column) => blank($settings->$column)));
+        if ($columns === []) {
             return;
         }
 
-        $results = Process::concurrently(function (Pool $pool) use ($versions) {
-            foreach ($versions as $column => $version) {
-                $pool->as($column)->path(__DIR__)->command("curl -{$version}s https://ifconfig.io");
-            }
-        });
-
-        foreach ($versions as $column => $version) {
-            $ip = trim($results[$column]->output());
-            if ($ip === '') {
-                continue;
-            }
-            if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) === false) {
-                echo "Invalid ipv{$version}: $ip\n";
-
-                continue;
-            }
-            $settings->update([$column => $ip]);
+        $detected = detect_public_ips($columns);
+        if ($detected !== []) {
+            $settings->update($detected);
         }
     } catch (Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
     }
+}
+
+/**
+ * Look up the public IPs of this host with ifconfig.io, without saving them.
+ *
+ * @param  list<'public_ipv4'|'public_ipv6'>  $columns
+ * @return array<'public_ipv4'|'public_ipv6', string> valid addresses only
+ */
+function detect_public_ips(array $columns = ['public_ipv4', 'public_ipv6']): array
+{
+    $versions = array_intersect_key(['public_ipv4' => 4, 'public_ipv6' => 6], array_flip($columns));
+    $results = Process::concurrently(function (Pool $pool) use ($versions) {
+        foreach ($versions as $column => $version) {
+            $pool->as($column)->path(__DIR__)->command("curl -{$version}s https://ifconfig.io");
+        }
+    });
+
+    $detected = [];
+    foreach ($versions as $column => $version) {
+        $ip = trim($results[$column]->output());
+        if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) !== false) {
+            $detected[$column] = $ip;
+        }
+    }
+
+    return $detected;
 }
 
 function isAnyDeploymentInprogress(bool $showAll = false)
