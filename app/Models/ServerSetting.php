@@ -319,7 +319,9 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
-        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+        // The local Sentinel runs on the coolify network. A host gateway URL leaves that network
+        // through the host INPUT chain, where host firewalls such as UFW drop it.
+        if ($this->server->isLocalhost() && strtolower((string) parse_url((string) $url, PHP_URL_HOST)) === 'host.docker.internal') {
             $url = null;
         }
 
