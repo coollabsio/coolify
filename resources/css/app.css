@@ -2952,13 +2952,14 @@ input[type="search"]::-webkit-search-results-decoration {
     width: 100%;
 }
 
-.data-table-row.service-backup-table-grid {
-    background: var(--coollabs-base);
-    border-bottom: 1px solid var(--coollabs-fill);
+.data-table-header.service-backup-table-grid {
+    border-bottom: 0;
 }
 
-.data-table-row.service-backup-table-grid:last-child {
-    border-bottom: 0;
+/* Rows are reordered with CSS order, so dividers must not depend on DOM position. */
+.data-table-row.service-backup-table-grid {
+    background: var(--coollabs-base);
+    border-top: 1px solid var(--coollabs-fill);
 }
 
 .data-table-row.service-backup-table-grid:hover {
