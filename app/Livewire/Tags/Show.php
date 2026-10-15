@@ -7,6 +7,7 @@ use App\Livewire\Concerns\CreatesTags;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
+use App\Services\TagCanvas;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -40,6 +41,9 @@ class Show extends Component
 
     #[Locked]
     public ?array $deploymentsPerTagPerServer = null;
+
+    /** The "Connect to resources" modal on small screens, where the tags canvas is not shown. */
+    public bool $connectResourcesOpen = false;
 
     public function mount()
     {
@@ -123,9 +127,39 @@ class Show extends Component
         }
     }
 
+    public function openConnectResources(): void
+    {
+        $this->connectResourcesOpen = true;
+    }
+
     /**
-     * Creates a tag without resources. Tag resources on the tags canvas or on the resource.
+     * Adds the tag to a resource of the tag's team, or removes it when the resource already has it.
      */
+    public function toggleResource(string $uuid): void
+    {
+        try {
+            $resource = app(TagCanvas::class)->resources($this->tag->team_id)->get($uuid);
+            if (! $resource) {
+                $this->dispatch('error', 'Resource not found.');
+
+                return;
+            }
+            $this->authorize('update', $resource);
+
+            if ($resource->tags->contains('id', $this->tag->id)) {
+                $resource->tags()->detach($this->tag->id);
+            } else {
+                $resource->tags()->attach($this->tag->id);
+            }
+
+            $this->applications = $this->tag->applications()->get();
+            $this->services = $this->tag->services()->get();
+            $this->getDeployments();
+        } catch (\Exception $e) {
+            handleError($e, $this);
+        }
+    }
+
     /**
      * Deletes the tag and removes it from every resource.
      */
@@ -158,6 +192,30 @@ class Show extends Component
                     'resourceCount' => $applicationsCount + $servicesCount,
                 ];
             })->values()->toArray(),
+            'connectableResources' => $this->connectableResources(),
         ]);
+    }
+
+    /**
+     * Resources of the tag's team for the "Connect to resources" modal, by "Project / Environment".
+     * Loaded only while the modal is open.
+     *
+     * @return Collection<string, Collection<int, array{uuid: string, name: string, tagged: bool, can_update: bool}>>
+     */
+    private function connectableResources(): Collection
+    {
+        if (! $this->connectResourcesOpen || ! $this->tag) {
+            return collect();
+        }
+
+        return app(TagCanvas::class)->resources($this->tag->team_id)
+            ->groupBy(fn ($resource) => $resource->environment->project->name.' / '.$resource->environment->name)
+            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)
+            ->map(fn (Collection $resources) => $resources->map(fn ($resource) => [
+                'uuid' => $resource->uuid,
+                'name' => $resource->name,
+                'tagged' => $resource->tags->contains('id', $this->tag->id),
+                'can_update' => auth()->user()->can('update', $resource),
+            ])->values());
     }
 }

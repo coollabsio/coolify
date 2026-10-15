@@ -2,6 +2,7 @@
 
 use App\Livewire\Dashboard;
 use App\Models\InstanceSettings;
+use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,4 +42,14 @@ it('remembers the view of each dashboard section on its own', function () {
         ->assertOk()
         ->assertSee("viewMode: 'grid'", false)
         ->assertSee("viewMode: 'table'", false);
+});
+
+it('links to all projects only when the dashboard hides some of them', function () {
+    Project::factory()->count(8)->create(['team_id' => $this->team->id]);
+
+    Livewire::test(Dashboard::class)->assertDontSee(route('project.index'), false);
+
+    Project::factory()->create(['team_id' => $this->team->id]);
+
+    Livewire::test(Dashboard::class)->assertSee(route('project.index'), false);
 });

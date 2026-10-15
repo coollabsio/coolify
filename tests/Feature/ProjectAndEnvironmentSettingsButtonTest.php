@@ -35,7 +35,7 @@ test('project show page header links to project settings', function () {
     $editUrl = route('project.edit', ['project_uuid' => $this->project->uuid]);
 
     Livewire::test(ProjectShow::class, ['project_uuid' => $this->project->uuid])
-        ->assertSee('Settings')
+        ->assertSee('Open settings for Test Project', false)
         ->assertSee('Project settings', false)
         ->assertSeeHtml($editUrl);
 });
@@ -51,7 +51,7 @@ test('environment resources page header links to environment settings', function
         'environment_uuid' => $this->environment->uuid,
     ]))
         ->assertSuccessful()
-        ->assertSee('Settings')
+        ->assertSee('Open settings for '.$this->environment->name, false)
         ->assertSee('Environment settings', false)
         ->assertSee($editUrl, false);
 });

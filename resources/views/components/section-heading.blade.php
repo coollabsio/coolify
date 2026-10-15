@@ -14,7 +14,7 @@
     puts a small control (such as a + button) right after the title.
 --}}
 <div {{ $attributes->merge(['class' => 'mb-3 min-w-0']) }}>
-    <div class="flex items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div class="flex min-w-0 items-baseline gap-2">
             <div class="flex min-w-0 items-center gap-1">
                 <h2 class="min-w-0 truncate text-[14px]! leading-5! font-semibold! text-black dark:text-fg">
@@ -29,7 +29,7 @@
             @endif
         </div>
         @isset($actions)
-            <div class="flex shrink-0 items-center gap-3">
+            <div class="ml-auto flex shrink-0 items-center gap-3">
                 @if (filled($href))
                     @include('components.section-heading-link')
                 @endif

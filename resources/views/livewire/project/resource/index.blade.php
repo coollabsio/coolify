@@ -5,13 +5,26 @@
     <div x-data="resourceIndex()" class="w-full">
         <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
-                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>
+                <div class="flex min-w-0 items-center gap-1.5">
+                    <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>
+                    @can('update', $project)
+                        <a href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                            {{ wireNavigate() }}
+                            class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                            title="Environment settings"
+                            aria-label="Open settings for {{ $environment->name }}">
+                            <x-reicon name="settings" class="size-4" />
+                        </a>
+                    @endcan
+                </div>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
                     <span x-text="`${resources.length} ${resources.length === 1 ? 'resource' : 'resources'}`"></span>
-                    in {{ $project->name }}
+                    in <a href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
+                        class="font-medium text-neutral-700 underline-offset-2 hover:text-black hover:underline dark:text-fg dark:hover:text-white"
+                        title="Show all environments in {{ $project->name }}">{{ $project->name }}</a>
                 </p>
             </div>
-            <div class="flex w-fit shrink-0 items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2 sm:shrink-0">
                 @if ($environment->isEmpty())
                     {{-- The list toolbar (with its canvas switch) is hidden when there are no resources. --}}
                     <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]"
@@ -25,16 +38,6 @@
                     <x-reicon name="variables" class="size-3.5" />
                     Shared variables
                 </a>
-                @can('update', $project)
-                    <a href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
-                        {{ wireNavigate() }}
-                        class="button whitespace-nowrap"
-                        title="Environment settings"
-                        aria-label="Open settings for {{ $environment->name }}">
-                        <x-reicon name="settings" class="size-3.5" />
-                        Settings
-                    </a>
-                @endcan
                 @can('createAnyResource')
                     <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                         {{ wireNavigate() }}
@@ -79,7 +82,7 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <x-table.dropdown panel-class="w-64! overflow-hidden! p-0!" :multiselectable="true">
                         <x-slot:trigger>
                             <button type="button" class="button max-w-64"

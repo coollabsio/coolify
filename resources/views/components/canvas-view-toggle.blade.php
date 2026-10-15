@@ -1,7 +1,7 @@
 @props(['listUrl' => null, 'canvasUrl' => null, 'onCanvas' => false, 'views' => null])
 @php
     $idle = 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg dark:hover:bg-white/[0.06] dark:hover:text-fg';
-    $canvasItem = 'relative flex h-7.5 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors';
+    $canvasItem = 'relative flex h-7.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[12px] font-medium transition-colors';
     $views ??= ['table' => ['Table view', 'unordered-list'], 'grid' => ['Grid view', 'grid']];
     // One list view (no table / grid choice): nothing to switch to on the list page.
     $singleList = count($views) === 1;

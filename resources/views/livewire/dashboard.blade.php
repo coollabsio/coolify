@@ -84,7 +84,7 @@
             }
         }">
             <x-section-heading title="Projects"
-                :href="route('project.index')">
+                :href="$projects->count() > $dashboardItemLimit ? route('project.index') : null">
                 {{-- Projects has no sidebar entry, so the dashboard is where new projects start. --}}
                 @can('createAnyResource')
                     <x-slot:titleAction>
@@ -272,7 +272,7 @@
             }
         }">
             <x-section-heading title="Servers"
-                :href="route('server.index')">
+                :href="$servers->count() > $dashboardItemLimit ? route('server.index') : null">
                 @can('createAnyResource')
                     <x-slot:titleAction>
                         <a href="{{ route('server.create') }}" {{ wireNavigate() }} class="{{ $titleIconButton }}"
