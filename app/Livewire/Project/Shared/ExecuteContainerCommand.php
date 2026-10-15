@@ -76,9 +76,6 @@ class ExecuteContainerCommand extends Component
             $this->type = 'service';
             $this->resource = Service::ownedByCurrentTeam()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->resource);
-            if (! $this->resource->isRunning()) {
-                $this->containersLoaded = true;
-            }
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
@@ -140,7 +137,7 @@ class ExecuteContainerCommand extends Component
                     }
                 });
                 $this->resource->databases()->get()->each(function ($database) {
-                    if ($database->isRunning()) {
+                    if ($database->isRunning() && $this->resource->server->isTerminalEnabled()) {
                         $this->containers->push([
                             'server' => $this->resource->server,
                             'container' => [
