@@ -12154,6 +12154,10 @@ paths:
                 docker_compose_raw:
                   type: string
                   description: 'The base64 encoded Docker Compose content.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'Connect the service to the predefined docker network.'
                 urls:
                   type: array
                   description: 'Array of URLs to be applied to containers of a service.'

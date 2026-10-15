@@ -308,6 +308,7 @@ class ServicesController extends Controller
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
                         'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
+                        'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
                         'urls' => [
                             'type' => 'array',
                             'description' => 'Array of URLs to be applied to containers of a service.',
@@ -388,7 +389,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -416,6 +417,7 @@ class ServicesController extends Controller
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
+            'connect_to_docker_network' => 'boolean',
             'urls' => 'array|nullable',
             'urls.*' => 'array:name,url',
             'urls.*.name' => 'string|required',
@@ -544,7 +546,7 @@ class ServicesController extends Controller
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
                 ];
-                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
+                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK) || $request->boolean('connect_to_docker_network')) {
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
                 $service = new Service($servicePayload);
