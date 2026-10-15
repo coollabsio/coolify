@@ -86,6 +86,9 @@ class ServerTransferExporter
         if (! $privateKey instanceof PrivateKey) {
             throw new RuntimeException('Server has no private key to export.');
         }
+        if ((int) $privateKey->team_id !== (int) $server->team_id) {
+            throw new RuntimeException('The server private key does not belong to the server team. Select a private key of this team first.');
+        }
 
         if (! $includeSensitive) {
             throw new RuntimeException('Server transfer export requires sensitive data access (read:sensitive).');
@@ -100,7 +103,10 @@ class ServerTransferExporter
         $this->assertNoAdditionalDestinations($server, $applications);
 
         $projectIds = $this->collectProjectIds($applications, $databases, $services);
-        $projects = Project::query()->whereIn('id', $projectIds)->orderBy('name')->get();
+        $projects = Project::query()->where('team_id', $server->team_id)->whereIn('id', $projectIds)->orderBy('name')->get();
+        if ($projects->count() !== collect($projectIds)->unique()->count()) {
+            throw new RuntimeException('Some resources on this server belong to a project of another team. Move them to a project of this team first.');
+        }
 
         $destinationUuidByKey = $this->destinationUuidMap($server);
         $dependencies = $this->collectDependencies($server, $applications, $databases, $services);
@@ -159,6 +165,7 @@ class ServerTransferExporter
      */
     private function collectDependencies(Server $server, Collection $applications, Collection $databases, Collection $services): array
     {
+        $teamId = $server->team_id;
         $privateKeys = collect([$server->privateKey])->filter();
         $githubApps = collect();
         $gitlabApps = collect();
@@ -166,38 +173,29 @@ class ServerTransferExporter
 
         foreach ($applications as $application) {
             if ($application->private_key_id) {
-                $key = PrivateKey::find($application->private_key_id);
-                if ($key) {
-                    $privateKeys->push($key);
-                }
+                $privateKeys->push($this->findTeamRecord(PrivateKey::class, $application->private_key_id, $teamId, 'private key'));
             }
 
             if ($application->source_type === GithubApp::class && $application->source_id !== null) {
-                $gh = GithubApp::find($application->source_id);
+                $gh = $this->findGitSource(GithubApp::class, $application->source_id, $teamId);
                 // System-wide GitHub Apps are instance-owned; do not copy them.
                 // Application export still records source.uuid so import can re-link
                 // to an existing system-wide app on the target instance.
                 if ($gh && ! $gh->is_system_wide) {
                     $githubApps->push($gh);
                     if ($gh->private_key_id) {
-                        $pk = PrivateKey::find($gh->private_key_id);
-                        if ($pk) {
-                            $privateKeys->push($pk);
-                        }
+                        $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gh->private_key_id, $teamId, 'private key'));
                     }
                 }
             }
 
             if ($application->source_type === GitlabApp::class && $application->source_id !== null) {
-                $gl = GitlabApp::find($application->source_id);
+                $gl = $this->findGitSource(GitlabApp::class, $application->source_id, $teamId);
                 // System-wide GitLab Apps are instance-owned; re-link by UUID on import.
                 if ($gl && ! $gl->is_system_wide) {
                     $gitlabApps->push($gl);
                     if ($gl->private_key_id) {
-                        $pk = PrivateKey::find($gl->private_key_id);
-                        if ($pk) {
-                            $privateKeys->push($pk);
-                        }
+                        $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gl->private_key_id, $teamId, 'private key'));
                     }
                 }
             }
@@ -264,19 +262,64 @@ class ServerTransferExporter
 
         $cloudTokens = collect();
         if ($server->cloud_provider_token_id) {
-            $token = CloudProviderToken::find($server->cloud_provider_token_id);
-            if ($token) {
-                $cloudTokens->push($token);
-            }
+            $cloudTokens->push($this->findTeamRecord(CloudProviderToken::class, $server->cloud_provider_token_id, $teamId, 'cloud provider token'));
         }
 
         return [
             'private_keys' => $privateKeys->unique('id')->values(),
             'github_apps' => $githubApps->unique('id')->values(),
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
-            's3_storages' => S3Storage::query()->whereIn('id', $s3Ids->unique()->filter()->all())->get(),
+            's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
+    }
+
+    /**
+     * Load a credential record that must belong to the server team. A record of another team is
+     * never exported, so a broken reference stops the export instead of leaking its secrets.
+     *
+     * @template T of Model
+     *
+     * @param  class-string<T>  $modelClass
+     * @return T
+     */
+    private function findTeamRecord(string $modelClass, int|string $id, int $teamId, string $label): Model
+    {
+        $record = $modelClass::query()->where('team_id', $teamId)->find($id);
+        if (! $record) {
+            throw new RuntimeException("A {$label} used on this server does not belong to the server team. Select a {$label} of this team first.");
+        }
+
+        return $record;
+    }
+
+    /**
+     * System-wide git sources are returned as they are (they are only linked by UUID, never exported).
+     *
+     * @param  class-string<GithubApp|GitlabApp>  $modelClass
+     */
+    private function findGitSource(string $modelClass, int|string $id, int $teamId): GithubApp|GitlabApp|null
+    {
+        $source = $modelClass::find($id);
+        if ($source && ! $source->is_system_wide && (int) $source->team_id !== $teamId) {
+            throw new RuntimeException('A git source used on this server does not belong to the server team. Select a git source of this team first.');
+        }
+
+        return $source;
+    }
+
+    /**
+     * @param  list<int|string>  $ids
+     * @return Collection<int, S3Storage>
+     */
+    private function findTeamS3Storages(array $ids, int $teamId): Collection
+    {
+        $storages = S3Storage::query()->where('team_id', $teamId)->whereIn('id', $ids)->get();
+        if ($storages->count() !== count($ids)) {
+            throw new RuntimeException('An S3 storage used by a backup on this server does not belong to the server team. Select an S3 storage of this team first.');
+        }
+
+        return $storages;
     }
 
     /**
@@ -402,12 +445,16 @@ class ServerTransferExporter
             'name' => $server->name,
             'description' => $server->description,
             'ip' => (string) $server->ip,
-            'port' => (int) $server->port,
+            'port' => $server->port ?: 22,
             'user' => (string) $server->user,
             'proxy' => $server->proxy?->toArray() ?? [],
             'server_role' => $server->settings->effectiveServerRole()->value,
             'is_build_server' => $server->isBuildServer(),
             'cloud_provider_token_uuid' => $server->cloudProviderToken?->uuid,
+            'hetzner_server_id' => $server->hetzner_server_id,
+            'vultr_instance_id' => $server->vultr_instance_id,
+            'digitalocean_droplet_id' => $server->digitalocean_droplet_id,
+            'hostinger_virtual_machine_id' => $server->hostinger_virtual_machine_id,
             'settings' => $settingsPayload,
         ];
     }

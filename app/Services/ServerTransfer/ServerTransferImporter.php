@@ -3,6 +3,7 @@
 namespace App\Services\ServerTransfer;
 
 use App\Enums\ServerRole;
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -37,9 +38,12 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
+use App\Rules\ValidServerIp;
+use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
@@ -117,6 +121,13 @@ class ServerTransferImporter
         bool $adoptMode = true,
     ): array {
         ServerTransferBundle::assertValid($bundle);
+        $this->assertValidServerPayload((array) data_get($bundle, 'server', []));
+
+        if ($adoptMode && ! $preserveUuids) {
+            throw ValidationException::withMessages([
+                'preserve_uuids' => ['Adopt mode keeps the running containers, so it needs the original UUIDs. Import with preserve_uuids=true.'],
+            ]);
+        }
 
         $validation = ServerTransferBundle::validate($bundle);
         $warnings = $validation['warnings'];
@@ -127,27 +138,18 @@ class ServerTransferImporter
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $serverIp = (string) data_get($bundle, 'server.ip');
 
-        $uuidConflict = Server::withTrashed()->where('uuid', $serverUuid)->exists() && $preserveUuids;
-        $existingIp = Server::where('ip', Server::normalizeIp($serverIp))->first();
-        $ipConflict = $existingIp !== null;
+        $uuidConflict = $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
+        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->exists();
 
-        if (! $dryRun && $uuidConflict) {
-            throw ValidationException::withMessages([
-                'server.uuid' => ["A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false."],
-            ]);
-        }
-
-        if (! $dryRun && $ipConflict) {
-            throw ValidationException::withMessages([
-                'server.ip' => ["A server with IP/domain {$serverIp} already exists (uuid={$existingIp->uuid}). Complete handoff on the source instance first."],
-            ]);
+        if (! $dryRun) {
+            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
         }
 
         if ($uuidConflict) {
             $warnings[] = "A server with UUID {$serverUuid} already exists on this instance.";
         }
         if ($ipConflict) {
-            $warnings[] = "A server with IP/domain {$serverIp} already exists (uuid={$existingIp->uuid}).";
+            $warnings[] = "A server with IP/domain {$serverIp} already exists on this instance.";
         }
 
         $created = [
@@ -358,6 +360,8 @@ class ServerTransferImporter
                 try {
                     $result['claim'] = app(ServerTransferClaimer::class)->claim($server);
                     $result['claimed'] = true;
+                    // Same check as the Validate button. A running proxy and Docker are kept as they are.
+                    ValidateAndInstallServerJob::dispatch($server);
                 } catch (Throwable $e) {
                     $result['claimed'] = false;
                     $result['claim'] = null;
@@ -367,6 +371,102 @@ class ServerTransferImporter
         }
 
         return $result;
+    }
+
+    /**
+     * Check the server connection fields with the same rules as the create server API.
+     *
+     * @param  array<string, mixed>  $server
+     */
+    private function assertValidServerPayload(array $server): void
+    {
+        Validator::make($server, [
+            'name' => 'nullable|string|max:255',
+            'ip' => ['required', 'string', new ValidServerIp],
+            'port' => 'required|integer|between:1,65535',
+            'user' => ValidationPatterns::serverUsernameRules(required: false),
+        ], [], [
+            'ip' => 'server.ip',
+            'port' => 'server.port',
+            'user' => 'server.user',
+        ])->validate();
+    }
+
+    /**
+     * Checks that a server can be imported into the team, without the bundle. Every check runs, so the
+     * source instance can show which checks are OK and which failed.
+     *
+     * @return list<array{field: string, label: string, ok: bool, message: string|null}>
+     */
+    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): array
+    {
+        $team = Team::find($teamId);
+        $limitReached = ! $team || Team::serverLimitReached($team);
+
+        $existingServer = $preserveUuids ? Server::withTrashed()->where('uuid', $serverUuid)->first() : null;
+        // A server that comes back keeps an archived copy of itself here from the first transfer.
+        $uuidMessage = match (true) {
+            $existingServer === null => null,
+            $existingServer->trashed() => "The server with UUID {$serverUuid} is still being deleted on this instance. Wait a minute, then transfer again.",
+            $existingServer->isTransferredAway() => "This instance still has the archived copy of server {$existingServer->name} from an earlier transfer. Delete that server on this instance first (this deletes only its records here, nothing on the server), then transfer again.",
+            default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
+        };
+
+        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->exists();
+
+        return [
+            [
+                'field' => 'server',
+                'label' => 'the team can have one more server',
+                'ok' => ! $limitReached,
+                'message' => $limitReached ? 'Server limit reached for your subscription.' : null,
+            ],
+            [
+                'field' => 'server.uuid',
+                'label' => 'no server with the same UUID exists',
+                'ok' => $uuidMessage === null,
+                'message' => $uuidMessage,
+            ],
+            [
+                'field' => 'server.ip',
+                'label' => 'no server with the same IP exists',
+                'ok' => ! $ipExists,
+                'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
+            ],
+        ];
+    }
+
+    /**
+     * @throws ValidationException with the first failed import check
+     */
+    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): void
+    {
+        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids) as $check) {
+            if (! $check['ok']) {
+                throw ValidationException::withMessages([$check['field'] => [$check['message']]]);
+            }
+        }
+    }
+
+    /**
+     * Running containers are found by the resource UUID. In adopt mode a new UUID would leave them
+     * without a resource, so a conflict stops the import instead.
+     *
+     * @param  class-string<Model>  $modelClass
+     */
+    private function resolveResourceUuid(string $modelClass, string $uuid, bool $adoptMode, string $label): string
+    {
+        if (! $modelClass::withTrashed()->where('uuid', $uuid)->exists()) {
+            return $uuid;
+        }
+
+        if ($adoptMode) {
+            throw ValidationException::withMessages([
+                'bundle' => ["The {$label} UUID {$uuid} is already used on this instance. Delete that {$label} permanently first, because adopt mode needs the same UUID to keep the running containers."],
+            ]);
+        }
+
+        return new_public_id();
     }
 
     /**
@@ -450,6 +550,10 @@ class ServerTransferImporter
             'private_key_id' => $privateKey->id,
             'team_id' => $teamId,
             'cloud_provider_token_id' => $cloudTokenId,
+            'hetzner_server_id' => data_get($payload, 'hetzner_server_id'),
+            'vultr_instance_id' => data_get($payload, 'vultr_instance_id'),
+            'digitalocean_droplet_id' => data_get($payload, 'digitalocean_droplet_id'),
+            'hostinger_virtual_machine_id' => data_get($payload, 'hostinger_virtual_machine_id'),
         ]);
         $server->uuid = $uuid;
         $server->save();
@@ -750,9 +854,7 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
-        if (Application::withTrashed()->where('uuid', $uuid)->exists()) {
-            $uuid = new_public_id();
-        }
+        $uuid = $this->resolveResourceUuid(Application::class, $uuid, $adoptMode, 'application');
 
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type'], $attributes['source_id'], $attributes['source_type'], $attributes['private_key_id']);
@@ -832,12 +934,9 @@ class ServerTransferImporter
         int $teamId = 0,
     ): ?Model {
         $type = (string) data_get($payload, 'type', 'StandalonePostgresql');
-        $modelClass = self::DATABASE_MODELS[$type]
-            ?? (is_string(data_get($payload, 'model')) && class_exists((string) data_get($payload, 'model'))
-                ? (string) data_get($payload, 'model')
-                : null);
+        $modelClass = self::DATABASE_MODELS[$type] ?? null;
 
-        if (! $modelClass || ! class_exists($modelClass)) {
+        if (! $modelClass) {
             throw new RuntimeException("Unsupported database type: {$type}");
         }
 
@@ -846,9 +945,7 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
-        if ($modelClass::withTrashed()->where('uuid', $uuid)->exists()) {
-            $uuid = new_public_id();
-        }
+        $uuid = $this->resolveResourceUuid($modelClass, $uuid, $adoptMode, 'database');
 
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type']);
@@ -900,9 +997,7 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
-        if (Service::withTrashed()->where('uuid', $uuid)->exists()) {
-            $uuid = new_public_id();
-        }
+        $uuid = $this->resolveResourceUuid(Service::class, $uuid, $adoptMode, 'service');
 
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type'], $attributes['server_id']);

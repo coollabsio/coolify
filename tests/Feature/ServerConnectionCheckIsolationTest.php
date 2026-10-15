@@ -5,6 +5,7 @@ use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -242,4 +243,50 @@ it('gives the job enough time for every connection check step', function () {
 
     expect($job->timeout)->toBeGreaterThanOrEqual(ServerConnectionCheckJob::maximumCheckSeconds())
         ->and($lock->expiresAfter)->toBeGreaterThan($job->timeout);
+});
+
+it('stops managing a server when its owner marker names another instance', function () {
+    $server = createServerForConnectionIsolationTest([
+        'ip' => '203.0.113.10',
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance']]],
+    ]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    Process::fake([
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-instance-b","instance_url":"https://coolify-b.test"}', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+
+    $server->refresh();
+    expect($server->isTransferredAway())->toBeTrue()
+        ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://coolify-b.test')
+        ->and((bool) $server->settings->force_disabled)->toBeTrue();
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'docker version'));
+});
+
+it('keeps managing a server when its owner marker is its own claim', function () {
+    $server = createServerForConnectionIsolationTest([
+        'ip' => '203.0.113.10',
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance']]],
+    ]);
+    Process::fake([
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-this-instance"}', exitCode: 0),
+        '*compose*' => Process::result(output: 'v2.32.4', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+
+    $server->refresh();
+    expect($server->isTransferredAway())->toBeFalse()
+        ->and((bool) $server->settings->is_usable)->toBeTrue();
+});
+
+it('passes the SSH probe on a server without an owner marker', function () {
+    // The remote shell runs the probe with `set -e`, like this.
+    $result = Process::input(ServerConnectionCheckJob::probeCommand())->run(['sh', '-se']);
+
+    expect(file_exists(ServerTransferClaimer::OWNER_MARKER_PATH))->toBeFalse()
+        ->and($result->exitCode())->toBe(0);
 });

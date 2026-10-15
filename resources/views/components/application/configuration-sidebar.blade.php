@@ -159,7 +159,7 @@
             'Git Source' => 'sources',
             'Servers' => 'servers',
             'Scheduled Tasks' => 'calendar',
-            'Webhooks' => 'notifications',
+            'Webhooks' => 'webhook',
             'Preview Deployments' => 'eye',
             'Healthcheck' => 'feedback',
             'Rollback' => 'time-back',
@@ -178,7 +178,6 @@
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
-            // Always last, after a divider and without a group header.
             'Danger Zone' => ['Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)
@@ -187,9 +186,6 @@
                 ->filter()
                 ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
-
-        // Group that holds the current page — always kept open, even if collapsed before.
-        $activeGroup = (string) $groupedMenuItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
         // In-page sections (cards) shown as sub-items under the active page
         $isComposeApp = $application->build_pack === 'dockercompose';
@@ -274,7 +270,6 @@
 ]) data-settings-search-items="{{ json_encode($settingsSearchItems) }}">
 @endif
                 <nav aria-label="Configuration sections"
-                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.application' })"
                     @class([
                         'grid gap-0.5',
                         'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
@@ -285,18 +280,6 @@
                             <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                                 aria-hidden="true"></div>
                         @endunless
-                        @unless ($groupLabel === 'Danger Zone')
-                        <button type="button" class="nav-section-toggle hidden xl:flex"
-                            @click="toggle(@js($groupLabel))" :aria-expanded="isOpen(@js($groupLabel))">
-                            <span>{{ $groupLabel }}</span>
-                            <svg class="size-3 shrink-0 opacity-60 transition-transform"
-                                :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
-                        @endunless
-                        <div @class(['contents', 'xl:block' => $groupLabel === 'Danger Zone']) @unless ($groupLabel === 'Danger Zone') :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'" @endunless>
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
                             <div wire:key="{{ $placement }}-application-settings-group-{{ str($menuItem['label'])->slug() }}">
@@ -336,7 +319,6 @@
                                 @endif
                             </div>
                         @endforeach
-                        </div>
                     @endforeach
                 </nav>
             @if ($placement === 'main-nav')

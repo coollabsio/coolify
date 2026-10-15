@@ -56,7 +56,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if ($this->deleteFromCoolifyOnly && $this->resource instanceof Service) {
+        if ($this->deleteFromCoolifyOnly) {
             // No remote calls on this path: remove only the schedule records, so the scheduler does
             // not keep running backups of volumes that no longer exist in Coolify.
             $this->volumeBackupSchedules()->each->delete();

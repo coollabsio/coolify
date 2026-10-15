@@ -46,6 +46,16 @@ class Delete extends Component
             $this->delete_from_hostinger = in_array('delete_from_hostinger', $selectedActions);
             $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
         }
+        // Another Coolify instance manages a transferred server. This instance deletes only its own records:
+        // never the VM, and never the containers that the other instance runs.
+        $isArchive = $this->server->isTransferredAway();
+        if ($isArchive) {
+            $this->delete_from_hetzner = false;
+            $this->delete_from_vultr = false;
+            $this->delete_from_digitalocean = false;
+            $this->delete_from_hostinger = false;
+            $this->force_delete_resources = true;
+        }
         try {
             $this->authorize('delete', $this->server);
             if ($this->server->is_coolify_host) {
@@ -61,7 +71,7 @@ class Delete extends Component
 
             if ($this->force_delete_resources) {
                 foreach ($this->server->definedResources() as $resource) {
-                    DeleteResourceJob::dispatch($resource);
+                    DeleteResourceJob::dispatch($resource, deleteFromCoolifyOnly: $isArchive);
                 }
             }
 
@@ -90,7 +100,7 @@ class Delete extends Component
     {
         $checkboxes = [];
 
-        if ($this->server->hasDefinedResources()) {
+        if ($this->server->hasDefinedResources() && ! $this->server->isTransferredAway()) {
             $resourceCount = $this->server->definedResources()->count();
             $checkboxes[] = [
                 'id' => 'force_delete_resources',
@@ -99,7 +109,9 @@ class Delete extends Component
             ];
         }
 
-        if ($this->server->hetzner_server_id) {
+        $canDeleteFromProvider = ! $this->server->isTransferredAway();
+
+        if ($canDeleteFromProvider && $this->server->hetzner_server_id) {
             $checkboxes[] = [
                 'id' => 'delete_from_hetzner',
                 'label' => 'Also delete server from Hetzner Cloud',
@@ -107,7 +119,7 @@ class Delete extends Component
             ];
         }
 
-        if ($this->server->vultr_instance_id) {
+        if ($canDeleteFromProvider && $this->server->vultr_instance_id) {
             $checkboxes[] = [
                 'id' => 'delete_from_vultr',
                 'label' => 'Also delete server from Vultr',
@@ -115,7 +127,7 @@ class Delete extends Component
             ];
         }
 
-        if ($this->server->digitalocean_droplet_id) {
+        if ($canDeleteFromProvider && $this->server->digitalocean_droplet_id) {
             $checkboxes[] = [
                 'id' => 'delete_from_digitalocean',
                 'label' => 'Also delete droplet from DigitalOcean',
@@ -123,7 +135,7 @@ class Delete extends Component
             ];
         }
 
-        if ($this->server->hostinger_virtual_machine_id) {
+        if ($canDeleteFromProvider && $this->server->hostinger_virtual_machine_id) {
             $checkboxes[] = [
                 'id' => 'delete_from_hostinger',
                 'label' => 'Also delete VPS from Hostinger (at the end of the paid period)',

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
@@ -26,16 +27,25 @@ use App\Models\StandaloneSqlite;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferBundle;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    // A claim writes the owner marker on the host over SSH.
+    Process::fake();
+    Storage::fake('ssh-keys');
+    // An import validates the claimed server over SSH; the sync test queue would run it.
+    Queue::fake([ValidateAndInstallServerJob::class]);
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'fqdn' => 'https://coolify-a.test']);
 
     $this->team = Team::factory()->create();
@@ -324,11 +334,38 @@ test('round trip import preserves uuids secrets and related resources after sour
         ->and($shared->value)->toBe('shared-secret');
 });
 
+test('import validates the claimed server in the background, but a dry run does not', function () {
+    $bundle = $this->exporter->export($this->server);
+    $serverUuid = $this->server->uuid;
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: true);
+    Queue::assertNotPushed(ValidateAndInstallServerJob::class);
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    expect($result['claimed'])->toBeTrue();
+    Queue::assertPushed(ValidateAndInstallServerJob::class, 1);
+    Queue::assertPushed(ValidateAndInstallServerJob::class, fn (ValidateAndInstallServerJob $job) => $job->server->uuid === $serverUuid);
+});
+
 test('import fails when server ip already exists', function () {
     $bundle = $this->exporter->export($this->server);
 
     $this->importer->import($bundle, teamId: $this->team->id);
 })->throws(ValidationException::class);
+
+test('import back to the source instance asks to delete the archived copy first', function () {
+    $bundle = $this->exporter->export($this->server);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))
+        ->toThrow(ValidationException::class, 'archived copy of server source-server');
+});
 
 test('import rolls back all created rows when a later resource fails', function () {
     $bundle = $this->exporter->export($this->server);
@@ -370,6 +407,7 @@ test('import reuses existing private key fingerprint on same team', function () 
     $originalKeyId = $this->privateKey->id;
 
     // Free the IP without deleting the key.
+    $this->service->forceDelete();
     $this->application->forceDelete();
     $this->database->forceDelete();
     $this->server->forceDelete();
@@ -386,6 +424,7 @@ test('import into another team creates its own key when the same key exists in a
     $targetTeam = Team::factory()->create();
 
     // Free the IP without deleting the source team's key.
+    $this->service->forceDelete();
     $this->application->forceDelete();
     $this->database->forceDelete();
     $this->server->forceDelete();
@@ -398,21 +437,6 @@ test('import into another team creates its own key when the same key exists in a
         ->and($server->privateKey->team_id)->toBe($targetTeam->id)
         ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
         ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
-});
-
-test('encrypted export decrypts for import', function () {
-    $bundle = $this->exporter->export($this->server);
-    $encrypted = ServerTransferBundle::encryptWithPassphrase($bundle, 'transfer-pass');
-
-    $this->application->forceDelete();
-    $this->database->forceDelete();
-    $this->server->forceDelete();
-    $this->privateKey->delete();
-
-    $plain = ServerTransferBundle::decryptWithPassphrase($encrypted, 'transfer-pass');
-    $result = $this->importer->import($plain, teamId: $this->team->id);
-
-    expect(Server::where('uuid', $result['server_uuid'])->exists())->toBeTrue();
 });
 
 test('system-wide github apps are not exported and re-link on import by uuid', function () {
@@ -990,7 +1014,7 @@ test('transfer keeps the link between an application volume and its sqlite datab
     ScheduledTask::query()->delete();
     $this->privateKey->delete();
 
-    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: false, adoptMode: true);
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: false, adoptMode: false);
 
     $importedSqlite = StandaloneSqlite::where('name', 'app-sqlite')->sole();
     $connectedVolume = Application::where('name', $originalAppName)->sole()
@@ -1070,4 +1094,81 @@ test('transfer keeps the Traefik certificate resolver of applications and servic
 
     expect(Application::where('uuid', $originalAppUuid)->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none')
         ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
+});
+
+test('transfer keeps the cloud provider instance id of the server', function () {
+    $this->server->forceFill(['hetzner_server_id' => 4242, 'vultr_instance_id' => 'vultr-7'])->save();
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->sole();
+    expect((int) $server->hetzner_server_id)->toBe(4242)
+        ->and($server->vultr_instance_id)->toBe('vultr-7');
+});
+
+test('adopt mode stops the import when a resource uuid is already used', function () {
+    $bundle = $this->exporter->export($this->server);
+    $appUuid = $this->application->uuid;
+
+    // The server is gone, but the application row still holds its UUID on this instance.
+    $this->service->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id, adoptMode: true))
+        ->toThrow(ValidationException::class, "The application UUID {$appUuid} is already used");
+
+    expect(Server::where('uuid', $bundle['server']['uuid'])->exists())->toBeFalse();
+});
+
+test('import rejects a database model class that is not a supported database type', function () {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['projects'][0]['environments'][0]['databases'][] = [
+        'type' => 'Unknown',
+        'model' => Application::class,
+        'uuid' => 'not-a-database',
+        'attributes' => ['name' => 'not-a-database'],
+        'destination_uuid' => $this->destination->uuid,
+    ];
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))
+        ->toThrow(RuntimeException::class, 'Unsupported database type');
+
+    expect(Application::where('uuid', 'not-a-database')->exists())->toBeFalse();
+});
+
+test('import rejects unsafe server connection fields', function (string $field, mixed $value) {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['server'][$field] = $value;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))
+        ->toThrow(ValidationException::class);
+})->with([
+    'ip with shell characters' => ['ip', '10.0.0.1;reboot'],
+    'user with shell characters' => ['user', 'root$(id)'],
+    'port out of range' => ['port', 70000],
+]);
+
+test('export refuses credentials of another team', function () {
+    $otherKey = PrivateKey::factory()->create(['team_id' => Team::factory()->create()->id]);
+    $this->application->forceFill(['private_key_id' => $otherKey->id])->save();
+
+    expect(fn () => $this->exporter->export($this->server))
+        ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });

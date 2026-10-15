@@ -17,7 +17,11 @@
                     <x-danger-zone title="This action cannot be undone">
                         <p>
                         The server will be removed from Coolify.
-                        @if ($server->definedResources()->count() > 0)
+                        @if ($server->isTransferredAway())
+                            This server was transferred to another Coolify instance. Only the records on this instance
+                            are deleted, also the records of its resources. The server, its containers, and its data
+                            stay as they are.
+                        @elseif ($server->definedResources()->count() > 0)
                             It currently contains managed resources. Enable force deletion in the confirmation only
                             if those resources should also be removed.
                         @endif
@@ -30,7 +34,9 @@
                         <p>Type the server name in the confirmation dialog to continue.</p>
                         <x-slot:action>
                         @php
-                            $deleteActions = ['This server will be permanently deleted from Coolify.'];
+                            $deleteActions = $server->isTransferredAway()
+                                ? ['This server and the records of its resources will be permanently deleted from this Coolify instance. Nothing on the server changes.']
+                                : ['This server will be permanently deleted from Coolify.'];
                             $deleteWarningMessage = null;
                             if ($server->hostinger_virtual_machine_id) {
                                 $deleteWarningMessage = '<strong>Hostinger deletes a VPS only at the end of its paid period.</strong><br>'

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Livewire\Server\Navbar;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -11,7 +12,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
 });
 
 function makeNavbarServer(bool $isFunctional): array
@@ -97,4 +98,23 @@ it('refreshes sentinel status when sentinel restarts for the server', function (
         ->assertSee('In sync')
         ->assertDontSee('Out of sync')
         ->assertDispatched('sentinel-status-changed');
+});
+
+it('does not render the floating action panel when the server has no proxy actions', function () {
+    [$server] = makeNavbarServer(isFunctional: false);
+
+    Livewire::test('server.navbar', ['server' => $server])
+        ->assertDontSeeHtml('x-teleport="#resource-action-hud-slot"');
+});
+
+it('renders the floating action panel with proxy actions for a functional server', function () {
+    [$server] = makeNavbarServer(isFunctional: true);
+    $server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value]])->save();
+    $server = $server->fresh();
+
+    expect($server->proxySet())->toBeTrue();
+
+    Livewire::test('server.navbar', ['server' => $server])
+        ->assertSeeHtml('x-teleport="#resource-action-hud-slot"')
+        ->assertSee('Refresh Proxy Status');
 });
