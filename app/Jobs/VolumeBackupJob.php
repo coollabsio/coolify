@@ -407,9 +407,13 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             ->implode(' ');
         $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
         $destination = 'temporary/'.$s3->bucket.$backupLocation;
+        // `mc pipe --quiet` panics in recent mc releases, so keep its progress bar out of the error output instead.
+        // Each progress frame starts with "\r", so printing the last field per line keeps only the final frame and real errors.
+        $mcPipeLog = '/tmp/mc-pipe.log';
         $streamScript = 'set -o pipefail; mc alias set'.$resolveOptions.' temporary '
             .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret)
-            .' >/dev/null && ('.$archiveScript.' | mc pipe --quiet'.$resolveOptions.' '.escapeshellarg($destination).' >/dev/null)'
+            .' >/dev/null && ('.$archiveScript.' | mc pipe'.$resolveOptions.' '.escapeshellarg($destination).' >/dev/null 2>'.$mcPipeLog
+            .' || { status=$?; awk -F '.escapeshellarg('\r').' '.escapeshellarg('{ print $NF }').' '.$mcPipeLog.' >&2; exit $status; })'
             .' && mc stat --json'.$resolveOptions.' '.escapeshellarg($destination)
             .' | sed -n '.escapeshellarg('s/.*"size":\([0-9][0-9]*\).*/\1/p');
 

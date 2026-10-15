@@ -2023,8 +2023,10 @@ it('streams S3-only volume backups without creating or copying a local archive',
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
+        && ! str_contains($process->command, '--quiet')
         && str_contains($process->command, '>/dev/null && (compressor=')
-        && str_contains($process->command, '>/dev/null) && mc stat')
+        && str_contains($process->command, '>/dev/null 2>/tmp/mc-pipe.log || {')
+        && str_contains($process->command, '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
         && str_contains($process->command, 'temporary/bucket/')
         && str_contains($process->command, $expectedFilename)
         && substr_count($process->command, '--resolve') === 3
