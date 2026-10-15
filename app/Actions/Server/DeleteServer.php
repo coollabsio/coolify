@@ -108,7 +108,7 @@ class DeleteServer
 
             // Notify the team about the failure
             $team = Team::find($teamId);
-            $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, $e->getMessage()));
+            $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, remove_iip($e->getMessage())));
         }
     }
 

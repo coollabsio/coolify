@@ -76,7 +76,7 @@
 
                 <x-backup-tabs context="service-schedule" :parameters="$parameters" section="general" />
 
-                @foreach (['general', 's3', 'retention', 'danger'] as $modalSection)
+                @foreach (['general', 'danger'] as $modalSection)
                     <div x-show="activeSection === '{{ $modalSection }}'" x-cloak>
                         @if ($selectedDatabaseBackup)
                             <livewire:project.database.backup-edit :backup="$selectedDatabaseBackup"

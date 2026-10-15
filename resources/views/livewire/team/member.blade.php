@@ -7,10 +7,15 @@
     ])>
     <div>
         <div class="flex items-center gap-2">
-            <div
-                class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-[11px] font-semibold text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
-                {{ Str::upper(Str::substr($member->name ?: $member->email, 0, 1)) }}
-            </div>
+            @if ($member->avatar_path)
+                <img src="{{ profile_avatar_url($member) }}" alt="{{ $member->name }}"
+                    class="size-7 shrink-0 rounded-lg object-cover">
+            @else
+                <div
+                    class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-[11px] font-semibold text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                    {{ Str::upper(Str::substr($member->name ?: $member->email, 0, 1)) }}
+                </div>
+            @endif
             <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $member->name }}</span>
             @if ($member->id === Auth::id())
                 <span
@@ -35,52 +40,54 @@
     <div class="flex justify-end">
         @can('manageMembers', currentTeam())
             @if ($member->id !== Auth::id())
-                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false"
-                    @click.outside="open = false">
-                    <button type="button" class="button h-7! px-2.5! text-[11px]!" @click="open = !open"
-                        aria-haspopup="menu" :aria-expanded="open">
+                <div x-data="{ open: false }" @keydown.escape.window="open = false">
+                    <button type="button" class="button h-7! px-2.5! text-[11px]!" x-ref="trigger"
+                        @click="open = !open" aria-haspopup="menu" :aria-expanded="open">
                         Manage
                     </button>
-                    <div x-show="open" x-cloak role="menu"
-                        class="listbox-panel top-full! right-0! left-auto! mt-1! w-36! min-w-0!">
-                        @if (Auth::user()->isOwner())
-                            @if (data_get($member, 'pivot.role') !== 'owner')
-                                <button type="button" class="listbox-option justify-start!" wire:click="makeOwner"
-                                    @click="open = false">
-                                    Make owner
-                                </button>
+                    <template x-teleport="body">
+                        <div x-show="open" x-cloak role="menu" x-anchor.bottom-end.fixed.offset.4="$refs.trigger"
+                            @click.outside="if (! $refs.trigger.contains($event.target)) open = false"
+                            class="listbox-panel w-36! min-w-0! z-50!">
+                            @if (Auth::user()->isOwner())
+                                @if (data_get($member, 'pivot.role') !== 'owner')
+                                    <button type="button" class="listbox-option justify-start!" wire:click="makeOwner"
+                                        @click="open = false">
+                                        Make owner
+                                    </button>
+                                @endif
+                                @if (data_get($member, 'pivot.role') !== 'admin')
+                                    <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
+                                        @click="open = false">
+                                        Make admin
+                                    </button>
+                                @endif
+                                @if (data_get($member, 'pivot.role') !== 'member')
+                                    <button type="button" class="listbox-option justify-start!"
+                                        wire:click="makeReadonly" @click="open = false">
+                                        Make member
+                                    </button>
+                                @endif
+                            @elseif (Auth::user()->isAdmin())
+                                @if (data_get($member, 'pivot.role') === 'admin')
+                                    <button type="button" class="listbox-option justify-start!"
+                                        wire:click="makeReadonly" @click="open = false">
+                                        Make member
+                                    </button>
+                                @elseif (data_get($member, 'pivot.role') === 'member')
+                                    <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
+                                        @click="open = false">
+                                        Make admin
+                                    </button>
+                                @endif
                             @endif
-                            @if (data_get($member, 'pivot.role') !== 'admin')
-                                <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
-                                    @click="open = false">
-                                    Make admin
-                                </button>
-                            @endif
-                            @if (data_get($member, 'pivot.role') !== 'member')
-                                <button type="button" class="listbox-option justify-start!"
-                                    wire:click="makeReadonly" @click="open = false">
-                                    Make member
-                                </button>
-                            @endif
-                        @elseif (Auth::user()->isAdmin())
-                            @if (data_get($member, 'pivot.role') === 'admin')
-                                <button type="button" class="listbox-option justify-start!"
-                                    wire:click="makeReadonly" @click="open = false">
-                                    Make member
-                                </button>
-                            @elseif (data_get($member, 'pivot.role') === 'member')
-                                <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
-                                    @click="open = false">
-                                    Make admin
-                                </button>
-                            @endif
-                        @endif
-                        <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
-                        <button type="button" class="listbox-option justify-start! text-error! hover:text-error!"
-                            wire:click="remove" @click="open = false">
-                            Remove member
-                        </button>
-                    </div>
+                            <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
+                            <button type="button" class="listbox-option justify-start! text-error! hover:text-error!"
+                                wire:click="remove" @click="open = false">
+                                Remove member
+                            </button>
+                        </div>
+                    </template>
                 </div>
             @endif
         @endcan

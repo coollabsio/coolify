@@ -13,6 +13,7 @@ use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
 use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -188,6 +189,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
+            $warning = $warning === null ? null : $this->redact($warning);
             $this->execution->update([
                 'status' => 'success',
                 'message' => $warning,
@@ -203,7 +205,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 Log::channel('scheduled-errors')->warning('Volume backup retention cleanup failed', [
                     'backup_id' => $this->backup->id,
                     'execution_id' => $this->execution->id,
-                    'error' => $exception->getMessage(),
+                    'error' => $this->redact($exception->getMessage()),
                 ]);
             }
         } catch (Throwable $exception) {
@@ -234,14 +236,17 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->execution->update([
                 'status' => 'failed',
-                'message' => $exception->getMessage().$recoveryError,
+                'message' => $this->redact($exception->getMessage().$recoveryError),
                 'filename' => $streamToS3
                     ? ($s3CleanupPending ? $backupLocation : null)
                     : ($archiveDeleted && ! $s3CleanupPending ? null : $backupLocation),
                 'local_storage_deleted' => $archiveDeleted,
             ]);
 
-            throw $exception;
+            $safeMessage = $this->redact($exception->getMessage());
+            throw $safeMessage === $exception->getMessage()
+                ? $exception
+                : new \RuntimeException($safeMessage, (int) $exception->getCode());
         } finally {
             if (! $failed && $this->occurrenceUuid) {
                 app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
@@ -285,7 +290,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $execution->update([
                 'status' => 'failed',
-                'message' => ($exception?->getMessage() ?? 'Volume backup timed out or was terminated.').$recoveryError,
+                'message' => $this->redact(($exception?->getMessage() ?? 'Volume backup timed out or was terminated.').$recoveryError),
                 'finished_at' => now(),
                 'filename' => $filename,
                 'local_storage_deleted' => $localStorageDeleted,
@@ -294,8 +299,27 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->backup->team?->notify(new BackupFailed(
             $this->backup,
-            $exception?->getMessage() ?? 'Volume backup timed out or was terminated.',
+            $this->redact($exception?->getMessage() ?? 'Volume backup timed out or was terminated.'),
         ));
+    }
+
+    /**
+     * Redact the key and secret of every S3 destination of the backup from text that is stored or sent in notifications.
+     */
+    private function redact(string $text): string
+    {
+        try {
+            $s3 = $this->backup->s3;
+            $lockedSecrets = [$s3?->key, $s3?->secret];
+            foreach ($this->backup->selectedS3Storages() as $storage) {
+                $lockedSecrets[] = $storage->key;
+                $lockedSecrets[] = $storage->secret;
+            }
+        } catch (Throwable) {
+            return SensitiveDataRedactor::FAILURE_MESSAGE;
+        }
+
+        return app(SensitiveDataRedactor::class)->redactText($text, lockedSecrets: array_filter($lockedSecrets, fn ($secret): bool => is_string($secret) && $secret !== ''));
     }
 
     /**
@@ -376,8 +400,9 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->uploadToS3($replica->s3, $backupLocation, $backupDirectory, $server);
                 $replica->update(['s3_uploaded' => true, 'message' => null]);
             } catch (Throwable $exception) {
-                $replica->update(['s3_uploaded' => false, 'message' => $exception->getMessage()]);
-                $errors[] = ($replica->s3?->name ?? 'Deleted storage').': '.$exception->getMessage();
+                $message = $this->redact($exception->getMessage());
+                $replica->update(['s3_uploaded' => false, 'message' => $message]);
+                $errors[] = ($replica->s3?->name ?? 'Deleted storage').': '.$message;
             }
         }
 

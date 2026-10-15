@@ -137,7 +137,7 @@
                             </span>
 
                             <span class="flex items-center justify-end gap-1">
-                                @if ($execution->status === 'success' && ! $execution->local_storage_deleted)
+                                @if ($execution->status === 'success' && $execution->isDownloadable())
                                     <button type="button" class="icon-button shrink-0"
                                         x-on:click="download_volume_backup_file('{{ $execution->id }}')"
                                         title="Download backup" aria-label="Download backup">

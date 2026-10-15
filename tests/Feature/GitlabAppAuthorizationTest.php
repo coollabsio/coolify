@@ -104,7 +104,8 @@ describe('GitLab App authorization', function () {
         expect($this->gitlabApp->refresh()->is_system_wide)->toBeFalse();
     });
 
-    test('team owner can update a gitlab app via instantSave', function () {
+    test('instance admin team owner can update a gitlab app via instantSave', function () {
+        Team::factory()->create(['id' => 0])->members()->attach($this->owner->id, ['role' => 'owner']);
         $this->actingAs($this->owner);
         session(['currentTeam' => $this->team]);
 
@@ -154,6 +155,7 @@ describe('GitLab App authorization', function () {
     });
 
     test('instantSave rejects unsafe GitLab URLs', function (string $url) {
+        Team::factory()->create(['id' => 0])->members()->attach($this->owner->id, ['role' => 'owner']);
         $this->actingAs($this->owner);
         session(['currentTeam' => $this->team]);
 

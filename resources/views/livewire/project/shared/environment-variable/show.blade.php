@@ -88,6 +88,12 @@
             @endforeach
         @endif
         <div class="flex items-center gap-0.5 justify-self-end">
+            @if ($this->connectLink)
+                <a href="{{ $this->connectLink }}" class="icon-button shrink-0"
+                    title="Connect {{ $key }} to resources" aria-label="Connect {{ $key }} to resources">
+                    <x-reicon name="link" class="size-3.5" />
+                </a>
+            @endif
             @if (! $isLocked && ! $isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endif
@@ -270,6 +276,12 @@
                                 @endcan
                             </div>
                             <div class="ml-auto flex flex-wrap gap-2" data-environment-variable-update-actions>
+                                @if ($this->connectLink)
+                                    <a href="{{ $this->connectLink }}" class="button" title="Add this variable to resources, and see which resources use it">
+                                        <x-reicon name="link" class="size-3.5" />
+                                        Connect to resources
+                                    </a>
+                                @endif
                                 @if ($canUpdate && !$isLocked && !$isMagicVariable)
                                     <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
                                 @endif

@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import laravel from "laravel-vite-plugin";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "");
@@ -47,6 +48,8 @@ export default defineConfig(({ mode }) => {
                 ],
                 refresh: true,
             }),
+            // Svelte 5 (runes) for the canvases: resources/js/canvas/.
+            svelte(),
         ],
     };
 });

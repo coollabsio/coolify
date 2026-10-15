@@ -24,10 +24,11 @@
     $hasAnyDeployments = $hasActiveDeployments || $hasRecentDeployments;
 @endphp
 
-<div wire:poll.3000ms="refreshDeployments" @class(['mb-0! min-w-0' => $hasAnyDeployments, 'hidden' => ! $hasAnyDeployments])>
+<div wire:poll.3000ms="refreshDeployments" @class(['min-w-0', 'mb-0!' => $hasAnyDeployments, 'hidden' => ! $hasAnyDeployments])>
     @if ($hasAnyDeployments)
-        <section class="mb-0! min-w-0">
-            <x-section-heading title="Deployments" subtitle="Active and recent deployment activity" />
+        {{-- Container breakpoints: the table needs room, which the dashboard column may not have. --}}
+        <section class="@container mb-0! min-w-0">
+            <x-section-heading title="Deployments" />
 
             <div class="flex min-w-0 flex-col gap-4">
                 @if ($hasActiveDeployments)
@@ -43,7 +44,7 @@
                         </div>
 
                         <div
-                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 @2xl:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <span>Application</span>
                             <span>Environment</span>
                             <span>Server</span>
@@ -61,7 +62,7 @@
 
                             <a wire:key="dashboard-active-deployment-{{ $deployment->deployment_uuid }}"
                                 href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
-                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
+                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 @2xl:grid @2xl:items-center @2xl:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
                                 <div class="min-w-0">
                                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                         {{ $deployment->application_name }}
@@ -73,20 +74,20 @@
                                     @endif
                                 </div>
 
-                                <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $environmentPath ?: '-' }}
                                 </p>
-                                <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $deployment->server_name ?: '-' }}
                                 </p>
-                                <span class="hidden md:block">
+                                <span class="hidden @2xl:block">
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
                                 </span>
-                                <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $deployment->created_at?->diffForHumans() ?? '-' }}
                                 </p>
 
-                                <div class="mt-3 flex min-w-0 items-center gap-3 md:hidden">
+                                <div class="mt-3 flex min-w-0 items-center gap-3 @2xl:hidden">
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
                                     <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $environmentPath ?: '-' }}
@@ -112,7 +113,7 @@
                         </div>
 
                         <div
-                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 @2xl:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <span>Application</span>
                             <span>Environment</span>
                             <span>Server</span>
@@ -130,7 +131,7 @@
 
                             <a wire:key="dashboard-recent-deployment-{{ $deployment->deployment_uuid }}"
                                 href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
-                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
+                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 @2xl:grid @2xl:items-center @2xl:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
                                 <div class="min-w-0">
                                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                         {{ $deployment->application_name }}
@@ -142,20 +143,20 @@
                                     @endif
                                 </div>
 
-                                <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $environmentPath ?: '-' }}
                                 </p>
-                                <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $deployment->server_name ?: '-' }}
                                 </p>
-                                <span class="hidden md:block">
+                                <span class="hidden @2xl:block">
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
                                 </span>
-                                <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $deployment->created_at?->diffForHumans() ?? '-' }}
                                 </p>
 
-                                <div class="mt-3 flex min-w-0 items-center gap-3 md:hidden">
+                                <div class="mt-3 flex min-w-0 items-center gap-3 @2xl:hidden">
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
                                     <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $environmentPath ?: '-' }}

@@ -20,9 +20,11 @@ use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use App\Support\DatabaseOperationReservation;
+use App\Support\PostgresUser;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -166,18 +168,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->directory_name = $serviceName.'-'.$this->container_name;
                 $escapedContainerName = escapeshellarg($this->container_name);
                 if (str($databaseType)->contains('postgres')) {
-                    $commands[] = "docker exec {$escapedContainerName} env | grep POSTGRES_";
+                    $commands[] = "docker exec {$escapedContainerName} env | grep -E '^(POSTGRES|PGUSER=)'";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
 
-                    $user = $envs->filter(function ($env) {
-                        return str($env)->startsWith('POSTGRES_USER=');
-                    })->first();
-                    if ($user) {
-                        $this->database->postgres_user = str($user)->after('POSTGRES_USER=')->value();
-                    } else {
-                        $this->database->postgres_user = 'postgres';
-                    }
+                    $this->database->postgres_user = PostgresUser::fromEnvLines($envs);
 
                     $db = $envs->filter(function ($env) {
                         return str($env)->startsWith('POSTGRES_DB=');
@@ -454,10 +449,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 } catch (Throwable $e) {
                     // Local backup failed: the partial file is not tracked, so retention would never remove it.
                     deleteBackupsLocally($this->backup_location, $this->server);
+                    $failureMessage = $this->redact($this->error_output ?? $this->backup_output ?? $e->getMessage());
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
-                            'message' => $this->error_output ?? $this->backup_output ?? $e->getMessage(),
+                            'message' => $failureMessage,
                             'size' => $size,
                             'filename' => null,
                             's3_uploaded' => null,
@@ -465,7 +461,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                     }
                     try {
-                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->error_output ?? $this->backup_output ?? $e->getMessage(), $database));
+                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $failureMessage, $database));
                     } catch (Throwable $notifyException) {
                         Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
                             'backup_id' => $this->backup->uuid,
@@ -490,13 +486,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     } catch (Throwable $e) {
                         // S3 upload failed but local backup succeeded
-                        $s3UploadError = $e->getMessage();
+                        $s3UploadError = $this->redact($e->getMessage());
                     }
                 }
 
                 // Step 3: Update status and send notifications based on results
                 if ($localBackupSucceeded) {
-                    $message = $this->backup_output;
+                    $message = $this->backup_output === null ? null : $this->redact($this->backup_output);
 
                     if ($s3UploadError) {
                         $message = $message
@@ -867,7 +863,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->upload_to_s3($storage);
                 $uploaded = true;
             } catch (Throwable $e) {
-                $uploadError = $e->getMessage();
+                $uploadError = $this->redact($e->getMessage());
                 $failures[] = "{$storage->name}: {$uploadError}";
             }
 
@@ -878,7 +874,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     'message' => $uploadError,
                 ]);
             } catch (Throwable $e) {
-                $failures[] = "{$storage->name}: {$e->getMessage()}";
+                $failures[] = "{$storage->name}: {$this->redact($e->getMessage())}";
             }
         }
 
@@ -1100,7 +1096,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         foreach ($unfinished as $execution) {
             $execution->update([
                 'status' => 'failed',
-                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
+                'message' => $this->redact('Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error')),
                 'size' => 0,
                 'filename' => null,
                 'finished_at' => Carbon::now(),
@@ -1111,7 +1107,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
+        $output = $this->redact($this->backup_output ?? $exception?->getMessage() ?? 'Unknown error');
         $databaseNames = $unfinished->isEmpty() ? ['unknown'] : $unfinished->map(fn (ScheduledDatabaseBackupExecution $execution) => $execution->database_name ?? 'unknown');
         foreach ($databaseNames as $databaseName) {
             try {
@@ -1123,6 +1119,31 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    /**
+     * Redact the backed-up database credentials and the key and secret of every S3 destination from text that is stored or sent in notifications.
+     */
+    private function redact(string $text): string
+    {
+        try {
+            $database = $this->database ?? $this->backup->database;
+            $s3 = $this->s3 ?? $this->backup->s3;
+            $lockedSecrets = [$this->postgres_password, $this->mongo_root_password, $s3?->key, $s3?->secret];
+            foreach ($this->backup->selectedS3Storages() as $storage) {
+                $lockedSecrets[] = $storage->key;
+                $lockedSecrets[] = $storage->secret;
+            }
+            foreach (array_keys($database?->getAttributes() ?? []) as $attribute) {
+                if (str_contains($attribute, 'password')) {
+                    $lockedSecrets[] = $database->getAttribute($attribute);
+                }
+            }
+        } catch (Throwable) {
+            return SensitiveDataRedactor::FAILURE_MESSAGE;
+        }
+
+        return app(SensitiveDataRedactor::class)->redactText($text, lockedSecrets: array_filter($lockedSecrets, fn ($secret): bool => is_string($secret) && $secret !== ''));
     }
 
     /**

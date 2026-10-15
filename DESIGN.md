@@ -229,8 +229,13 @@ sub-header.
 The dashboard is a compact overview, not a metrics wall. It has no page header:
 live active deployments come first as a compact table, followed by traffic
 analytics when a server has it enabled, then two full-width sections (Projects,
-then Servers) that follow the projects-page grid pattern. Each section uses
-`x-section-heading` linking to its full index. Communicate server health with
+then Servers). Each section uses `x-section-heading` with a small "View all"
+link to its full index (next to the switcher) and a table / grid `x-canvas-view-toggle` (no canvas
+link). Table is the default; each section remembers its own choice. A page-level
+List / Canvas switch at the top opens `/dashboard/canvas`: the servers canvas
+with a "Deploying" / "Queued" pill on each application card that has an active
+deployment, and a foldable Recent deployments panel at the bottom left (active, then
+recent; a row shows its card, the status opens the deployment). Communicate server health with
 the shared status badge.
 
 ### Top-level dashboard destinations

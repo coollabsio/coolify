@@ -13,7 +13,7 @@
                 :placeholder="$use_for_github_runners ? 'GitHub organization, for example coollabsio' : 'Personal account when empty'" />
         </div>
 
-        @if (! isCloud())
+        @if (! isCloud() && auth()->user()->can('makeSystemWide', \App\Models\GithubApp::class))
             <div x-data="{ showWarning: @entangle('is_system_wide') }">
                 <div class="max-w-xs">
                     <x-forms.checkbox id="is_system_wide" label="System wide"

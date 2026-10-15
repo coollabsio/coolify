@@ -59,6 +59,7 @@ class InstanceSettings extends Model
         'avatar_storage_type',
         'avatar_s3_storage_id',
         'image_cdn_url',
+        'file_download_s3_storage_id',
         'is_dashboard_force_https_enabled',
         'is_passkey_enabled',
     ];

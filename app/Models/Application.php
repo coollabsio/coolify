@@ -748,6 +748,14 @@ class Application extends BaseModel
         return $this->hasOne(ApplicationSetting::class);
     }
 
+    /**
+     * Whether logs hide every environment value, or only locked values.
+     */
+    public function redactsAllEnvValuesInLogs(): bool
+    {
+        return $this->settings?->redact_all_env_values_in_logs ?? true;
+    }
+
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
@@ -1160,7 +1168,7 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->withoutBuildpackControlVariables();
+            ->withoutBuildOnlyBuildpackControlVariables();
     }
 
     public function nixpacks_environment_variables()
@@ -1195,7 +1203,7 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->withoutBuildpackControlVariables();
+            ->withoutBuildOnlyBuildpackControlVariables();
     }
 
     public function nixpacks_environment_variables_preview()
