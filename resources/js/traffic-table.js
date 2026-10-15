@@ -75,14 +75,16 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
                     values = {};
                 }
 
-                return { el, index, pinned: 'pinned' in el.dataset ? 1 : 0, value: values[this.key] ?? '' };
+                const value = values[this.key] ?? null;
+
+                return { el, index, pinned: 'pinned' in el.dataset ? 1 : 0, missing: value === null ? 1 : 0, value };
             });
 
-            // Pinned rows (the "Other" remainder) stay last in each sort.
-            rows.sort((a, b) => a.pinned - b.pinned || compareValues(a.value, b.value) * sign || a.index - b.index);
+            // Pinned rows (the "Other" remainder) stay last in each sort, then rows without a value.
+            rows.sort((a, b) => a.pinned - b.pinned || a.missing - b.missing || compareValues(a.value, b.value) * sign || a.index - b.index);
             rows.forEach((row, rank) => ranks.set(row.el, rank));
-            // All rows share one parent. Move them only when the order changed, so the
-            // mutation that the move causes finds them sorted and stops.
+            // All rows share one parent. Move them only when the order changed: the mutation
+            // that the move causes then finds them sorted, and a focused link is not blurred.
             if (rows.some((row, rank) => row.index !== rank)) {
                 rows.forEach((row) => row.el.parentElement.appendChild(row.el));
                 observer?.takeRecords();

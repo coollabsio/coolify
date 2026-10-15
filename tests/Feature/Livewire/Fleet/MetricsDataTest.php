@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Server\StartSentinel;
 use App\Livewire\Fleet\Metrics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -13,6 +14,8 @@ use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\Support\ConcurrentMetricsClient;
 
@@ -72,6 +75,8 @@ class ProcessTestableMetrics extends Metrics
 }
 
 beforeEach(function () {
+    // The settings hook starts Sentinel when metrics turn on. A sync queue would run it and make a real SSH call.
+    Queue::fake();
     Concurrency::setDefaultInstance('sync');
     StubMetricsClient::$summaries = [];
     StubMetricsClient::$containers = [];
@@ -379,4 +384,66 @@ it('repairs the Sentinel token before creating worker clients', function () {
     $token = $server->settings->fresh()->sentinel_token;
     expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
     expect($token)->not->toBe('invalid token');
+});
+
+/** A server that Coolify can reach, with metrics off. */
+function reachableServerWithoutMetrics(int $teamId, PrivateKey $privateKey): Server
+{
+    $server = Server::factory()->create(['team_id' => $teamId, 'private_key_id' => $privateKey->id]);
+    $server->settings->forceFill(['is_reachable' => true, 'is_usable' => true])->saveQuietly();
+
+    return $server;
+}
+
+it('enables metrics on each eligible server of the team from the empty state', function () {
+    $first = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $second = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $build = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $build->settings->update(['server_role' => 'build', 'is_build_server' => true]);
+    $unreachable = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $foreign = reachableServerWithoutMetrics(Team::factory()->create()->id, $this->privateKey);
+
+    $component = Livewire::test(TestableMetrics::class)
+        ->assertSee('Enable metrics on 2 servers')
+        ->call('enableMetrics');
+
+    expect($first->settings->fresh()->is_metrics_enabled)->toBeTruthy();
+    expect($second->settings->fresh()->is_metrics_enabled)->toBeTruthy();
+    expect($build->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    expect($unreachable->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    expect($foreign->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    StartSentinel::assertPushed(2);
+
+    expect(array_column($component->get('serverRows'), 'uuid'))->toEqualCanonicalizing([$first->uuid, $second->uuid]);
+    $component->assertDontSee('No server metrics yet');
+});
+
+it('keeps enabling metrics on the other servers when one server fails', function () {
+    $broken = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $healthy = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    DB::statement("CREATE TRIGGER fail_settings_update BEFORE UPDATE ON server_settings WHEN NEW.server_id = {$broken->id} BEGIN SELECT RAISE(ABORT, 'write failed'); END");
+
+    Livewire::test(TestableMetrics::class)
+        ->call('enableMetrics')
+        ->assertDispatched('success', fn (string $event, array $params) => str_contains($params[0], 'Metrics enabled on 1 server.'))
+        ->assertDispatched('error', fn (string $event, array $params) => str_contains($params[0], $broken->name));
+
+    expect($broken->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    expect($healthy->settings->fresh()->is_metrics_enabled)->toBeTruthy();
+    StartSentinel::assertPushed(1);
+});
+
+it('does not let a team member enable metrics', function () {
+    $server = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(TestableMetrics::class)
+        ->assertSee('No server metrics yet')
+        ->assertDontSee('Enable metrics on '.$server->name)
+        ->call('enableMetrics');
+
+    expect($server->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    StartSentinel::assertNotPushed();
 });
