@@ -98,6 +98,15 @@ test('PATCH /api/v1/applications/{uuid} updates application settings', function 
     }
 });
 
+test('PATCH /api/v1/applications/{uuid} accepts github app uuid', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'github_app_uuid' => 'test-uuid-1234',
+        ])
+        ->assertOk()
+        ->assertJsonPath('uuid', $this->application->uuid);
+});
+
 test('application creation accepts application settings', function () {
     Queue::fake();
 
