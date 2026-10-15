@@ -484,6 +484,7 @@ class DatabasesController extends Controller
                         'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit of the database'],
                         'limits_cpuset' => ['type' => 'string', 'description' => 'CPU set of the database'],
                         'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares of the database'],
+                        'instant_deploy' => ['type' => 'boolean', 'description' => 'Restart the database after the update. Requires the deploy ability.'],
                         'postgres_user' => ['type' => 'string', 'description' => 'PostgreSQL user'],
                         'postgres_password' => ['type' => 'string', 'description' => 'PostgreSQL password'],
                         'postgres_db' => ['type' => 'string', 'description' => 'PostgreSQL database'],
@@ -571,6 +572,7 @@ class DatabasesController extends Controller
             'limits_cpus' => 'string',
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
+            'instant_deploy' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -580,6 +582,7 @@ class DatabasesController extends Controller
             ], 422);
         }
         $uuid = $request->uuid;
+        $instantDeploy = $request->boolean('instant_deploy');
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
@@ -587,6 +590,11 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('update', $database);
+
+        if ($instantDeploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $this->authorize('manage', $database);
+        }
 
         if ($request->is_public && $request->public_port) {
             if (isPublicPortAlreadyUsed($database->destination->server, $request->public_port, $database->id)) {
@@ -811,6 +819,17 @@ class DatabasesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        $restartReservation = null;
+        if ($instantDeploy) {
+            $prerequisiteError = StartDatabase::prerequisiteError($database);
+            if ($prerequisiteError !== null) {
+                return response()->json(['message' => $prerequisiteError], 422);
+            }
+            $restartReservation = StartDatabase::reserveOperation($database);
+            if ($restartReservation === null) {
+                return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);
+            }
+        }
         $whatToDoWithDatabaseProxy = null;
         if ($request->is_public === false && $database->is_public === true) {
             $whatToDoWithDatabaseProxy = 'stop';
@@ -821,11 +840,21 @@ class DatabasesController extends Controller
 
         // Only update database fields, not backup configuration
         $database->update($request->only($allowedFields));
+        // The Redis password is stored in the REDIS_PASSWORD variable, not in a column.
+        if ($database instanceof StandaloneRedis && filled($request->redis_password)) {
+            $database->runtime_environment_variables()->updateOrCreate(
+                ['key' => 'REDIS_PASSWORD'],
+                ['value' => $request->redis_password, 'resourceable_id' => $database->id]
+            );
+        }
 
         if ($whatToDoWithDatabaseProxy === 'start') {
             StartDatabaseProxy::dispatch($database);
         } elseif ($whatToDoWithDatabaseProxy === 'stop') {
             StopDatabaseProxy::dispatch($database);
+        }
+        if ($restartReservation !== null) {
+            StartDatabase::dispatchReserved(RestartDatabase::class, $database, $restartReservation);
         }
 
         auditLog('api.database.updated', [

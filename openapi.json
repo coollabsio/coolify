@@ -7077,6 +7077,10 @@
                                         "type": "integer",
                                         "description": "CPU shares of the database"
                                     },
+                                    "instant_deploy": {
+                                        "type": "boolean",
+                                        "description": "Restart the database after the update. Requires the deploy ability."
+                                    },
                                     "postgres_user": {
                                         "type": "string",
                                         "description": "PostgreSQL user"
