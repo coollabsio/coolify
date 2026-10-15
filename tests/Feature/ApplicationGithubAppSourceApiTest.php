@@ -101,3 +101,16 @@ test('PATCH rejects github_app_uuid for deploy key applications', function () {
 
     expect($this->application->refresh()->source_id)->toBe($this->oldGithubApp->id);
 });
+
+test('PATCH rejects github_app_uuid for applications without a git repository', function (array $attributes) {
+    $this->application->forceFill($attributes)->saveQuietly();
+
+    patchApplicationSource(['github_app_uuid' => $this->newGithubApp->uuid])
+        ->assertUnprocessable()
+        ->assertInvalid(['github_app_uuid']);
+
+    expect($this->application->refresh()->source_id)->toBe($this->oldGithubApp->id);
+})->with([
+    'inline dockerfile' => [['build_pack' => 'dockerfile', 'dockerfile' => "FROM nginx:alpine\n"]],
+    'docker image' => [['build_pack' => 'dockerimage']],
+]);
