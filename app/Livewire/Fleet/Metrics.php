@@ -137,21 +137,34 @@ class Metrics extends Component
                 return;
             }
 
+            // One failed server must not stop the others, so each server has its own try.
+            $failed = [];
             foreach ($servers as $server) {
-                $server->settings->is_metrics_enabled = true;
-                // Saved quietly: Sentinel is started below, so the settings hook must not start it a second time.
-                $server->settings->saveQuietly();
-                auditLog('ui.server.sentinel.updated', [
-                    'team_id' => $server->team_id,
-                    'server_uuid' => $server->uuid,
-                    'server_name' => $server->name,
-                    'changed_fields' => ['is_metrics_enabled'],
-                ]);
-                $server->restartSentinel();
+                try {
+                    $server->settings->is_metrics_enabled = true;
+                    // Saved quietly: Sentinel is started below, so the settings hook must not start it a second time.
+                    $server->settings->saveQuietly();
+                    auditLog('ui.server.sentinel.updated', [
+                        'team_id' => $server->team_id,
+                        'server_uuid' => $server->uuid,
+                        'server_name' => $server->name,
+                        'changed_fields' => ['is_metrics_enabled'],
+                    ]);
+                    $server->restartSentinel();
+                } catch (\Throwable $e) {
+                    report($e);
+                    $failed[] = $server->name;
+                }
             }
 
             $this->loadData();
-            $this->dispatch('success', 'Metrics enabled on '.$servers->count().' '.str('server')->plural($servers->count()).'. Sentinel is starting, data shows in about one minute.');
+            $enabled = $servers->count() - count($failed);
+            if ($enabled > 0) {
+                $this->dispatch('success', 'Metrics enabled on '.$enabled.' '.str('server')->plural($enabled).'. Sentinel is starting, data shows in about one minute.');
+            }
+            if ($failed !== []) {
+                $this->dispatch('error', 'Could not enable metrics on '.implode(', ', $failed).'. Check the server settings and try again.');
+            }
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

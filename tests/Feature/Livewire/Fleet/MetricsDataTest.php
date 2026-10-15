@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\Support\ConcurrentMetricsClient;
@@ -415,6 +416,21 @@ it('enables metrics on each eligible server of the team from the empty state', f
 
     expect(array_column($component->get('serverRows'), 'uuid'))->toEqualCanonicalizing([$first->uuid, $second->uuid]);
     $component->assertDontSee('No server metrics yet');
+});
+
+it('keeps enabling metrics on the other servers when one server fails', function () {
+    $broken = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    $healthy = reachableServerWithoutMetrics($this->team->id, $this->privateKey);
+    DB::statement("CREATE TRIGGER fail_settings_update BEFORE UPDATE ON server_settings WHEN NEW.server_id = {$broken->id} BEGIN SELECT RAISE(ABORT, 'write failed'); END");
+
+    Livewire::test(TestableMetrics::class)
+        ->call('enableMetrics')
+        ->assertDispatched('success', fn (string $event, array $params) => str_contains($params[0], 'Metrics enabled on 1 server.'))
+        ->assertDispatched('error', fn (string $event, array $params) => str_contains($params[0], $broken->name));
+
+    expect($broken->settings->fresh()->is_metrics_enabled)->toBeFalsy();
+    expect($healthy->settings->fresh()->is_metrics_enabled)->toBeTruthy();
+    StartSentinel::assertPushed(1);
 });
 
 it('does not let a team member enable metrics', function () {
