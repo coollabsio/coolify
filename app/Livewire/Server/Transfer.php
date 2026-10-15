@@ -54,6 +54,20 @@ class Transfer extends Component
         return is_array($migration) ? $migration : null;
     }
 
+    /**
+     * Manual steps of a finished transfer that the target instance cannot do.
+     *
+     * @return list<string>
+     */
+    public function getPostTransferChecklistProperty(): array
+    {
+        if (data_get($this->migration, 'status') !== 'succeeded') {
+            return [];
+        }
+
+        return array_values(array_filter((array) data_get($this->migration, 'checklist', []), 'is_string'));
+    }
+
     public function refreshMigration(): void
     {
         $this->server->refresh();

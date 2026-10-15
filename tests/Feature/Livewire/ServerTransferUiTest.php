@@ -221,3 +221,34 @@ test('transfer with a token that the target does not accept shows an error and d
 
     Queue::assertNotPushed(MigrateServerToInstanceJob::class);
 });
+
+test('transfer page shows the post-transfer checklist after a finished transfer', function () {
+    $this->server->forceFill(['server_metadata' => ['migration' => [
+        'status' => 'succeeded',
+        'target_url' => 'https://8.8.8.8',
+        'checklist' => ['Set the webhook URL of GitHub App <b>deploy-bot</b> to https://8.8.8.8/webhooks/source/github/events.'],
+    ]]])->save();
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Transfer finished')
+        ->assertSee('After the transfer')
+        ->assertSee('Do these steps to finish the move. The target instance cannot do them for you.')
+        ->assertSee('Set the webhook URL of GitHub App <b>deploy-bot</b> to https://8.8.8.8/webhooks/source/github/events.')
+        ->assertDontSee('<b>deploy-bot</b>', escape: false);
+});
+
+test('transfer page hides the post-transfer checklist', function (string $status, array $checklist) {
+    $this->server->forceFill(['server_metadata' => ['migration' => [
+        'status' => $status,
+        'target_url' => 'https://8.8.8.8',
+        'error' => 'Target import failed (HTTP 401): Unauthenticated.',
+        'checklist' => $checklist,
+    ]]])->save();
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertDontSee('After the transfer')
+        ->assertDontSee('Set the webhook URL');
+})->with([
+    'finished transfer without steps' => ['succeeded', []],
+    'failed transfer' => ['failed', ['Set the webhook URL of GitHub App deploy-bot.']],
+]);

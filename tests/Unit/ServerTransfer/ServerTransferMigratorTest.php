@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferClaimer;
+use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -42,9 +43,10 @@ beforeEach(function () {
         'name' => 'migrate-me',
     ]);
     $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
-    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $project = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Shop']);
     $environment = $project->environments()->first()
         ?? Environment::factory()->create(['project_id' => $project->id]);
+    $this->environment = $environment;
     Application::factory()->create([
         'environment_id' => $environment->id,
         'destination_id' => $destination->id,
@@ -468,4 +470,96 @@ test('the migrate job logs each attempt to read the result of a timed out import
     $messages = collect(data_get($this->server->fresh()->server_metadata, 'migration.log'))->pluck('message');
     expect($messages->filter(fn ($message) => str_starts_with($message, 'Asking the target for the import result')))->toHaveCount(ServerTransferMigrator::STATUS_PROBE_ATTEMPTS)
         ->and($messages->last())->toStartWith('Transfer failed: Target import failed (HTTP 504)');
+});
+
+test('the migrate job stores the post-transfer checklist with the target URL', function () {
+    Http::fake([
+        'https://8.8.8.8/api/v1/servers/import' => Http::response(['server_uuid' => $this->server->uuid, 'claimed' => true], 201),
+    ]);
+    $exporter = app(ServerTransferExporter::class);
+    $fakeExporter = Mockery::mock(ServerTransferExporter::class);
+    $fakeExporter->shouldReceive('export')->once()->andReturnUsing(fn (Server $server, bool $includeSensitive = true) => [
+        ...$exporter->export($server, $includeSensitive),
+        'post_transfer_checklist' => [
+            'Set the webhook URL of GitHub App deploy-bot to {target_url}/webhooks/source/github/events.',
+            ['not a step'],
+            'Point the DNS record of shop.example.com to the server.',
+        ],
+    ]);
+    app()->instance(ServerTransferExporter::class, $fakeExporter);
+
+    (new MigrateServerToInstanceJob($this->server, 'https://8.8.8.8', 'token'))
+        ->handle(app(ServerTransferMigrator::class));
+
+    $migration = data_get($this->server->fresh()->server_metadata, 'migration');
+    expect($migration['status'])->toBe('succeeded')
+        ->and($migration['checklist'])->toBe([
+            'Set the webhook URL of GitHub App deploy-bot to https://8.8.8.8/webhooks/source/github/events.',
+            'Point the DNS record of shop.example.com to the server.',
+        ]);
+});
+
+test('the migrate job stores the checklist of the target, which has the public URL of the target', function () {
+    Http::fake([
+        'https://8.8.8.8/api/v1/servers/import' => Http::response([
+            'server_uuid' => $this->server->uuid,
+            'claimed' => true,
+            'checklist' => ['Set the webhook URL of GitHub App deploy-bot to https://coolify-b.example.com/webhooks/source/github/events.'],
+        ], 201),
+    ]);
+
+    (new MigrateServerToInstanceJob($this->server, 'https://8.8.8.8', 'token'))
+        ->handle(app(ServerTransferMigrator::class));
+
+    expect(data_get($this->server->fresh()->server_metadata, 'migration.checklist'))
+        ->toBe(['Set the webhook URL of GitHub App deploy-bot to https://coolify-b.example.com/webhooks/source/github/events.']);
+});
+
+test('start notes projects that also have resources on other servers', function (int $checkStatus, bool $queued) {
+    Queue::fake();
+    Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => []], $checkStatus)]);
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id, 'ip' => '10.88.0.11']);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+    foreach (['web', 'worker'] as $name) {
+        Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $otherDestination->id,
+            'destination_type' => $otherDestination->getMorphClass(),
+            'name' => $name,
+        ]);
+    }
+    // A project with resources only on the other server is not affected by the transfer.
+    $otherProject = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Blog']);
+    Application::factory()->create([
+        'environment_id' => $otherProject->environments()->first()->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+    ]);
+
+    try {
+        app(ServerTransferMigrator::class)->start($this->server, 'https://8.8.8.8', 'token');
+    } catch (RuntimeException) {
+    }
+
+    $notes = collect(data_get($this->server->fresh()->server_metadata, 'migration.log'))
+        ->filter(fn (array $entry) => str_starts_with($entry['message'], 'NOTE: '));
+    expect($notes->pluck('message')->all())->toBe([
+        "NOTE: project 'Shop' also has 2 resources on other servers. They stay on this instance; only the resources of this server are transferred.",
+    ])
+        ->and($notes->first()['level'])->toBe('info');
+    $queued ? Queue::assertPushed(MigrateServerToInstanceJob::class, 1) : Queue::assertNothingPushed();
+})->with([
+    'checks pass' => [200, true],
+    'a check fails' => [401, false],
+]);
+
+test('start adds no note when the projects have no resources on other servers', function () {
+    Queue::fake();
+    Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => []])]);
+
+    app(ServerTransferMigrator::class)->start($this->server, 'https://8.8.8.8', 'token');
+
+    $messages = collect(data_get($this->server->fresh()->server_metadata, 'migration.log'))->pluck('message');
+    expect($messages->filter(fn (string $message) => str_starts_with($message, 'NOTE: ')))->toBeEmpty();
+    Queue::assertPushed(MigrateServerToInstanceJob::class, 1);
 });

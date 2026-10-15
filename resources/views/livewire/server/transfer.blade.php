@@ -90,6 +90,28 @@
                                 {{ data_get($migration, 'target_url') }} now manages this server. Automations are
                                 disabled on this instance.
                             </x-callout>
+                            @php $checklist = $this->postTransferChecklist; @endphp
+                            @if (count($checklist) > 0)
+                                <div x-data="{ done: [] }" data-testid="post-transfer-checklist">
+                                    <div class="flex items-baseline justify-between gap-3">
+                                        <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">After the transfer</h3>
+                                        <span class="text-xs text-neutral-500 dark:text-fg-dim"
+                                            x-text="`${done.length} of {{ count($checklist) }} done`"></span>
+                                    </div>
+                                    <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                        Do these steps to finish the move. The target instance cannot do them for you.
+                                    </p>
+                                    <div class="mt-2 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                                        @foreach ($checklist as $step)
+                                            @php $stepKey = hash('xxh128', $step); @endphp
+                                            <div wire:key="post-transfer-step-{{ $stepKey }}">
+                                                <x-forms.checkbox :id="'post-transfer-step-' . $stepKey" :label="e($step)"
+                                                    :domValue="$stepKey" fullWidth x-model="done" />
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                         @endif
                         @if (count((array) data_get($migration, 'log', [])) > 0)
                             <div>

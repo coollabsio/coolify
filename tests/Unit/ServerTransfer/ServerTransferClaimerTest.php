@@ -1,12 +1,26 @@
 <?php
 
+use App\Enums\GithubRunnerStatus;
+use App\Jobs\CleanupGithubRunnerJob;
+use App\Jobs\DeregisterGithubRunnerJob;
+use App\Jobs\ProvisionGithubRunnerJob;
+use App\Models\Application;
+use App\Models\DnsProviderZone;
+use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
+use App\Models\GithubRunnerExecution;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -133,4 +147,108 @@ test('a server that this instance never claimed ignores the owner marker', funct
 
     expect($released)->toBeFalse()
         ->and($this->server->fresh()->isTransferredAway())->toBeFalse();
+});
+
+test('markTransferred stops tracking the DNS records of the server resources without deleting them at the provider', function () {
+    Http::fake();
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create(['destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()]);
+    $otherApplication = Application::factory()->create();
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare']);
+    $zone = DnsProviderZone::factory()->create(['integration_token_id' => $token->id]);
+    $onlyThisServer = ManagedDnsRecord::factory()->owned()->create(['dns_provider_zone_id' => $zone->id]);
+    $onlyThisServer->addReference($application);
+    $shared = ManagedDnsRecord::factory()->owned()->create(['dns_provider_zone_id' => $zone->id]);
+    $shared->addReference($application);
+    $shared->addReference($otherApplication);
+
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    Http::assertNothingSent();
+    expect(ManagedDnsRecord::find($onlyThisServer->id))->toBeNull()
+        ->and($shared->fresh()->references()->pluck('resource_id')->all())->toBe([$otherApplication->id]);
+});
+
+function transferRunnerSetup(Server $server): array
+{
+    $githubApp = GithubApp::create([
+        'name' => 'runner-app',
+        'organization' => 'acme',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'app_id' => 5151,
+        'installation_id' => 5252,
+        'webhook_secret' => 'runner-secret',
+        'team_id' => $server->team_id,
+        'is_system_wide' => false,
+    ]);
+    $config = GithubRunnerConfig::create(['server_id' => $server->id, 'github_app_id' => $githubApp->id, 'labels' => ['coolify'], 'is_enabled' => true]);
+
+    return [$githubApp, $config];
+}
+
+test('markTransferred disables the runner config and stops tracking the runners without removing them at GitHub', function () {
+    Queue::fake();
+    [$githubApp, $config] = transferRunnerSetup($this->server);
+    $execution = fn (GithubRunnerStatus $status, array $attributes = []) => GithubRunnerExecution::create([
+        'github_app_id' => $githubApp->id,
+        'github_runner_config_id' => $config->id,
+        'server_id' => $this->server->id,
+        'trigger_workflow_job_id' => fake()->unique()->numberBetween(1000, 9999),
+        'status' => $status,
+        'runner_id' => fake()->unique()->numberBetween(1, 999),
+        ...$attributes,
+    ]);
+    $active = collect([
+        $execution(GithubRunnerStatus::Queued, ['runner_id' => null]),
+        $execution(GithubRunnerStatus::Provisioning),
+        $execution(GithubRunnerStatus::Idle),
+        $execution(GithubRunnerStatus::Running),
+    ]);
+    $completed = $execution(GithubRunnerStatus::Completed, ['completed_at' => now()->subDay(), 'error_message' => null]);
+
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    expect($config->fresh()->is_enabled)->toBeFalse()
+        ->and($completed->fresh()->only(['status', 'error_message']))->toBe(['status' => GithubRunnerStatus::Completed, 'error_message' => null]);
+    foreach ($active as $row) {
+        $row->refresh();
+        expect($row->status)->toBe(GithubRunnerStatus::Cancelled)
+            ->and($row->completed_at)->not->toBeNull()
+            ->and($row->error_message)->toBe('The server was transferred to another Coolify instance. This instance stopped managing its runners.');
+    }
+
+    // Deleting the archive later must not pull the runners that now belong to the target.
+    $this->server->fresh()->forceDelete();
+
+    Queue::assertNotPushed(DeregisterGithubRunnerJob::class);
+    Queue::assertNotPushed(CleanupGithubRunnerJob::class);
+});
+
+test('a GitHub webhook does not queue a runner for a transferred server', function () {
+    Queue::fake();
+    [$githubApp] = transferRunnerSetup($this->server);
+    $send = function () use ($githubApp) {
+        $body = json_encode([
+            'action' => 'queued',
+            'workflow_job' => ['id' => fake()->unique()->numberBetween(1000, 9999), 'labels' => ['self-hosted', 'coolify'], 'name' => 'test'],
+            'repository' => ['id' => 99, 'full_name' => 'acme/api'],
+            'installation' => ['id' => $githubApp->installation_id],
+        ], JSON_THROW_ON_ERROR);
+
+        return $this->call('POST', '/webhooks/source/github/events', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'workflow_job',
+            'HTTP_X-GitHub-Hook-Installation-Target-Id' => (string) $githubApp->app_id,
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $body, 'runner-secret'),
+            'CONTENT_TYPE' => 'application/json',
+        ], $body);
+    };
+    $send()->assertSee('Runner queued.');
+    GithubRunnerExecution::query()->delete();
+
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    $send()->assertSee('No runner configuration matches the job labels.');
+    expect(GithubRunnerExecution::count())->toBe(0);
+    Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
 });

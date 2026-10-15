@@ -10,13 +10,21 @@ class ProjectIconStorageService extends AvatarStorageService
 {
     public function storeProject(Project $project, UploadedFile $upload): void
     {
+        $this->storeProjectContents($project, $this->compress($upload));
+    }
+
+    /**
+     * Stores an icon that is already a compressed JPEG, for example one from a server transfer bundle.
+     */
+    public function storeProjectContents(Project $project, string $contents): void
+    {
         $settings = instanceSettings();
         $storageType = $settings->avatar_storage_type === 's3' && $settings->avatar_s3_storage_id ? 's3' : 'local';
         $s3StorageId = $storageType === 's3' ? $settings->avatar_s3_storage_id : null;
         $disk = $this->disk($storageType, $s3StorageId);
         $path = "project-icons/{$project->uuid}/icon.jpg";
 
-        if (! $disk->put($path, $this->compress($upload))) {
+        if (! $disk->put($path, $contents)) {
             throw new RuntimeException('Unable to store the project icon.');
         }
 

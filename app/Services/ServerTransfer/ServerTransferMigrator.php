@@ -4,11 +4,16 @@ namespace App\Services\ServerTransfer;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\MigrateServerToInstanceJob;
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\Environment;
+use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Rules\SafeWebhookUrl;
 use App\Services\Security\SensitiveDataRedactor;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
@@ -16,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -67,6 +73,9 @@ class ServerTransferMigrator
                 false => ['at' => $check['at'], 'level' => 'error', 'message' => "FAILED: {$check['label']}. {$check['message']}"],
                 null => ['at' => $check['at'], 'level' => 'warning', 'message' => "NOT CHECKED: {$check['label']}. {$check['message']}"],
             };
+        }
+        foreach ($this->sharedProjectNotes($server) as $note) {
+            $log[] = $this->logEntry($note);
         }
 
         $failed = array_values(array_filter($checks, fn (array $check) => $check['ok'] === false));
@@ -231,6 +240,43 @@ class ServerTransferMigrator
         ];
     }
 
+    /**
+     * One note for every project that has resources on this server and on other servers. Only the
+     * resources of this server are transferred, so the user must know that the project is split.
+     *
+     * @return list<string>
+     */
+    private function sharedProjectNotes(Server $server): array
+    {
+        $resourcesOnServer = collect([
+            ...$server->applications(),
+            ...$server->databases(),
+            ...$server->services()->get(),
+        ]);
+        $keysOnServer = $resourcesOnServer->map(fn (Model $resource) => $resource::class.':'.$resource->getKey())->flip();
+
+        $projectIds = Environment::query()
+            ->whereIn('id', $resourcesOnServer->pluck('environment_id')->filter()->unique())
+            ->distinct()
+            ->pluck('project_id');
+        $projectIdByEnvironment = Environment::query()->whereIn('project_id', $projectIds)->pluck('project_id', 'id');
+
+        $otherServerCounts = collect([Application::class, Service::class, ...array_values(STANDALONE_DATABASE_MODELS)])
+            ->flatMap(fn (string $model) => $model::query()
+                ->whereIn('environment_id', $projectIdByEnvironment->keys())
+                ->pluck('environment_id', 'id')
+                ->reject(fn (int|string $environmentId, int|string $id) => $keysOnServer->has("{$model}:{$id}")))
+            ->countBy(fn (int|string $environmentId) => $projectIdByEnvironment[$environmentId]);
+
+        return Project::query()
+            ->whereIn('id', $otherServerCounts->keys())
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Project $project) => "NOTE: project '{$project->name}' also has {$otherServerCounts[$project->id]} ".
+                Str::plural('resource', $otherServerCounts[$project->id]).' on other servers. They stay on this instance; only the resources of this server are transferred.')
+            ->all();
+    }
+
     private function assertCanMigrate(Server $server): void
     {
         foreach ($this->migrationChecks($server) as $check) {
@@ -250,6 +296,7 @@ class ServerTransferMigrator
      *     import: array<string, mixed>,
      *     complete: array<string, mixed>,
      *     warnings: list<string>,
+     *     checklist: list<string>,
      *     message: string
      * }
      */
@@ -265,6 +312,7 @@ class ServerTransferMigrator
         $bundle = $this->exporter->export($server, includeSensitive: true);
         $exportId = data_get($bundle, 'export_id');
         $warnings = array_values((array) data_get($bundle, 'warnings', []));
+        $checklist = $this->postTransferChecklist($bundle, $targetUrl);
         $this->log($server, "Export {$exportId} created. Sending it to {$targetUrl}. The target imports the server and takes over management.");
 
         // Target import+claim runs in its own DB transaction on the remote instance.
@@ -275,6 +323,12 @@ class ServerTransferMigrator
             token: $token,
             bundle: $bundle,
         );
+
+        // The target fills in its own public URL; the URL typed here can be an internal address.
+        $targetChecklist = array_values(array_filter((array) data_get($importBody, 'checklist', []), 'is_string'));
+        if ($targetChecklist !== []) {
+            $checklist = $targetChecklist;
+        }
 
         if (is_array(data_get($importBody, 'warnings'))) {
             $warnings = array_values(array_unique(array_merge($warnings, $importBody['warnings'])));
@@ -316,8 +370,25 @@ class ServerTransferMigrator
             'import' => app(SensitiveDataRedactor::class)->redactValue($importBody),
             'complete' => $complete,
             'warnings' => $warnings,
+            'checklist' => $checklist,
             'message' => 'Server migrated to '.$targetUrl.'. Automations disabled on this instance.',
         ];
+    }
+
+    /**
+     * Manual steps the user must do after the transfer. The exporter writes {target_url} where the URL of the target belongs.
+     *
+     * @param  array<string, mixed>  $bundle
+     * @return list<string>
+     */
+    private function postTransferChecklist(array $bundle, string $targetUrl): array
+    {
+        $steps = array_filter((array) data_get($bundle, 'post_transfer_checklist', []), 'is_string');
+
+        return array_values(array_unique(array_map(
+            fn (string $step) => str_replace('{target_url}', $targetUrl, $step),
+            $steps,
+        )));
     }
 
     private function normalizeTargetUrl(string $targetUrl): string

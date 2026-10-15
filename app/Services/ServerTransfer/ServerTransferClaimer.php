@@ -2,8 +2,11 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\GithubRunnerStatus;
+use App\Models\GithubRunnerExecution;
 use App\Models\Server;
 use App\Notifications\Internal\GeneralNotification;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -124,6 +127,15 @@ class ServerTransferClaimer
             $server->server_metadata = $metadata;
             $server->save();
 
+            $this->releaseGithubRunners($server);
+
+            // The other instance serves these hostnames now. Without this, deleting the archive here, or the
+            // orphaned-record cleanup after it, would delete live DNS records at the provider.
+            app(ManagedDnsRecordCleanup::class)->forgetResources(
+                $server->applications()
+                    ->concat($server->services()->with('applications')->get()->flatMap->applications)
+            );
+
             return [
                 'server_uuid' => $server->uuid,
                 'message' => 'Server marked as transferred. Automations disabled on this instance.',
@@ -133,6 +145,23 @@ class ServerTransferClaimer
         $this->clearLocalSshArtifacts($server);
 
         return $result;
+    }
+
+    /**
+     * The runners on the server belong to the target now. Queued runners are cancelled. Started runners are marked
+     * finished without removing them at GitHub: their jobs keep running, and deleting the archive here later must
+     * not deregister them. A disabled config also stops new runners for this server from GitHub webhooks.
+     */
+    private function releaseGithubRunners(Server $server): void
+    {
+        $server->githubRunnerConfig()->update(['is_enabled' => false]);
+
+        $message = 'The server was transferred to another Coolify instance. This instance stopped managing its runners.';
+        GithubRunnerExecution::query()
+            ->where('server_id', $server->id)
+            ->whereIn('status', GithubRunnerStatus::active())
+            ->get()
+            ->each(fn (GithubRunnerExecution $execution) => $execution->finish(GithubRunnerStatus::Cancelled, $message));
     }
 
     /**

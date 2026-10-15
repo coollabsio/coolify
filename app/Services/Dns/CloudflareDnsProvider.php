@@ -330,6 +330,53 @@ class CloudflareDnsProvider
         return $this->forgetDeletedRecord($record, ManagedDnsDeletionResult::Deleted, $resource);
     }
 
+    /**
+     * Takes ownership of a record that another Coolify instance created, after a server transfer. The provider
+     * comment changes from $previousComment to the ownership comment of this instance only when the record still
+     * has the expected type, name, value and comment. Never throws; returns false when the record was not adopted.
+     */
+    public function adoptRecord(ManagedDnsRecord $record, string $previousComment): bool
+    {
+        try {
+            $record->loadMissing(['zone', 'integrationToken']);
+            if ($record->zone === null || $record->integrationToken?->provider !== 'cloudflare') {
+                return false;
+            }
+
+            return $this->hostnameLock->run(
+                (int) $record->integrationToken->team_id,
+                $record->name,
+                fn (): bool => $this->adoptRecordLocked($record, $previousComment),
+            );
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function adoptRecordLocked(ManagedDnsRecord $record, string $previousComment): bool
+    {
+        $url = "https://api.cloudflare.com/client/v4/zones/{$record->zone->provider_zone_id}/dns_records/{$record->provider_record_id}";
+        $response = $this->client($record->integrationToken)->get($url);
+        $remote = $response->json('result');
+        if (! $response->successful() || ! is_array($remote)) {
+            return false;
+        }
+        if (($remote['type'] ?? null) !== $record->type
+            || strtolower((string) ($remote['name'] ?? '')) !== $record->name
+            || ! DnsRecordHints::sameAddress(is_string($remote['content'] ?? null) ? $remote['content'] : null, $record->content)
+            || ($remote['comment'] ?? null) !== $previousComment) {
+            return false;
+        }
+
+        $patchResponse = $this->client($record->integrationToken)->patch($url, ['comment' => $record->ownershipComment()]);
+        if (! $patchResponse->successful()) {
+            return false;
+        }
+        $this->auditDnsRecord('ownership_adopted', $record->zone, $record->name, null);
+
+        return true;
+    }
+
     private function forgetDeletedRecord(ManagedDnsRecord $record, ManagedDnsDeletionResult $result, ?Model $resource): ManagedDnsDeletionResult
     {
         $record->delete();
