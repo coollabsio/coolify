@@ -63,15 +63,15 @@
                 {{-- Brand (width tracks sidebar) --}}
                 <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"
                     :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
-                    <div class="flex shrink-0 items-baseline gap-1.5 min-w-0">
+                    <div class="flex items-baseline gap-1.5 min-w-0">
                         <a href="/" {{ wireNavigate() }} title="Coolify"
-                            class="flex items-center hover:opacity-80 transition-opacity">
+                            class="flex shrink-0 items-center hover:opacity-80 transition-opacity">
                             <img x-show="collapsed" x-cloak src="/coolify-logo.svg" alt="Coolify"
                                 class="size-5" />
                             <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Coolify</span>
                         </a>
-                        <x-version x-show="!collapsed"
-                            class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
+                        <x-version x-show="!collapsed" title="v{{ config('constants.coolify.version') }}"
+                            class="min-w-0 truncate !text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
                     </div>
                     @if (isInstanceAdmin() && !isCloud())
                         <div x-show="!collapsed" class="ml-auto shrink-0">
