@@ -676,7 +676,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
     $variables = collect($environment_variables);
     $payload = collect([]);
     switch ($type) {
-        case $type?->contains('minio'):
+        case $type?->contains(['minio', 'pgsty/silo']):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
 
