@@ -89,8 +89,8 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]" />
                     <div class="lg:col-span-2">
-                        <x-forms.input id="allowed_ips" label="Allowed API IPs"
-                            helper="Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
+                        <x-forms.input id="allowed_ips" label="Allowed IPs"
+                            helper="Applies to the REST API and the MCP endpoint. Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
                             placeholder="192.168.1.100, 10.0.0.0/8" />
                     </div>
                 </div>
