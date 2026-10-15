@@ -5,7 +5,18 @@
     <div x-data="projectEnvironments()" class="w-full">
         <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
-                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $project->name }}</h1>
+                <div class="flex min-w-0 items-center gap-1.5">
+                    <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $project->name }}</h1>
+                    @can('update', $project)
+                        <a href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}"
+                            {{ wireNavigate() }}
+                            class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                            title="Project settings"
+                            aria-label="Open settings for {{ $project->name }}">
+                            <x-reicon name="settings" class="size-4" />
+                        </a>
+                    @endcan
+                </div>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
                     <span
                         x-text="`${environments.length} ${environments.length === 1 ? 'environment' : 'environments'}`"></span>
@@ -15,15 +26,6 @@
 
             @can('update', $project)
                 <div class="flex w-fit shrink-0 items-center gap-2">
-                    <a href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}"
-                        {{ wireNavigate() }}
-                        class="button"
-                        title="Project settings"
-                        aria-label="Open settings for {{ $project->name }}">
-                        <x-reicon name="settings" class="size-3.5" />
-                        Settings
-                    </a>
-
                     <x-modal-input title="New Environment">
                         <x-slot:content>
                             <button type="button"
@@ -58,7 +60,7 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <x-table.dropdown panel-class="w-48!">
                         <x-slot:trigger>
                             <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">

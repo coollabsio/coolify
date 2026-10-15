@@ -30,6 +30,12 @@ class SharedVariableCanvas
 
     public const RESOURCES_ZONE = 'resources';
 
+    /**
+     * Server variables that Coolify creates on every server. Resources get them only through a reference,
+     * but every server has them, so the canvas and the overview leave them out to stay readable.
+     */
+    public const BUILT_IN_SERVER_KEYS = ['COOLIFY_SERVER_UUID', 'COOLIFY_SERVER_NAME'];
+
     public function __construct(private EnvironmentCanvas $canvas, private ServerCanvas $serverCanvas) {}
 
     /**
@@ -37,9 +43,14 @@ class SharedVariableCanvas
      */
     public function payload(string $scope, Model $owner, bool $canEdit): array
     {
-        $variables = $this->variables($owner);
+        $hidden = $scope === 'server' ? self::BUILT_IN_SERVER_KEYS : [];
+        $variables = $this->variables($owner)->reject(fn (SharedEnvironmentVariable $variable) => in_array($variable->key, $hidden, true))->values();
         $resources = $this->resources($scope, $owner);
-        $links = $this->links($scope, $variables, $resources);
+        // A reference to a hidden variable is not a reference to a deleted one: leave its link out too.
+        $links = collect($this->links($scope, $variables, $resources))
+            ->reject(fn (array $link) => in_array($link['key'], $hidden, true))
+            ->values()
+            ->all();
 
         $missing = collect($links)
             ->where('missing', true)
@@ -238,6 +249,81 @@ class SharedVariableCanvas
     public function variableNodeId(SharedEnvironmentVariable $variable): string
     {
         return 'variable:'.$variable->id;
+    }
+
+    /**
+     * The shared variables overview of a team: counts per scope, recently changed variables,
+     * and how many resources use each variable (from the {{scope.KEY}} references in the
+     * saved resource variables). Keys and counts only; values are never read out.
+     *
+     * @return array{scopes: array<string, array{variables: int, owners: int}>, recent: Collection<int, array<string, mixed>>, used: Collection<int, array<string, mixed>>, unused: Collection<int, array<string, mixed>>, missing: int}
+     */
+    public function overview(Team $team): array
+    {
+        $variables = SharedEnvironmentVariable::query()
+            ->where('team_id', $team->id)
+            ->with(['project', 'environment.project', 'server'])
+            ->get()
+            // Built-in server variables; the server variables page hides them too.
+            ->reject(fn (SharedEnvironmentVariable $variable) => $variable->type === 'server' && in_array($variable->key, self::BUILT_IN_SERVER_KEYS, true));
+
+        $scopes = collect(self::SCOPES)->mapWithKeys(function (string $scope) use ($variables) {
+            $ofScope = $variables->where('type', $scope);
+            $ownerColumn = $scope === 'team' ? 'team_id' : $scope.'_id';
+
+            return [$scope => ['variables' => $ofScope->count(), 'owners' => $ofScope->pluck($ownerColumn)->unique()->count()]];
+        })->all();
+
+        // Resources per variable: "scope|owner id|KEY" => resource uuids.
+        $idByReference = $variables->mapWithKeys(fn (SharedEnvironmentVariable $variable) => [
+            $variable->type.'|'.($variable->type === 'team' ? $variable->team_id : $variable->{$variable->type.'_id'}).'|'.$variable->key => $variable->id,
+        ]);
+        $resources = $this->resources('team', $team);
+        $resourceByMorph = $resources->mapWithKeys(fn (Model $resource) => [$resource->getMorphClass().'#'.$resource->getKey() => $resource]);
+        $usedBy = [];
+        $missing = [];
+        foreach ($this->resourceVariables($resources) as $environmentVariable) {
+            $resource = $resourceByMorph->get($environmentVariable->resourceable_type.'#'.$environmentVariable->resourceable_id);
+            $owners = [
+                'team' => $team->id,
+                'project' => $resource->environment->project_id,
+                'environment' => $resource->environment_id,
+                'server' => $this->mainServer($resource)?->id,
+            ];
+            foreach ($owners as $scope => $ownerId) {
+                foreach ($this->referencedKeys($scope, $environmentVariable->value) as $key) {
+                    $reference = $scope.'|'.$ownerId.'|'.$key;
+                    if ($idByReference->has($reference)) {
+                        $usedBy[$idByReference->get($reference)][$resource->uuid] = true;
+                    } else {
+                        $missing[$reference] = true;
+                    }
+                }
+            }
+        }
+
+        $rows = $variables->map(fn (SharedEnvironmentVariable $variable) => [
+            'key' => $variable->key,
+            'scope' => $variable->type,
+            'owner' => match ($variable->type) {
+                'team' => 'Team',
+                'project' => $variable->project?->name,
+                'environment' => $variable->environment ? $variable->environment->project?->name.' / '.$variable->environment->name : null,
+                'server' => $variable->server?->name,
+                default => null,
+            },
+            'link' => $this->connectLink($variable),
+            'resources' => count($usedBy[$variable->id] ?? []),
+            'updated_at' => $variable->updated_at,
+        ]);
+
+        return [
+            'scopes' => $scopes,
+            'recent' => $rows->sortByDesc('updated_at')->take(6)->values(),
+            'used' => $rows->where('resources', '>', 0)->sortByDesc('resources')->take(6)->values(),
+            'unused' => $rows->where('resources', 0)->sortBy('key')->values(),
+            'missing' => count($missing),
+        ];
     }
 
     /**

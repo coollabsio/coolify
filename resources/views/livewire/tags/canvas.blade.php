@@ -2,7 +2,7 @@
     <x-slot:title>
         Tags > Canvas | Coolify
     </x-slot>
-    <div data-environment-canvas data-title="Tags canvas" data-mode="tags" data-endpoint="/tags/canvas"
+    <div data-environment-canvas data-mode="tags" data-endpoint="/tags/canvas"
         data-team="{{ $teamId }}" data-user="{{ auth()->id() }}"
         class="relative h-full" wire:ignore>
         {{-- The canvas moves this group into its toolbar (page actions last, at the right end),

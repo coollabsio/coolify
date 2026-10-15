@@ -5,12 +5,12 @@
     @if ($server)
         {{-- Status, proxy actions and the server name dock in the top bar. --}}
         <livewire:server.navbar :server="$server" />
-        {{-- Fixed rail on xl, hidden below xl (see .app-main-full .application-settings-navigation in app.css). --}}
+        {{-- Its menu shows in the main sidebar on xl (components/server/sidebar.blade.php); below xl a canvas has no room for it. --}}
         <x-server.sidebar :server="$server" activeMenu="resources" />
     @endif
-    <div data-environment-canvas data-title="{{ $server ? 'Server canvas' : 'Servers canvas' }}"
+    <div data-environment-canvas
         data-endpoint="{{ $server ? '/servers/'.$server->uuid.'/canvas' : '/servers/canvas' }}"
-        data-team="{{ $teamId }}" data-user="{{ auth()->id() }}" @if ($server) data-toolbar-inline @endif
+        data-team="{{ $teamId }}" data-user="{{ auth()->id() }}"
         class="relative min-h-0 flex-1" wire:ignore>
         @if ($server)
             <x-canvas-view-toggle data-ec-views on-canvas :views="['list' => ['List view', 'unordered-list']]"

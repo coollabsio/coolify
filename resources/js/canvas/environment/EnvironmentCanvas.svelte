@@ -6,7 +6,7 @@
   // The server canvas (data-endpoint) reuses this view. It saves moves and links on the environment canvas of each card.
   // The shared variables and tags canvases (data-mode) reuse it too: their links add a variable or a tag to a resource.
   import { flushSync, onMount, tick } from 'svelte';
-  import { api, BOX_GAP, freeSpot, MIN_ZOOM, panZoom } from '../../canvas-core.js';
+  import { api, BOX_GAP, freeSpot, panZoom } from '../../canvas-core.js';
   import {
     canConnect,
     canLink,
@@ -16,8 +16,13 @@
     dragRules,
     filterGraph,
     filterOptions,
+    fitView,
+    GROUP_GAP,
+    GROUP_HEADER,
+    GROUP_PADDING,
     groupByUse,
     groupFrames,
+    groupKey,
     isSource,
     layoutGraph,
     layoutServerView,
@@ -25,13 +30,17 @@
     MOBILE_NOTICE_KEY,
     readView,
     STATUS_CHANNELS,
+    unreachableZones,
     zoneBoxes,
     zoneGroups,
   } from '../../environment-canvas.js';
   import Card from './Card.svelte';
+  import Deployments from './Deployments.svelte';
+  import EmptyCard from './EmptyCard.svelte';
   import Icon from './Icon.svelte';
   import Panel from './Panel.svelte';
   import Toolbar from './Toolbar.svelte';
+  import CanvasControls from '../CanvasControls.svelte';
   import Zone from './Zone.svelte';
 
   // The page's [data-environment-canvas] element; it does not change while the canvas is mounted.
@@ -78,11 +87,16 @@
   const interactions = new Set(); // active drags; refetches wait until they end
   let deferred = null;
   const unsaved = {};
-  let offsets = {}; // server view: card shift from its environment canvas position (see layoutServerView)
+  // Saved moves stay on the canvas until a load that started after the save returns them, so an older
+  // response (a poll or status refresh during the drag or the request) cannot put the cards back for a moment.
+  const settling = { positions: {}, saved: {} }; // id -> { at, after: load number the save finished at }
+  let loads = 0;
   let reloadQueued = false;
   let fitted = false;
   let destroyed = false;
   let containers = null; // server canvas: unmanaged container cards, loaded after the canvas renders
+  let usage = $state({}); // server canvas: latest CPU, memory and disk usage per server zone
+  const USAGE_POLL_MS = 30000;
   const timers = { save: 0, refresh: 0, toast: 0, view: 0 };
   // Zoom and pan are kept per team and page, so a reload opens the canvas where it was.
   const viewKey = `coolify-canvas-view:${ds.team || ''}:${window.location.pathname}`;
@@ -97,10 +111,13 @@
   let pz;
 
   const canEdit = $derived(!!graph?.can_edit);
+  // Only the environment canvas has its own card positions; server and project views save on it (canMoveGroups).
   const canMove = $derived(canEdit && graph?.can_move !== false);
-  // Server view: unmanaged containers have no environment canvas, and zone frames are laid out, not saved.
-  const canMoveNode = node => canMove && (!serverView || !!node?.environment);
-  const canMoveZones = $derived(canMove && !serverView);
+  // Server canvas: admins drag whole project / environment groups and their cards; each environment saves them.
+  const canMoveGroups = $derived(canEdit && !!graph?.can_move_groups);
+  /** Server view: key of the card's group when the card can be moved there (it is saved on its environment canvas). */
+  const movableGroupOf = node => (canMoveGroups && node ? groupKey([node], node.zone) : null);
+  let groupMeta = {}; // server view: frame top-left and zone inner top-left per group key (see layoutServerView)
   // Environment canvas endpoints of a card (the server view has no endpoints of its own for changes).
   const environmentBase = node => (serverView
     ? `/projects/${encodeURIComponent(node?.project?.uuid || '')}/environments/${encodeURIComponent(node?.environment?.uuid || '')}/canvas`
@@ -123,6 +140,7 @@
     .filter(p => !filter.project || p.uuid === filter.project)
     .flatMap(p => p.environments.map(e => ({ uuid: e.uuid, name: filter.project ? e.name : `${p.name} / ${e.name}` }))));
   const boxes = $derived(graph ? zoneBoxes(graph, positions, sizes) : []);
+  const downZones = $derived(unreachableZones(graph));
   // Server and connect views: project / environment frames inside the zones.
   const frames = $derived(graph?.layout === 'server' || graph?.layout === 'connect'
     ? zoneGroups(graph).flatMap(zone => groupFrames(zone.nodes.filter(n => n.context), positions, sizes))
@@ -197,24 +215,32 @@
   // Floating nav: the canvas fills the screen behind the top bar and the sidebar (see app.css),
   // so fit and the side panel use only the part that the floating panels do not cover.
   function coveredInsets() {
-    if (!floatingBar()) return { top: 0, left: 0 };
     const gap = 8;
     const v = viewport.getBoundingClientRect();
+    // The bottom-left controls and deployments sit below the cards; fit keeps no side space for them.
+    const deploymentsRight = 0;
+    if (!floatingBar()) return { top: 0, left: Math.max(0, deploymentsRight) };
     // The main sidebar, and a page's fixed settings rail (server canvas) when it is on the left.
     const rail = document.querySelector('.application-settings-navigation');
     const panels = [document.querySelector('.app-sidebar > div > nav'), rail && getComputedStyle(rail).position === 'fixed' ? rail : null]
       .map(el => el?.getBoundingClientRect())
       .filter(r => r?.width);
     // The toolbar is in the top bar row, or in a row below it when the top bar has no room (see alignFloatingBar).
-    const barBottom = bar?.isConnected ? bar.getBoundingClientRect().bottom : 0;
+    const barBottom = bar?.isConnected && !inControls() ? bar.getBoundingClientRect().bottom : 0;
     return {
       top: Math.max(0, Math.max(topbar.getBoundingClientRect().bottom, barBottom) + gap - v.top),
-      left: Math.max(0, ...panels.map(r => r.right + gap - v.left)),
+      left: Math.max(0, deploymentsRight, ...panels.map(r => r.right + gap - v.left)),
     };
   }
+  /** Desktop: the toolbar sits in the zoom controls bar (bottom left), not in its own panel. */
+  const inControls = () => !!bar?.closest('[data-canvas-controls]');
   function alignFloatingBar() {
     if (!floatingBar()) {
       panelTop = '';
+      return;
+    }
+    if (inControls()) {
+      panelTop = `${coveredInsets().top}px`;
       return;
     }
     const gap = 8;
@@ -232,18 +258,15 @@
     panelTop = `${coveredInsets().top}px`;
   }
   function placeBar() {
-    // data-toolbar-inline: the page docks its own actions in the top bar, so the toolbar stays in the canvas.
-    const slot = desktop.matches && !floatingBar() && !('toolbarInline' in ds) && document.getElementById('page-toolbar-slot');
+    // Desktop (every nav style): the toolbar joins the zoom controls bar at the bottom left.
+    // Small screens: a rounded box above the canvas.
     bar.removeAttribute('style');
-    if (floatingBar()) {
-      bar.className = 'fixed z-40 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-neutral-200 bg-white px-2 py-1.5 dark:border-white/[0.08] dark:bg-panel';
-      bodyEl.append(bar);
+    if (desktop.matches) {
+      bar.className = 'ml-0.5 flex items-center gap-2 border-l border-neutral-200 pr-0.5 pl-2 dark:border-white/[0.08]';
+      rootEl.querySelector('[data-canvas-controls]').append(bar);
       alignFloatingBar();
-    } else if (slot) {
-      bar.className = 'flex items-center gap-3 pl-3';
-      slot.append(bar);
     } else {
-      bar.className = 'flex shrink-0 flex-wrap items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 dark:border-white/[0.08] dark:bg-panel';
+      bar.className = 'flex shrink-0 flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 dark:border-white/[0.08] dark:bg-panel';
       barSlot.append(bar);
       panelTop = '';
     }
@@ -285,14 +308,14 @@
       root: node.closest('[data-ec-root]'),
       viewport: node,
       world: node.firstElementChild,
-      zoomLabel: {}, // the toolbar shows `zoom`
+      zoomLabel: {}, // CanvasControls shows `zoom`
       getView: () => view,
       onChange: () => {
         zoom = view.z;
         clearTimeout(timers.view);
         timers.view = setTimeout(saveView, 300);
       },
-      canPan: e => !e.target.closest('[data-ec-card],[data-ec-zone-header],[data-ec-label],[data-ec-link],a,button,input'),
+      canPan: e => !e.target.closest('[data-ec-card],[data-ec-zone-header],[data-ec-group-header],[data-ec-label],[data-ec-link],a,button,input'),
       onPanEnd: moved => {
         if (!moved) closePanel();
       },
@@ -306,7 +329,8 @@
       // Storage full or blocked: the canvas fits to the screen next time.
     }
   }
-  function fit() {
+  /** Shows every card; the first fit of a load keeps them readable (see fitView). */
+  function fit({ readable = false } = {}) {
     const all = graph ? zoneBoxes(graph, positions, sizes) : [];
     const r = viewport.getBoundingClientRect();
     const inset = coveredInsets();
@@ -315,15 +339,13 @@
       pz.apply();
       return;
     }
-    const minX = Math.min(...all.map(b => b.x));
-    const minY = Math.min(...all.map(b => b.y));
-    const maxX = Math.max(...all.map(b => b.x + b.width));
-    const maxY = Math.max(...all.map(b => b.y + b.height));
-    const pad = 48;
-    const width = r.width - inset.left;
-    const height = r.height - inset.top;
-    const z = Math.min(1.1, Math.max(MIN_ZOOM, Math.min((width - pad * 2) / (maxX - minX), (height - pad * 2) / (maxY - minY))));
-    view = { z, x: inset.left + (width - (maxX - minX) * z) / 2 - minX * z, y: inset.top + (height - (maxY - minY) * z) / 2 - minY * z };
+    const bounds = {
+      minX: Math.min(...all.map(b => b.x)),
+      minY: Math.min(...all.map(b => b.y)),
+      maxX: Math.max(...all.map(b => b.x + b.width)),
+      maxY: Math.max(...all.map(b => b.y + b.height)),
+    };
+    view = fitView(bounds, { left: inset.left, top: inset.top, width: r.width - inset.left, height: r.height - inset.top }, readable);
     pz.apply();
   }
 
@@ -350,6 +372,16 @@
   // ── Selection ──
   function select(selection) {
     selected = selection;
+  }
+  /** Dashboard deployment panel: centres the card at 100% and selects it. */
+  function showNode(id) {
+    const at = positions[id];
+    if (!at) return;
+    const size = sizes[id] || { width: 260, height: 100 };
+    const r = viewport.getBoundingClientRect();
+    view = { z: 1, x: r.width / 2 - at.x - size.width / 2, y: r.height / 2 - at.y - size.height / 2 };
+    pz.apply();
+    select({ kind: 'node', id });
   }
   function closePanel() {
     if (selected) select(null);
@@ -446,30 +478,39 @@
     if (e.button !== 0 || e.target.closest('a,button,input,[data-ec-port]')) return;
     e.stopPropagation();
     const start = { cx: e.clientX, cy: e.clientY, ...positions[id] };
+    const key = movableGroupOf(nodeById(id));
+    const meta = key ? groupMeta[key] : null;
+    const movable = canMove || !!meta;
     // The other cards and frames stay put during the drag, so measure them once.
     const rules = dragRules(graph, positions, sizes, id);
+    // Server view: the group frame stays inside its zone, below the zone header.
+    const fits = meta
+      ? b => b.x >= meta.inner.x + GROUP_PADDING && b.y >= meta.inner.y + GROUP_HEADER + GROUP_PADDING && rules.fits(b)
+      : rules.fits;
     let moved = false;
     capture(card, e.pointerId);
     begin(`card:${id}`);
     track(card, ev => {
       if (!moved && Math.hypot(ev.clientX - start.cx, ev.clientY - start.cy) < 4) return;
-      if (!canMoveNode(nodeById(id))) return;
+      if (!movable) return;
       const rect = rectOf(id);
       const wanted = { x: start.x + (ev.clientX - start.cx) / view.z, y: start.y + (ev.clientY - start.cy) / view.z, w: rect.width, h: rect.height };
       // Cards cannot cover each other or another zone: stop at the edge of what is in the way.
-      const spot = freeSpot(wanted, rules.others, BOX_GAP, rules.fits);
+      const spot = freeSpot(wanted, rules.others, BOX_GAP, fits);
       if (!spot) return;
       moved = true;
       positions[id] = { x: spot.x, y: spot.y };
     }, () => {
-      if (moved) queueSave({ [id]: { ...positions[id] } });
+      // Server view: save the whole group, so its other cards keep the place they have here.
+      if (moved && meta) saveGroup(graph.nodes.filter(n => groupKey([n], n.zone) === key).map(n => n.id), meta.shift);
+      else if (moved) queueSave({ [id]: { ...positions[id] } });
       else select({ kind: 'node', id });
       end(`card:${id}`);
     });
   }
 
   function startZoneDrag(box, header, e) {
-    if (e.button !== 0 || !canMoveZones || e.target.closest('a')) return;
+    if (e.button !== 0 || !canMove || e.target.closest('a')) return;
     e.stopPropagation();
     const ids = box.nodes.filter(id => positions[id]);
     const starts = Object.fromEntries(ids.map(id => [id, { ...positions[id] }]));
@@ -492,6 +533,53 @@
       if (moved) queueSave(Object.fromEntries(ids.map(id => [id, { ...positions[id] }])));
       end('zone');
     });
+  }
+
+  /** Server view: drag a project / environment group inside its server zone; it cannot cover another group. */
+  function startGroupDrag(frame, header, e) {
+    if (e.button !== 0 || !canMoveGroups || !frame.key || !groupMeta[frame.key] || e.target.closest('a')) return;
+    e.stopPropagation();
+    const meta = groupMeta[frame.key];
+    const ids = graph.nodes.filter(n => groupKey([n], n.zone) === frame.key).map(n => n.id);
+    const starts = Object.fromEntries(ids.map(id => [id, { ...positions[id] }]));
+    const box = toBox(frame);
+    const others = frames.filter(f => f !== frame && f.zone === frame.zone).map(toBox);
+    const fits = b => b.x >= meta.inner.x && b.y >= meta.inner.y;
+    const origin = { cx: e.clientX, cy: e.clientY };
+    let moved = false;
+    capture(header, e.pointerId);
+    begin('group');
+    track(header, ev => {
+      if (!moved && Math.hypot(ev.clientX - origin.cx, ev.clientY - origin.cy) < 4) return;
+      const wanted = { ...box, x: Math.max(meta.inner.x, box.x + (ev.clientX - origin.cx) / view.z), y: Math.max(meta.inner.y, box.y + (ev.clientY - origin.cy) / view.z) };
+      // Same gap as layoutServerView, so a reload does not move the group.
+      const spot = freeSpot(wanted, others, GROUP_GAP, fits);
+      if (!spot) return;
+      moved = true;
+      for (const id of ids) positions[id] = { x: starts[id].x + spot.x - box.x, y: starts[id].y + spot.y - box.y };
+    }, () => {
+      if (moved) saveGroup(ids, meta.shift);
+      end('group');
+    });
+  }
+
+  /**
+   * Saves the cards of a moved group on their environment canvas (the server canvas has no positions of its own),
+   * so the group keeps its place here and moves by the same distance on the environment canvas.
+   */
+  async function saveGroup(ids, shift) {
+    const saved = Object.fromEntries(ids.map(id => [id, { x: Math.round(positions[id].x - shift.x), y: Math.round(positions[id].y - shift.y) }]));
+    hold(settling.saved, saved);
+    try {
+      await api('PATCH', `${environmentBase(nodeById(ids[0]))}/positions`, { positions: saved });
+      settle(settling.saved, saved);
+      if (!destroyed) applyGraph(full);
+    } catch (e) {
+      release(settling.saved, saved);
+      if (destroyed) return;
+      toast(e.message, true);
+      load({ quiet: true });
+    }
   }
 
   function startConnect(id, port, e) {
@@ -573,18 +661,8 @@
   }
 
   // ── Persistence ──
-  /**
-   * Server view: environment canvas positions of the moved cards and of the other cards of their group,
-   * so the whole group keeps its arrangement on the next layout.
-   */
-  function environmentPositions(ids) {
-    const moved = ids.map(nodeById).filter(n => n?.environment);
-    const members = (graph?.nodes || []).filter(n => offsets[n.id] && positions[n.id]
-      && moved.some(m => m.zone === n.zone && m.environment.uuid === n.environment?.uuid));
-    return Object.fromEntries(members.map(n => [n.id, { x: positions[n.id].x - offsets[n.id].x, y: positions[n.id].y - offsets[n.id].y }]));
-  }
   function queueSave(map) {
-    Object.assign(unsaved, serverView ? environmentPositions(Object.keys(map)) : map);
+    Object.assign(unsaved, map);
     clearTimeout(timers.save);
     timers.save = setTimeout(() => flushSave(), 400);
   }
@@ -594,25 +672,34 @@
     const ids = Object.keys(batch);
     if (!ids.length || !graph) return;
     const rounded = Object.fromEntries(ids.map(id => [id, { x: Math.round(batch[id].x), y: Math.round(batch[id].y) }]));
-    const forget = () => {
-      for (const id of ids) if (unsaved[id] === batch[id]) delete unsaved[id];
-    };
-    // Server view: one request per environment canvas.
-    const requests = new Map();
-    for (const id of ids) {
-      const path = environmentBase(full?.nodes.find(n => n.id === id));
-      requests.set(path, { ...requests.get(path), [id]: rounded[id] });
-    }
+    hold(settling.positions, rounded);
+    for (const id of ids) if (unsaved[id] === batch[id]) delete unsaved[id];
     try {
-      await Promise.all([...requests].map(([path, part]) => api('PATCH', `${path}/positions`, { positions: part }, options)));
+      await api('PATCH', `${base}/positions`, { positions: rounded }, options);
+      settle(settling.positions, rounded);
       if (graph && !destroyed) patchGraph({ positions: { ...(graph.positions || {}), ...rounded } });
-      forget();
     } catch (e) {
-      forget();
+      release(settling.positions, rounded);
       if (destroyed) return;
       toast(e.message, true);
       load({ quiet: true });
     }
+  }
+
+  /** Keeps moves that are being saved on the canvas (see settling). */
+  function hold(map, moves) {
+    for (const [id, at] of Object.entries(moves)) map[id] = { at, after: Infinity };
+  }
+  /** The save is done: loads that start from now on return the moves, so they can replace them. */
+  function settle(map, moves) {
+    for (const id of Object.keys(moves)) if (map[id]?.at === moves[id]) map[id].after = loads;
+  }
+  function release(map, moves) {
+    for (const id of Object.keys(moves)) if (map[id]?.at === moves[id]) delete map[id];
+  }
+  /** A load that started after the save returned the saved moves. */
+  function dropSettled(started) {
+    for (const map of Object.values(settling)) for (const [id, entry] of Object.entries(map)) if (entry.after < started) delete map[id];
   }
 
   // ── Data ──
@@ -631,12 +718,14 @@
     next.nodes ||= [];
     next.links ||= [];
     next.positions = next.positions && !Array.isArray(next.positions) ? next.positions : {};
-    // Local moves that are not saved yet stay where the user put them.
-    next.positions = { ...next.positions, ...Object.fromEntries(Object.entries(unsaved).map(([id, p]) => [id, { x: p.x, y: p.y }])) };
+    // Local moves that are not saved yet (or not loaded back yet) stay where the user put them.
+    const kept = Object.fromEntries(Object.entries(settling.positions).map(([id, s]) => [id, s.at]));
+    next.positions = { ...next.positions, ...kept, ...Object.fromEntries(Object.entries(unsaved).map(([id, p]) => [id, { x: p.x, y: p.y }])) };
+    if (Object.keys(settling.saved).length) next.nodes = next.nodes.map(n => (settling.saved[n.id] ? { ...n, saved: settling.saved[n.id].at } : n));
     full = next;
     const shown = groupByUse(filterGraph(next, filter));
-    offsets = {};
-    positions = shown.layout === 'server' ? layoutServerView(shown, offsets) : layoutGraph(shown);
+    groupMeta = {};
+    positions = shown.layout === 'server' ? layoutServerView(shown, groupMeta) : layoutGraph(shown);
     graph = shown;
     error = null;
     if (hover && !nodeById(hover)) hover = null;
@@ -649,7 +738,7 @@
       fitted = true;
       // The first load keeps a saved view; later refits (filter changes) fit again.
       if (restoredView) restoredView = null;
-      else fit();
+      else fit({ readable: true });
       // Connect view: ?select=<card id> (from a variable's or tag's connect button) opens that card.
       const wanted = connectView && params.get('select');
       if (wanted && !selected && nodeById(wanted)) select({ kind: 'node', id: wanted });
@@ -664,13 +753,16 @@
       return;
     }
     loading = true;
+    const started = ++loads;
     try {
       const next = await api('GET', base);
+      dropSettled(started);
       if (next && containers) next.nodes = [...(next.nodes || []), ...containers];
       applyGraph(next);
       if (!quiet && fitted && next) toast('Canvas refreshed.');
       // Status refreshes keep the containers; the first load and the Refresh button read them again.
       if (next?.containers_endpoint && (!quiet || !containers)) loadContainers(next.containers_endpoint);
+      if (!quiet || !Object.keys(usage).length) loadUsage();
     } catch (e) {
       if (destroyed) return;
       if (graph) toast(e.message, true);
@@ -694,6 +786,21 @@
       applyGraph({ ...full, nodes: [...full.nodes.filter(n => n.type !== 'container'), ...nodes] });
     } catch {
       // The server zone already shows when the server is not reachable.
+    }
+  }
+
+  /** Server canvas: live usage per server, after the canvas renders (Sentinel answers through SSH). */
+  function loadUsage() {
+    for (const zone of full?.zones || []) {
+      const path = zone.details?.usage_endpoint;
+      if (!path) continue;
+      api('GET', path)
+        .then(data => {
+          if (!destroyed && data) usage = { ...usage, [zone.id]: data };
+        })
+        .catch(() => {
+          // Usage is optional; the header shows the other server details.
+        });
     }
   }
 
@@ -730,6 +837,19 @@
       }
     }
 
+    // data-poll (seconds): reload while the page is visible, for changes without a broadcast event (dashboard deployments).
+    if (Number(ds.poll) > 0) {
+      const poll = setInterval(() => {
+        if (document.visibilityState === 'visible') load({ quiet: true });
+      }, Number(ds.poll) * 1000);
+      cleanups.push(() => clearInterval(poll));
+    }
+
+    const usagePoll = setInterval(() => {
+      if (document.visibilityState === 'visible') loadUsage();
+    }, USAGE_POLL_MS);
+    cleanups.push(() => clearInterval(usagePoll));
+
     pz.apply();
     load({ quiet: true });
 
@@ -759,20 +879,14 @@
   <!-- The toolbar's place above the canvas; use:dock moves it into the top bar when there is room. -->
   <div bind:this={barSlot} class="contents">
     <Toolbar
-      title={ds.title}
       viewOnly={!!graph && !canEdit}
       {viewOnlyTitle}
       {filter}
       {projects}
       {environments}
-      {loading}
-      {zoom}
       {views}
       {dock}
       onfilter={setFilter}
-      onrefresh={() => load()}
-      onzoom={z => pz.zoomTo(z)}
-      onfit={fit}
     />
   </div>
 
@@ -796,14 +910,21 @@
       <div class="absolute top-0 left-0 origin-top-left">
         <div class="absolute top-0 left-0">
           {#each boxes as box (box.id ?? '__none')}
-            <Zone {box} movable={canMoveZones} onpress={(e, header) => startZoneDrag(box, header, e)} />
+            <Zone {box} movable={canMove} nodes={box.nodes.map(nodeById).filter(Boolean)} usage={usage[box.id]} onpress={(e, header) => startZoneDrag(box, header, e)} />
           {/each}
         </div>
         <!-- Server view: project / environment frames inside the server zones. -->
         <div class="pointer-events-none absolute top-0 left-0">
           {#each frames as frame, i (i)}
+            {@const movableGroup = canMoveGroups && !!frame.key}
             <div class="absolute rounded-xl border border-dashed border-neutral-300 dark:border-white/[0.12]" style:left="{frame.x}px" style:top="{frame.y}px" style:width="{frame.width}px" style:height="{frame.height}px">
-              <div class="flex h-8 items-center gap-1.5 px-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="flex h-8 items-center gap-1.5 px-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim {movableGroup ? 'pointer-events-auto cursor-grab active:cursor-grabbing' : ''}"
+                data-ec-group-header
+                title={movableGroup ? 'Drag to move this group' : undefined}
+                onpointerdown={e => startGroupDrag(frame, e.currentTarget, e)}
+              >
                 <Icon name="service" class="size-3 text-neutral-400 dark:text-fg-faint" />
                 <a class="pointer-events-auto truncate hover:text-neutral-700 dark:hover:text-fg [&[href]]:cursor-pointer [&[href]]:underline-offset-2 [&[href]]:hover:underline" href={frame.link || undefined} draggable="false">{frame.name || 'Other'}</a>
               </div>
@@ -854,22 +975,28 @@
         </div>
         <div class="absolute top-0 left-0">
           {#each graph?.nodes || [] as node (node.id)}
-            <Card
-              {node}
-              position={positions[node.id]}
-              selected={selected?.kind === 'node' && selected.id === node.id}
-              dropTarget={dropTarget === node.id}
-              movable={canMoveNode(node)}
-              port={canEdit && (connectView ? isSource(node) && !node.missing : !serverView || !!node.environment)
-                ? (connectView ? text.port : 'Drag to another card to draw a link')
-                : null}
-              linkCount={linkCounts[node.id] || 0}
-              zoneNames={zoneNames(node)}
-              onpress={(e, card) => startCardDrag(node.id, card, e)}
-              onconnect={(e, port) => startConnect(node.id, port, e)}
-              onselect={() => select({ kind: 'node', id: node.id })}
-              onhover={on => hoverCard(node.id, on)}
-            />
+            {#if node.type === 'empty'}
+              <EmptyCard {node} position={positions[node.id]} />
+            {:else}
+              <Card
+                {node}
+                position={positions[node.id]}
+                selected={selected?.kind === 'node' && selected.id === node.id}
+                dropTarget={dropTarget === node.id}
+                movable={canMove || !!movableGroupOf(node)}
+                port={canEdit && (connectView ? isSource(node) && !node.missing : !serverView || !!node.environment)
+                  ? (connectView ? text.port : 'Drag to another card to draw a link')
+                  : null}
+                linkCount={linkCounts[node.id] || 0}
+                zoneNames={zoneNames(node)}
+                serverDown={downZones.has(node.zone)}
+                statusText={graph?.layout === 'server'}
+                onpress={(e, card) => startCardDrag(node.id, card, e)}
+                onconnect={(e, port) => startConnect(node.id, port, e)}
+                onselect={() => select({ kind: 'node', id: node.id })}
+                onhover={on => hoverCard(node.id, on)}
+              />
+            {/if}
           {/each}
         </div>
         <!-- Link end dots sit above the cards, on their edges (like the deploy canvas ports). -->
@@ -908,6 +1035,14 @@
         </div>
       </div>
     {/if}
+
+    <!-- Bottom left: zoom controls, then the dashboard's recent deployments next to them. -->
+    <div class="pointer-events-none absolute bottom-3 left-3 right-3 z-20 flex items-end gap-2 *:pointer-events-auto" data-ec-dock>
+      <CanvasControls inline {zoom} {loading} onzoom={z => pz.zoomTo(z)} onfit={() => fit()} onrefresh={() => load()} />
+      {#if graph?.deployments?.length}
+        <Deployments deployments={graph.deployments} {nodeById} onshow={showNode} />
+      {/if}
+    </div>
 
     {#if graph && (panelNode || panelLink)}
       {#key `${selected.kind}:${selected.id}`}

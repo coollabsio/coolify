@@ -34,7 +34,7 @@
                     'label' => 'Danger Zone',
                     'route' => 'source.github.danger',
                     'active' => $activeTab === 'danger',
-                    'icon' => 'shield-alert',
+                    'icon' => 'danger',
                 ],
             ];
         @endphp
@@ -47,12 +47,14 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <aside class="application-settings-navigation min-w-0 xl:self-start"
+                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations"
                         data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                            <div class="nav-section hidden xl:block">Settings</div>
                             @foreach ($settingsMenuItems as $menuItem)
+                                @if ($menuItem['label'] === 'Danger Zone')
+                                    <div class="col-span-full my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                                @endif
                                 <a wire:key="github-app-settings-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -65,7 +67,7 @@
                                 </a>
                             @endforeach
                         </nav>
-                    </aside>
+                    </x-main-nav-menu>
 
                     <div class="min-w-0">
                         @if (!data_get($github_app, 'installation_id') && $activeTab === 'general')
@@ -138,6 +140,7 @@
                                             label="Organization" placeholder="Personal account when empty" />
 
                                         @if (!isCloud())
+                                            @can('makeSystemWide', \App\Models\GithubApp::class)
                                             <div class="lg:col-span-2">
                                                 <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
@@ -146,6 +149,7 @@
                                                     helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
                                                     :disabled="!auth()->user()->can('update', $github_app)" />
                                             </div>
+                                            @endcan
                                             @if ($isSystemWide)
                                                 <div class="lg:col-span-2">
                                                     <x-callout type="warning" title="Shared with every team">

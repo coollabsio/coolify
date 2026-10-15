@@ -9,51 +9,22 @@
     @auth
         <div x-data="{
             open: false,
-            hasSidebarPreference: localStorage.getItem('sidebarCollapsed') !== null,
-            userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-            autoCollapse: localStorage.getItem('sidebarAutoCollapse') !== 'false',
-            hasSecondBar: false,
-            collapsed: false,
+            // New users start expanded.
+            collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
             pageWidth: localStorage.getItem('pageWidth') || 'centered',
             sidebarReady: false,
             init() {
-                this.applyCollapsed(false);
                 this.$nextTick(() => {
                     requestAnimationFrame(() => {
                         this.sidebarReady = true;
                     });
                 });
             },
-            targetCollapsed() {
-                this.hasSecondBar = !!document.querySelector('.application-settings-navigation');
-                // New users start collapsed; auto-collapse still applies on pages with a settings menu.
-                const preferred = this.hasSidebarPreference ? this.userCollapsed : true;
-                return preferred || (this.autoCollapse && this.hasSecondBar);
-            },
-            applyCollapsed(animate) {
-                const target = this.targetCollapsed();
-                if (target === this.collapsed) return;
-                if (animate) {
-                    // Let the new page paint at the current width, then animate the
-                    // slide a frame later so the auto-collapse reads as a motion.
-                    this.sidebarReady = true;
-                    requestAnimationFrame(() => requestAnimationFrame(() => { this.collapsed = target; }));
-                } else {
-                    this.collapsed = target;
-                }
-            },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
-                this.hasSidebarPreference = true;
-                this.userCollapsed = this.collapsed;
-                localStorage.setItem('sidebarCollapsed', this.userCollapsed);
-            },
-            toggleAutoCollapse() {
-                this.autoCollapse = !this.autoCollapse;
-                localStorage.setItem('sidebarAutoCollapse', this.autoCollapse);
-                this.applyCollapsed(true);
+                localStorage.setItem('sidebarCollapsed', this.collapsed);
             }
-        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-on:livewire:navigated.window="applyCollapsed(true)"
+        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail"
             :style="{ '--sidebar-w': collapsed ? '4rem' : '14rem' }" x-cloak
             @class(['app-shell dark:text-inherit text-black', 'flex h-dvh flex-col' => $fullBleed ?? false])>
             {{-- ============ DESKTOP TOP BAR ============ --}}
@@ -98,6 +69,7 @@
                     {{-- Page toolbars (the canvases) dock here on desktop. --}}
                     <div id="page-toolbar-slot" class="flex shrink-0 items-center empty:hidden"></div>
                     <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
+                    <livewire:deployments-indicator variant="topbar" />
                     {{-- Resource actions dock here on desktop. --}}
                     <div id="resource-action-hud-slot" x-ref="resourceActions" class="hidden shrink-0 items-center xl:flex"></div>
                 </div>
@@ -149,8 +121,8 @@
             {{-- ============ DESKTOP SIDEBAR (below top bar) ============ --}}
             <div class="app-sidebar hidden lg:fixed lg:top-12 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col min-w-0"
                 :class="[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']">
-                <div class="flex grow min-w-0 flex-col overflow-visible">
-                    <x-navbar deployments-indicator />
+                <div class="flex min-h-0 grow min-w-0 flex-col overflow-visible">
+                    <x-navbar desktop />
                 </div>
             </div>
 

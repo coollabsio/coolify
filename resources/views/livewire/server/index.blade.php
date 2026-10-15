@@ -100,14 +100,8 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
-                        <span x-text="filteredServers.length"></span>
-                        <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
-                    </span>
-                    <x-canvas-view-toggle :list-url="route('server.index')"
-                        :canvas-url="route('server.canvas.index')" />
-                </div>
+                <x-canvas-view-toggle :list-url="route('server.index')"
+                    :canvas-url="route('server.canvas.index')" />
             </div>
 
             <div x-cloak x-show="viewMode === 'grid'"

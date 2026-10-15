@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\Project;
 use App\Models\ResourceLink;
 use App\Models\Server;
 use App\Models\Service;
@@ -21,6 +22,9 @@ use Spatie\Activitylog\Models\Activity;
 class EnvironmentCanvas
 {
     public const MAX_COORDINATE = 100000;
+
+    /** Zone id of the placeholder cards of environments without resources. */
+    public const EMPTY_ZONE = 'empty';
 
     /**
      * Environment relations that hold standalone databases, keyed by relation name.
@@ -108,6 +112,8 @@ class EnvironmentCanvas
                 $servers->put($server->id, $server);
             }
             unset($node['servers']);
+            // Other canvases keep the arrangement saved on the environment canvas inside each environment group.
+            $node['saved'] = $this->filterPositions($resource->environment?->canvas_positions ?? [], [$resource->uuid])[$resource->uuid] ?? null;
 
             return $node;
         })->values();
@@ -147,6 +153,65 @@ class EnvironmentCanvas
     }
 
     /**
+     * Zone of the server, project and dashboard canvases for environments without resources (they have no server).
+     *
+     * @return array{id: string, name: string, icon: string}
+     */
+    public function emptyZone(): array
+    {
+        return ['id' => self::EMPTY_ZONE, 'name' => 'Empty environments', 'icon' => 'service'];
+    }
+
+    /**
+     * Zone for the placeholder cards of a project: the zone with most of the project's cards, or `$fallback`
+     * when the project has no cards.
+     *
+     * @param  Collection<int, array<string, mixed>>  $nodes  cards of the canvas
+     * @return callable(Project): string
+     */
+    public function projectZones(Collection $nodes, string $fallback): callable
+    {
+        $zones = $nodes
+            ->filter(fn (array $node) => filled($node['zone']))
+            ->groupBy(fn (array $node) => data_get($node, 'project.uuid'))
+            ->map(fn (Collection $cards) => $cards->countBy('zone')->sortDesc()->keys()->first());
+
+        return fn (Project $project) => $zones->get($project->uuid, $fallback);
+    }
+
+    /**
+     * Placeholder card of an environment without resources, so the grouped canvases still show it.
+     * Without an environment, it stands for a project without environments.
+     * `$canAdd`: the card opens the deploy canvas for the environment instead of the environment page.
+     *
+     * @return array<string, mixed>
+     */
+    public function emptyNode(Project $project, ?Environment $environment, string $zone, string $context, bool $canAdd = false): array
+    {
+        $page = $environment
+            ? route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])
+            : route('project.show', ['project_uuid' => $project->uuid]);
+        $add = $canAdd && $environment;
+
+        return [
+            'id' => 'empty:'.($environment?->uuid ?? $project->uuid),
+            'type' => 'empty',
+            'name' => $environment ? 'No resources yet' : 'No environments yet',
+            'subtitle' => $add ? 'Click to add a resource' : 'Open to see this '.($environment ? 'environment' : 'project'),
+            'status' => null,
+            'zone' => $zone,
+            'extra_zones' => [],
+            'urls' => [],
+            'children' => [],
+            'link' => $add ? route('deploy-canvas', ['project' => $project->uuid, 'environment' => $environment->uuid]) : $page,
+            'context' => $context,
+            'context_link' => $page,
+            'project' => ['uuid' => $project->uuid, 'name' => $project->name],
+            'environment' => $environment ? ['uuid' => $environment->uuid, 'name' => $environment->name] : null,
+        ];
+    }
+
+    /**
      * Top-level resources of the environment (applications, services, standalone databases), keyed by uuid,
      * with the relations the canvas reads.
      *
@@ -157,19 +222,19 @@ class EnvironmentCanvas
         $project = $environment->project;
         $environment->setRelation('project', $project);
         $applications = $environment->applications()
-            ->with(['destination.server.settings', 'additional_servers.settings', 'persistentStorages'])
+            ->with(['destination.server.settings', 'additional_servers.settings'])
             ->get();
         $services = $environment->services()
             ->with([
                 'server.settings',
                 'destination.server.settings',
-                'applications.persistentStorages',
-                'databases.persistentStorages',
+                'applications',
+                'databases',
             ])
             ->get();
         $databases = collect(self::DATABASE_RELATIONS)
             ->flatMap(fn (string $relation) => $environment->{$relation}()
-                ->with(['destination.server.settings', 'persistentStorages'])
+                ->with(['destination.server.settings'])
                 ->get());
 
         return collect()
@@ -251,7 +316,6 @@ class EnvironmentCanvas
             'kind' => $buildPack,
             'subtitle' => $this->subtitle([self::BUILD_PACK_NAMES[$buildPack] ?? str($buildPack)->headline()->value(), $detail]),
             'children' => [],
-            'volumes' => $application->persistentStorages->pluck('name')->filter()->values()->all(),
             'link' => $application->link(),
             'logo' => resource_logo($application),
             'servers' => collect([$server])->concat($extraServers)->filter()->all(),
@@ -285,12 +349,6 @@ class EnvironmentCanvas
             'kind' => null,
             'subtitle' => $this->subtitle(['Service', $containerCount.' '.str('container')->plural($containerCount)]),
             'children' => $children->all(),
-            'volumes' => $service->applications->concat($service->databases)
-                ->flatMap(fn ($child) => $child->persistentStorages->pluck('name'))
-                ->filter()
-                ->unique()
-                ->values()
-                ->all(),
             'link' => $service->link(),
             'logo' => resource_logo($service),
             'servers' => collect([$server])->filter()->all(),
@@ -316,7 +374,6 @@ class EnvironmentCanvas
             'kind' => $engine,
             'subtitle' => $this->subtitle([self::DATABASE_ENGINE_NAMES[$engine] ?? str($engine)->headline()->value(), $database->image]),
             'children' => [],
-            'volumes' => $database->persistentStorages->pluck('name')->filter()->values()->all(),
             'link' => $database->link(),
             'logo' => resource_logo($database),
             'servers' => collect([$server])->filter()->all(),

@@ -11,6 +11,8 @@ use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
+use App\Traits\PreparesBackupDownloads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +26,8 @@ use Throwable;
 class VolumeBackups extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use PreparesBackupDownloads;
     use WithPagination;
 
     public LocalPersistentVolume|LocalFileVolume $storage;
@@ -33,6 +37,9 @@ class VolumeBackups extends Component
     public ?ScheduledVolumeBackup $backup = null;
 
     public string $section = 'general';
+
+    /** The page shows the backup actions in the top header bar instead. */
+    public bool $actionsInHeader = false;
 
     public string $frequency = 'daily';
 
@@ -66,6 +73,15 @@ class VolumeBackups extends Component
     public int $missingBackupNotificationDays = 0;
 
     public int $perPage = 10;
+
+    public function getListeners(): array
+    {
+        if ($this->section !== 'executions') {
+            return [];
+        }
+
+        return $this->teamChannelListeners(['BackupCreated' => '$refresh']);
+    }
 
     public function updatedPerPage(): void
     {
@@ -329,6 +345,28 @@ class VolumeBackups extends Component
         $this->dispatch('success', 'Backup recovery queued.');
     }
 
+    public function downloadBackup(int $executionId): void
+    {
+        $this->authorize('update', $this->resource);
+
+        $execution = $this->backup?->executions()->whereKey($executionId)->first();
+        if (! $execution) {
+            $this->dispatch('error', 'Backup execution not found.');
+
+            return;
+        }
+
+        try {
+            $this->prepareBackupDownload(
+                $execution->local_storage_deleted ? null : $this->backup->server(),
+                $execution->filename,
+                route('download.volume-backup', $execution->id),
+            );
+        } catch (Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function deleteBackup(int $executionId, string $password, array $selectedActions = []): bool|string
     {
         $this->authorize('update', $this->resource);
@@ -383,6 +421,7 @@ class VolumeBackups extends Component
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),
             'latestExecution' => $this->backup?->executions()->first(),
+            's3Downloads' => $this->s3BackupDownloadsEnabled(),
             'deleteScheduleCheckboxes' => [
                 ['id' => 'delete_associated_backups_locally', 'label' => 'Delete all local archives created by this schedule.'],
                 ['id' => 'delete_associated_backups_s3', 'label' => 'Delete all S3 archives created by this schedule.'],

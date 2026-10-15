@@ -93,7 +93,7 @@ it('saves several S3 destinations for the instance backup and drops storages of 
     // The session team can change in another tab after the page loads.
     session(['currentTeam' => ['id' => $this->otherTeam->id]]);
 
-    Livewire::test(BackupEdit::class, ['backup' => $this->backup->fresh(), 'availableS3Storages' => collect(), 'section' => 's3'])
+    Livewire::test(BackupEdit::class, ['backup' => $this->backup->fresh(), 'availableS3Storages' => collect()])
         ->set('saveS3', true)
         ->set('s3StorageIds', [$this->firstStorage->id, $this->secondStorage->id, $this->foreignStorage->id])
         ->call('submit')

@@ -21,7 +21,7 @@
     },
 }" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()"
     @click.outside="closePanel()">
-    <button type="button" @click="open ? closePanel() : openPanel()"
+    <button type="button" x-ref="userMenuButton" @click="open ? closePanel() : openPanel()"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
         @if ($sidebar) :class="collapsed ? 'w-8 px-0' : 'w-full'" @endif
         @class([
@@ -44,7 +44,9 @@
         </svg>
     </button>
 
+    {{-- In the sidebar the panel is fixed to the button, so the scrolling sidebar does not clip it. --}}
     <div x-show="open" x-cloak
+        @if ($sidebar) x-anchor.top-start.fixed.offset.4="$refs.userMenuButton" @endif
         x-transition:enter="transition ease-out duration-150"
         x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
         x-transition:leave="transition ease-in duration-100"
@@ -52,7 +54,6 @@
         @class([
             'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
             'right-0! left-auto!' => ! $sidebar,
-            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
             'origin-bottom-left' => $sidebar,
             'origin-top-right' => ! $sidebar,
         ])>
@@ -83,22 +84,6 @@
         <div x-show="appearanceOpen" x-collapse.duration.200ms class="mx-1 pb-1 pl-6">
             <x-theme-controls variant="menu" />
         </div>
-
-        <button type="button" class="listbox-option w-full" @click="toggleAutoCollapse()"
-            :aria-pressed="autoCollapse" title="Collapse the sidebar on pages that have a settings menu">
-            <span class="flex items-center gap-2">
-                <svg class="size-4 opacity-80" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
-                    <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-                </svg>
-                Auto-collapse sidebar
-            </span>
-            <svg x-show="autoCollapse" x-cloak class="size-4 shrink-0 text-black dark:text-fg" viewBox="0 0 24 24"
-                fill="none" aria-hidden="true">
-                <path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" />
-            </svg>
-        </button>
 
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
 

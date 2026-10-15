@@ -1,4 +1,10 @@
-<div>
+<div x-on:open-backup-download.window="window.location.href = $event.detail.url">
+    @if (count($pendingDownloads) > 0)
+        <div wire:poll.3s="checkDownloads" class="hidden"></div>
+    @endif
+    @if ($executions->onFirstPage())
+        <div wire:poll.5000ms class="hidden"></div>
+    @endif
     @if ($selectedExecution)
         <x-modal-input title="Backup execution" wireOpen="executionModalOpen" :wireIgnore="false" isLarge>
             <x-slot:content><span></span></x-slot:content>
@@ -60,7 +66,12 @@
                         <span>{{ $execution['started_at']->diffForHumans() }}</span>
                         <span>{{ $execution['size'] ? formatBytes($execution['size']) : '-' }}</span>
                         <span class="flex justify-end">
-                            @if ($execution['download_url'])
+                            @if ($execution['download_url'] && $s3Downloads)
+                                <button type="button" wire:click.stop="downloadExecution('{{ $execution['uuid'] }}')"
+                                    class="icon-button shrink-0" title="Download backup" aria-label="Download backup">
+                                    <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                </button>
+                            @elseif ($execution['download_url'])
                                 <a href="{{ $execution['download_url'] }}" target="_blank" rel="noopener"
                                     @click.stop class="icon-button shrink-0" title="Download backup"
                                     aria-label="Download backup">

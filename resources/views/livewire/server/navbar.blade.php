@@ -141,7 +141,7 @@
                             <span class="size-1.5 shrink-0 rounded-full"
                                 :class="option.functional ? 'bg-success' : 'bg-error'"></span>
                             <span class="min-w-0 flex-1 truncate" x-text="option.name"></span>
-                            <x-reicon name="check-circle"
+                            <x-reicon name="check"
                                 class="size-3.5 shrink-0 text-black dark:text-fg"
                                 x-show="option.uuid === '{{ $server->uuid }}'" />
                         </a>

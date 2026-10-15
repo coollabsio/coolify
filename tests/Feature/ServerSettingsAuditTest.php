@@ -126,6 +126,12 @@ test('toggling terminal access records enabled and disabled events', function ()
         ->and(serverSettingsAuditRows('ui.server.terminal_access.disabled'))->toHaveCount(1);
 });
 
+test('toggling terminal access keeps the security sidebar group open', function () {
+    Livewire::test(TerminalAccess::class, ['server_uuid' => $this->server->uuid])
+        ->call('toggleTerminal', 'password')
+        ->assertSeeHtml("activeGroup: 'Security'");
+});
+
 test('server settings saves record changed setting names without the sentinel token', function () {
     $newToken = 'audit-secret-sentinel-token-123';
 

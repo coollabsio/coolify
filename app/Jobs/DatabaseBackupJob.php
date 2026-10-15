@@ -24,6 +24,7 @@ use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use App\Support\DatabaseOperationReservation;
+use App\Support\PostgresUser;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -167,18 +168,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->directory_name = $serviceName.'-'.$this->container_name;
                 $escapedContainerName = escapeshellarg($this->container_name);
                 if (str($databaseType)->contains('postgres')) {
-                    $commands[] = "docker exec {$escapedContainerName} env | grep POSTGRES_";
+                    $commands[] = "docker exec {$escapedContainerName} env | grep -E '^(POSTGRES|PGUSER=)'";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
 
-                    $user = $envs->filter(function ($env) {
-                        return str($env)->startsWith('POSTGRES_USER=');
-                    })->first();
-                    if ($user) {
-                        $this->database->postgres_user = str($user)->after('POSTGRES_USER=')->value();
-                    } else {
-                        $this->database->postgres_user = 'postgres';
-                    }
+                    $this->database->postgres_user = PostgresUser::fromEnvLines($envs);
 
                     $db = $envs->filter(function ($env) {
                         return str($env)->startsWith('POSTGRES_DB=');

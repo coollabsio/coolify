@@ -2,9 +2,9 @@
     <x-slot:title>
         {{ $environment->name }} > Canvas | Coolify
     </x-slot>
-    <div data-environment-canvas data-title="Environment canvas" data-project="{{ $project->uuid }}" data-environment="{{ $environment->uuid }}"
+    <div data-environment-canvas data-project="{{ $project->uuid }}" data-environment="{{ $environment->uuid }}"
         data-team="{{ $project->team_id }}" data-user="{{ auth()->id() }}"
-        data-new="{{ auth()->user()->can('createAnyResource') ? route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) : '' }}"
+        data-new="{{ auth()->user()->can('createAnyResource') ? route('deploy-canvas', ['project' => $project->uuid, 'environment' => $environment->uuid]) : '' }}"
         class="relative h-full" wire:ignore>
         {{-- The canvas moves this group into its toolbar; the page actions come last, at the right end. --}}
         <div data-ec-views class="flex items-center gap-2">
@@ -26,8 +26,9 @@
                 </a>
             @endcan
             @can('createAnyResource')
-                <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
-                    {{ wireNavigate() }} class="button button-highlighted whitespace-nowrap">
+                {{-- A full page load: the deploy canvas uses the minimal layout. --}}
+                <a href="{{ route('deploy-canvas', ['project' => $project->uuid, 'environment' => $environment->uuid]) }}"
+                    class="button button-highlighted whitespace-nowrap">
                     <x-reicon name="plus" class="size-3.5" />
                     New resource
                 </a>

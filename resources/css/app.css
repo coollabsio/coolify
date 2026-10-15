@@ -1889,6 +1889,15 @@ html[data-theme="custom"] textarea:disabled {
         grid-column: 2;
     }
 
+    /* A resource menu that the main sidebar shows instead (navbar #main-nav-context-{depth}). */
+    .application-settings-navigation.in-main-nav {
+        display: none;
+    }
+
+    .application-settings-navigation.in-main-nav ~ * {
+        grid-column: 1 / -1;
+    }
+
     html:not(.dark) .application-settings-navigation {
         --rail-fill: var(--coollabs-base);
     }
@@ -1916,7 +1925,7 @@ html[data-theme="custom"] textarea:disabled {
         z-index: 20;
     }
 
-    .app-main-full .application-settings-navigation ~ [data-environment-canvas] {
+    .app-main-full .application-settings-navigation:not(.in-main-nav) ~ [data-environment-canvas] {
         margin-left: calc(210px + 2.5rem);
     }
 
@@ -2033,6 +2042,17 @@ html[data-theme="custom"] textarea:disabled {
 .dark .application-settings-workspace .form-control:hover,
 .dark .application-settings-form .form-control:hover {
     background: transparent;
+}
+
+/* Main sidebar: only the menu scrolls on short or zoomed-in screens; the
+   footer stays visible. Hide the scrollbar so it does not take width from the
+   narrow collapsed rail and push the icons aside. */
+.sidebar-menu {
+    scrollbar-width: none; /* Firefox */
+}
+
+.sidebar-menu::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
 }
 
 /* Unified resource heading bar: hide tab-strip scrollbars; menus/actions stay overflow-visible for dropdowns */
@@ -2164,7 +2184,7 @@ html[data-theme="custom"] textarea:disabled {
 .application-heading-actions .button,
 .application-heading-actions .app-tab,
 .application-heading-actions .relative > button[x-ref='trigger'] {
-    height: 1.75rem;
+    height: 2rem;
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
@@ -2319,11 +2339,6 @@ html[data-theme="custom"] textarea:disabled {
     position: relative;
     z-index: 1;
     box-shadow: 0 0 0 1px var(--color-accent);
-}
-
-.application-heading-actions .split-action-main,
-.application-heading-actions .split-action-caret {
-    height: 1.75rem;
 }
 
 /* Custom listbox (replaces native <select>) */
@@ -2649,6 +2664,44 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .env-table-grid {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+/* File browser: icon, name, perms, size, modified, actions.
+   Every column is a fixed width except the flexible name column, so the
+   header grid and each row grid resolve identical tracks and stay aligned
+   (an `auto` column would size to its own content per row and drift). */
+.file-table-grid {
+    grid-template-columns: 1.75rem minmax(10rem, 1fr) 5rem 6rem 6rem 5rem 11rem 10rem;
+}
+
+@media (max-width: 768px) {
+    .data-table-header.file-table-grid {
+        display: none;
+    }
+
+    .data-table-row.file-table-grid {
+        grid-template-columns: 1.75rem minmax(0, 1fr) 10rem;
+        gap: 0.75rem;
+    }
+
+    /* Hide perms, owner, group, size and modified columns on small screens */
+    .data-table-row.file-table-grid > :nth-child(3),
+    .data-table-row.file-table-grid > :nth-child(4),
+    .data-table-row.file-table-grid > :nth-child(5),
+    .data-table-row.file-table-grid > :nth-child(6),
+    .data-table-row.file-table-grid > :nth-child(7) {
+        display: none;
+    }
+}
+
+/* File browser Monaco editor container: fixed viewport-relative height with a
+   rounded, hairline-framed surface that matches the rest of the settings UI. */
+.file-editor-monaco {
+    height: 60vh;
+    min-height: 320px;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px var(--coollabs-line);
 }
 
 .environment-table-scroll {
@@ -3163,8 +3216,9 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+/* Status and Started only fit a badge and a short "3 hours ago"; the names get the rest. */
 .dashboard-deployment-table-grid {
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.7fr) 6.5rem 6rem;
 }
 
 .team-members-table-grid {
@@ -3225,13 +3279,18 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-executions-table-grid {
-    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 8.5rem 5rem minmax(8rem, 1fr) 5rem;
     gap: 0.75rem;
     min-width: 66rem;
 }
 
 .backup-executions-table-scroll {
     overflow-x: auto;
+}
+
+/* Match the grid width so the log output spans the full scrolled row. */
+.backup-execution-row {
+    min-width: 66rem;
 }
 
 .backup-execution-row:last-child > .data-table-row {
@@ -3286,11 +3345,10 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 8rem 6rem minmax(9rem, auto);
+        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 8.5rem minmax(8rem, 1fr) 5rem;
     }
 
-    .backup-executions-table-grid > :nth-child(6),
-    .backup-executions-table-grid > :nth-child(7) {
+    .backup-executions-table-grid > :nth-child(5) {
         display: none;
     }
 }
@@ -3370,15 +3428,18 @@ input[type="search"]::-webkit-search-results-decoration {
         display: none;
     }
 
+    .backup-executions-table-grid,
+    .backup-execution-row {
+        min-width: 42rem;
+    }
+
     .backup-executions-table-grid {
         grid-template-columns: 7.5rem 9rem minmax(14rem, 1fr) minmax(7rem, auto);
-        min-width: 42rem;
     }
 
     .backup-executions-table-grid > :nth-child(4),
     .backup-executions-table-grid > :nth-child(5),
-    .backup-executions-table-grid > :nth-child(6),
-    .backup-executions-table-grid > :nth-child(7) {
+    .backup-executions-table-grid > :nth-child(6) {
         display: none;
     }
 
@@ -5219,9 +5280,14 @@ a.command-palette-item:focus-visible {
    has no background. Applies to both navigation styles. Appearance →
    Navigation items → Flat sets data-nav-items="flat" on <html> and turns these
    rules off, which brings back the plain rows. */
-html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) {
+html:where(:not([data-nav-items="flat"])) .menu-item:not(.sidebar-toggle) {
     height: 2.5rem;
     padding-left: 0.25rem;
+}
+
+/* In-page section rows have no icon tile, so they stay compact. */
+html:where(:not([data-nav-items="flat"])) .menu-subitem {
+    height: 1.75rem;
 }
 
 /* Only the icon tile reacts: no row background on hover or for the current
@@ -5229,8 +5295,9 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.si
    In the utilities layer so it can beat the search row's !bg-* utilities
    (a layered !important wins over an unlayered one). */
 @layer utilities {
-    html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle),
-    html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover {
+    /* The submenu Back row (navbar) keeps its fill. */
+    html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle, .menu-back),
+    html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle, .menu-back):hover {
         background-color: transparent !important;
     }
 
@@ -5275,6 +5342,13 @@ html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subi
     --button-depth-color: color-mix(in oklab, var(--color-warning) 35%, transparent) !important;
 }
 
+/* Danger Zone icons (<x-reicon name="danger">) stay red, also when active. */
+html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon.text-error {
+    color: var(--color-error);
+    border-color: color-mix(in oklab, var(--color-error) 45%, transparent) !important;
+    --button-depth-color: color-mix(in oklab, var(--color-error) 40%, transparent) !important;
+}
+
 html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible {
     outline: none;
 }
@@ -5282,6 +5356,47 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.si
 html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible .menu-item-icon {
     outline: 1px solid var(--color-accent);
     outline-offset: 2px;
+}
+
+/* Sidebar menu swap: a deeper menu (submenu, resource menu) enters from the right, a lower one from the left.
+   CSS animations restart when an element is shown again, so x-show replays them on each swap. */
+@keyframes nav-swap-forward {
+    from {
+        opacity: 0;
+        transform: translateX(0.5rem);
+    }
+}
+
+@keyframes nav-swap-back {
+    from {
+        opacity: 0;
+        transform: translateX(-0.5rem);
+    }
+}
+
+.nav-swap-forward {
+    animation: nav-swap-forward 150ms ease-out;
+}
+
+.nav-swap-back {
+    animation: nav-swap-back 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-swap-forward,
+    .nav-swap-back {
+        animation: none;
+    }
+}
+
+/* Submenu Back chevron box: one icon wide (flat), or one icon tile wide (16px + padding + border). */
+.menu-back-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+html:where(:not([data-nav-items="flat"])) .menu-back-icon {
+    width: calc(1rem + 0.875rem + 2px);
 }
 
 html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
@@ -5427,7 +5542,7 @@ html.dark .canvas-zoom-max {
     --canvas-dots-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath transform='translate(8 8) scale(0.0125)' d='M64 256H0V64h64Zm0-192V0h256v64Zm0 192h256v64H64Z' fill='rgb(255 255 255 / 0.09)'/%3E%3C/svg%3E");
 }
 
-.canvas-zoom-max :is([data-ec-viewport], .cv-viewport) {
+.canvas-zoom-max [data-ec-viewport] {
     background-image: var(--canvas-dots-image);
 }
 
@@ -5438,7 +5553,8 @@ html.dark .canvas-zoom-max {
 @media (min-width: 1024px) {
     html[data-nav-style="floating"] {
         --floating-gap: 0.5rem;
-        --floating-radius: 12px;
+        /* Same radius as the content cards (.application-settings-section). */
+        --floating-radius: 8px;
         --floating-line: oklch(0% 0 0 / 0.09);
         /* Bottom edge of the top bar panel plus one gap. */
         --floating-top: calc(3rem + var(--floating-gap) * 2);
@@ -5469,7 +5585,7 @@ html.dark .canvas-zoom-max {
         background-color: var(--color-panel);
     }
 
-    html[data-nav-style="floating"] :is(.app-topbar, .app-sidebar > div > nav, .app-tabbar) {
+    html[data-nav-style="floating"] :is(.app-topbar, .app-sidebar > div > nav) {
         border: 1px solid var(--floating-line);
         border-radius: var(--floating-radius);
     }
@@ -5501,14 +5617,16 @@ html.dark .canvas-zoom-max {
         left: var(--floating-gap);
     }
 
-    html[data-nav-style="floating"] .app-sidebar > div > nav > .sticky {
+    html[data-nav-style="floating"] .app-sidebar > div > nav > .sidebar-footer {
         border-radius: 0 0 var(--floating-radius) var(--floating-radius);
     }
 
     html[data-nav-style="floating"] .app-main {
         margin-left: calc(var(--sidebar-w, 14rem) + var(--floating-gap));
-        /* The content top lines up with the sidebar and settings rail panels. */
-        padding-top: var(--floating-top);
+        /* The content top lines up with the sidebar and settings rail panels.
+           The cards draw their frame as a 1px ring outside the box, while the
+           panels use a 1px border inside it, so add 1px to match the edges. */
+        padding-top: calc(var(--floating-top) + 1px);
     }
 
     /* Full-bleed pages (canvases): no top padding gap, and the same gap as the panels. */
@@ -5547,7 +5665,7 @@ html.dark .canvas-zoom-max {
         padding-top: var(--floating-top);
     }
 
-    html[data-nav-style="floating"] .app-main-full :is([data-ec-viewport], .cv-viewport) {
+    html[data-nav-style="floating"] .app-main-full [data-ec-viewport] {
         background-image: none;
     }
 
@@ -5558,10 +5676,11 @@ html.dark .canvas-zoom-max {
         padding-bottom: var(--floating-gap);
     }
 
-    html[data-nav-style="floating"] .app-tabbar {
-        top: var(--floating-top);
+    /* Dashboard canvas Deployments panel: one gap from the floating sidebar and the screen bottom. */
+    /* Bottom-left zoom controls and deployments: the canvas fills the screen behind the sidebar, so start one gap after it. */
+    html[data-nav-style="floating"] .app-main-full [data-ec-dock] {
         left: calc(var(--sidebar-w, 14rem) + var(--floating-gap) * 2);
-        right: var(--floating-gap);
+        bottom: var(--floating-gap);
     }
 }
 
@@ -5653,4 +5772,20 @@ html.dark .canvas-zoom-max {
     html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.12]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 12%, var(--color-app)) !important; }
     html.dark[data-nav-style="floating"] .app-main [class*="dark:hover:bg-white/[0.1]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
     html.dark[data-nav-style="floating"] .app-main .button:not(:disabled):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
+}
+
+/* Resource menu in the collapsed main sidebar: icons only. */
+.sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-section-toggle, .nav-children, .menu-item > :not(.menu-item-icon)) {
+    display: none !important;
+}
+
+.sidebar-collapsed .nav-context-menu .menu-item {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* A page menu's own "Back to ..." item: the main sidebar copy has the back row instead (components/main-nav-menu). */
+.nav-context-menu [data-page-only] {
+    display: none !important;
 }

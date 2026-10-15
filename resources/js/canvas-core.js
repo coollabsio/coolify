@@ -96,6 +96,18 @@ export function setCanvasDots(root, size, x, y, atMaxZoom = false) {
 }
 
 /**
+ * The browser zoom shortcut in a keydown event (Cmd/Ctrl with +, - or 0), so the
+ * canvas can zoom itself instead: 'in', 'out', 'reset', or null for other keys.
+ */
+export function zoomShortcut(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return null;
+  if (e.key === '+' || e.key === '=') return 'in';
+  if (e.key === '-' || e.key === '_') return 'out';
+  if (e.key === '0') return 'reset';
+  return null;
+}
+
+/**
  * Wheel zoom (ctrl/cmd) and pan, and drag-to-pan on the viewport background.
  * getView() returns the current { x, y, z }, which is changed in place.
  * canPan(event) decides which presses pan; onPanEnd(moved) runs on release.

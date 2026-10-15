@@ -107,7 +107,7 @@ beforeEach(function () {
 it('saves two S3 destinations for a database backup schedule', function () {
     $backup = createDatabaseBackupForDestinationsFormTest($this->database);
 
-    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->assertSee('First S3')
         ->assertSee('Second S3')
         ->assertSet('s3StorageIds', [$this->firstStorage->id])
@@ -282,7 +282,7 @@ it('shows the copy status of each destination in the execution lists', function 
     }
 
     Livewire::test(BackupExecutions::class, ['backup' => $databaseBackup])
-        ->assertSeeInOrder(['First S3 Available', 'Second S3 Failed'])
+        ->assertSeeInOrder(['First S3', 'Second S3 failed'])
         ->assertSee('Access denied')
         ->assertSee('Delete the selected backup permanently from every S3 storage');
 
@@ -304,12 +304,12 @@ it('keeps a selected destination that is unusable for a while when other setting
     $volumeBackup->syncS3Storages([$this->firstStorage->id, $this->secondStorage->id]);
     $this->secondStorage->update(['is_usable' => false]);
 
-    Livewire::test(BackupEdit::class, ['backup' => $databaseBackup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
+    Livewire::test(BackupEdit::class, ['backup' => $databaseBackup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->assertSee('Second S3 (unavailable)')
         ->set('timeout', 7200)
         ->call('submit')
         ->assertHasNoErrors();
-    Livewire::test(VolumeBackups::class, ['storage' => $this->volume, 'resource' => $this->application, 'section' => 's3'])
+    Livewire::test(VolumeBackups::class, ['storage' => $this->volume, 'resource' => $this->application])
         ->assertSee('Second S3 (unavailable)')
         ->set('stopDuringBackup', true)
         ->call('save')

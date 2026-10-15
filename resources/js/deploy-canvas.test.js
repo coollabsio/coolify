@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freeSpot } from './canvas-core.js';
+import { freeSpot, zoomShortcut } from './canvas-core.js';
 import { canFollow, domainList, fresh, logoOf, onlyOption, parseEnvVars, planOf, splitImage, targetFrom, uniqueLabels, withDeploy, withoutSecrets, withTarget } from './deploy-canvas.js';
 
 test('splits the tag out of an image name', () => {
@@ -175,4 +175,15 @@ test('shows the logo of what a source step creates, like the rest of Coolify', (
     // No engine or template yet, or a step that creates nothing: the step keeps its glyph.
     assert.equal(src('database', {}), null);
     assert.equal(src('server', {}), null);
+});
+
+test('reads the browser zoom shortcut so the canvas can zoom instead', () => {
+    const key = (key, mods = {}) => zoomShortcut({ key, ctrlKey: false, metaKey: false, altKey: false, ...mods });
+    assert.equal(key('=', { metaKey: true }), 'in');
+    assert.equal(key('+', { ctrlKey: true }), 'in');
+    assert.equal(key('-', { ctrlKey: true }), 'out');
+    assert.equal(key('0', { metaKey: true }), 'reset');
+    assert.equal(key('-'), null);
+    assert.equal(key('-', { ctrlKey: true, altKey: true }), null);
+    assert.equal(key('s', { metaKey: true }), null);
 });

@@ -2,9 +2,9 @@
     <x-slot:title>
         {{ str($scope)->headline() }} Variables > Canvas | Coolify
     </x-slot>
-    {{-- Fixed rail on xl, hidden below xl (see .app-main-full .application-settings-navigation in app.css). --}}
+    {{-- Page search items; the menu is in the main sidebar. --}}
     <x-shared-variables.sidebar />
-    <div data-environment-canvas data-title="Variables canvas" data-mode="variables" data-endpoint="{{ $endpoint }}"
+    <div data-environment-canvas data-mode="variables" data-endpoint="{{ $endpoint }}"
         data-team="{{ $teamId }}" data-user="{{ auth()->id() }}"
         class="relative min-h-0 flex-1" wire:ignore>
         {{-- The canvas moves this group into its toolbar (page actions last, at the right end),
