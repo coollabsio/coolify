@@ -14,6 +14,7 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\GotifyNotificationSettings;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
@@ -113,6 +114,7 @@ class AuthServiceProvider extends ServiceProvider
         TelegramNotificationSettings::class => NotificationPolicy::class,
         SlackNotificationSettings::class => NotificationPolicy::class,
         PushoverNotificationSettings::class => NotificationPolicy::class,
+        GotifyNotificationSettings::class => NotificationPolicy::class,
         WebhookNotificationSettings::class => NotificationPolicy::class,
 
         // API Token policy
