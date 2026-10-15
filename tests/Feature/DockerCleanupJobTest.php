@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Services\ScheduledJobDeliveryService;
 use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Jobs\FakeJob;
@@ -524,4 +525,81 @@ it('removes stopped Coolify containers but keeps the proxy, databases, applicati
 
     expect($command)->toContain('--filter label=coolify.managed=true')
         ->and(trim((string) $output))->toBe('rm helper');
+});
+
+it('broadcasts DockerCleanupDone without the cleanup log so large logs fit the Reverb message size', function () {
+    $server = dockerCleanupReachableServer();
+    $execution = DockerCleanupExecution::create([
+        'server_id' => $server->id,
+        'status' => 'success',
+        'cleanup_log' => str_repeat('x', 50_000),
+    ]);
+    $event = new DockerCleanupDone($execution);
+    $event->broadcastOn();
+
+    $payload = (fn () => $this->getPayloadFromEvent($event))->call(new BroadcastEvent($event), $event);
+
+    expect($payload)->toBe([
+        'executionId' => $execution->id,
+        'serverId' => $server->id,
+        'status' => 'success',
+        'socket' => null,
+    ])->and(strlen(json_encode($payload)))->toBeLessThan(10_000);
+});
+
+/**
+ * Runs a cleanup command with a fake docker on PATH: `docker images` prints $images, `docker rmi`
+ * prints what it is asked to remove, other docker commands print nothing.
+ */
+function dockerCleanupRunImageCommand(string $command, array $images): string
+{
+    $bin = sys_get_temp_dir().'/docker-cleanup-'.bin2hex(random_bytes(4));
+    mkdir($bin);
+    file_put_contents("$bin/images", implode("\n", $images)."\n");
+    file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = images ]; then cat $bin/images; elif [ \"\$1\" = rmi ]; then echo \"\$@\"; fi\n");
+    chmod("$bin/docker", 0755);
+
+    $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
+
+    array_map('unlink', glob("$bin/*"));
+    rmdir($bin);
+
+    return trim((string) $output);
+}
+
+it('removes old helper, realtime and sentinel images from any registry but keeps the current helper', function () {
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildCoolifyImageCleanupCommand'))->invoke(new CleanupDocker, '1.0.17');
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'coollabsio/coolify-helper:1.0.17',
+        'ghcr.io/coollabsio/coolify-helper:1.0.17',
+        'coollabsio/coolify-helper:1.0.14',
+        'ghcr.io/coollabsio/coolify-helper:1.0.15',
+        'coollabsio/coolify-helper:1.0.170',
+        'coollabsio/coolify-realtime:1.0.19',
+        'ghcr.io/coollabsio/coolify-realtime:1.0.17',
+        'coollabsio/sentinel:1.0.1',
+        'ghcr.io/coollabsio/sentinel:0.0.22',
+        'coollabsio/sentinel:<none>',
+        'coollabsio/coolify:4.4.6',
+        'postgres:16',
+    ]);
+
+    expect($command)->not->toContain('awk')
+        ->and($output)->toBe('rmi coollabsio/coolify-helper:1.0.14 ghcr.io/coollabsio/coolify-helper:1.0.15 coollabsio/coolify-helper:1.0.170 coollabsio/coolify-realtime:1.0.19 ghcr.io/coollabsio/coolify-realtime:1.0.17 coollabsio/sentinel:1.0.1 ghcr.io/coollabsio/sentinel:0.0.22');
+});
+
+it('removes unused images pulled by digest but keeps application images', function () {
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildImagePruneCommand'))->invoke(new CleanupDocker, collect(['app-uuid']), '1.0.17');
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'gtstef/filebrowser@sha256:abc',
+        '<none>@<none>',
+        'app-uuid@sha256:def',
+        'app-uuid:v1',
+        'postgres:16',
+    ]);
+
+    expect($command)->toContain('docker images --digests')
+        ->and(explode("\n", $output))->toBe(['rmi gtstef/filebrowser@sha256:abc', 'rmi postgres:16']);
 });
