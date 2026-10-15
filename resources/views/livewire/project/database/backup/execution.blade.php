@@ -24,6 +24,8 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+            {{-- The database menu, one Back away from the backup menu in the main sidebar. --}}
+            <x-database.configuration-sidebar :database="$database" current-route="project.database.backup.index" nav-only />
             <x-backup-sidebar context="database" :parameters="$parameters" :section="$section" />
 
             <div class="min-w-0">

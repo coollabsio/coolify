@@ -135,7 +135,8 @@ const byTypeAndName = (a, b) => columnOf(a) - columnOf(b) || String(a.name).loca
 
 /**
  * Card positions inside one group, from (0, 0). Cards with a position saved on their environment
- * canvas (node.saved) keep that arrangement; the other cards follow below them. Otherwise linked
+ * canvas (node.saved) keep that arrangement; the other cards follow below them in the grid the environment
+ * canvas uses, so both canvases show the group the same way. Otherwise linked
  * cards form chains from left to right (source before target, one column per step); every chain
  * gets its own rows. Cards without links follow in a grid of SINGLE_COLUMNS.
  */
@@ -150,9 +151,9 @@ export function layoutBlock(nodes, links = []) {
     const bottom = Math.max(...saved.map(n => out[n.id].y + estimateNodeHeight(n)));
     const rest = nodes.filter(n => !out[n.id]);
     if (!rest.length) return { positions: out, width, height: bottom };
-    const below = layoutBlock(rest, links);
-    for (const [id, p] of Object.entries(below.positions)) out[id] = { x: p.x, y: bottom + ROW_GAP + p.y };
-    return { positions: out, width: Math.max(width, below.width), height: bottom + ROW_GAP + below.height };
+    // Same grid as the environment canvas (layoutGraph) puts below the saved cards, so both canvases match.
+    const height = placeGrid(rest, 0, bottom + ROW_GAP, out);
+    return { positions: out, width: Math.max(...Object.values(out).map(p => p.x)) + CARD_WIDTH, height };
   }
   const ids = new Set(nodes.map(n => n.id));
   const inside = links.filter(l => ids.has(l.source) && ids.has(l.target) && l.source !== l.target);
@@ -217,9 +218,12 @@ export function layoutBlock(nodes, links = []) {
   return { positions: out, width: columns * step - COLUMN_GAP, height: bottom };
 }
 
-/** Server view: key of a project / environment group on one server ("<environment uuid>:<zone id>"). */
+/**
+ * Server view: key of a project / environment group on one server ("<environment uuid>:<zone id>").
+ * Groups of an empty environment (placeholder card) have none, so they cannot be moved.
+ */
 export const groupKey = (nodes, zoneId) => {
-  const environment = nodes.find(n => n.environment?.uuid)?.environment?.uuid;
+  const environment = nodes.find(n => n.type !== 'empty' && n.environment?.uuid)?.environment?.uuid;
   return environment && zoneId ? `${environment}:${zoneId}` : null;
 };
 
@@ -230,7 +234,7 @@ export const groupKey = (nodes, zoneId) => {
  * GROUPS_PER_ROW per row. When `groups` is given, it gets per group key its frame top-left, the zone's inner
  * top-left, and `shift`: environment canvas position = server view position - shift.
  */
-export function layoutServerView(graph, groups = null) {
+export function layoutServerView(graph, groups = null, { compact = false } = {}) {
   const out = {};
   let y = 0;
   for (const zone of zoneGroups(graph)) {
@@ -240,15 +244,20 @@ export function layoutServerView(graph, groups = null) {
       const block = layoutBlock(nodes, graph.links || []);
       return {
         key: groupKey(nodes, zone.id),
+        nodes,
         block,
         size: { w: block.width + GROUP_PADDING * 2, h: GROUP_HEADER + GROUP_PADDING * 2 + block.height },
         at: saved.length ? { x: Math.min(...saved.map(n => Number(n.saved.x))), y: Math.min(...saved.map(n => Number(n.saved.y))) } : null,
       };
     });
+    // Empty environments (placeholder cards only) go next to the other groups after these are placed.
+    const isEmpty = b => b.nodes.every(n => n.type === 'empty');
     const pinned = blocks.filter(b => b.at).sort((a, b) => a.at.y - b.at.y || a.at.x - b.at.x);
     // The environment canvas puts its first cards below a zone header; those land at the zone's top-left here.
     const shift = { x: inner.x + GROUP_PADDING, y: inner.y + GROUP_HEADER + GROUP_PADDING - ZONE_HEADER - ZONE_PADDING };
+    const frames = [];
     const place = ({ key, block, size }, left, top) => {
+      frames.push({ x: left, y: top });
       for (const [id, p] of Object.entries(block.positions)) {
         out[id] = { x: left + GROUP_PADDING + p.x, y: top + GROUP_HEADER + GROUP_PADDING + p.y };
       }
@@ -266,21 +275,39 @@ export function layoutServerView(graph, groups = null) {
         ...b.size,
       };
       const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
-      taken.push(spot);
+      taken.push({ ...spot, project: b.nodes[0]?.project?.uuid });
       bottom = Math.max(bottom, place(b, spot.x, spot.y));
     }
     let x = 0;
     let rowTop = pinned.length ? bottom + GROUP_GAP : inner.y;
     let rowBottom = rowTop;
-    blocks.filter(b => !b.at).forEach((b, i) => {
+    blocks.filter(b => !b.at && !isEmpty(b)).forEach((b, i) => {
       if (i > 0 && i % GROUPS_PER_ROW === 0) {
         x = 0;
         rowTop = rowBottom + GROUP_GAP;
       }
+      taken.push({ x, y: rowTop, ...b.size, project: b.nodes[0]?.project?.uuid });
       rowBottom = Math.max(rowBottom, place(b, x, rowTop));
       x += b.size.w + GROUP_GAP;
     });
-    y = Math.max(bottom, rowBottom) + ZONE_PADDING + ZONE_GAP;
+    bottom = Math.max(bottom, rowBottom);
+    // Right of the last group of the same project (or of the zone), at the nearest free spot.
+    for (const b of blocks.filter(b => !b.at && isEmpty(b))) {
+      const project = b.nodes[0]?.project?.uuid;
+      const anchor = taken.filter(t => t.project === project).at(-1) || taken.at(-1);
+      const wanted = anchor ? { x: anchor.x + anchor.w + GROUP_GAP, y: anchor.y, ...b.size } : { ...inner, ...b.size };
+      const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
+      taken.push({ ...spot, project });
+      bottom = Math.max(bottom, place(b, spot.x, spot.y));
+    }
+    if (compact && frames.length) {
+      // The groups keep their arrangement, but start at the zone's top-left (no empty space from saved positions).
+      const dx = inner.x - Math.min(...frames.map(f => f.x));
+      const dy = inner.y - Math.min(...frames.map(f => f.y));
+      for (const n of zone.nodes) if (out[n.id]) out[n.id] = { x: out[n.id].x + dx, y: out[n.id].y + dy };
+      bottom += dy;
+    }
+    y = bottom + ZONE_PADDING + ZONE_GAP;
   }
   return out;
 }
@@ -300,7 +327,7 @@ export function layoutConnectView(graph) {
     out[n.id] = { x: 0, y };
     y += estimateNodeHeight(n) + ROW_GAP;
   }
-  const offset = variables ? CARD_WIDTH + ZONE_PADDING * 2 + ZONE_GAP * 3 : 0;
+  const offset = variables ? CARD_WIDTH + ZONE_PADDING * 2 + ZONE_GAP * 2 : 0;
   let top = 0;
   if (connected) {
     y = ZONE_HEADER + ZONE_PADDING;
@@ -315,7 +342,8 @@ export function layoutConnectView(graph) {
     top = y - GROUP_GAP + ZONE_PADDING + ZONE_GAP;
   }
   const others = groups.filter(g => g.id !== SOURCES_ZONE && g.id !== CONNECTED_ZONE);
-  const placed = layoutServerView({ zones: others.map(g => g.zone || { id: g.id }), nodes: others.flatMap(g => g.nodes) });
+  // Compact: groups cannot be moved here, so positions saved on the environment canvas must not leave gaps.
+  const placed = layoutServerView({ zones: others.map(g => g.zone || { id: g.id }), nodes: others.flatMap(g => g.nodes) }, null, { compact: true });
   for (const [id, p] of Object.entries(placed)) out[id] = { x: p.x + offset, y: p.y + top };
   return out;
 }

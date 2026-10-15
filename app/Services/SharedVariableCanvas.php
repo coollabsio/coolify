@@ -30,6 +30,12 @@ class SharedVariableCanvas
 
     public const RESOURCES_ZONE = 'resources';
 
+    /**
+     * Server variables that Coolify creates on every server. Resources get them only through a reference,
+     * but every server has them, so the canvas and the overview leave them out to stay readable.
+     */
+    public const BUILT_IN_SERVER_KEYS = ['COOLIFY_SERVER_UUID', 'COOLIFY_SERVER_NAME'];
+
     public function __construct(private EnvironmentCanvas $canvas, private ServerCanvas $serverCanvas) {}
 
     /**
@@ -37,9 +43,14 @@ class SharedVariableCanvas
      */
     public function payload(string $scope, Model $owner, bool $canEdit): array
     {
-        $variables = $this->variables($owner);
+        $hidden = $scope === 'server' ? self::BUILT_IN_SERVER_KEYS : [];
+        $variables = $this->variables($owner)->reject(fn (SharedEnvironmentVariable $variable) => in_array($variable->key, $hidden, true))->values();
         $resources = $this->resources($scope, $owner);
-        $links = $this->links($scope, $variables, $resources);
+        // A reference to a hidden variable is not a reference to a deleted one: leave its link out too.
+        $links = collect($this->links($scope, $variables, $resources))
+            ->reject(fn (array $link) => in_array($link['key'], $hidden, true))
+            ->values()
+            ->all();
 
         $missing = collect($links)
             ->where('missing', true)
@@ -254,7 +265,7 @@ class SharedVariableCanvas
             ->with(['project', 'environment.project', 'server'])
             ->get()
             // Built-in server variables; the server variables page hides them too.
-            ->reject(fn (SharedEnvironmentVariable $variable) => $variable->type === 'server' && in_array($variable->key, ['COOLIFY_SERVER_UUID', 'COOLIFY_SERVER_NAME'], true));
+            ->reject(fn (SharedEnvironmentVariable $variable) => $variable->type === 'server' && in_array($variable->key, self::BUILT_IN_SERVER_KEYS, true));
 
         $scopes = collect(self::SCOPES)->mapWithKeys(function (string $scope) use ($variables) {
             $ofScope = $variables->where('type', $scope);

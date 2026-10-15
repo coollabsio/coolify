@@ -85,62 +85,10 @@ export function pan(viewport) {
     canPan: e => [viewport, world, edges].includes(e.target),
     onPanStart: closeMenu,
   });
-}
-
-const DESKTOP = '(min-width: 1024px)';
-/**
- * use:dock on the header. Desktop: it docks into the app top bar, or with the
- * floating nav it is a separate panel next to the top bar (as on the
- * environment canvas) when it fits there. Small screens: a box above the canvas.
- */
-export function dock(top) {
-  const root = top.closest('.cv-root');
-  const stage = root.querySelector('.cv-stage');
-  function place() {
-    const desktop = matchMedia(DESKTOP).matches;
-    const slot = desktop && document.getElementById('page-toolbar-slot');
-    const topbar = document.querySelector('.app-topbar');
-    top.removeAttribute('style');
-    if (desktop && topbar && document.documentElement.dataset.navStyle === 'floating') {
-      top.className = 'fixed z-40 flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 dark:border-white/[0.08] dark:bg-panel';
-      root.append(top);
-      const gap = 8;
-      const head = topbar.getBoundingClientRect();
-      const width = top.offsetWidth;
-      if (head.right + gap + width <= innerWidth - gap) {
-        // Centered over the canvas, but never over the top bar.
-        const box = stage.getBoundingClientRect();
-        const left = Math.max(box.left + (box.width - width) / 2, head.right + gap);
-        Object.assign(top.style, { top: `${head.top}px`, left: `${left}px`, minHeight: `${head.height}px` });
-        root.classList.add('cv-docked');
-        return;
-      }
-      top.removeAttribute('style');
-    }
-    top.className = slot ? 'flex items-center gap-3 pl-3' : 'cv-island cv-top';
-    root.classList.toggle('cv-docked', !!slot);
-    if (slot) slot.replaceChildren(top);
-    else root.prepend(top);
-  }
-  place();
-  const replace = () => root.isConnected && place();
-  // The floating header is centered over the canvas next to the app top bar, so follow their sizes.
-  const sizes = new ResizeObserver(replace);
-  for (const target of [stage, document.querySelector('.app-topbar')].filter(Boolean)) sizes.observe(target);
-  const media = matchMedia(DESKTOP);
-  media.addEventListener('change', replace);
-  addEventListener('resize', replace);
-  const navStyle = new MutationObserver(replace);
-  navStyle.observe(document.documentElement, { attributes: true, attributeFilter: ['data-nav-style'] });
-  return {
-    destroy() {
-      sizes.disconnect();
-      media.removeEventListener('change', replace);
-      removeEventListener('resize', replace);
-      navStyle.disconnect();
-      top.remove(); // it may sit in the app top bar
-    },
-  };
+  // The root paints the dots, so move them with the viewport when the Steps panel folds or the window resizes.
+  const sizes = new ResizeObserver(() => els.pz.apply());
+  sizes.observe(viewport);
+  return { destroy: () => sizes.disconnect() };
 }
 
 /** use:track on a card: its element (for measuring) and its size (for the lines). */

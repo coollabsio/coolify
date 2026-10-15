@@ -1,4 +1,4 @@
-@props(['database', 'currentRoute'])
+@props(['database', 'currentRoute', 'navOnly' => false])
 
 @php
     $databaseRouteParameters = [
@@ -68,17 +68,14 @@
 
 @php
     // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
-    request()->attributes->set('mainNavContext', [
-        'label' => 'Dashboard',
-        'backHref' => route('dashboard'),
-        'backTitle' => 'Back to the dashboard',
-    ]);
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
 @endphp
 
-{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up). --}}
-@foreach (['page', 'main-nav'] as $placement)
+{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
+     navOnly renders only the sidebar copy, as the parent menu of a deeper page (e.g. a backup). --}}
+@foreach ($navOnly ? ['main-nav'] : ['page', 'main-nav'] as $placement)
 @if ($placement === 'main-nav')
-@teleport('#main-nav-context')
+@teleport('#main-nav-context-0')
 <div class="nav-context-menu">
 @else
 <aside class="application-settings-navigation in-main-nav min-w-0 xl:self-start"

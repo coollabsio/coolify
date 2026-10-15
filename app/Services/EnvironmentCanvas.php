@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\Project;
 use App\Models\ResourceLink;
 use App\Models\Server;
 use App\Models\Service;
@@ -21,6 +22,9 @@ use Spatie\Activitylog\Models\Activity;
 class EnvironmentCanvas
 {
     public const MAX_COORDINATE = 100000;
+
+    /** Zone id of the placeholder cards of environments without resources. */
+    public const EMPTY_ZONE = 'empty';
 
     /**
      * Environment relations that hold standalone databases, keyed by relation name.
@@ -145,6 +149,65 @@ class EnvironmentCanvas
             'is_reachable' => (bool) $server->settings?->is_reachable,
             'is_usable' => (bool) $server->settings?->is_usable,
             'link' => route('server.show', ['server_uuid' => $server->uuid]),
+        ];
+    }
+
+    /**
+     * Zone of the server, project and dashboard canvases for environments without resources (they have no server).
+     *
+     * @return array{id: string, name: string, icon: string}
+     */
+    public function emptyZone(): array
+    {
+        return ['id' => self::EMPTY_ZONE, 'name' => 'Empty environments', 'icon' => 'service'];
+    }
+
+    /**
+     * Zone for the placeholder cards of a project: the zone with most of the project's cards, or `$fallback`
+     * when the project has no cards.
+     *
+     * @param  Collection<int, array<string, mixed>>  $nodes  cards of the canvas
+     * @return callable(Project): string
+     */
+    public function projectZones(Collection $nodes, string $fallback): callable
+    {
+        $zones = $nodes
+            ->filter(fn (array $node) => filled($node['zone']))
+            ->groupBy(fn (array $node) => data_get($node, 'project.uuid'))
+            ->map(fn (Collection $cards) => $cards->countBy('zone')->sortDesc()->keys()->first());
+
+        return fn (Project $project) => $zones->get($project->uuid, $fallback);
+    }
+
+    /**
+     * Placeholder card of an environment without resources, so the grouped canvases still show it.
+     * Without an environment, it stands for a project without environments.
+     * `$canAdd`: the card opens the deploy canvas for the environment instead of the environment page.
+     *
+     * @return array<string, mixed>
+     */
+    public function emptyNode(Project $project, ?Environment $environment, string $zone, string $context, bool $canAdd = false): array
+    {
+        $page = $environment
+            ? route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])
+            : route('project.show', ['project_uuid' => $project->uuid]);
+        $add = $canAdd && $environment;
+
+        return [
+            'id' => 'empty:'.($environment?->uuid ?? $project->uuid),
+            'type' => 'empty',
+            'name' => $environment ? 'No resources yet' : 'No environments yet',
+            'subtitle' => $add ? 'Click to add a resource' : 'Open to see this '.($environment ? 'environment' : 'project'),
+            'status' => null,
+            'zone' => $zone,
+            'extra_zones' => [],
+            'urls' => [],
+            'children' => [],
+            'link' => $add ? route('deploy-canvas', ['project' => $project->uuid, 'environment' => $environment->uuid]) : $page,
+            'context' => $context,
+            'context_link' => $page,
+            'project' => ['uuid' => $project->uuid, 'name' => $project->name],
+            'environment' => $environment ? ['uuid' => $environment->uuid, 'name' => $environment->name] : null,
         ];
     }
 

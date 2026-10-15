@@ -74,20 +74,35 @@ test('the servers canvas shows every server of the team with its resources and l
         ->assertJsonPath('positions', [])
         ->assertJsonPath('links.0.id', $link->uuid);
 
+    $resources = collect($response->json('nodes'))->where('type', '!=', 'empty');
+
+    // The project's empty production environment shows as a placeholder card on the server of its other environments.
     expect(collect($response->json('zones'))->pluck('name')->all())->toBe(['db-server', 'web-server'])
         ->and(collect($response->json('nodes'))->mapWithKeys(fn ($node) => [$node['name'] => [$node['zone'], $node['context']]])->all())->toBe([
             'storefront' => [$this->web->uuid, 'Shop / staging'],
             'orders-api' => [$this->db->uuid, 'Shop / staging'],
+            'No resources yet' => [$this->web->uuid, 'Shop / production'],
         ])
         ->and($response->json('nodes.0.project'))->toBe(['uuid' => $this->project->uuid, 'name' => 'Shop'])
         ->and($response->json('nodes.0.environment'))->toBe(['uuid' => $this->environment->uuid, 'name' => 'staging'])
-        ->and(collect($response->json('nodes'))->pluck('context_link')->unique()->all())->toBe([
+        ->and($resources->pluck('context_link')->unique()->all())->toBe([
             route('project.resource.index', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]),
         ])
         ->and(collect($response->json('zones'))->pluck('link')->all())->toBe([
             route('server.show', ['server_uuid' => $this->db->uuid]),
             route('server.show', ['server_uuid' => $this->web->uuid]),
         ]);
+});
+
+test('the servers canvas puts empty environments of a project without resources on the first server', function () {
+    $bare = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Bare']);
+
+    $response = serverCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/servers/canvas')
+        ->assertOk();
+
+    expect(collect($response->json('zones'))->pluck('name')->all())->toBe(['db-server', 'web-server'])
+        ->and(collect($response->json('nodes'))->where('project.uuid', $bare->uuid)->pluck('zone')->all())->toBe([$this->db->uuid]);
 });
 
 test('one server canvas shows only that server, and links that leave it are hidden', function () {

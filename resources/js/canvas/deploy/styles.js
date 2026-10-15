@@ -22,6 +22,11 @@ const CSS = `
     display: grid; grid-template-columns: 15.5rem minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
     gap: 8px; padding: 8px;
     background: var(--cv-backdrop); color: var(--cv-text);
+    /* The dots cover the whole backdrop, also under the Steps panel. pan()
+       (canvas-core.js) lines them up with the viewport through these variables. */
+    background-image: var(--canvas-dots-image, radial-gradient(circle, light-dark(rgb(0 0 0 / 0.13), rgb(255 255 255 / 0.09)) 1px, transparent 1.3px));
+    background-size: var(--canvas-dots-size, 20px 20px);
+    background-position: var(--canvas-dots-position, 0 0);
     color-scheme: light; font: 13px/1.4 var(--font-sans, ui-sans-serif, system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
   }
@@ -32,7 +37,7 @@ const CSS = `
   .cv-root svg { width: 1rem; height: 1rem; flex: none; }
   .cv-root button:not(.button, [data-canvas-controls] button) { font: inherit; }
 
-  /* Header island on small screens; on desktop the header docks into the app top bar. */
+  /* Header island on small screens; on desktop the header is in the zoom controls bar. */
   .cv-top { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; }
   .cv-root.cv-docked { grid-template-rows: minmax(0, 1fr); }
   .cv-btn {
@@ -61,7 +66,9 @@ const CSS = `
 
   /* Palette island */
   /* Hugs its steps instead of filling the row; scrolls when the screen is short. */
-  .cv-palette { display: flex; flex-direction: column; align-self: start; max-height: 100%; overflow-y: auto; padding: 1rem 0.625rem 0.75rem; }
+  /* The zoom controls sit below the Steps panel, so the panel leaves room for them. */
+  .cv-palette { display: flex; flex-direction: column; align-self: start; max-height: calc(100% - 3.25rem); overflow-y: auto; padding: 1rem 0.625rem 0.75rem; }
+  .cv-root > [data-canvas-controls] { bottom: 8px; left: 8px; }
   .cv-palette-head { padding: 0 0.5rem 0.75rem; margin: 0 -0.625rem 0.5rem; padding-inline: 1.125rem; border-bottom: 1px solid var(--cv-line); }
   .cv-palette-head b { display: block; font-size: 14px; font-weight: 600; }
   .cv-palette-head span { color: var(--cv-subtle); font-size: 12px; }
@@ -95,7 +102,8 @@ const CSS = `
   .cv-stage { position: relative; overflow: hidden; border: 0; background: transparent; }
   .cv-viewport {
     position: absolute; inset: 0; cursor: grab; touch-action: none;
-    background-image: radial-gradient(circle, light-dark(rgb(0 0 0 / 0.13), rgb(255 255 255 / 0.09)) 1px, transparent 1.3px);
+    /* The dots are on .cv-root, so the viewport has none of its own. */
+    background-image: none;
   }
   .cv-viewport.panning { cursor: grabbing; }
   .cv-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }

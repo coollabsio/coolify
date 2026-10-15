@@ -173,7 +173,7 @@
             </x-application.settings-section>
 
             <x-application.settings-section id="file-download-storage-section" title="File downloads"
-                helper="Choose how files from the container file browser are downloaded. Streaming sends each file through this Coolify instance, up to 1 GB. With S3, the server uploads the file to the bucket and the browser downloads it from S3, up to 5 GB. S3 download links expire after 15 minutes, and the files are deleted after 6 hours.">
+                helper="Choose how files from the container file browser and backups are downloaded. Streaming sends each file through this Coolify instance (file browser: up to 1 GB). With S3, the server uploads the file to the bucket and the browser downloads it from S3, up to 5 GB; larger backups are streamed. S3 download links expire after 15 minutes, and the files are deleted after 6 hours.">
                 <div class="flex max-w-md flex-col gap-4">
                     <x-forms.listbox id="file_download_storage" label="Download method" onChange="instantSave"
                         :options="[

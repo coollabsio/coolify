@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Cache;
 /**
  * Builds the server canvas: one zone per server with every resource of the team on it,
  * in the same shape as the environment canvas. Cards and project / environment groups use the positions saved on
- * their environment canvas (node.saved); admins move whole groups here, which saves the moved cards on that environment
+ * their environment canvas (node.saved); admins move whole groups and single cards here, which saves the group's cards on that environment
  * canvas, and change links through the environment canvas endpoints of each card.
  */
 class ServerCanvas
@@ -29,9 +29,11 @@ class ServerCanvas
      */
     public function payload(int $teamId, Collection $servers, ?Server $single, bool $canReadSensitive, bool $canEdit = false): array
     {
-        $environmentIds = Environment::query()
+        $environments = Environment::query()
             ->whereHas('project', fn ($query) => $query->where('team_id', $teamId))
-            ->pluck('id');
+            ->with('project')
+            ->get(['id', 'uuid', 'name', 'project_id']);
+        $environmentIds = $environments->pluck('id');
         $resources = $this->loadResources($environmentIds);
         $links = ResourceLink::query()->whereIn('environment_id', $environmentIds)->orderBy('id')->get();
         $graph = $this->canvas->graph($resources, $links, $canReadSensitive);
@@ -56,6 +58,13 @@ class ServerCanvas
             })
             ->values();
         $shown = $nodes->pluck('id')->flip();
+        // Every-server canvases: environments without resources show as placeholder cards next to the other environments of their project.
+        $used = $resources->pluck('environment_id')->flip();
+        $zoneOf = $this->canvas->projectZones($nodes, $serverUuids[0] ?? EnvironmentCanvas::EMPTY_ZONE);
+        $empty = $single ? collect() : $environments
+            ->reject(fn (Environment $environment) => $used->has($environment->id))
+            ->map(fn (Environment $environment) => $this->canvas->emptyNode($environment->project, $environment, $zoneOf($environment->project), $environment->project->name.' / '.$environment->name, $canEdit))
+            ->values();
 
         return [
             'title' => $single ? $single->name : 'Servers',
@@ -68,8 +77,10 @@ class ServerCanvas
             'can_move_groups' => $canEdit,
             // Tells the canvas to group cards by project / environment and place linked cards side by side.
             'layout' => 'server',
-            'zones' => $servers->map(fn (Server $server) => [...$this->canvas->zone($server, $canReadSensitive), 'details' => $this->details($server)])->values()->all(),
-            'nodes' => $nodes->all(),
+            'zones' => $servers->map(fn (Server $server) => [...$this->canvas->zone($server, $canReadSensitive), 'details' => $this->details($server)])
+                ->when($empty->contains('zone', EnvironmentCanvas::EMPTY_ZONE), fn (Collection $zones) => $zones->push($this->canvas->emptyZone()))
+                ->values()->all(),
+            'nodes' => $nodes->concat($empty)->all(),
             'links' => collect($graph['links'])->filter(fn (array $link) => $shown->has($link['source']) && $shown->has($link['target']))->values()->all(),
             'positions' => [],
         ];

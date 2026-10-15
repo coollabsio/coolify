@@ -63,7 +63,7 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-            <x-main-nav-menu :back-href="route('dashboard')" back-label="Dashboard" back-title="Back to the dashboard"
+            <x-main-nav-menu back-label="Dashboard"
                 data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
                 <nav aria-label="Service settings"
                     x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"

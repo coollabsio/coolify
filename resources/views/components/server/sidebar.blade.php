@@ -226,18 +226,14 @@
 
 @php
     // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
-    request()->attributes->set('mainNavContext', [
-        'label' => 'Servers',
-        'backHref' => route('server.index'),
-        'backTitle' => 'Back to the servers',
-    ]);
+    registerMainNavContext(0, 'Servers', 'Back to the main menu');
 @endphp
 
 {{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
      Both copies keep their own warning state (proxy, Sentinel). --}}
 @foreach (['page', 'main-nav'] as $placement)
 @if ($placement === 'main-nav')
-@teleport('#main-nav-context')
+@teleport('#main-nav-context-0')
 <div class="nav-context-menu"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),

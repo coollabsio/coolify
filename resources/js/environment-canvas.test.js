@@ -7,6 +7,7 @@ import {
   ROW_GAP,
   ZONE_HEADER,
   ZONE_PADDING,
+  ZONE_GAP,
   canConnect,
   canLink,
   dragRules,
@@ -21,6 +22,7 @@ import {
   statusWord,
   READABLE_ZOOM,
   groupFrames,
+  groupKey,
   layoutBlock,
   estimateNodeHeight,
   layoutGraph,
@@ -289,6 +291,28 @@ test('server view: cards keep the arrangement saved on their environment canvas,
   assert.equal(p.b.y - p.a.y, 200);
   assert.equal(p.c.x, p.b.x);
   assert.ok(p.c.y >= p.b.y + estimateNodeHeight(g.nodes[1]) + ROW_GAP);
+});
+
+test('server view: a group with one saved card matches the environment canvas arrangement', () => {
+  const apps = Array.from({ length: MAX_ROWS + 1 }, (_, i) => envNode(`n${i}`, 'application', 'z1', 'prod'));
+  const nodes = [envNode('a', 'application', 'z1', 'prod', { saved: { x: 1000, y: 697 } }), ...apps, envNode('d', 'database', 'z1', 'prod')];
+  const env = layoutGraph({ zones: [{ id: 'z1', name: 'web' }], nodes, links: [], positions: { a: { x: 1000, y: 697 } } });
+  const server = layoutServerView({ layout: 'server', zones: [{ id: 'z1', name: 'web' }], nodes, links: [{ source: 'n0', target: 'd' }] });
+  for (const n of nodes) {
+    assert.deepEqual({ x: server[n.id].x - server.a.x, y: server[n.id].y - server.a.y }, { x: env[n.id].x - env.a.x, y: env[n.id].y - env.a.y }, n.id);
+  }
+});
+
+test('server view: a moved card saved with its group on the environment canvas stays where it was dropped', () => {
+  const nodes = [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'service', 'z1', 'prod'), envNode('d', 'database', 'z1', 'prod')];
+  const g = { layout: 'server', zones: [{ id: 'z1', name: 'web' }], nodes, links: [] };
+  const groups = {};
+  const before = layoutServerView(g, groups);
+  const { shift } = groups['prod:z1'];
+  const dropped = { ...before, b: { x: before.b.x + 120, y: before.b.y + 400 } };
+  const saved = Object.fromEntries(nodes.map(n => [n.id, { x: dropped[n.id].x - shift.x, y: dropped[n.id].y - shift.y }]));
+  const after = layoutServerView({ ...g, nodes: nodes.map(n => ({ ...n, saved: saved[n.id] })) });
+  assert.deepEqual(after, dropped);
 });
 
 test('server view: zones with server details get the taller header', () => {
@@ -560,4 +584,44 @@ test('server view: a dragged card stops before its group covers another group', 
   const positions = dragOnto(g, layoutGraph(g), 'a', 'c');
   const [f1, f2] = groupFrames(g.nodes, positions);
   assert.ok(apart(f1, f2), 'the project / environment frames do not overlap');
+});
+
+test('groupKey: a group with only an empty-environment placeholder has no key, so it cannot be moved', () => {
+  const environment = { uuid: 'env', name: 'production' };
+  assert.equal(groupKey([{ id: 'empty:env', type: 'empty', environment }], 'empty'), null);
+  assert.equal(groupKey([{ id: 'a', type: 'application', environment }], 'srv'), 'env:srv');
+});
+
+test('layoutServerView: an empty environment sits right of the other groups of its project, not below them', () => {
+  const shop = { uuid: 'shop', name: 'Shop' };
+  const node = (id, context, extra = {}) => ({ id, type: 'application', zone: 'srv', context, project: shop, environment: { uuid: context }, ...extra });
+  const graph = {
+    layout: 'server',
+    zones: [{ id: 'srv', name: 'srv' }],
+    nodes: [
+      node('a', 'Shop / staging', { saved: { x: 0, y: 0 } }),
+      node('empty:prod', 'Shop / production', { type: 'empty' }),
+    ],
+    links: [],
+  };
+  const out = layoutServerView(graph);
+  assert.equal(out['empty:prod'].y, out.a.y);
+  assert.ok(out['empty:prod'].x >= out.a.x + CARD_WIDTH);
+});
+
+test('variables view: saved environment canvas positions do not push resources away from the variables', () => {
+  const g = {
+    layout: 'connect',
+    zones: [{ id: 'sources', name: 'Server variables', icon: 'variable' }, { id: 'resources', name: 'Other resources', icon: 'service' }],
+    nodes: [
+      node('variable:1', 'variable', 'sources', { name: 'COOLIFY_SERVER_NAME' }),
+      node('app', 'application', 'resources', { context: 'Shop / prod', environment: { uuid: 'e1' }, saved: { x: 900, y: 1200 } }),
+    ],
+    links: [],
+    positions: {},
+  };
+  const [variables, resources] = zoneBoxes(g, layoutGraph(g));
+
+  assert.equal(resources.y, variables.y, 'both zones start at the top');
+  assert.ok(resources.x - (variables.x + variables.width) <= ZONE_GAP * 2, 'resources sit next to the variables');
 });

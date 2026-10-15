@@ -1,4 +1,4 @@
-@props(['service', 'currentRoute'])
+@props(['service', 'currentRoute', 'navOnly' => false])
 
 @php
     $serviceRouteParameters = [
@@ -55,7 +55,7 @@
     $activeGroup = (string) $groupedItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 @endphp
 
-<x-main-nav-menu :back-href="route('dashboard')" back-label="Dashboard" back-title="Back to the dashboard"
+<x-main-nav-menu back-label="Dashboard" :nav-only="$navOnly"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
         x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"

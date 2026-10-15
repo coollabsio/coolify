@@ -38,6 +38,12 @@
         ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'danger'],
     ];
     $backLabel = $context === 'database' ? 'Back to database' : 'Back to backups';
+    // The resource menu that the page renders one Back away in the main sidebar.
+    $parentMenu = match ($context) {
+        'application' => 'Application',
+        'database' => 'Database',
+        default => 'Service',
+    };
     $backParameters = match ($context) {
         'database' => collect($parameters)->except('backup_uuid')->all(),
         'service' => collect($parameters)->except(['stack_service_uuid', 'backup_uuid'])->all(),
@@ -45,7 +51,7 @@
     };
 @endphp
 
-<x-main-nav-menu :back-href="route($routes['back'], $backParameters)" :back-label="$context === 'database' ? 'Database' : 'Backups'"
+<x-main-nav-menu :depth="1" :back-label="$parentMenu" :back-title="'Back to the '.strtolower($parentMenu).' menu'"
     data-settings-search-items="{{ json_encode(settingsSearchItems(['Backup' => collect($items)->map(fn (array $item): array => [...$item, 'route' => $routes[$item['key']]])], $parameters)) }}">
     <nav aria-label="Backup settings"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">

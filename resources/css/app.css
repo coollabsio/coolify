@@ -1889,7 +1889,7 @@ html[data-theme="custom"] textarea:disabled {
         grid-column: 2;
     }
 
-    /* A resource menu that the main sidebar shows instead (navbar #main-nav-context). */
+    /* A resource menu that the main sidebar shows instead (navbar #main-nav-context-{depth}). */
     .application-settings-navigation.in-main-nav {
         display: none;
     }
@@ -5360,7 +5360,7 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.si
     outline-offset: 2px;
 }
 
-/* Sidebar main menu/submenu swap: the submenu enters from the right, the main menu from the left.
+/* Sidebar menu swap: a deeper menu (submenu, resource menu) enters from the right, a lower one from the left.
    CSS animations restart when an element is shown again, so x-show replays them on each swap. */
 @keyframes nav-swap-forward {
     from {
@@ -5544,7 +5544,7 @@ html.dark .canvas-zoom-max {
     --canvas-dots-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath transform='translate(8 8) scale(0.0125)' d='M64 256H0V64h64Zm0-192V0h256v64Zm0 192h256v64H64Z' fill='rgb(255 255 255 / 0.09)'/%3E%3C/svg%3E");
 }
 
-.canvas-zoom-max :is([data-ec-viewport], .cv-viewport) {
+.canvas-zoom-max [data-ec-viewport] {
     background-image: var(--canvas-dots-image);
 }
 
@@ -5667,7 +5667,7 @@ html.dark .canvas-zoom-max {
         padding-top: var(--floating-top);
     }
 
-    html[data-nav-style="floating"] .app-main-full :is([data-ec-viewport], .cv-viewport) {
+    html[data-nav-style="floating"] .app-main-full [data-ec-viewport] {
         background-image: none;
     }
 

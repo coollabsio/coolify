@@ -12,6 +12,11 @@
                 </p>
             </div>
             <div class="flex w-fit shrink-0 items-center gap-2">
+                @if ($environment->isEmpty())
+                    {{-- The list toolbar (with its canvas switch) is hidden when there are no resources. --}}
+                    <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]"
+                        :canvas-url="route('project.environment.canvas', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])" />
+                @endif
                 <a href="{{ route('shared-variables.environment.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                     {{ wireNavigate() }}
                     class="button whitespace-nowrap"

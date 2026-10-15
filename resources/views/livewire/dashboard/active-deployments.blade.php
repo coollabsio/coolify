@@ -24,18 +24,11 @@
     $hasAnyDeployments = $hasActiveDeployments || $hasRecentDeployments;
 @endphp
 
-{{-- The dashboard's canvas link sits in the Deployments heading, or
-     alone at the top right when there are no deployments. --}}
-<div wire:poll.3000ms="refreshDeployments" @class(['min-w-0', 'mb-0!' => $hasAnyDeployments, '-mb-4' => ! $hasAnyDeployments])>
+<div wire:poll.3000ms="refreshDeployments" @class(['min-w-0', 'mb-0!' => $hasAnyDeployments, 'hidden' => ! $hasAnyDeployments])>
     @if ($hasAnyDeployments)
         {{-- Container breakpoints: the table needs room, which the dashboard column may not have. --}}
         <section class="@container mb-0! min-w-0">
-            <x-section-heading title="Deployments">
-                <x-slot:actions>
-                    <x-canvas-view-toggle :views="[]"
-                        :list-url="route('dashboard')" :canvas-url="route('dashboard.canvas')" />
-                </x-slot:actions>
-            </x-section-heading>
+            <x-section-heading title="Deployments" />
 
             <div class="flex min-w-0 flex-col gap-4">
                 @if ($hasActiveDeployments)
@@ -177,10 +170,5 @@
                 @endif
             </div>
         </section>
-    @else
-        <div class="flex justify-end">
-            <x-canvas-view-toggle :views="[]"
-                :list-url="route('dashboard')" :canvas-url="route('dashboard.canvas')" />
-        </div>
     @endif
 </div>

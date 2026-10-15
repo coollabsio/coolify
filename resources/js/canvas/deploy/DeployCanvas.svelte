@@ -8,7 +8,7 @@
   import PaletteItem from './PaletteItem.svelte';
   import RunPanel from './RunPanel.svelte';
   import CanvasControls from '../CanvasControls.svelte';
-  import { closeMenu, cv, dock, els, fit, hideResult, leave, pan, pickNext, PORT_Y, resetCanvas } from './state.svelte.js';
+  import { closeMenu, cv, els, fit, hideResult, leave, pan, pickNext, PORT_Y, resetCanvas } from './state.svelte.js';
 
   // The deploy canvas: header, step palette, and the canvas with the step
   // cards. The state lives in state.svelte.js (init() runs before the mount).
@@ -19,6 +19,10 @@
   // Small screens: a notice that the canvas is not optimized for mobile. CSS
   // shows it below 768px; closed once, it stays closed.
   let noticeOpen = $state(!load('mobile-notice-dismissed', false));
+  // Desktop: the header sits in the zoom controls bar (bottom left), as on the
+  // other canvases. Small screens: a box above the canvas.
+  const desktopQuery = matchMedia('(min-width: 1024px)');
+  let desktop = $state(desktopQuery.matches);
 
   const stop = e => e.stopPropagation();
   // A pill joined to the Deploy card: each address opens in a new tab.
@@ -60,7 +64,10 @@
     const reset = () => { if (els.root?.isConnected) resetCanvas(); };
     addEventListener('keydown', escape);
     addEventListener('deploy-canvas-reset', reset);
+    const media = () => { desktop = desktopQuery.matches; };
+    desktopQuery.addEventListener('change', media);
     return () => {
+      desktopQuery.removeEventListener('change', media);
       theme.disconnect();
       removeEventListener('keydown', escape);
       removeEventListener('deploy-canvas-reset', reset);
@@ -69,20 +76,21 @@
   });
 </script>
 
-<div class="cv-root" class:cv-dark={dark} class:cv-folded={folded}>
-  <!-- Header: placed by dock (app top bar, floating panel, or a box above the canvas). -->
-  <div use:dock>
-    <div class="mr-auto flex min-w-0 items-center gap-2">
-      {#if cv.target}
-        <!-- Opened from an environment's New resource page: back to that environment. -->
-        <a class="cv-back button px-2!" href="/project/{cv.target.project}/environment/{cv.target.environment}" title="Back to the environment" aria-label="Back to the environment"><Icon name="back" cls="size-4" /></a>
-      {/if}
-      <span class="shrink-0 rounded-full border border-coollabs/30 bg-coollabs/10 px-2 py-0.5 text-xs font-medium text-coollabs dark:border-warning/30 dark:bg-warning/15 dark:text-warning">Beta</span>
-    </div>
-    <div class="flex shrink-0 items-center gap-2">
-      <button type="button" class="button" title="Start again with an empty canvas" onclick={askReset}>Reset</button>
-    </div>
+{#snippet header()}
+  <div class="mr-auto flex min-w-0 items-center gap-2">
+    {#if cv.target}
+      <!-- Opened from an environment's New resource page: back to that environment. -->
+      <a class="cv-back button px-2!" href="/project/{cv.target.project}/environment/{cv.target.environment}" title="Back to the environment" aria-label="Back to the environment"><Icon name="back" cls="size-4" /></a>
+    {/if}
+    <span class="shrink-0 rounded-full border border-coollabs/30 bg-coollabs/10 px-2 py-0.5 text-xs font-medium text-coollabs dark:border-warning/30 dark:bg-warning/15 dark:text-warning">Beta</span>
   </div>
+  <button type="button" class="button shrink-0" title="Start again with an empty canvas" onclick={askReset}>Reset</button>
+{/snippet}
+
+<div class="cv-root" class:cv-dark={dark} class:cv-folded={folded} class:cv-docked={desktop}>
+  {#if !desktop}
+    <div class="cv-island cv-top">{@render header()}</div>
+  {/if}
 
   {#if noticeOpen}
     <div class="cv-island cv-notice" role="note">
@@ -134,7 +142,6 @@
         {/if}
       </div>
     </div>
-    <CanvasControls zoom={cv.view.z} onzoom={z => els.pz.zoomTo(z)} onfit={fit} />
     <RunPanel />
     {#if cv.menu}
       <div class="cv-menu" style:left="{cv.menu.left}px" style:top="{cv.menu.top}px">
@@ -148,6 +155,9 @@
       <div class="cv-toast" class:bad={cv.toast.bad}>{cv.toast.text}</div>
     {/if}
   </section>
+
+  <!-- Bottom left of the whole canvas, below the Steps panel. -->
+  <CanvasControls zoom={cv.view.z} onzoom={z => els.pz.zoomTo(z)} onfit={fit} children={desktop ? header : null} />
 
   {#if cv.dropdown}
     {#key cv.dropdown?.trigger}

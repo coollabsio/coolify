@@ -99,11 +99,11 @@
                         </x-modal-input>
                     </x-slot:titleAction>
                 @endcan
-                @if ($dashboardProjects->isNotEmpty())
-                    <x-slot:actions>
-                        <x-canvas-view-toggle />
-                    </x-slot:actions>
-                @endif
+                {{-- The dashboard canvas link lives here, so it never adds a row above the page. --}}
+                <x-slot:actions>
+                    <x-canvas-view-toggle :views="$dashboardProjects->isNotEmpty() ? null : []"
+                        :list-url="route('dashboard')" :canvas-url="route('dashboard.canvas')" />
+                </x-slot:actions>
             </x-section-heading>
 
             @if ($dashboardProjects->isEmpty())

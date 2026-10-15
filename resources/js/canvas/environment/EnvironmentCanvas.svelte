@@ -17,6 +17,8 @@
     filterGraph,
     filterOptions,
     fitView,
+    GROUP_HEADER,
+    GROUP_PADDING,
     groupByUse,
     groupFrames,
     groupKey,
@@ -33,6 +35,7 @@
   } from '../../environment-canvas.js';
   import Card from './Card.svelte';
   import Deployments from './Deployments.svelte';
+  import EmptyCard from './EmptyCard.svelte';
   import Icon from './Icon.svelte';
   import Panel from './Panel.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -103,10 +106,12 @@
   let pz;
 
   const canEdit = $derived(!!graph?.can_edit);
-  // Only the environment canvas saves card positions; server, project and connect views are auto-placed.
+  // Only the environment canvas has its own card positions; server and project views save on it (canMoveGroups).
   const canMove = $derived(canEdit && graph?.can_move !== false);
-  // Server canvas: admins drag whole project / environment groups; each environment saves its group position.
+  // Server canvas: admins drag whole project / environment groups and their cards; each environment saves them.
   const canMoveGroups = $derived(canEdit && !!graph?.can_move_groups);
+  /** Server view: key of the card's group when the card can be moved there (it is saved on its environment canvas). */
+  const movableGroupOf = node => (canMoveGroups && node ? groupKey([node], node.zone) : null);
   let groupMeta = {}; // server view: frame top-left and zone inner top-left per group key (see layoutServerView)
   // Environment canvas endpoints of a card (the server view has no endpoints of its own for changes).
   const environmentBase = node => (serverView
@@ -468,23 +473,32 @@
     if (e.button !== 0 || e.target.closest('a,button,input,[data-ec-port]')) return;
     e.stopPropagation();
     const start = { cx: e.clientX, cy: e.clientY, ...positions[id] };
+    const key = movableGroupOf(nodeById(id));
+    const meta = key ? groupMeta[key] : null;
+    const movable = canMove || !!meta;
     // The other cards and frames stay put during the drag, so measure them once.
     const rules = dragRules(graph, positions, sizes, id);
+    // Server view: the group frame stays inside its zone, below the zone header.
+    const fits = meta
+      ? b => b.x >= meta.inner.x + GROUP_PADDING && b.y >= meta.inner.y + GROUP_HEADER + GROUP_PADDING && rules.fits(b)
+      : rules.fits;
     let moved = false;
     capture(card, e.pointerId);
     begin(`card:${id}`);
     track(card, ev => {
       if (!moved && Math.hypot(ev.clientX - start.cx, ev.clientY - start.cy) < 4) return;
-      if (!canMove) return;
+      if (!movable) return;
       const rect = rectOf(id);
       const wanted = { x: start.x + (ev.clientX - start.cx) / view.z, y: start.y + (ev.clientY - start.cy) / view.z, w: rect.width, h: rect.height };
       // Cards cannot cover each other or another zone: stop at the edge of what is in the way.
-      const spot = freeSpot(wanted, rules.others, BOX_GAP, rules.fits);
+      const spot = freeSpot(wanted, rules.others, BOX_GAP, fits);
       if (!spot) return;
       moved = true;
       positions[id] = { x: spot.x, y: spot.y };
     }, () => {
-      if (moved) queueSave({ [id]: { ...positions[id] } });
+      // Server view: save the whole group, so its other cards keep the place they have here.
+      if (moved && meta) saveGroup(graph.nodes.filter(n => groupKey([n], n.zone) === key).map(n => n.id), meta.shift);
+      else if (moved) queueSave({ [id]: { ...positions[id] } });
       else select({ kind: 'node', id });
       end(`card:${id}`);
     });
@@ -933,24 +947,28 @@
         </div>
         <div class="absolute top-0 left-0">
           {#each graph?.nodes || [] as node (node.id)}
-            <Card
-              {node}
-              position={positions[node.id]}
-              selected={selected?.kind === 'node' && selected.id === node.id}
-              dropTarget={dropTarget === node.id}
-              movable={canMove}
-              port={canEdit && (connectView ? isSource(node) && !node.missing : !serverView || !!node.environment)
-                ? (connectView ? text.port : 'Drag to another card to draw a link')
-                : null}
-              linkCount={linkCounts[node.id] || 0}
-              zoneNames={zoneNames(node)}
-              serverDown={downZones.has(node.zone)}
-              statusText={graph?.layout === 'server'}
-              onpress={(e, card) => startCardDrag(node.id, card, e)}
-              onconnect={(e, port) => startConnect(node.id, port, e)}
-              onselect={() => select({ kind: 'node', id: node.id })}
-              onhover={on => hoverCard(node.id, on)}
-            />
+            {#if node.type === 'empty'}
+              <EmptyCard {node} position={positions[node.id]} />
+            {:else}
+              <Card
+                {node}
+                position={positions[node.id]}
+                selected={selected?.kind === 'node' && selected.id === node.id}
+                dropTarget={dropTarget === node.id}
+                movable={canMove || !!movableGroupOf(node)}
+                port={canEdit && (connectView ? isSource(node) && !node.missing : !serverView || !!node.environment)
+                  ? (connectView ? text.port : 'Drag to another card to draw a link')
+                  : null}
+                linkCount={linkCounts[node.id] || 0}
+                zoneNames={zoneNames(node)}
+                serverDown={downZones.has(node.zone)}
+                statusText={graph?.layout === 'server'}
+                onpress={(e, card) => startCardDrag(node.id, card, e)}
+                onconnect={(e, port) => startConnect(node.id, port, e)}
+                onselect={() => select({ kind: 'node', id: node.id })}
+                onhover={on => hoverCard(node.id, on)}
+              />
+            {/if}
           {/each}
         </div>
         <!-- Link end dots sit above the cards, on their edges (like the deploy canvas ports). -->

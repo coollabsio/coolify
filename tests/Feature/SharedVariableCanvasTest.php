@@ -218,6 +218,20 @@ test('a server canvas only shows resources on that server', function () {
     expect(collect($response->json('nodes'))->where('type', '!=', 'variable')->pluck('name')->all())->toBe(['storefront']);
 });
 
+test('the server canvas hides the built-in server variables and the references to them', function () {
+    $this->server->environment_variables()->create(['key' => 'REGION', 'value' => 'eu', 'team_id' => $this->team->id]);
+    sharedVariableCanvasEnv($this->storefront, 'HOST', '{{server.COOLIFY_SERVER_NAME}}');
+    sharedVariableCanvasEnv($this->storefront, 'REGION', '{{server.REGION}}');
+
+    $response = sharedVariableCanvasAs($this, $this->admin, $this->team)
+        ->getJson("/canvas/api/shared-variables/server/{$this->server->uuid}/canvas")
+        ->assertOk();
+
+    // Coolify creates COOLIFY_SERVER_UUID / COOLIFY_SERVER_NAME on every server; they are not shown, not even as deleted.
+    expect(collect($response->json('nodes'))->where('type', 'variable')->pluck('name')->all())->toBe(['REGION'])
+        ->and(collect($response->json('links'))->pluck('key')->all())->toBe(['REGION']);
+});
+
 test('another team cannot open or change the canvas of a scope it does not own', function () {
     $otherTeam = Team::factory()->create(['show_boarding' => false]);
     $otherTeam->members()->attach($this->admin->id, ['role' => 'owner']);

@@ -414,6 +414,18 @@ describe('canvas authorization', function () {
 });
 
 describe('canvas page', function () {
+    test('add resource opens the deploy canvas for this environment', function () {
+        $deployCanvasUrl = route('deploy-canvas', ['project' => $this->project->uuid, 'environment' => $this->environment->uuid]);
+
+        $this->actingAs($this->admin)->withSession(['currentTeam' => $this->team])
+            ->withoutVite()
+            ->get(route('project.environment.canvas', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]))
+            ->assertOk()
+            ->assertSee('data-new="'.e($deployCanvasUrl).'"', false)
+            ->assertSee('href="'.e($deployCanvasUrl).'"', false)
+            ->assertDontSee(route('project.resource.create', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]), false);
+    });
+
     test('a team member can open the canvas page', function () {
         $member = User::factory()->create();
         $this->team->members()->attach($member->id, ['role' => 'member']);

@@ -20,9 +20,11 @@
         // Label of the open submenu ('' = main menu). It starts on the submenu of the current page
         // ([data-active-submenu], read in init). Back opens the main menu.
         submenu: '',
-        // Direction of the last main menu/submenu swap ('forward' or 'back'); it selects the enter animation.
-        // A swap that loads a new page stores it in sessionStorage, so the new navbar plays it once.
-        navSwap: sessionStorage.getItem('navSwap') || '',
+        // Depth of the open resource menu on wide screens (-1 = main menu or submenu). It starts on the
+        // deepest menu of the current page; Back opens the menu one depth lower.
+        navLevel: -1,
+        // Direction of the last menu swap ('forward' or 'back'); it selects the enter animation of every menu.
+        navSwap: '',
         // macOS/iOS use ⌘; Windows/Linux use Ctrl+
         modKeyLabel: (() => {
             const platform = navigator.userAgentData?.platform || navigator.platform || '';
@@ -30,9 +32,19 @@
             return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
         })(),
         init() {
-                // Cleared after this tick: the mobile and desktop navbars both read it on init.
-                setTimeout(() => sessionStorage.removeItem('navSwap'));
                 this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
+                this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+                if (@js($desktop)) {
+                    // The open resource menu depth is kept across page loads: a page that opens a deeper menu
+                    // (e.g. a backup) plays the forward swap, and a page that opens a lower one plays the back swap.
+                    const previousLevel = sessionStorage.getItem('navLevel');
+                    if (previousLevel !== null && window.matchMedia('(min-width: 80rem)').matches) {
+                        const levelChange = this.navLevel - Number(previousLevel);
+                        this.navSwap = levelChange > 0 ? 'forward' : (levelChange < 0 ? 'back' : '');
+                    }
+                    sessionStorage.setItem('navLevel', this.navLevel);
+                    this.$watch('navLevel', level => sessionStorage.setItem('navLevel', level));
+                }
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                     const userSettings = localStorage.getItem('theme');
                     if (userSettings !== 'system') { return; }
@@ -89,7 +101,7 @@
                 $navSections = collect([
                     'Workspace' => [
                         // The dashboard lists projects and links to all of them, so project pages count as Dashboard.
-                        ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'projects', 'projects/*', 'project/*')],
+                        ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'projects', 'projects/*', 'project/*', 'canvas')],
                         ['label' => 'Monitoring', 'icon' => 'graph', 'children' => [
                             ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics')],
                             ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics')],
@@ -97,7 +109,7 @@
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [
-                        ['label' => 'Servers', 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers')],
+                        ['label' => 'Servers', 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers', 'servers/*')],
                         ['label' => 'Integrations', 'icon' => 'link', 'children' => [
                             ['label' => 'Sources', 'icon' => 'sources', 'href' => route('source.all'), 'active' => request()->is('sources', 'source/*')],
                             ['label' => 'Destinations', 'icon' => 'destinations', 'href' => route('destination.index'), 'active' => request()->is('destinations', 'destination/*')],
@@ -136,7 +148,7 @@
                             ['label' => 'API Tokens', 'icon' => 'code', 'href' => route('security.api-tokens'), 'active' => request()->is('security/api-tokens')],
                         ]],
                         ['label' => 'Subscription', 'icon' => 'subscription', 'href' => isCloud() ? route('subscription.show') : '', 'active' => request()->is('subscription*'), 'visible' => isCloud() && auth()->user()->isAdmin()],
-                        ['label' => 'Tags', 'icon' => 'tags', 'href' => route('tags.show'), 'active' => request()->is('tags*')],
+                        ['label' => 'Tags', 'icon' => 'tags', 'href' => route('tags.show'), 'active' => request()->is('tags*', 'canvas/tags')],
                         ['label' => 'Settings', 'icon' => 'settings', 'visible' => isInstanceAdmin(), 'children' => [
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->is('settings')],
                             ['label' => 'Advanced', 'icon' => 'grid', 'href' => route('settings.advanced'), 'active' => request()->is('settings/advanced')],
@@ -158,28 +170,35 @@
                     })
                     ->all());
                 $activeSubmenu = $navSections->flatten(1)->first(fn (array $item): bool => isset($item['children']) && $item['active']);
-                // Set by a resource menu (e.g. components/application/configuration-sidebar.blade.php) that
-                // teleports itself into #main-nav-context; only the desktop sidebar has the slot.
-                $navContext = $desktop ? request()->attributes->get('mainNavContext') : null;
+                // Resource menus by depth, registered by registerMainNavContext() (e.g. from
+                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth};
+                // only the desktop sidebar has the slots.
+                $navContext = $desktop ? request()->attributes->get('mainNavContext', []) : [];
             @endphp
-            {{-- Wide screens on a resource page: the resource menu replaces the main menu; Back opens the dashboard. --}}
-            @if ($navContext)
-                <li class="hidden xl:contents">
-                    <ul role="list" class="flex flex-col gap-y-0.5">
+            {{-- Wide screens on a resource page: the deepest resource menu replaces the main menu. Back shows the
+                 menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
+            @foreach ($navContext as $depth => $navMenu)
+                @php
+                    $previousDepth = collect($navContext)->keys()->filter(fn (int $key): bool => $key < $depth)->last() ?? -1;
+                @endphp
+                <li x-show="navLevel === {{ $depth }}" data-nav-level="{{ $depth }}" @unless ($loop->last) x-cloak @endunless
+                    class="hidden xl:contents">
+                    <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
-                            <a href="{{ $navContext['backHref'] }}" {{ wireNavigate() }} title="{{ $navContext['backTitle'] }}" aria-label="{{ $navContext['backTitle'] }}"
+                            <button type="button" @click="navLevel = {{ $previousDepth }}; navSwap = 'back'"
+                                title="{{ $navMenu['backTitle'] }}" aria-label="{{ $navMenu['backTitle'] }}"
                                 class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
                                     <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-fg-dim" />
                                 </span>
                                 <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
-                                    :class="collapsed && 'lg:hidden'">{{ $navContext['label'] }}</span>
-                            </a>
+                                    :class="collapsed && 'lg:hidden'">{{ $navMenu['label'] }}</span>
+                            </button>
                         </li>
-                        <li id="main-nav-context" class="nav-context min-w-0"></li>
+                        <li id="main-nav-context-{{ $depth }}" class="nav-context min-w-0"></li>
                     </ul>
                 </li>
-            @endif
+            @endforeach
             {{-- Submenus: a parent entry opens its submenu in place, and the user picks a page (the mobile
                  drawer stays open until then). Back shows the main menu without leaving the page. --}}
             @php
@@ -188,8 +207,8 @@
             @foreach ($renderedSubmenus as $submenuItem)
                 <li x-show="submenu === @js($submenuItem['label'])"
                     @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @else x-cloak @endif
-                    @class(['contents', 'xl:hidden' => $navContext])>
-                    <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap === 'forward' && 'nav-swap-forward'">
+                    @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+                    <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="submenu = ''; navSwap = 'back'" title="Back to the main menu" aria-label="Back to the main menu"
                                 class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
@@ -230,8 +249,8 @@
                     </ul>
                 </li>
             @endforeach
-            <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext])>
-                <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap === 'back' && 'nav-swap-back'">
+            <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+                <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
             @foreach ($navSections as $sectionLabel => $sectionItems)
                 @if ($loop->first)
                     <li class="nav-section" :class="collapsed && 'lg:hidden'">{{ $sectionLabel }}</li>
@@ -269,7 +288,8 @@
         @endif
         @if (auth()->id() === 0 && (isCloud() || isDev()))
             {{-- Part of the main menu: hidden while a submenu or a resource menu shows. --}}
-            <li x-show="!submenu" @if ($activeSubmenu ?? null) x-cloak @endif @class(['xl:hidden' => $navContext ?? null])>
+            <li x-show="!submenu" @if ($activeSubmenu ?? null) x-cloak @endif @class(['xl:hidden' => $navContext ?? []])
+                :class="{ 'xl:hidden': navLevel !== -1 }">
                 <a title="Admin" {{ wireNavigate() }}
                     class="{{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">

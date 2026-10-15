@@ -3,7 +3,7 @@
     'serviceDatabase',
 ])
 
-<x-main-nav-menu :back-href="route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null])" back-label="Service">
+<x-main-nav-menu :depth="1" back-label="Service" back-title="Back to the service menu">
     <nav aria-label="Compose resource settings"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         <div class="nav-section hidden xl:block">Compose resource</div>
