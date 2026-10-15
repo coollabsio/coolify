@@ -67,7 +67,7 @@
         {{-- Wide screens: activity takes the left third, projects and servers the other two thirds.
              It stays one column while the left side has no section (no deployments, no traffic). --}}
         <div class="grid min-w-0 gap-8 xl:items-start xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <div class="dashboard-activity flex min-w-0 flex-col gap-8">
+        <div class="dashboard-activity hidden min-w-0 has-[section]:flex flex-col gap-8">
         <livewire:dashboard.active-deployments />
 
         @if ($hasTrafficAnalytics)
