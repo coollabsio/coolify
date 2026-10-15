@@ -183,6 +183,8 @@ COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
+# Version data for Traefik, Sentinel, and helper checks until CheckForUpdatesJob refreshes it
+COPY --chown=www-data:www-data versions.json ./versions.json
 
 RUN composer dump-autoload
 
