@@ -1,10 +1,15 @@
 <?php
 
 use App\Jobs\PullTemplatesFromCDN;
+use App\Models\Team;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Cache::flush();
@@ -146,7 +151,9 @@ it('keeps the local templates when the CDN returns an unusable bundle', function
     'json list' => '[1, 2]',
 ]);
 
-it('logs when the CDN responds with a non-success status', function () {
+it('logs without notifying when the CDN responds with a non-success status', function () {
+    Team::factory()->create(['id' => 0])->discordNotificationSettings()->update(['discord_enabled' => true]);
+    Notification::fake();
     Http::fake([
         'cdn.coollabs.io/*' => Http::response('nope', 503),
     ]);
@@ -160,4 +167,5 @@ it('logs when the CDN responds with a non-success status', function () {
     (new PullTemplatesFromCDN)->handle();
 
     expect(Cache::get(service_templates_cache_key()))->toBeNull();
+    Notification::assertNothingSent();
 });
