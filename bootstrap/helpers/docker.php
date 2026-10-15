@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -765,9 +766,12 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         return false;
     }
 
+    // Flags are stored without a port, so compare portless: https://app.example.com:3000 matches https://app.example.com.
+    $normalize = fn (string $url) => DomainPortOverrides::withoutPort(ValidationPatterns::normalizeApplicationDomainUrl($url));
+
     return $noindex_domains
-        ->map(fn (string $noindex_domain) => ValidationPatterns::normalizeApplicationDomainUrl($noindex_domain))
-        ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
+        ->map($normalize)
+        ->contains($normalize($domain));
 }
 
 function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
