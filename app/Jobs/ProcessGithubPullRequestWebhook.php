@@ -38,7 +38,6 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public ?string $beforeSha,
         public ?string $afterSha,
         public string $commitSha,
-        public ?string $authorAssociation,
         public string $fullName,
         public bool $isForkPullRequest = false,
     ) {
@@ -110,22 +109,16 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        // Check if PR deployments from public contributors are restricted
-        if (! $application->settings->is_pr_deployments_public_enabled) {
-            // Fork PRs carry untrusted code from a repository outside our control.
-            // GitHub's author_association cannot be trusted to gate these (it grants
-            // CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
-            // PRs are never deployed automatically when public previews are off.
-            if ($this->isForkPullRequest) {
-                return;
-            }
+        // Fork PRs carry untrusted code, so they deploy only when public previews are on.
+        // Same-repository branches can only be pushed by users with write access.
+        if ($this->isForkPullRequest && ! $application->settings->is_pr_deployments_public_enabled) {
+            Log::info('Skipped GitHub pull request preview deployment from a fork because public PR deployments are disabled.', [
+                'application_uuid' => $application->uuid,
+                'pull_request_id' => $this->pullRequestId,
+                'action' => $this->action,
+            ]);
 
-            // Same-repo (non-fork) branch PRs require push access to the base repo,
-            // so only trusted associations are allowed to trigger a deployment.
-            $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
-            if (! in_array($this->authorAssociation, $trustedAssociations)) {
-                return;
-            }
+            return;
         }
 
         // Get changed files for watch path filtering (null means the full list is unknown)

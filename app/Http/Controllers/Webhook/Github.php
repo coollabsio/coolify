@@ -71,7 +71,6 @@ class Github extends Controller
                     'before_sha' => $before_sha,
                     'after_sha' => $after_sha,
                     'commit_sha' => $commit_sha,
-                    'author_association' => $author_association,
                     'is_fork_pull_request' => $is_fork_pull_request,
                 ] = $this->readPullRequestPayload($payload);
                 $full_name = data_get($payload, 'repository.full_name');
@@ -239,7 +238,6 @@ class Github extends Controller
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: $commit_sha,
-                            authorAssociation: $author_association,
                             fullName: $full_name,
                             isForkPullRequest: $is_fork_pull_request,
                         );
@@ -459,7 +457,6 @@ class Github extends Controller
                     'before_sha' => $before_sha,
                     'after_sha' => $after_sha,
                     'commit_sha' => $commit_sha,
-                    'author_association' => $author_association,
                     'is_fork_pull_request' => $is_fork_pull_request,
                 ] = $this->readPullRequestPayload($payload);
                 $full_name = $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
@@ -601,7 +598,6 @@ class Github extends Controller
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: $commit_sha,
-                            authorAssociation: $author_association,
                             fullName: $full_name,
                             isForkPullRequest: $is_fork_pull_request,
                         );
@@ -655,7 +651,7 @@ class Github extends Controller
     /**
      * Read and validate the pull_request payload fields that the handlers use.
      *
-     * @return array{action: string, pull_request_id: int, pull_request_html_url: string, pull_request_title: ?string, branch: ?string, base_branch: ?string, before_sha: ?string, after_sha: ?string, commit_sha: string, author_association: ?string, is_fork_pull_request: bool}
+     * @return array{action: string, pull_request_id: int, pull_request_html_url: string, pull_request_title: ?string, branch: ?string, base_branch: ?string, before_sha: ?string, after_sha: ?string, commit_sha: string, is_fork_pull_request: bool}
      *
      * @throws InvalidWebhookPayloadException When a field has a wrong type or format.
      */
@@ -673,7 +669,6 @@ class Github extends Controller
             'before_sha' => $this->webhookCommitSha($payload, 'before'),
             'after_sha' => $this->webhookCommitSha($payload, 'after') ?? $head_sha,
             'commit_sha' => $head_sha ?? 'HEAD',
-            'author_association' => $this->webhookPayloadString($payload, 'pull_request.author_association'),
             'is_fork_pull_request' => $this->isForkPullRequest($payload),
         ];
     }
@@ -681,13 +676,15 @@ class Github extends Controller
     /**
      * Determine whether a pull_request webhook payload originates from a fork.
      *
-     * GitHub's `author_association` is not a reliable trust signal (it grants
-     * CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
-     * detection is gated on whether the PR crosses repository boundaries.
+     * A same-repository PR branch can only be pushed by users with write access,
+     * so this is the trust signal for preview deployments. GitHub's
+     * `author_association` is not reliable for this: users with access through a
+     * team or a private organization membership arrive as CONTRIBUTOR or NONE.
      *
      * The repository id comparison is the canonical signal; the `head.repo.fork`
      * flag and a case-insensitive full_name comparison are fallbacks for payloads
-     * where the ids are unavailable (e.g. a deleted head repository).
+     * where the ids are unavailable. A PR whose head repository is unknown (e.g.
+     * a deleted fork) is treated as a fork.
      *
      * @throws InvalidWebhookPayloadException When a repository id is not a positive integer.
      */
@@ -711,7 +708,7 @@ class Github extends Controller
             return Str::lower($headRepoFullName) !== Str::lower($baseRepoFullName);
         }
 
-        return false;
+        return true;
     }
 
     public function redirect(Request $request)

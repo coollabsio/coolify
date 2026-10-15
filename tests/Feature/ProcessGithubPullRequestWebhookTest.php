@@ -54,7 +54,7 @@ it('cleans up a closed pull request preview when pull request comment cleanup fa
             'status' => 'success',
         ]);
 
-    $job = new class(applicationId: $this->application->id, githubAppId: null, action: 'closed', pullRequestId: 42, pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42', pullRequestTitle: null, beforeSha: null, afterSha: null, commitSha: 'HEAD', authorAssociation: 'OWNER', fullName: 'example/repo') extends ProcessGithubPullRequestWebhook
+    $job = new class(applicationId: $this->application->id, githubAppId: null, action: 'closed', pullRequestId: 42, pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42', pullRequestTitle: null, beforeSha: null, afterSha: null, commitSha: 'HEAD', fullName: 'example/repo') extends ProcessGithubPullRequestWebhook
     {
         protected function dispatchPullRequestClosedUpdate(Application $application, ApplicationPreview $preview): void
         {
@@ -98,7 +98,6 @@ it('skips a synchronized GitHub pull request preview when the head commit messag
         beforeSha: 'before-sha',
         afterSha: 'after-sha',
         commitSha: 'after-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -148,7 +147,6 @@ it('deploys a synchronized GitHub pull request preview when the head commit mess
         beforeSha: 'before-sha',
         afterSha: 'after-sha',
         commitSha: 'after-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -195,7 +193,6 @@ it('skips a GitHub pull request preview when the opened or reopened head commit 
         beforeSha: null,
         afterSha: null,
         commitSha: 'head-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -246,7 +243,6 @@ it('deploys an opened GitHub pull request preview when a watched file is beyond 
         beforeSha: null,
         afterSha: null,
         commitSha: 'head-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -291,7 +287,6 @@ it('deploys a GitHub pull request preview when the full list of changed files is
         beforeSha: 'before-sha',
         afterSha: 'after-sha',
         commitSha: 'after-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -348,7 +343,6 @@ it('skips an opened GitHub pull request preview when no changed file matches the
         beforeSha: null,
         afterSha: null,
         commitSha: 'head-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -414,7 +408,6 @@ it('uses one GitHub App installation token for all GitHub API calls of a pull re
         beforeSha: null,
         afterSha: null,
         commitSha: 'head-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -429,3 +422,50 @@ it('uses one GitHub App installation token for all GitHub API calls of a pull re
         ->and($repositoryRequests)->toHaveCount(3)
         ->and($repositoryRequests->every(fn (array $pair): bool => $pair[0]->hasHeader('Authorization', 'Bearer fake-installation-token')))->toBeTrue();
 });
+
+it('deploys an opened GitHub pull request preview by fork status, not by author association', function (bool $isForkPullRequest, bool $isPublicEnabled, bool $deploys) {
+    Queue::fake();
+
+    $this->application->settings->update([
+        'is_preview_deployments_enabled' => true,
+        'is_pr_deployments_public_enabled' => $isPublicEnabled,
+    ]);
+
+    Http::fake([
+        'https://api.github.com/repos/example/repo/commits/head-sha' => Http::response([
+            'commit' => ['message' => 'feat: add app'],
+        ]),
+        'https://api.github.com/repos/example/repo/pulls/42/files*' => Http::response([
+            ['filename' => 'README.md'],
+        ]),
+    ]);
+
+    $job = new ProcessGithubPullRequestWebhook(
+        applicationId: $this->application->id,
+        githubAppId: GithubApp::create([
+            'name' => 'Public GitHub',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => true,
+            'team_id' => $this->team->id,
+        ])->id,
+        action: 'opened',
+        pullRequestId: 42,
+        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
+        pullRequestTitle: 'Add feature',
+        beforeSha: null,
+        afterSha: 'head-sha',
+        commitSha: 'head-sha',
+        fullName: 'example/repo',
+        isForkPullRequest: $isForkPullRequest,
+    );
+
+    $job->handle();
+
+    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBe($deploys)
+        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBe($deploys);
+})->with([
+    'same-repository branch with public deployments off' => [false, false, true],
+    'fork with public deployments off' => [true, false, false],
+    'fork with public deployments on' => [true, true, true],
+]);
