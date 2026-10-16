@@ -60,3 +60,47 @@ it('ships the import map used by the Edge Functions main worker', function () {
     expect(supabaseTemplateFile('./volumes/functions/main/index.ts'))->toContain('/home/deno/functions/deno.jsonc')
         ->and(supabaseTemplateFile('./volumes/functions/deno.jsonc'))->toContain('@supabase/server');
 });
+
+it('collects logs only from its own stack', function () {
+    expect(supabaseTemplateFile('./volumes/logs/vector.yml'))
+        ->toContain('include_labels:')
+        ->toContain("- 'com.docker.compose.project=\${COOLIFY_RESOURCE_UUID}'");
+});
+
+it('verifies asymmetric keys when JWT_KEYS and JWT_JWKS are set', function () {
+    $services = supabaseTemplate()['services'];
+
+    expect($services['supabase-auth']['environment'])->toContain('GOTRUE_JWT_KEYS=${JWT_KEYS:-[]}')
+        ->and($services['supabase-rest']['environment'])->toContain('PGRST_JWT_SECRET=${PGRST_JWT_SECRET:-${SERVICE_PASSWORD_JWT}}')
+        ->and($services['realtime-dev']['environment'])->toContain('API_JWT_JWKS=${JWT_JWKS:-{"keys":[]}}')
+        ->and($services['supabase-storage']['environment'])->toContain('JWT_JWKS=${JWT_JWKS:-{"keys":[]}}')
+        ->and($services['supabase-edge-functions']['environment'])->toContain('SUPABASE_JWKS=${JWT_JWKS:-{"keys":[]}}');
+});
+
+it('uses one default per variable, because Coolify stores the first default as the value', function () {
+    $defaults = [];
+
+    foreach (supabaseTemplate()['services'] as $service) {
+        foreach ($service['environment'] ?? [] as $entry) {
+            $offset = 0;
+            while (($start = strpos($entry, '${', $offset)) !== false) {
+                $depth = 0;
+                for ($end = $start + 1; $end < strlen($entry); $end++) {
+                    $depth += match ($entry[$end]) {
+                        '{' => 1,
+                        '}' => -1,
+                        default => 0,
+                    };
+                    if ($depth === 0) {
+                        break;
+                    }
+                }
+                preg_match('/^([A-Za-z_][A-Za-z0-9_]*)(.*)$/s', substr($entry, $start + 2, $end - $start - 2), $match);
+                $defaults[$match[1]][$match[2]] = true;
+                $offset = $start + 2;
+            }
+        }
+    }
+
+    expect(array_keys(array_filter($defaults, fn (array $variants): bool => count($variants) > 1)))->toBe([]);
+});

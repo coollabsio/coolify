@@ -2016,6 +2016,8 @@ services:
               type: docker_logs
               exclude_containers:
                 - supabase-vector
+              include_labels:
+                - 'com.docker.compose.project=${COOLIFY_RESOURCE_UUID}'
 
           transforms:
             project_logs:
@@ -2300,7 +2302,7 @@ services:
       - PGRST_DB_ANON_ROLE=anon
       - PGRST_ADMIN_SERVER_PORT=3001
       - PGRST_ADMIN_SERVER_HOST=localhost
-      - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - PGRST_JWT_SECRET=${PGRST_JWT_SECRET:-${SERVICE_PASSWORD_JWT}}
       - PGRST_DB_USE_LEGACY_GUCS=false
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
@@ -2343,6 +2345,7 @@ services:
       - GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
       - GOTRUE_JWT_EXP=${JWT_EXPIRY:-3600}
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - 'GOTRUE_JWT_KEYS=${JWT_KEYS:-[]}'
       - GOTRUE_JWT_ISSUER=${API_EXTERNAL_URL:-${SERVICE_URL_SUPABASEENVOY}/auth/v1}
 
       - GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}
@@ -2432,6 +2435,7 @@ services:
       - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
       - DB_ENC_KEY=${REALTIME_DB_ENC_KEY:-supabaserealtime}
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - 'API_JWT_JWKS=${JWT_JWKS:-{"keys":[]}}'
       - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_REALTIME}
       - METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - ERL_AFLAGS=-proto_dist inet_tcp
@@ -2508,6 +2512,7 @@ services:
       - SERVER_REGION=local
       - MULTI_TENANT=false
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - 'JWT_JWKS=${JWT_JWKS:-{"keys":[]}}'
       - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - DB_INSTALL_ROLES=false
       - STORAGE_BACKEND=s3
@@ -2582,6 +2587,7 @@ services:
       retries: 3
     environment:
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - 'SUPABASE_JWKS=${JWT_JWKS:-{"keys":[]}}'
       - SUPABASE_URL=http://supabase-envoy:8000
       - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEENVOY}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
@@ -3010,7 +3016,7 @@ services:
           })
 
           // To invoke:
-          // curl 'http://localhost:<KONG_HTTP_PORT>/functions/v1/hello' \
+          // curl '<SERVICE_URL_SUPABASEENVOY>/functions/v1/hello' \
           //   --header 'Authorization: Bearer <anon/service_role API key>'
       - type: bind
         source: ./volumes/functions/deno.jsonc
