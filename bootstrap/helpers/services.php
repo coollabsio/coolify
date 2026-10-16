@@ -313,8 +313,16 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             // Those belong to other services and will be updated when THOSE services are updated
         }
 
-        // Remove duplicates
-        $templateVariableNames = array_unique($templateVariableNames);
+        // Remove duplicates and copies of another application's declaration
+        $templateVariableNames = array_filter(
+            array_unique($templateVariableNames),
+            fn ($variableName) => ! isCopiedServiceUrlDeclaration(
+                $resource->service,
+                collect(data_get($dockerCompose, 'services', [])),
+                $resource,
+                $variableName,
+            ),
+        );
 
         // Extract unique service names to process (preserving the original case from template)
         // This allows us to create both URL and FQDN pairs regardless of which one is in the template
