@@ -51,9 +51,7 @@ class StandaloneDocker extends BaseModel
 
     public function networkCreateCommand(): string
     {
-        $safeNetwork = escapeshellarg($this->network);
-
-        return "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --attachable {$safeNetwork} >/dev/null";
+        return dockerNetworkCreateCommand($this->network);
     }
 
     public function proxyConnectCommand(): string
