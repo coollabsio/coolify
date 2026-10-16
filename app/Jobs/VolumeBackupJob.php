@@ -92,8 +92,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ? 'docker volume inspect '.escapeshellarg($source).' >/dev/null'
                 : 'test -d '.escapeshellarg($source);
 
-            $compressorCommand = BackupCompression::compressorCommand($compressionCpuPercentage);
-            $archiveScript = "compressor=\$({$compressorCommand}); tar -I \"\$compressor\" -cf - -C /volume .";
+            $archiveScript = self::archiveScript($compressionCpuPercentage);
             if ($streamToS3) {
                 $this->execution->update(['local_storage_deleted' => true]);
                 $archiveCommand = $this->streamToS3Command($archiveScript, $backupLocation, $source, $containerName, $image);
@@ -289,8 +288,16 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * @return array<int, string>
+     * GNU tar exits with 1 when a file changes while it is read (for example, an app that writes to the volume
+     * during a live backup). The archive is still valid, so only exit codes above 1 fail the backup.
      */
+    public static function archiveScript(int $compressionCpuPercentage): string
+    {
+        $compressorCommand = BackupCompression::compressorCommand($compressionCpuPercentage);
+
+        return "compressor=\$({$compressorCommand}); { tar -I \"\$compressor\" -cf - -C /volume . || { status=\$?; [ \$status -eq 1 ] || exit \$status; }; }";
+    }
+
     /**
      * Containers can exit and be removed (e.g. `--rm` backup helpers) between `docker ps` and
      * `docker inspect`. Skip those, but still fail when an existing container cannot be inspected.

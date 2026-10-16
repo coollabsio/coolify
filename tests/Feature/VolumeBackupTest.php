@@ -2969,3 +2969,22 @@ it('records a missed volume backup that is too old to run late as a failed execu
     Notification::assertSentToTimes($team, BackupFailed::class, 1);
     Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
 });
+
+it('fails the volume archive only on fatal tar errors', function (int $tarExitCode, int $expectedExitCode) {
+    $bin = sys_get_temp_dir().'/volume-backup-tar-'.uniqid();
+    mkdir($bin);
+    file_put_contents($bin.'/tar', "#!/bin/sh\nexit {$tarExitCode}\n");
+    chmod($bin.'/tar', 0755);
+
+    $result = Process::env(['PATH' => $bin.':/usr/bin:/bin'])
+        ->run(['sh', '-c', VolumeBackupJob::archiveScript(50)]);
+
+    unlink($bin.'/tar');
+    rmdir($bin);
+
+    expect($result->exitCode())->toBe($expectedExitCode);
+})->with([
+    'success' => [0, 0],
+    'file changed as we read it' => [1, 0],
+    'fatal error' => [2, 2],
+]);
