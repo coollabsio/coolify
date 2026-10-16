@@ -36,7 +36,7 @@ afterEach(function () {
     File::deleteDirectory($this->stubDirectory);
 });
 
-function serviceComposeStdinService(string $sshUser): Service
+function serviceComposeStdinService(string $sshUser, ?string $composeRaw = null): Service
 {
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -54,7 +54,7 @@ function serviceComposeStdinService(string $sshUser): Service
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
         'connect_to_docker_network' => true,
-        'docker_compose_raw' => "services:\n  app:\n    image: busybox:latest\n    volumes:\n      - data:/data\nvolumes:\n  data:\n    labels:\n      example: changed\n",
+        'docker_compose_raw' => $composeRaw ?? "services:\n  app:\n    image: busybox:latest\n    volumes:\n      - data:/data\nvolumes:\n  data:\n    labels:\n      example: changed\n",
     ]);
 }
 
@@ -98,7 +98,7 @@ function serviceComposeCommandLines(Activity $activity): array
 {
     return array_values(array_filter(
         explode("\n", RemoteProcessCommand::read($activity)),
-        fn (string $line) => str_contains($line, 'docker compose ') && (str_contains($line, ' up -d') || str_contains($line, ' pull')),
+        fn (string $line) => str_contains($line, 'docker compose ') && (str_contains($line, ' up -d') || str_contains($line, ' pull') || str_contains($line, ' start')),
     ));
 }
 
@@ -130,7 +130,7 @@ it('gives service compose up and pull no stdin and never answers the recreate pr
 
     $lines = serviceComposeCommandLines(StartService::run($service, pullLatestImages: true));
 
-    expect($lines)->toHaveCount(2);
+    expect($lines)->toHaveCount(3);
     foreach ($lines as $line) {
         expect($line)->toStartWith('sudo docker compose ')
             ->toEndWith(' < /dev/null')
@@ -138,3 +138,52 @@ it('gives service compose up and pull no stdin and never answers the recreate pr
             ->not->toContain(' -y ');
     }
 });
+
+/**
+ * @param  list<string>  $calls
+ */
+function serviceComposeCallIndex(array $calls, string ...$needles): int
+{
+    foreach ($calls as $index => $call) {
+        if (collect($needles)->every(fn (string $needle) => str_contains($call, $needle))) {
+            return $index;
+        }
+    }
+
+    throw new RuntimeException('No call contains: '.implode(', ', $needles));
+}
+
+it('connects service containers to the predefined network before compose starts them', function (string $sshUser) {
+    $compose = "services:\n  db:\n    image: busybox:latest\n    healthcheck:\n      test: ['CMD-SHELL', 'true']\n  app:\n    image: busybox:latest\n    depends_on:\n      db:\n        condition: service_healthy\n";
+    $service = serviceComposeStdinService($sshUser, $compose);
+
+    $calls = runServiceScriptLikeSsh(RemoteProcessCommand::read(StartService::run($service)), $this->stubDirectory);
+
+    $create = serviceComposeCallIndex($calls, ' compose ', ' up -d ', ' --no-start');
+    $start = serviceComposeCallIndex($calls, ' compose ', " --project-name {$service->uuid} start");
+    foreach (['db', 'app'] as $name) {
+        $connect = serviceComposeCallIndex($calls, "docker network connect --alias {$name}-{$service->uuid} coolify {$name}-{$service->uuid}");
+        expect($connect)->toBeGreaterThan($create)->toBeLessThan($start);
+    }
+})->with(['root' => 'root', 'non-root' => 'deploy']);
+
+it('does not connect containers that use a network mode or already declare the predefined network', function () {
+    $compose = "services:\n  vpn:\n    image: busybox:latest\n    networks:\n      - default\n      - coolify\n  app:\n    image: busybox:latest\n    network_mode: service:vpn\nnetworks:\n  coolify:\n    external: true\n";
+    $service = serviceComposeStdinService('root', $compose);
+
+    $calls = runServiceScriptLikeSsh(RemoteProcessCommand::read(StartService::run($service)), $this->stubDirectory);
+
+    expect(collect($calls)->filter(fn (string $call) => str_contains($call, 'network connect --alias'))->all())->toBe([]);
+});
+
+it('connects a single service container to the predefined network before it starts', function (string $sshUser) {
+    $service = serviceComposeStdinService($sshUser);
+    $service->parse();
+
+    $calls = runServiceScriptLikeSsh(RemoteProcessCommand::read(DeployServiceApplication::run($service->applications()->firstOrFail())), $this->stubDirectory);
+
+    $create = serviceComposeCallIndex($calls, ' compose ', ' up -d --no-deps --no-start app');
+    $connect = serviceComposeCallIndex($calls, "docker network connect --alias app-{$service->uuid} coolify app-{$service->uuid}");
+    $start = serviceComposeCallIndex($calls, "docker start app-{$service->uuid}");
+    expect($connect)->toBeGreaterThan($create)->toBeLessThan($start);
+})->with(['root' => 'root', 'non-root' => 'deploy']);
