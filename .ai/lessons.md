@@ -110,3 +110,6 @@
 
 ## Keep browser form restore away from app state
 - Firefox session restore writes saved input values back and fires a trusted `input` event. Add `autocomplete="off"` to inputs that only mirror client state (for example an Alpine-bound color picker), or their handlers run without a user action.
+
+## Session writes are last-writer-wins
+- Laravel saves the whole session payload at the end of every request, and pages run concurrent `wire:poll` requests. A value that one request changes can be overwritten by a request that started earlier. `KeepConcurrentTeamSwitch` protects `currentTeam`; protect any new session value that changes mid-session the same way, or keep it out of the session.
