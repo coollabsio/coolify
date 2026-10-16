@@ -158,10 +158,10 @@ class MigrateResourceToDestination
         }
 
         if ($resource instanceof Service) {
-            foreach ($resource->applications() as $application) {
+            foreach ($resource->applications()->get() as $application) {
                 $application->fill(['status' => 'exited'])->save();
             }
-            foreach ($resource->databases() as $database) {
+            foreach ($resource->databases()->get() as $database) {
                 $database->fill(['status' => 'exited'])->save();
             }
         }
@@ -236,10 +236,10 @@ class MigrateResourceToDestination
     ) {
         if ($resource instanceof Service) {
             $volumes = collect();
-            foreach ($resource->applications() as $application) {
+            foreach ($resource->applications()->get() as $application) {
                 $volumes = $volumes->merge($application->persistentStorages()->get());
             }
-            foreach ($resource->databases() as $database) {
+            foreach ($resource->databases()->get() as $database) {
                 $volumes = $volumes->merge($database->persistentStorages()->get());
             }
 
@@ -271,10 +271,10 @@ class MigrateResourceToDestination
         $fileStorages = collect();
 
         if ($resource instanceof Service) {
-            foreach ($resource->applications() as $application) {
+            foreach ($resource->applications()->get() as $application) {
                 $fileStorages = $fileStorages->merge($application->fileStorages()->get());
             }
-            foreach ($resource->databases() as $database) {
+            foreach ($resource->databases()->get() as $database) {
                 $fileStorages = $fileStorages->merge($database->fileStorages()->get());
             }
         } elseif (method_exists($resource, 'fileStorages')) {
@@ -283,6 +283,13 @@ class MigrateResourceToDestination
 
         foreach ($fileStorages as $storage) {
             if ($storage->is_host_file) {
+                continue;
+            }
+            /** Compose bind sources resolve on the new server only after its next start or deployment. */
+            if ($storage->usesComposeBindSource()) {
+                $storage->pending_initialization = true;
+                $storage->saveQuietly();
+
                 continue;
             }
             ServerStorageSaveJob::dispatch($storage);

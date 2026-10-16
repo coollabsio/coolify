@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
+use App\Services\ComposeBindPathResolver;
 use Closure;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -79,6 +80,7 @@ class LocalFileVolume extends BaseModel
         'is_directory' => 'boolean',
         'is_host_file' => 'boolean',
         'is_preview_suffix_enabled' => 'boolean',
+        'pending_initialization' => 'boolean',
     ];
 
     protected $hidden = [
@@ -105,6 +107,13 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             if ($fileVolume->is_host_file) {
+                return;
+            }
+
+            if ($fileVolume->usesComposeBindSource()) {
+                $fileVolume->pending_initialization = true;
+                $fileVolume->saveQuietly();
+
                 return;
             }
 
@@ -170,18 +179,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = $this->resolvedFsPath($workdir);
-
-        if (! $this->isAdminControlledComposeMount()) {
-            [$hostPath, $resourceDirectory] = $this->hostPathAndResourceDirectory();
-            if ($resourceDirectory !== null) {
-                $this->assertRemotePathIsConfined($resourceDirectory, $hostPath, $server);
-            }
-            $path = str($hostPath);
-        }
-
-        // Validate and escape path to prevent command injection
-        validateShellSafePath($path, 'storage path');
+        $path = $this->resolvedStoragePath($workdir, $server);
         $escapedPath = escapeshellarg($path);
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
@@ -193,12 +191,7 @@ class LocalFileVolume extends BaseModel
 
                 return;
             }
-            $content = $this->readRemoteFileContent($escapedPath, $server);
-            // Check if content contains binary data by looking for null bytes or non-printable characters
-            if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
-                $content = self::BINARY_PLACEHOLDER;
-            }
-            $this->content = $content;
+            $this->content = self::displayContent($this->readRemoteFileContent($escapedPath, $server));
             $this->is_directory = false;
             $this->save();
         }
@@ -241,32 +234,24 @@ class LocalFileVolume extends BaseModel
      * Without a server, Coolify deletes the file on every server of the resource.
      * Host paths outside the resource directory are never deleted.
      */
-    public function deleteStorageOnServer(?Server $server = null)
+    public function deleteStorageOnServer(?Server $server = null, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null)
     {
         if ($this->is_host_file) {
             return;
         }
         if (is_null($server)) {
-            return $this->runOnEveryServer(fn (Server $server) => $this->deleteStorageOnServer($server));
+            return $this->runOnEveryServer(fn (Server $server) => $this->deleteStorageOnServer($server, $composeFile, $projectDirectory, $envFile));
         }
 
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
         $workdir = $isService ? $this->resource->service->workdir() : $this->resource->workdir();
         $commands = collect([]);
-        $path = $this->resolvedFsPath($workdir);
-
-        if ($this->isOutsideResourceDirectory()) {
+        $path = $this->resolvedStoragePath($workdir, $server, $composeFile, $projectDirectory, $envFile);
+        if (self::resourceDirectoryContaining($path, array_map(normalizeUnixPath(...), $this->contentBaseDirectories())) === null) {
             return null;
         }
-
-        if (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
-        }
-
-        // Validate and escape path to prevent command injection
-        validateShellSafePath($path, 'storage path');
+        $this->assertRemotePathIsConfined($workdir, $path, $server);
         $escapedPath = escapeshellarg($path);
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
@@ -288,13 +273,13 @@ class LocalFileVolume extends BaseModel
      * Without a server, Coolify writes the file on every server of the resource.
      * Outside the resource directory, nothing is deleted or written through a symlink.
      */
-    public function saveStorageOnServer(?Server $server = null)
+    public function saveStorageOnServer(?Server $server = null, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null)
     {
         if ($this->is_host_file) {
             return;
         }
         if (is_null($server)) {
-            return $this->runOnEveryServer(fn (Server $server) => $this->saveStorageOnServer($server));
+            return $this->runOnEveryServer(fn (Server $server) => $this->saveStorageOnServer($server, $composeFile, $projectDirectory, $envFile));
         }
 
         $this->load(['service']);
@@ -302,41 +287,16 @@ class LocalFileVolume extends BaseModel
         $workdir = $isService ? $this->resource->service->workdir() : $this->resource->workdir();
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
-
-        $path = $this->resolvedFsPath($workdir);
-        $content = data_get($this, 'content');
-
-        // A Compose bind mount (also with `content:`) uses the host path that the administrator wrote.
-        if (! $this->isAdminControlledComposeMount()) {
-            [$hostPath, $resourceDirectory] = $this->hostPathAndResourceDirectory();
-            if ($resourceDirectory === null) {
-                if (! $this->is_directory) {
-                    self::assertRemotePathIsNotSymlink($hostPath, $server);
-                }
-            } else {
-                $this->assertRemotePathIsConfined($resourceDirectory, $hostPath, $server);
-            }
-            $path = str($hostPath);
-        }
-        $isOutsideResourceDirectory = $this->isOutsideResourceDirectory();
+        $path = $this->resolvedStoragePath($workdir, $server, $composeFile, $projectDirectory, $envFile);
+        $escapedPath = escapeshellarg($path);
 
         if ($this->is_directory) {
-            validateShellSafePath($path, 'storage path');
-            $commands->push('mkdir -p '.escapeshellarg($path).' > /dev/null 2>&1 || true');
+            $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
             $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
         }
-
-        if ($path->startsWith('/') || $path->startsWith('~')) {
-            $parent_dir = $path->beforeLast('/');
-            if ($parent_dir != '') {
-                $escapedParentDir = escapeshellarg($parent_dir);
-                $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
-            }
-        }
-
-        // Validate and escape resolved path (may differ from fs_path if relative)
-        validateShellSafePath($path, 'storage path');
-        $escapedPath = escapeshellarg($path);
+        $content = data_get($this, 'content');
+        $commands->push('mkdir -p '.escapeshellarg(dirname($path)).' > /dev/null 2>&1 || true');
+        $isOutsideResourceDirectory = self::resourceDirectoryContaining($path, array_map(normalizeUnixPath(...), $this->contentBaseDirectories())) === null;
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
         $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
@@ -345,11 +305,15 @@ class LocalFileVolume extends BaseModel
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
-                $this->content = $this->readRemoteFileContent($escapedPath, $server);
+                $this->content = self::displayContent($this->readRemoteFileContent($escapedPath, $server));
             }
             $this->is_directory = false;
             $this->save();
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
+            /** A new storage adopts a file that already exists on the server. */
+            if ($this->pending_initialization) {
+                return null;
+            }
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
         } elseif ($isDir === 'OK' && ! $this->is_directory) {
             if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
@@ -370,7 +334,12 @@ class LocalFileVolume extends BaseModel
             }
             $chmod = data_get($this, 'chmod');
             $chown = data_get($this, 'chown');
-            if ($content) {
+            if ($this->is_binary || $this->is_too_large) {
+                /** A placeholder is not file content; keep the file on the server. */
+                if ($isFile !== 'OK') {
+                    $commands->push("touch {$escapedPath}");
+                }
+            } elseif (! is_null($content)) {
                 $content = base64_encode($content);
                 $commands->push("echo '$content' | base64 -d | tee {$escapedPath} > /dev/null");
             } else {
@@ -430,10 +399,10 @@ class LocalFileVolume extends BaseModel
      *
      * @throws \Exception If the path is not allowed
      */
-    public function contentPathOnServer(): string
+    public function contentPathOnServer(?Server $server = null): string
     {
-        if ($this->isAdminControlledComposeMount()) {
-            return $this->resolvedFsPath($this->ownerResource()->workdir())->value();
+        if ($this->usesComposeBindSource()) {
+            return $this->composeBindHostPath($server);
         }
 
         return $this->hostPathAndResourceDirectory()[0];
@@ -579,6 +548,85 @@ class LocalFileVolume extends BaseModel
             && ! $this->is_binary
             && ! $this->is_too_large
             && (string) $this->content !== '';
+    }
+
+    /**
+     * Replace binary file content with a placeholder for display.
+     */
+    public static function displayContent(string $content): string
+    {
+        if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
+            return self::BINARY_PLACEHOLDER;
+        }
+
+        return $content;
+    }
+
+    /**
+     * Compose resources use the administrator-selected bind source and write their file mounts
+     * before `docker compose up`, not in a queued job.
+     */
+    public function usesComposeBindSource(): bool
+    {
+        $compose = data_get($this->resource, 'docker_compose_raw')
+            ?? data_get($this->resource, 'service.docker_compose_raw');
+
+        return is_string($compose) && $compose !== '';
+    }
+
+    /**
+     * The host path of a Compose bind source. Only a source with a variable needs
+     * `docker compose config`; the parser already resolved other sources in `fs_path`.
+     */
+    public function composeBindHostPath(?Server $server = null, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
+    {
+        validateComposeBindSource($this->fs_path);
+        if (str_contains($this->fs_path, '$')) {
+            return ComposeBindPathResolver::resolve($this, $composeFile, $envFile, $projectDirectory, $server);
+        }
+
+        $path = normalizeUnixPath($this->resolvedFsPath($this->ownerResource()->workdir())->value(), allowLiteralBindCharacters: true);
+        if ($path === '/' || ! str_starts_with($path, '/')) {
+            throw new \RuntimeException('Invalid storage path: the bind source must be an absolute path below the root directory.');
+        }
+
+        return $path;
+    }
+
+    /**
+     * Write the storage to the server and clear the pending flag.
+     *
+     * @return string|null The error message when the storage could not be written.
+     */
+    public function initializeOnServer(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null, ?Server $server = null): ?string
+    {
+        try {
+            $this->saveStorageOnServer($server, $composeFile, $projectDirectory, $envFile);
+        } catch (\Throwable $e) {
+            return $e->getMessage();
+        }
+        if ($this->pending_initialization) {
+            $this->pending_initialization = false;
+            $this->saveQuietly();
+        }
+
+        return null;
+    }
+
+    public function resolvedStoragePath(string $workdir, Server $server, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
+    {
+        if ($this->usesComposeBindSource()) {
+            return $this->composeBindHostPath($server, $composeFile, $projectDirectory, $envFile);
+        }
+
+        [$path, $resourceDirectory] = $this->hostPathAndResourceDirectory();
+        if ($resourceDirectory !== null) {
+            $this->assertRemotePathIsConfined($resourceDirectory, $path, $server);
+        } elseif (! $this->is_directory) {
+            self::assertRemotePathIsNotSymlink($path, $server);
+        }
+
+        return $path;
     }
 
     /**

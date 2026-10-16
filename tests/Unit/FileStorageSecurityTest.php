@@ -185,7 +185,7 @@ test('confined path resolver rejects paths that escape the resource configuratio
 test('local file volume write sink keeps saved managed file paths for compatibility', function () {
     $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
 
-    expect($source)->toContain('confinePathToBase($workdir, $path->value(), \'storage path\')')
+    expect($source)->toContain('hostPathAndResourceDirectory()')
         ->and($source)->toContain('assertRemotePathIsConfined')
         ->and($source)->toContain('tee {$escapedPath}');
 });

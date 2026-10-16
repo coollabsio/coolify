@@ -43,26 +43,6 @@ test('preserves command substitutions inside database and volume backup scripts'
         ->not->toContain('$(sudo if');
 });
 
-test('keeps safe file-storage path expansion in non-root commands', function () {
-    $argument = filesystemVolumeShellArgument('${DATA_PATH:-/srv/app/config.yml}');
-    $commands = collect([
-        "test -f {$argument} && echo OK || echo NOK",
-        'mkdir -p -- "$(dirname -- '.$argument.')"',
-        "echo 'e30=' | base64 -d | tee -- {$argument}",
-    ]);
-
-    $result = parseCommandsByLineForSudo($commands, $this->server);
-
-    expect($result[0])->toContain('"${DATA_PATH:-/srv/app/config.yml}"')
-        ->and($result[1])->toContain('$(sudo dirname -- "${DATA_PATH:-/srv/app/config.yml}")')
-        ->and($result[2])->toContain('"${DATA_PATH:-/srv/app/config.yml}"');
-});
-
-test('rejects unsupported nested Compose defaults before non-root file commands', function () {
-    expect(fn () => filesystemVolumeShellArgument('${DATA:-${HOME}/config.yml}'))
-        ->toThrow(Exception::class);
-});
-
 test('preserves quoted backup container and file arguments for a non-root server', function () {
     $container = escapeshellarg('db-name-uuid');
     $path = escapeshellarg('/backups/db-name.dump');
@@ -71,6 +51,21 @@ test('preserves quoted backup container and file arguments for a non-root server
     $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
 
     expect($result)->toBe(['sudo '.$command]);
+});
+
+test('keeps a resolved bind path as data for non-root commands', function () {
+    $path = escapeshellarg('/srv/space and $${LITERAL}/file');
+    $commands = collect([
+        "test -f {$path} && echo OK || echo NOK",
+        "mkdir -p -- {$path}",
+        "echo 'YQ==' | base64 -d | tee -- {$path} > /dev/null",
+    ]);
+
+    $rewritten = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($rewritten[0])->toContain($path)->not->toContain('sudo ${LITERAL}')
+        ->and($rewritten[1])->toContain($path)
+        ->and($rewritten[2])->toContain($path);
 });
 
 test('wraps complex Docker install command with multiple fallbacks', function () {
