@@ -627,8 +627,8 @@ class ScheduledJobDeliveryService
             return false;
         }
 
-        // An open previous occurrence usually means the previous run is still running. Backup jobs
-        // then skip this one without running it (see withoutOverlapping()).
+        // An open previous occurrence usually means the previous run is still running. Backup and
+        // task jobs then skip this one without running it (see withoutOverlapping()).
         $previousOpen = ScheduledJobDelivery::query()
             ->where('schedule_key', $occurrence->schedule_key)
             ->where('scheduled_for', '<', $occurrence->scheduled_for)
