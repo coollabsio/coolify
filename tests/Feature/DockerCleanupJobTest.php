@@ -3,6 +3,7 @@
 use App\Actions\Server\CleanupDocker;
 use App\Events\DockerCleanupDone;
 use App\Jobs\DockerCleanupJob;
+use App\Jobs\ScheduledJobManager;
 use App\Models\Application;
 use App\Models\DockerCleanupExecution;
 use App\Models\Environment;
@@ -194,6 +195,34 @@ it('leaves a running scheduled cleanup untouched when a manual cleanup fails bef
         ->and($scheduledExecution->fresh()->finished_at)->toBeNull();
     Notification::assertNothingSent();
     Event::assertNotDispatched(DockerCleanupDone::class);
+});
+
+it('fails a cleanup execution whose worker was killed once the server lock has expired, so it does not stay running', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 16, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $interrupted = DockerCleanupExecution::create(['server_id' => $server->id]);
+    Carbon::setTestNow(now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() - 1));
+    $live = DockerCleanupExecution::create(['server_id' => $server->id]);
+    $finished = DockerCleanupExecution::create(['server_id' => $server->id, 'status' => 'success', 'finished_at' => now()]);
+
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+
+    expect($interrupted->fresh()->status)->toBe('running');
+
+    Carbon::setTestNow(now()->addSeconds(2));
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+
+    expect($interrupted->fresh()->only(['status', 'message']))->toBe(['status' => 'failed', 'message' => DockerCleanupJob::INTERRUPTED_MESSAGE])
+        ->and($interrupted->fresh()->finished_at)->not->toBeNull()
+        ->and($live->fresh()->only(['status', 'finished_at']))->toBe(['status' => 'running', 'finished_at' => null])
+        ->and($finished->fresh()->status)->toBe('success');
+    Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
 });
 
 it('skips a scheduled cleanup occurrence while another cleanup holds the server lock, so it is not reported missed later', function () {
