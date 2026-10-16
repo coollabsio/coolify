@@ -254,8 +254,11 @@
             </div>
         </div>
 
-        @if ($server->proxySet() && auth()->user()?->can('manageProxy', $server))
-        {{-- Teleport only with actions: a filled slot renders as a floating panel. --}}
+        @php
+            $canManageProxy = auth()->user()?->can('manageProxy', $server) ?? false;
+        @endphp
+        @if ($server->proxySet() && ($canManageProxy || $traefikDashboardAvailable))
+        {{-- Teleport only with content: a filled slot renders as a floating panel. --}}
         @teleport('#resource-action-hud-slot')
         <div class="hidden xl:flex xl:w-auto xl:items-center">
             <div
@@ -269,31 +272,33 @@
                         </a>
                     </div>
                 @endif
-                <x-split-action id="server-desktop-actions" class="resource-heading-actions shrink-0">
-                    @if ($proxyCanBeStopped)
-                        <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
-                            @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
-                            <x-reicon name="restart" class="size-3.5" />
-                            Restart Proxy
-                        </x-slot:main>
-                        <button type="button" class="listbox-option justify-start! gap-2.5!"
-                            @click="open = false; document.getElementById('server-mobile-stop-proxy-trigger')?.click()"
-                            role="menuitem">
-                            <x-reicon name="stop-circle" class="size-3.5 text-error" />
-                            Stop Proxy
+                @if ($canManageProxy)
+                    <x-split-action id="server-desktop-actions" class="resource-heading-actions shrink-0">
+                        @if ($proxyCanBeStopped)
+                            <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
+                                @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
+                                <x-reicon name="restart" class="size-3.5" />
+                                Restart Proxy
+                            </x-slot:main>
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @click="open = false; document.getElementById('server-mobile-stop-proxy-trigger')?.click()"
+                                role="menuitem">
+                                <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                Stop Proxy
+                            </button>
+                        @else
+                            <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
+                                <x-reicon name="play-circle" class="size-3.5" />
+                                Start Proxy
+                            </x-slot:main>
+                        @endif
+                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="checkProxyStatus"
+                            wire:loading.attr="disabled" @click="open = false" role="menuitem">
+                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                            Refresh Proxy Status
                         </button>
-                    @else
-                        <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
-                            <x-reicon name="play-circle" class="size-3.5" />
-                            Start Proxy
-                        </x-slot:main>
-                    @endif
-                    <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="checkProxyStatus"
-                        wire:loading.attr="disabled" @click="open = false" role="menuitem">
-                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                        Refresh Proxy Status
-                    </button>
-                </x-split-action>
+                    </x-split-action>
+                @endif
             </div>
         </div>
         @endteleport

@@ -6,7 +6,9 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -117,4 +119,17 @@ it('renders the floating action panel with proxy actions for a functional server
     Livewire::test('server.navbar', ['server' => $server])
         ->assertSeeHtml('x-teleport="#resource-action-hud-slot"')
         ->assertSee('Refresh Proxy Status');
+});
+
+it('shows the Traefik dashboard link without proxy actions to members who cannot manage the proxy', function () {
+    [$server, $user, $team] = makeNavbarServer(isFunctional: true);
+    $user->teams()->updateExistingPivot($team->id, ['role' => 'member']);
+    $server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value, 'status' => 'running']])->save();
+    $server = $server->fresh();
+    Cache::put(ProxyDashboardCacheService::getCacheKey($server), true);
+
+    Livewire::test('server.navbar', ['server' => $server])
+        ->assertSeeHtml('x-teleport="#resource-action-hud-slot"')
+        ->assertSee('Traefik Dashboard')
+        ->assertDontSee('Refresh Proxy Status');
 });

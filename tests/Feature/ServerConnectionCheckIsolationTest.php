@@ -290,3 +290,11 @@ it('passes the SSH probe on a server without an owner marker', function () {
     expect(file_exists(ServerTransferClaimer::OWNER_MARKER_PATH))->toBeFalse()
         ->and($result->exitCode())->toBe(0);
 });
+
+it('keeps the owner marker read elevated in the SSH probe on a non-root server', function () {
+    $server = createServerForConnectionIsolationTest(['user' => 'ubuntu']);
+
+    expect(parseCommandsByLineForSudo(collect([ServerConnectionCheckJob::probeCommand()]), $server))->toBe([
+        'sudo cat '.ServerTransferClaimer::OWNER_MARKER_PATH.' 2>/dev/null || sudo true; ls -la / > /dev/null',
+    ]);
+});

@@ -3,11 +3,15 @@
 use App\Actions\Server\DeleteServer;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\MigrateServerToInstanceJob;
+use App\Jobs\ReleaseManagedDnsRecordsJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Livewire\Server\Delete;
 use App\Livewire\Server\Transfer;
 use App\Models\Application;
+use App\Models\DnsProviderZone;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -36,6 +40,8 @@ beforeEach(function () {
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
+    // The default password of UserFactory.
+    $this->userPassword = 'password'; // ggignore
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
@@ -158,9 +164,18 @@ test('a transferred server cannot delete its cloud provider machine', function (
     $component = Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid]);
     expect(collect($component->viewData('checkboxes'))->pluck('id'))->not->toContain('delete_from_hetzner');
 
-    $component->call('delete', 'password', ['delete_from_hetzner']);
+    $component->call('delete', $this->userPassword, ['delete_from_hetzner']);
 
     DeleteServer::assertPushed(fn ($action, array $parameters) => $parameters[1] === false && $parameters[2] === 4242);
+});
+
+test('a transferred server does not show Hostinger VPS deletion guidance', function () {
+    $this->server->forceFill(['hostinger_virtual_machine_id' => 4242])->save();
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid])
+        ->assertDontSee('Hostinger deletes')
+        ->assertDontSee('hpanel.hostinger.com');
 });
 
 test('a managed server can still delete its cloud provider machine', function () {
@@ -183,10 +198,29 @@ test('deleting a transferred server deletes its resources from this instance onl
     $component = Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid]);
     expect(collect($component->viewData('checkboxes'))->pluck('id'))->not->toContain('force_delete_resources');
 
-    $component->call('delete', 'password');
+    $component->call('delete', $this->userPassword);
 
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($application) && $job->deleteFromCoolifyOnly);
     expect(Server::find($this->server->id))->toBeNull();
+});
+
+test('deleting a transferred server forgets the DNS records of its resources without releasing them at the provider', function () {
+    Queue::fake();
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create(['destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()]);
+    // An archive that still tracks a record, for example from a transfer before records were forgotten at claim time.
+    $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->save();
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare']);
+    $zone = DnsProviderZone::factory()->create(['integration_token_id' => $token->id]);
+    $record = ManagedDnsRecord::factory()->owned()->create(['dns_provider_zone_id' => $zone->id]);
+    $record->addReference($application);
+
+    Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid])->call('delete', $this->userPassword);
+    (new DeleteResourceJob($application->fresh(), deleteFromCoolifyOnly: true))->handle();
+
+    Queue::assertNotPushed(ReleaseManagedDnsRecordsJob::class);
+    expect(ManagedDnsRecord::find($record->id))->toBeNull()
+        ->and(Application::withTrashed()->find($application->id))->toBeNull();
 });
 
 test('deleting an application from Coolify only does not touch the server', function () {

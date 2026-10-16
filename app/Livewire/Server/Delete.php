@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\DeleteServer;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Server;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -69,6 +70,9 @@ class Delete extends Component
                 return;
             }
 
+            if ($isArchive) {
+                app(ServerTransferClaimer::class)->forgetDnsRecords($this->server);
+            }
             if ($this->force_delete_resources) {
                 foreach ($this->server->definedResources() as $resource) {
                     DeleteResourceJob::dispatch($resource, deleteFromCoolifyOnly: $isArchive);

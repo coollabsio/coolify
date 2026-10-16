@@ -129,12 +129,7 @@ class ServerTransferClaimer
 
             $this->releaseGithubRunners($server);
 
-            // The other instance serves these hostnames now. Without this, deleting the archive here, or the
-            // orphaned-record cleanup after it, would delete live DNS records at the provider.
-            app(ManagedDnsRecordCleanup::class)->forgetResources(
-                $server->applications()
-                    ->concat($server->services()->with('applications')->get()->flatMap->applications)
-            );
+            $this->forgetDnsRecords($server);
 
             return [
                 'server_uuid' => $server->uuid,
@@ -152,6 +147,18 @@ class ServerTransferClaimer
      * finished without removing them at GitHub: their jobs keep running, and deleting the archive here later must
      * not deregister them. A disabled config also stops new runners for this server from GitHub webhooks.
      */
+    /**
+     * The other instance serves the hostnames of a transferred server. Without this, deleting the archive here,
+     * or the orphaned-record cleanup after it, would delete live DNS records at the provider.
+     */
+    public function forgetDnsRecords(Server $server): void
+    {
+        app(ManagedDnsRecordCleanup::class)->forgetResources(
+            $server->applications()
+                ->concat($server->services()->with('applications')->get()->flatMap->applications)
+        );
+    }
+
     private function releaseGithubRunners(Server $server): void
     {
         $server->githubRunnerConfig()->update(['is_enabled' => false]);
