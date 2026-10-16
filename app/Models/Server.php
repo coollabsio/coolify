@@ -252,7 +252,13 @@ class Server extends BaseModel
                 $destination->delete();
             });
             // Leftover active runner rows would block deleting the GitHub App.
-            GithubRunnerExecution::deleteAndDeregister(GithubRunnerExecution::query()->where('server_id', $server->id));
+            // The runners of a transferred server now belong to the other instance, so keep them registered at GitHub.
+            $executions = GithubRunnerExecution::query()->where('server_id', $server->id);
+            if ($server->isTransferredAway()) {
+                $executions->delete();
+            } else {
+                GithubRunnerExecution::deleteAndDeregister($executions);
+            }
             $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
             $server->sslCertificates()->delete();
@@ -1377,15 +1383,6 @@ $siteAddress {
     }
 
     /**
-     * Management was disabled manually on this instance; the server is ready to be transferred.
-     */
-    public function isManagementDisabled(): bool
-    {
-        return $this->isTransferredAway()
-            && (bool) data_get($this->server_metadata, 'transfer.management_disabled', false);
-    }
-
-    /**
      * Whether this server may be validated / installed against from this instance.
      */
     public function canBeValidated(): bool
@@ -2120,7 +2117,13 @@ $siteAddress {
                 'collected_at' => now()->toIso8601String(),
             ];
 
-            $this->update(['server_metadata' => $metadata]);
+            // Merge into the saved row: server_metadata also holds the transfer and migration state.
+            DB::transaction(function () use ($metadata) {
+                $locked = self::query()->lockForUpdate()->findOrFail($this->id);
+                $locked->update(['server_metadata' => array_merge($locked->server_metadata ?? [], $metadata)]);
+                $this->server_metadata = $locked->server_metadata;
+                $this->syncOriginalAttribute('server_metadata');
+            });
 
             try {
                 $detectedDockerVersion = parseDockerEngineVersion($sections['DOCKER'] ?? null);

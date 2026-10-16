@@ -891,6 +891,19 @@ describe('server deletion', function () {
         expect(GithubApp::find($this->githubApp->id))->toBeNull();
     });
 
+    it('keeps the GitHub runners of a transferred server registered when it deletes the archive', function () {
+        Queue::fake();
+        $running = runnerTestExecution($this->githubApp, ['status' => GithubRunnerStatus::Running, 'server_id' => $this->server->id, 'github_runner_config_id' => $this->config->id, 'runner_id' => 42]);
+        $this->server->update(['server_metadata' => ['transfer' => ['status' => 'transferred']]]);
+
+        $this->server->delete();
+        DeleteServer::run($this->server->id);
+
+        expect(Server::withTrashed()->find($this->server->id))->toBeNull()
+            ->and(GithubRunnerExecution::whereKey($running->id)->exists())->toBeFalse();
+        Queue::assertNotPushed(DeregisterGithubRunnerJob::class);
+    });
+
     it('removes the runner from GitHub and ignores GitHub errors', function (int $status) {
         Http::fake([
             'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),

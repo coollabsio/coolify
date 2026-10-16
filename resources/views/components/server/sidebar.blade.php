@@ -196,15 +196,16 @@
             'route' => 'server.transfer',
             'active' => $activeMenu === 'transfer',
             'icon' => 'arrow-right',
+            'beta' => true,
             'group' => 'Operations',
-            'visible' => isDev() && ! $server->isLocalhost() && auth()->user()?->can('view', $server),
+            'visible' => ! $server->isLocalhost() && auth()->user()?->can('update', $server),
         ],
         [
-            'label' => 'Danger',
+            'label' => 'Danger Zone',
             'route' => 'server.delete',
             'active' => $activeMenu === 'danger',
             'icon' => 'danger',
-            'group' => 'Danger zone',
+            'group' => 'Danger Zone',
             // Coolify host (id 0) cannot be deleted. Other servers may still use
             // host.docker.internal (e.g. Lima VMs) and must keep the Danger menu.
             'visible' => ! $server->is_coolify_host,
@@ -215,13 +216,6 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
-
-    // Group that holds the current page (item or nested child) — always kept
-    // open, even if collapsed before.
-    $activeGroup = (string) $groupedServerMenuItems->search(fn ($items) => $items->contains(
-        fn ($item) => ($item['active'] ?? false)
-            || collect($item['children'] ?? [])->contains(fn ($child) => $child['active'] ?? false)
-    ));
 @endphp
 
 @php
@@ -286,7 +280,6 @@
     ">
 @endif
     <nav aria-label="Server configuration sections"
-        x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.server' })"
         @class([
             'grid gap-0.5',
             'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
@@ -297,16 +290,6 @@
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                     aria-hidden="true"></div>
             @endunless
-            <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
-                :aria-expanded="isOpen(@js($groupLabel))">
-                <span>{{ $groupLabel }}</span>
-                <svg class="size-3 shrink-0 opacity-60 transition-transform"
-                    :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-                </svg>
-            </button>
-            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
             @foreach ($groupItems as $menuItem)
                 @if ($menuItem['disabled'] ?? false)
                     <span wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
@@ -354,7 +337,6 @@
                     </div>
                 @endif
             @endforeach
-            </div>
         @endforeach
     </nav>
 @if ($placement === 'main-nav')

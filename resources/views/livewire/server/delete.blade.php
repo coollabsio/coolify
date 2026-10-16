@@ -17,11 +17,15 @@
                     <x-danger-zone title="This action cannot be undone">
                         <p>
                         The server will be removed from Coolify.
-                        @if ($server->definedResources()->count() > 0)
+                        @if ($server->isTransferredAway())
+                            This server was transferred to another Coolify instance. Only the records on this instance
+                            are deleted, also the records of its resources. The server, its containers, and its data
+                            stay as they are.
+                        @elseif ($server->definedResources()->count() > 0)
                             It currently contains managed resources. Enable force deletion in the confirmation only
                             if those resources should also be removed.
                         @endif
-                        @if ($server->hostinger_virtual_machine_id)
+                        @if ($server->hostinger_virtual_machine_id && ! $server->isTransferredAway())
                             Hostinger deletes the VPS only at the end of its paid period, and only if you select this in the confirmation dialog.
                             <a class="underline" href="https://hpanel.hostinger.com/" target="_blank"
                                 rel="noopener noreferrer">Manage the VPS and billing in hPanel.</a>
@@ -30,9 +34,11 @@
                         <p>Type the server name in the confirmation dialog to continue.</p>
                         <x-slot:action>
                         @php
-                            $deleteActions = ['This server will be permanently deleted from Coolify.'];
+                            $deleteActions = $server->isTransferredAway()
+                                ? ['This server and the records of its resources will be permanently deleted from this Coolify instance. Nothing on the server changes.']
+                                : ['This server will be permanently deleted from Coolify.'];
                             $deleteWarningMessage = null;
-                            if ($server->hostinger_virtual_machine_id) {
+                            if ($server->hostinger_virtual_machine_id && ! $server->isTransferredAway()) {
                                 $deleteWarningMessage = '<strong>Hostinger deletes a VPS only at the end of its paid period.</strong><br>'
                                     .'If you select to delete the VPS from Hostinger, Coolify turns off its auto-renewal. '
                                     .'The VPS keeps running until the paid period ends. Then Hostinger deletes it with all its data. '

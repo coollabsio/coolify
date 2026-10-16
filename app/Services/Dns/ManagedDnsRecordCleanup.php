@@ -150,6 +150,34 @@ class ManagedDnsRecordCleanup
     }
 
     /**
+     * Stops tracking the records of these resources without touching the provider. Used when another Coolify
+     * instance takes over the resources: their records still serve live traffic there. A record that another
+     * resource of this instance still uses keeps that resource's references.
+     *
+     * @param  iterable<int, Model>  $resources
+     */
+    public function forgetResources(iterable $resources): void
+    {
+        $keys = collect($resources)
+            ->flatMap(fn (Model $resource) => $this->resourceKeys($resource->getMorphClass(), $resource->getKey()))
+            ->all();
+        if ($keys === []) {
+            return;
+        }
+
+        $records = ManagedDnsRecord::query()
+            ->whereHas('references', fn (Builder $query) => $this->whereResourceKeys($query, $keys))
+            ->get();
+
+        foreach ($records as $record) {
+            $this->deleteReferences($record, $keys);
+            if (! $record->references()->exists()) {
+                $this->forget($record, 'The resource was transferred to another Coolify instance, which uses the record now.', 'info');
+            }
+        }
+    }
+
+    /**
      * Releases orphaned records: records whose references all point to deleted (or soft-deleted) resources, and
      * records without references that are older than the grace period. Records with a live reference are not touched.
      * Each orphan goes through release(), so a hostname that a live resource uses again keeps its record, and

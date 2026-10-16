@@ -5775,7 +5775,7 @@ html.dark .canvas-zoom-max {
 }
 
 /* Resource menu in the collapsed main sidebar: icons only. */
-.sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-section-toggle, .nav-children, .menu-item > :not(.menu-item-icon)) {
+.sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-children, .menu-item > :not(.menu-item-icon)) {
     display: none !important;
 }
 

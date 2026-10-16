@@ -21,16 +21,6 @@
             <div data-ec-views class="flex items-center gap-2">
                 <x-canvas-view-toggle on-canvas
                     :list-url="route('server.index')" :canvas-url="route('server.canvas.index')" />
-                @if (isDev())
-                    @can('create', App\Models\Server::class)
-                        <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
-                            class="button whitespace-nowrap">
-                            <x-reicon name="upload" class="size-3.5" />
-                            Import server
-                            <x-status-badge label="Dev" />
-                        </a>
-                    @endcan
-                @endif
                 @can('createAnyResource')
                     <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                         class="button button-highlighted whitespace-nowrap">
