@@ -3,6 +3,7 @@
         $executionCount = method_exists($executions, 'total') ? $executions->total() : $executions->count();
         $currentPage = method_exists($executions, 'currentPage') ? $executions->currentPage() : 1;
         $lastPage = method_exists($executions, 'lastPage') ? $executions->lastPage() : 1;
+        $server = $backup->server();
     @endphp
 
     <div wire:poll.5000ms="$refresh">
@@ -82,12 +83,13 @@
                                 <x-forms.copy-input :text="$execution->filename ?? 'No archive name'" />
                             </span>
 
-                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint"
+                                title="Started: {{ formatDateInServerTimezone($execution->created_at, $server) }}@if ($execution->status !== 'running')&#10;Ended: {{ formatDateInServerTimezone($finishedAt, $server) }}@endif">
                                 @if ($execution->status === 'running')
                                     Running for {{ calculateDuration($execution->created_at, now()) }}
                                 @else
-                                    {{ $finishedAt->diffForHumans() }}<br>
-                                    {{ calculateDuration($execution->created_at, $finishedAt) }}
+                                    <span class="block text-black dark:text-fg">{{ formatDateInServerTimezone($finishedAt, $server) }}</span>
+                                    {{ $finishedAt->diffForHumans() }} · {{ calculateDuration($execution->created_at, $finishedAt) }}
                                 @endif
                             </span>
 
