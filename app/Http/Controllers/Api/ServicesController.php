@@ -210,6 +210,7 @@ class ServicesController extends Controller
 
             $application->fqdn = $containerUrls;
             $application->save();
+            updateCompose($application);
         });
 
         if (! empty($errors)) {
