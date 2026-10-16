@@ -563,3 +563,81 @@ test('start adds no note when the projects have no resources on other servers', 
     expect($messages->filter(fn (string $message) => str_starts_with($message, 'NOTE: ')))->toBeEmpty();
     Queue::assertPushed(MigrateServerToInstanceJob::class, 1);
 });
+
+test('the migrate job timeout covers the import request and every status probe', function () {
+    $worstCase = ServerTransferMigrator::IMPORT_TIMEOUT_SECONDS
+        + ServerTransferMigrator::STATUS_PROBE_ATTEMPTS
+        * (ServerTransferMigrator::STATUS_PROBE_INTERVAL_SECONDS + ServerTransferMigrator::STATUS_REQUEST_TIMEOUT_SECONDS);
+    $job = new MigrateServerToInstanceJob($this->server, 'https://8.8.8.8', 'token');
+
+    // The rest of the timeout is for the export and the database writes.
+    expect($job->timeout)->toBeGreaterThanOrEqual($worstCase + 300)
+        ->and(ServerTransferMigrator::STALE_MIGRATION_SECONDS)->toBeGreaterThan($job->timeout);
+});
+
+function stopMigrateJobAfterExport(Server $server): void
+{
+    $metadata = $server->fresh()->server_metadata ?? [];
+    $metadata['migration'] = ['status' => 'running', 'target_url' => 'https://8.8.8.8', 'export_id' => 'export-1', 'log' => []];
+    $server->forceFill(['server_metadata' => $metadata])->save();
+
+    (new MigrateServerToInstanceJob($server, 'https://8.8.8.8', 'token'))
+        ->failed(new RuntimeException('The job has timed out.'));
+}
+
+test('a stopped migrate job completes the transfer when the target manages the server', function () {
+    Http::fake(['*' => Http::response(['transfer' => ['status' => 'claimed', 'export_id' => 'export-1']])]);
+
+    stopMigrateJobAfterExport($this->server);
+
+    $server = $this->server->fresh();
+    expect(data_get($server->server_metadata, 'migration.status'))->toBe('succeeded')
+        ->and($server->isTransferredAway())->toBeTrue();
+});
+
+test('a stopped migrate job records an unknown result when the target cannot be asked', function () {
+    Http::fake(fn () => throw new ConnectionException('Connection timed out'));
+
+    stopMigrateJobAfterExport($this->server);
+
+    $server = $this->server->fresh();
+    expect(data_get($server->server_metadata, 'migration.status'))->toBe('unknown')
+        ->and(data_get($server->server_metadata, 'migration.error'))->toContain("/api/v1/servers/{$server->uuid}/transfer/complete")
+        ->and($server->isTransferredAway())->toBeFalse();
+});
+
+test('a stopped migrate job records a failure when the target does not have the export', function (array $body, int $status) {
+    Http::fake(['*' => Http::response($body, $status)]);
+
+    stopMigrateJobAfterExport($this->server);
+
+    $server = $this->server->fresh();
+    expect(data_get($server->server_metadata, 'migration.status'))->toBe('failed')
+        ->and($server->isTransferredAway())->toBeFalse();
+})->with([
+    'not found' => [['message' => 'Server not found.'], 404],
+    'other export' => [['transfer' => ['status' => 'claimed', 'export_id' => 'export-0']], 200],
+]);
+
+test('a migrate job stopped before the export records a failure without asking the target', function () {
+    Http::fake();
+
+    (new MigrateServerToInstanceJob($this->server, 'https://8.8.8.8', 'token'))
+        ->failed(new RuntimeException('The job has timed out.'));
+
+    expect(data_get($this->server->fresh()->server_metadata, 'migration.status'))->toBe('failed');
+    Http::assertNothingSent();
+});
+
+test('migrate saves the export ID before it sends the bundle', function () {
+    $savedExportId = null;
+    Http::fake(function ($request) use (&$savedExportId) {
+        $savedExportId = data_get($this->server->fresh()->server_metadata, 'migration.export_id');
+
+        return Http::response(['server_uuid' => $this->server->uuid, 'claimed' => true], 201);
+    });
+
+    $result = app(ServerTransferMigrator::class)->migrate($this->server, 'https://8.8.8.8', 'token');
+
+    expect($savedExportId)->toBe($result['export_id']);
+});

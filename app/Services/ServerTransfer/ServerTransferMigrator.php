@@ -35,7 +35,15 @@ class ServerTransferMigrator
 
     public const STATUS_PROBE_INTERVAL_SECONDS = 15;
 
+    public const STATUS_REQUEST_TIMEOUT_SECONDS = 15;
+
     public const CHECK_TIMEOUT_SECONDS = 15;
+
+    /**
+     * Time the queued job gets. It must be longer than the import request and all status probes together,
+     * plus time for the export, so the worker does not stop the job after the target took the server.
+     */
+    public const MIGRATION_TIMEOUT_SECONDS = 1500;
 
     /** Longer than the job timeout, so a running state older than this one is stale. */
     public const STALE_MIGRATION_SECONDS = 1800;
@@ -121,9 +129,11 @@ class ServerTransferMigrator
      */
     public function recordMigration(Server $server, string $status, array $details = []): void
     {
-        $entry = $status === 'succeeded'
-            ? $this->logEntry('Transfer finished. The target instance manages the server now.', 'success')
-            : $this->logEntry('Transfer failed: '.data_get($details, 'error', 'unknown error'), 'error');
+        $entry = match ($status) {
+            'succeeded' => $this->logEntry('Transfer finished. The target instance manages the server now.', 'success'),
+            'unknown' => $this->logEntry('Transfer result unknown: '.data_get($details, 'error', 'unknown error'), 'warning'),
+            default => $this->logEntry('Transfer failed: '.data_get($details, 'error', 'unknown error'), 'error'),
+        };
 
         DB::transaction(function () use ($server, $status, $details, $entry) {
             $locked = Server::query()->lockForUpdate()->find($server->id);
@@ -140,18 +150,65 @@ class ServerTransferMigrator
     }
 
     /**
-     * Add one line to the transfer log, so the UI can show where the transfer is.
+     * Record the result of a transfer job that the worker stopped, for example at its timeout. When the export
+     * was already sent, ask the target once, because the target can manage the server already.
      */
-    public function log(Server $server, string $message, string $level = 'info'): void
+    public function recordStoppedMigration(Server $server, string $targetUrl, string $targetToken, string $error): void
+    {
+        $exportId = data_get($server->fresh()?->server_metadata, 'migration.export_id');
+        if (! is_string($exportId)) {
+            $this->recordMigration($server, 'failed', ['error' => $error]);
+
+            return;
+        }
+
+        $targetUrl = $this->normalizeTargetUrl($targetUrl);
+        $status = $this->targetTransferStatus($targetUrl, $this->normalizeToken($targetToken), $server->uuid, $exportId);
+
+        if ($status === 'claimed') {
+            try {
+                $this->claimer->markTransferred($server, exportId: $exportId, targetInstanceUrl: $targetUrl);
+                $this->recordMigration($server, 'succeeded', [
+                    'warnings' => ['The transfer job stopped before it finished. The target status confirms that the target manages the server.'],
+                ]);
+            } catch (Throwable) {
+                $this->recordMigration($server, 'unknown', [
+                    'error' => "{$error} The target manages the server, but this instance could not mark it as transferred. Call POST /api/v1/servers/{$server->uuid}/transfer/complete on this instance.",
+                ]);
+            }
+
+            return;
+        }
+
+        // The target answered that it does not manage this export, so this instance still manages the server.
+        if (in_array($status, ['imported', 'absent'], true)) {
+            $this->recordMigration($server, 'failed', ['error' => $error]);
+
+            return;
+        }
+
+        $this->recordMigration($server, 'unknown', [
+            'error' => "{$error} This instance could not ask {$targetUrl} whether it imported the server. ".
+                "Check the server on the target. If the target manages it, call POST /api/v1/servers/{$server->uuid}/transfer/complete on this instance. ".
+                'If not, transfer again.',
+        ]);
+    }
+
+    /**
+     * Add one line to the transfer log, so the UI can show where the transfer is.
+     *
+     * @param  array<string, mixed>  $fields  values to save in the transfer state with the line
+     */
+    public function log(Server $server, string $message, string $level = 'info', array $fields = []): void
     {
         $entry = $this->logEntry($message, $level);
 
-        DB::transaction(function () use ($server, $entry) {
+        DB::transaction(function () use ($server, $entry, $fields) {
             $locked = Server::query()->lockForUpdate()->find($server->id);
             if (! $locked) {
                 return;
             }
-            $migration = (array) data_get($locked->server_metadata, 'migration', []);
+            $migration = array_merge((array) data_get($locked->server_metadata, 'migration', []), $fields);
             $migration['log'] = $this->appendToLog((array) data_get($migration, 'log', []), $entry);
             $this->writeMigration($locked, $migration);
         });
@@ -313,7 +370,8 @@ class ServerTransferMigrator
         $exportId = data_get($bundle, 'export_id');
         $warnings = array_values((array) data_get($bundle, 'warnings', []));
         $checklist = $this->postTransferChecklist($bundle, $targetUrl);
-        $this->log($server, "Export {$exportId} created. Sending it to {$targetUrl}. The target imports the server and takes over management.");
+        // A job that the worker stops after this line reads the export ID to ask the target for the result.
+        $this->log($server, "Export {$exportId} created. Sending it to {$targetUrl}. The target imports the server and takes over management.", fields: ['export_id' => $exportId]);
 
         // Target import+claim runs in its own DB transaction on the remote instance.
         // Source DB is unchanged until markTransferred below — so a failed remote import leaves source intact.
@@ -565,7 +623,6 @@ class ServerTransferMigrator
     {
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $exportId = (string) data_get($bundle, 'export_id');
-        $statusUrl = $targetUrl.'/api/v1/servers/'.rawurlencode($serverUuid).'/transfer';
 
         $this->log($server, "The import request did not finish ({$reason}). The target can still finish the import, so this instance asks the target for the result.", 'warning');
 
@@ -573,22 +630,13 @@ class ServerTransferMigrator
             Sleep::for(self::STATUS_PROBE_INTERVAL_SECONDS)->seconds();
             $this->log($server, "Asking the target for the import result (attempt {$attempt} of ".self::STATUS_PROBE_ATTEMPTS.').');
 
-            try {
-                $response = $this->targetRequest($statusUrl, $token, 30)->get($statusUrl);
-            } catch (Throwable) {
-                continue;
-            }
+            $status = $this->targetTransferStatus($targetUrl, $token, $serverUuid, $exportId);
 
             // A rejected token stays rejected, so more attempts cannot confirm the import.
-            if (in_array($response->status(), [401, 403], true)) {
+            if ($status === 'rejected') {
                 return null;
             }
 
-            if (! $response->successful() || data_get($response->json(), 'transfer.export_id') !== $exportId) {
-                continue;
-            }
-
-            $status = data_get($response->json(), 'transfer.status');
             if (in_array($status, ['claimed', 'imported'], true)) {
                 return [
                     'server_uuid' => $serverUuid,
@@ -600,6 +648,40 @@ class ServerTransferMigrator
         }
 
         return null;
+    }
+
+    /**
+     * Ask the target once what it knows about this export: 'claimed' or 'imported', 'absent' when the target
+     * does not have it, 'rejected' when the target rejects the token, or 'unknown' when there is no clear answer.
+     *
+     * @return 'claimed'|'imported'|'absent'|'rejected'|'unknown'
+     */
+    private function targetTransferStatus(string $targetUrl, string $token, string $serverUuid, string $exportId): string
+    {
+        $statusUrl = $targetUrl.'/api/v1/servers/'.rawurlencode($serverUuid).'/transfer';
+
+        try {
+            $response = $this->targetRequest($statusUrl, $token, self::STATUS_REQUEST_TIMEOUT_SECONDS)->get($statusUrl);
+        } catch (Throwable) {
+            return 'unknown';
+        }
+
+        if (in_array($response->status(), [401, 403], true)) {
+            return 'rejected';
+        }
+        if ($response->status() === 404) {
+            return 'absent';
+        }
+        if (! $response->successful()) {
+            return 'unknown';
+        }
+        if (data_get($response->json(), 'transfer.export_id') !== $exportId) {
+            return 'absent';
+        }
+
+        $status = data_get($response->json(), 'transfer.status');
+
+        return in_array($status, ['claimed', 'imported'], true) ? $status : 'unknown';
     }
 
     private function targetRequest(string $url, string $token, int $timeout): PendingRequest

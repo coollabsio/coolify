@@ -23,7 +23,7 @@ class MigrateServerToInstanceJob implements ShouldBeEncrypted, ShouldBeUnique, S
 
     public int $tries = 1;
 
-    public int $timeout = 900;
+    public int $timeout = ServerTransferMigrator::MIGRATION_TIMEOUT_SECONDS;
 
     public function __construct(
         public Server $server,
@@ -52,10 +52,17 @@ class MigrateServerToInstanceJob implements ShouldBeEncrypted, ShouldBeUnique, S
         }
     }
 
+    /**
+     * The worker stopped the job, for example at its timeout. The target can manage the server already,
+     * so the migrator asks the target before it records the result.
+     */
     public function failed(?Throwable $exception): void
     {
-        app(ServerTransferMigrator::class)->recordMigration($this->server, 'failed', [
-            'error' => $exception?->getMessage() ?: 'The transfer job stopped before it finished.',
-        ]);
+        app(ServerTransferMigrator::class)->recordStoppedMigration(
+            $this->server,
+            $this->targetUrl,
+            $this->targetToken,
+            $exception?->getMessage() ?: 'The transfer job stopped before it finished.',
+        );
     }
 }

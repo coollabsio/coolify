@@ -85,6 +85,13 @@
                                     {{ data_get($migration, 'error') }}
                                 @endif
                             </x-callout>
+                        @elseif (data_get($migration, 'status') === 'unknown')
+                            <x-callout type="warning" title="Transfer result unknown">
+                                The transfer stopped before this instance could confirm the result. Check whether
+                                {{ data_get($migration, 'target_url') }} manages this server. If it does, call
+                                <code>POST /api/v1/servers/{{ $server->uuid }}/transfer/complete</code> on this instance.
+                                If it does not, transfer again.
+                            </x-callout>
                         @elseif (data_get($migration, 'status') === 'succeeded')
                             <x-callout type="success" title="Transfer finished">
                                 {{ data_get($migration, 'target_url') }} now manages this server. Automations are
