@@ -330,6 +330,22 @@ services:
                                 text_format_source:
                                   inline_string: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% - - [%START_TIME(%d/%b/%Y:%H:%M:%S %z)%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %BYTES_SENT% \"%REQ(REFERER)%\" \"%REQ(USER-AGENT)%\"\n"
 
+                        # One Basic realm for all paths: basic_auth puts the request URL into the realm
+                        local_reply_config:
+                          mappers:
+                            - filter:
+                                status_code_filter:
+                                  comparison:
+                                    op: EQ
+                                    value:
+                                      default_value: 401
+                                      runtime_key: local_reply.basic_auth_realm
+                              headers_to_add:
+                                - header:
+                                    key: WWW-Authenticate
+                                    value: 'Basic realm="Supabase Studio"'
+                                  append_action: OVERWRITE_IF_EXISTS
+
                         route_config:
                           name: supabase_route
                           virtual_hosts:

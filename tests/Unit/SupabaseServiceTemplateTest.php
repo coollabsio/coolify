@@ -37,6 +37,13 @@ it('blocks the Realtime management API at the gateway', function () {
         ->toContain('prefix: /realtime/v1/api/openapi');
 });
 
+it('uses one basic auth realm for every Studio path', function () {
+    expect(supabaseTemplateFile('./volumes/api/envoy/lds.template.yaml'))
+        ->toContain('local_reply_config:')
+        ->toContain("value: 'Basic realm=\"Supabase Studio\"'")
+        ->toContain('append_action: OVERWRITE_IF_EXISTS');
+});
+
 it('does not expose the JWT secret as a Postgres setting', function () {
     $services = supabaseTemplate()['services'];
 
