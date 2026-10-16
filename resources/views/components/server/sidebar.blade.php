@@ -223,6 +223,7 @@
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start"
+    data-settings-search-items="{{ json_encode(settingsSearchItems($groupedServerMenuItems, $serverRouteParameters)) }}"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
         traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),

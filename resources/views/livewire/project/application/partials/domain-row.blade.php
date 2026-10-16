@@ -16,10 +16,7 @@
     };
     $gridClass = 'service-domains-overview-grid';
     $publicUrl = getFqdnWithoutPort($row['url']);
-    $domainParts = $isSuggested ? null : parse_url($publicUrl);
-    $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
-        ? $domainParts['scheme'].'://'.$domainParts['host'].'/favicon.ico'
-        : null;
+    $faviconUrl = $isSuggested ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
     $rowDirection = $isCompose
         ? ($serviceRedirects[$this->serviceRedirectWireKey($row['service'])] ?? 'both')
         : $redirect;

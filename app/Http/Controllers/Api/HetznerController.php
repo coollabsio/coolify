@@ -932,7 +932,7 @@ class HetznerController extends Controller
             if ($request->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
                 $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
             } elseif ($request->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
+                $ipAddress = hetznerServerIpv6($hetznerServer['public_net']['ipv6']['ip']);
             }
 
             if (! $ipAddress) {

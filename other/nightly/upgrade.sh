@@ -38,6 +38,24 @@ write_status() {
     echo "${step}|${message}|$(date -Iseconds)" > "$STATUS_FILE"
 }
 
+# Pull an image. Retry with backoff, because the registry can rate limit many instances that pull at the same time.
+pull_image() {
+    local image="$1"
+    local attempt=1
+    local max_attempts=5
+    local delay=15
+    until docker pull "$image" >>"$LOGFILE" 2>&1; do
+        if [ "$attempt" -ge "$max_attempts" ]; then
+            return 1
+        fi
+        log "Pull of $image failed (attempt $attempt/$max_attempts). Retrying in ${delay}s..."
+        echo "     Pull failed (attempt $attempt/$max_attempts). Retrying in ${delay}s..."
+        sleep "$((delay + RANDOM % 10))"
+        attempt=$((attempt + 1))
+        delay=$((delay * 2))
+    done
+}
+
 echo ""
 echo "=========================================="
 echo "   Coolify Upgrade - ${DATE}"
@@ -205,7 +223,7 @@ echo "     This may take a few minutes depending on your connection."
 HELPER_IMAGE="${REGISTRY_URL:-docker.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION}"
 echo "     - Pulling $HELPER_IMAGE..."
 log "Pulling image: $HELPER_IMAGE"
-if docker pull "$HELPER_IMAGE" >>"$LOGFILE" 2>&1; then
+if pull_image "$HELPER_IMAGE"; then
     log "Successfully pulled $HELPER_IMAGE"
 else
     log "ERROR: Failed to pull $HELPER_IMAGE"
@@ -220,7 +238,7 @@ for IMAGE in $IMAGES; do
     if [ -n "$IMAGE" ]; then
         echo "     - Pulling $IMAGE..."
         log "Pulling image: $IMAGE"
-        if docker pull "$IMAGE" >>"$LOGFILE" 2>&1; then
+        if pull_image "$IMAGE"; then
             log "Successfully pulled $IMAGE"
         else
             log "ERROR: Failed to pull $IMAGE"

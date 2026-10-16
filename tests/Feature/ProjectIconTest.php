@@ -129,7 +129,7 @@ it('loads an S3 project icon from the configured CDN', function () {
         ->assertViewHas('projectsJs', fn (array $projects): bool => $projects[0]['iconUrl'] === "https://avatars.example.com/media/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
 });
 
-it('loads an S3 project icon directly from S3 when the CDN is not configured', function () {
+it('falls back to the authenticated proxy route for an S3 project icon when the CDN is not configured', function () {
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -147,7 +147,12 @@ it('loads an S3 project icon directly from S3 when the CDN is not configured', f
         'icon_s3_storage_id' => $storage->id,
     ])->save();
 
-    expect(project_icon_url($this->project))->toBe("https://s3.example.com/avatars/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
+    // Direct S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests,
+    // so without a CDN the browser must use the app's authenticated proxy route.
+    expect(project_icon_url($this->project))->toBe(route('project.icon', [
+        'project_uuid' => $this->project->uuid,
+        'v' => $this->project->updated_at->timestamp,
+    ]));
 });
 
 it('does not use an unusable S3 storage URL for a project icon', function () {

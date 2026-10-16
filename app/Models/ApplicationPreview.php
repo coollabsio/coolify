@@ -54,10 +54,13 @@ class ApplicationPreview extends BaseModel
 
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
-                foreach ($preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', []))) as $volumeName) {
+                $volumeNames = $preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', [])));
+                foreach ($volumeNames as $volumeName) {
                     // Docker does not remove a volume that a container still uses, also with -f.
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server, false);
                 }
+                // The compose parser stores preview volumes on the application, not on the preview
+                $application->persistentStorages()->whereIn('name', $volumeNames)->delete();
                 $preview->removeComposePreviewNetwork($application, $server);
             } else {
                 // Regular application volume cleanup
@@ -337,6 +340,10 @@ class ApplicationPreview extends BaseModel
         $previewFqdn = str_replace('{{random}}', $random, $template);
         $previewFqdn = str_replace('{{domain}}', $host, $previewFqdn);
         $previewFqdn = str_replace('{{pr_id}}', (string) $this->pull_request_id, $previewFqdn);
+        if (preg_match('#^(https?)://(.*)$#i', $previewFqdn, $matches)) {
+            $schema = strtolower($matches[1]);
+            $previewFqdn = $matches[2];
+        }
         $previewUrl = "{$schema}://{$previewFqdn}{$path}";
         $sourceCanonical = DomainPortOverrides::withoutPort($sourceDomain);
         $port = $url->getPort() ?? ($this->application->domain_port_overrides[$sourceCanonical] ?? null);

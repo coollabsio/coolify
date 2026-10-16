@@ -153,3 +153,58 @@ it('findServerByIp matches correct server among multiple', function () {
         ->and($result['id'])->toBe(22222)
         ->and($result['name'])->toBe('server-b');
 });
+
+it('findServerByIp matches an IPv6 server address inside the Hetzner network', function (string $ip) {
+    Http::fake([
+        'api.hetzner.cloud/v1/servers*' => Http::response([
+            'servers' => [
+                [
+                    'id' => 11111,
+                    'name' => 'other-server',
+                    'public_net' => [
+                        'ipv4' => ['ip' => '10.0.0.1'],
+                        'ipv6' => ['ip' => '2a01:4f8:c016:aaaa::/64'],
+                    ],
+                ],
+                [
+                    'id' => 22222,
+                    'name' => 'ipv6-server',
+                    'public_net' => [
+                        'ipv4' => null,
+                        'ipv6' => ['ip' => '2a01:4f8:c016:bd23::/64'],
+                    ],
+                ],
+            ],
+            'meta' => ['pagination' => ['next_page' => null]],
+        ], 200),
+    ]);
+
+    $result = (new HetznerService('fake-token'))->findServerByIp($ip);
+
+    expect($result)->not->toBeNull()
+        ->and($result['id'])->toBe(22222);
+})->with([
+    'server address' => '2a01:4f8:c016:bd23::1',
+    'long upper-case form' => '2A01:04F8:C016:BD23:0000:0000:0000:0001',
+    'in brackets' => '[2a01:4f8:c016:bd23::1]',
+]);
+
+it('findServerByIp does not match an IPv6 address outside the Hetzner network', function () {
+    Http::fake([
+        'api.hetzner.cloud/v1/servers*' => Http::response([
+            'servers' => [
+                [
+                    'id' => 22222,
+                    'public_net' => [
+                        'ipv4' => ['ip' => '10.0.0.1'],
+                        'ipv6' => ['ip' => '2a01:4f8:c016:bd23::/64'],
+                    ],
+                ],
+            ],
+            'meta' => ['pagination' => ['next_page' => null]],
+        ], 200),
+    ]);
+
+    expect((new HetznerService('fake-token'))->findServerByIp('2a01:4f8:c016:bd24::1'))->toBeNull()
+        ->and((new HetznerService('fake-token'))->findServerByIp('10.0.0.2'))->toBeNull();
+});

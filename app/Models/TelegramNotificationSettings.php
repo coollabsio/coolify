@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class TelegramNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -116,5 +117,15 @@ class TelegramNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->telegram_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Telegram';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->telegram_enabled = false;
     }
 }

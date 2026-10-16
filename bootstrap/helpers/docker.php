@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -89,10 +90,12 @@ function containerOwnerUuid(Collection|array|string $labels, string $type): ?str
 
 /**
  * Resource that owns a container, from the given candidates, by UUID label or compose project /
- * stack namespace (see containerOwnerUuid()). Applications deployed before mid-2024 used the
- * deployment directory as compose project; their compose service (the container name) starts
- * with the application UUID. The numeric id label is never used: another Coolify instance that
- * manages the same server can have a resource with the same id.
+ * stack namespace (see containerOwnerUuid()). Some older application containers have another
+ * compose project: the deployment directory (before mid-2024, or a custom Compose start command
+ * without --project-name). Their container name (`coolify.name`, for Dockerfile-style builds also
+ * the compose service) contains the application UUID as a dash-separated part, for example
+ * `{uuid}-104512123456` or `{service}-{uuid}-104512123456`. The numeric id label is never used:
+ * another Coolify instance that manages the same server can have a resource with the same id.
  *
  * @template TResource of \Illuminate\Database\Eloquent\Model
  *
@@ -110,9 +113,11 @@ function resolveContainerOwner(Collection $resources, Collection|array|string $l
         return $owner;
     }
 
-    $composeService = (string) $labels->get('com.docker.compose.service');
+    $names = [(string) $labels->get('com.docker.compose.service'), (string) $labels->get('coolify.name')];
 
-    return $resources->first(fn ($resource) => $composeService === $resource->uuid || str_starts_with($composeService, $resource->uuid.'-'));
+    return $resources->first(fn ($resource) => collect($names)->contains(
+        fn (string $name) => filled($resource->uuid) && preg_match('/(?:^|-)'.preg_quote($resource->uuid, '/').'(?:-|$)/', $name) === 1
+    ));
 }
 
 /**
@@ -238,8 +243,8 @@ function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters
         $base.' '.$filters(["label=coolify.{$type}Id", "label=com.docker.compose.project={$uuid}", ...$legacyFilters]).' '.$formatArgument,
     ];
     if ($type === 'application') {
-        // Deployed before mid-2024 (see resolveContainerOwner()): the container name starts with the UUID.
-        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name=^{$uuid}", ...$legacyFilters]).' '.$formatArgument;
+        // Compose project is the deployment directory (see resolveContainerOwner()): the container name contains the UUID.
+        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name={$uuid}", ...$legacyFilters]).' '.$formatArgument;
     }
 
     return $commands;
@@ -671,7 +676,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
     $variables = collect($environment_variables);
     $payload = collect([]);
     switch ($type) {
-        case $type?->contains('minio'):
+        case $type?->contains(['minio', 'pgsty/silo']):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
 
@@ -761,9 +766,12 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         return false;
     }
 
+    // Flags are stored without a port, so compare portless: https://app.example.com:3000 matches https://app.example.com.
+    $normalize = fn (string $url) => DomainPortOverrides::withoutPort(ValidationPatterns::normalizeApplicationDomainUrl($url));
+
     return $noindex_domains
-        ->map(fn (string $noindex_domain) => ValidationPatterns::normalizeApplicationDomainUrl($noindex_domain))
-        ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
+        ->map($normalize)
+        ->contains($normalize($domain));
 }
 
 function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
@@ -893,7 +901,7 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
     }
 
     try {
-        $services = data_get(Yaml::parse($compose), 'services', []);
+        $services = data_get(parseDockerComposeYaml($compose), 'services', []);
     } catch (Throwable) {
         return [];
     }
@@ -907,7 +915,20 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
         ->unique()->values()->all();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
+/**
+ * Traefik matches an IPv6 host without brackets: Host(`[2a01:4f8::1]`) never matches a request,
+ * Host(`2a01:4f8::1`) does. Labels that were saved with brackets get them removed here.
+ */
+function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
+{
+    return $labels->map(fn ($label) => is_string($label) ? preg_replace_callback(
+        '/Host\(`\[([0-9A-Fa-f:.]+)\]`\)/',
+        fn (array $matches): string => filter_var($matches[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "Host(`{$matches[1]}`)" : $matches[0],
+        $label,
+    ) : $label);
+}
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt')
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -960,6 +981,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
             $url = Url::fromString($domain);
             $host = $url->getHost();
+            // Traefik matches an IPv6 Host header without brackets: Host(`[2a01:4f8::1]`) never matches.
+            $traefikHost = trim($host, '[]');
             $path = $url->getPath();
             $schema = $url->getScheme();
             $portlessDomain = ServiceApplication::withoutPort($domain);
@@ -1004,7 +1027,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             ];
             if ($schema === 'https') {
                 // Set labels for https
-                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
                 if ($port) {
                     $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
@@ -1073,10 +1096,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
-                $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
+                if (filled($certificate_resolver)) {
+                    $labels->push("traefik.http.routers.{$https_label}.tls.certresolver={$certificate_resolver}");
+                }
 
                 // Set labels for http (redirect to https)
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
@@ -1096,7 +1121,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
             } else {
                 // Set labels for http
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
@@ -1207,6 +1232,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
+                            certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1245,6 +1271,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
+                    certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -1291,6 +1318,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         noindex_domains: $noindexDomains,
                         escape_redirect_replacement_for_compose: false,
                         domainPortOverrides: $preview->domain_port_overrides ?? [],
+                        certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -1327,6 +1355,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 noindex_domains: $noindexDomains,
                 escape_redirect_replacement_for_compose: false,
                 domainPortOverrides: $preview->domain_port_overrides ?? [],
+                certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -1782,7 +1811,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         if (! $server) {
             throw new Exception('Server not found');
         }
-        $yaml_compose = Yaml::parse($compose);
+        $yaml_compose = parseDockerComposeYaml($compose);
 
         // Remove Coolify's custom fields before Docker validation
         $yaml_compose = stripCoolifyCustomFields($yaml_compose);
@@ -1885,6 +1914,17 @@ function escapeBashEnvValue(?string $value): string
 
     // Wrap in single quotes
     return "'{$escaped}'";
+}
+
+function escapeComposeEnvFileValue(?string $value, bool $allowInterpolation = false): string
+{
+    $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $value ?? '');
+
+    if (! $allowInterpolation) {
+        $escaped = str_replace('$', '\\$', $escaped);
+    }
+
+    return '"'.$escaped.'"';
 }
 
 /**

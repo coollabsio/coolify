@@ -31,14 +31,21 @@ fi
 
 # Resource directories hold data whose owner and mode the resource images or a non-root SSH user need.
 # Set their owner and mode only when they are created, never on an upgrade (#11945).
-for COOLIFY_DIRECTORY in /data/coolify /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
-    if [ ! -d "$COOLIFY_DIRECTORY" ]; then
-        mkdir -p "$COOLIFY_DIRECTORY"
-        chown 9999:root "$COOLIFY_DIRECTORY"
-        chmod 700 "$COOLIFY_DIRECTORY"
+create_data_directory() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        chown 9999:root "$1"
+        chmod 700 "$1"
     fi
-done
-mkdir -p /data/coolify/source /data/coolify/images /data/coolify/ssh/{keys,mux}
+}
+
+# Run only after the checks and downloads succeed, so a failed run does not change the data directories (#11973).
+create_coolify_directories() {
+    for COOLIFY_DIRECTORY in /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
+        create_data_directory "$COOLIFY_DIRECTORY"
+    done
+    mkdir -p /data/coolify/images /data/coolify/ssh/{keys,mux}
+}
 
 # Coolify's own directories, used by the coolify container (UID 9999)
 set_coolify_directory_permissions() {
@@ -46,7 +53,9 @@ set_coolify_directory_permissions() {
     chmod -R 700 /data/coolify/{source,ssh,images}
 }
 
-set_coolify_directory_permissions
+# The installation log and the downloaded files go to /data/coolify/source, so only it is created before the checks.
+create_data_directory /data/coolify
+mkdir -p /data/coolify/source
 
 INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 
@@ -1070,6 +1079,7 @@ step_done
 
 step_start "Checking SSH key for localhost access"
 SSH_KEY_DETAIL="existing key"
+create_coolify_directories
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh

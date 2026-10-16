@@ -40,6 +40,19 @@ function updateCoolifyTestCreateRootServerAndSettings(array $settings = []): voi
     Once::flush();
 }
 
+function updateCoolifyTestActionWithStatus(string $status): UpdateCoolify
+{
+    return new class($status) extends UpdateCoolify
+    {
+        public function __construct(private string $status) {}
+
+        protected function readUpgradeStatus(): ?string
+        {
+            return $this->status;
+        }
+    };
+}
+
 afterEach(function () {
     Mockery::close();
 });
@@ -315,4 +328,38 @@ it('prevents downgrade even with manual update', function () {
         expect($e->getMessage())->toContain('4.0.10');
         expect($e->getMessage())->toContain('4.0.0');
     }
+});
+
+it('does not start a second upgrade while a recent upgrade status is in progress', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    updateCoolifyTestCreateRootServerAndSettings();
+    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    $action = updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(2)->toIso8601String());
+
+    expect(fn () => $action->handle(manual_update: true))
+        ->toThrow(Exception::class, 'Another Coolify upgrade is already running');
+
+    expect(Activity::query()->count())->toBe(0)
+        ->and(InstanceSettings::findOrFail(0)->new_version_available)->toBeFalsy();
+});
+
+it('starts an upgrade when the previous upgrade status is older than the lock expiry', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    updateCoolifyTestCreateRootServerAndSettings();
+    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(16)->toIso8601String())
+        ->handle(manual_update: true);
+
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
+        ->toContain("bash /data/coolify/source/upgrade.sh '4.0.10'");
 });

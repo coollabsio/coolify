@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Enums\TrafficIpMode;
 use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Models\Server;
@@ -78,6 +79,10 @@ class Analytics extends Component
     public array $breakdowns = [];
 
     public ?string $attribution = null;
+
+    /** Effective TrafficIpMode of the queried servers; decides how the IP breakdown renders. */
+    #[Locked]
+    public string $ipMode = 'full';
 
     /**
      * Per-bucket status-class time series for the stacked area chart, summed across
@@ -342,8 +347,11 @@ class Analytics extends Component
         $resource = $this->selectedResource();
         $servers = $this->targetServers();
         $domainForKey = fn (string $key): ?string => $this->appMeta($key)['domain'];
+        $ipMode = TrafficIpMode::forServers($servers);
+        $this->ipMode = $ipMode->value;
+        $dimensions = $ipMode->breakdownDimensions($this->breakdownDimensions);
 
-        $aggregator = new TrafficAnalyticsAggregator($this->breakdownDimensions);
+        $aggregator = new TrafficAnalyticsAggregator($dimensions);
         $appRows = [];
         $hostTotals = [];
 
@@ -362,7 +370,7 @@ class Analytics extends Component
                 // Warm every server-wide endpoint, including the leaderboard's per-key
                 // overviews, in one dashboard fetch; the per-call methods below then read
                 // from cache.
-                $leaderboardKeys = $client->prefetchServerWide(null, $from, $to, $this->breakdownDimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
+                $leaderboardKeys = $client->prefetchServerWide(null, $from, $to, $dimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
 
                 if (count($leaderboardKeys) > self::MAX_LEADERBOARD_APPS) {
                     Log::warning('Traffic analytics leaderboard truncated', [

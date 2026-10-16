@@ -221,7 +221,8 @@ describe('Sentinel API', function () {
             ->assertJsonPath('is_sentinel_enabled', true)
             ->assertJsonPath('is_metrics_enabled', true)
             ->assertJsonPath('traffic_topn', 50)
-            ->assertJsonPath('is_geoip_enabled', true);
+            ->assertJsonPath('is_geoip_enabled', true)
+            ->assertJsonPath('traffic_ip_mode', 'full');
 
         expect($response->json())->not->toHaveKey('sentinel_token')
             ->and($response->json())->not->toHaveKey('sentinel_custom_url');
@@ -245,6 +246,32 @@ describe('Sentinel API', function () {
         // Sentinel reads both settings from its environment, so it must be recreated.
         expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
             ->toHaveCount(1);
+    });
+
+    test('PATCH updates the client IP mode and restarts Sentinel', function (string $mode) {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'traffic_ip_mode' => $mode,
+            ])
+            ->assertOk()
+            ->assertJsonPath('traffic_ip_mode', $mode);
+
+        expect($this->server->settings->fresh()->traffic_ip_mode->value)->toBe($mode);
+        expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
+            ->toHaveCount(1);
+    })->with(['anonymized', 'off']);
+
+    test('PATCH rejects an unknown client IP mode', function () {
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'traffic_ip_mode' => 'partial',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('traffic_ip_mode');
+
+        expect($this->server->settings->fresh()->traffic_ip_mode->value)->toBe('full');
     });
 
     test('PATCH rejects disabling mandatory Sentinel', function () {

@@ -200,6 +200,24 @@ it('decorates per-app paths with the app domain and surfaces AI agents', functio
     expect($component->instance()->topPaths[0]['domain'])->toBe('api.example.com');
 });
 
+it('hides the IP breakdown when the server does not record client IPs', function () {
+    $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
+    $server = $application->destination->server;
+    $server->settings->traffic_ip_mode = 'off';
+    // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+    $server->settings->saveQuietly();
+
+    $fake = new FakeAnalyticsTrafficClient($server);
+    $fake->responses = fakeAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application->fresh()]))
+        ->assertOk()
+        ->assertSee('Top user agents')
+        ->assertDontSee('Top IPs')
+        ->assertDontSee('198.51.100.42');
+});
+
 it('shows an empty state when traffic analytics is disabled for the server', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, false);
 

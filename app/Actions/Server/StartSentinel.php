@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Enums\TrafficIpMode;
 use App\Events\SentinelRestarted;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -58,6 +59,7 @@ class StartSentinel
             'TRAFFIC_RETENTION_1D_DAYS' => (string) ($settings->traffic_retention_1d_days ?: 395),
             'GEOIP_ENABLED' => $settings->is_geoip_enabled ? 'true' : 'false',
             'GEOIP_REFRESH_DAYS' => (string) ($settings->geoip_refresh_days ?: 30),
+            'TRAFFIC_IP_MODE' => TrafficIpMode::forServer($server)->value,
         ];
         $license = data_get($settings, 'geoip_maxmind_license_key');
         if ($settings->is_geoip_enabled && filled($license)) {
@@ -146,7 +148,9 @@ class StartSentinel
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $network = $server->isLocalhost() ? ' --network coolify' : '';
-        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        // A userns-remap daemon refuses --pid host unless the container opts out of remapping.
+        // On other daemons --userns host has no effect. https://docs.docker.com/engine/security/userns-remap/
+        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--userns host --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
         $server->sentinelHeartbeat(isReset: true);
         $server->forceFill(['sentinel_waiting_since' => now()])->save();

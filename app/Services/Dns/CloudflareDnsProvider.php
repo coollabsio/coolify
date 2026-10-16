@@ -153,7 +153,8 @@ class CloudflareDnsProvider
 
         $uuid = new_public_id();
         $response = $this->client($zone->integrationToken)->post("https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records", [
-            'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1, 'proxied' => false,
+            'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1,
+            'proxied' => $zone->integrationToken->proxiedDnsEnabled(),
             'comment' => ManagedDnsRecord::ownershipCommentFor($uuid),
         ]);
         if (! $response->successful() || ! is_string($response->json('result.id'))) {

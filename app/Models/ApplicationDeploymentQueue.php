@@ -177,6 +177,19 @@ class ApplicationDeploymentQueue extends Model
         return getJobStatus($this->horizon_job_id);
     }
 
+    /**
+     * Horizon drops its job record 'trim.pending' minutes after the push, also while the job runs,
+     * so a missing record counts as running only until the deployment timeout has passed.
+     */
+    public function isHorizonJobActive(): bool
+    {
+        return match ($this->getHorizonJobStatus()) {
+            'reserved' => true,
+            'unknown' => $this->updated_at?->gt(now()->subSeconds($this->server?->settings?->dynamic_timeout ?? 3600)) ?? false,
+            default => false,
+        };
+    }
+
     public function commitMessage()
     {
         if (empty($this->commit_message) || is_null($this->commit_message)) {

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ServerRole;
+use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -36,6 +37,8 @@ use OpenApi\Attributes as OA;
         'traffic_retention_1d_days' => ['type' => 'integer'],
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
+        'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
+        'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -69,6 +72,16 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    /**
+     * Allowed Traefik certificate resolver names; also keeps the value safe inside generated labels.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_PATTERN = '/^[A-Za-z0-9_-]+$/';
+
+    /**
+     * Resolver value that turns the resolver off (no certresolver label) on a resource or server.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_NONE = 'none';
+
     public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
 
     public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
@@ -131,6 +144,8 @@ class ServerSetting extends Model
         'is_geoip_enabled',
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
+        'traffic_ip_mode',
+        'traefik_certificate_resolver',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
@@ -167,6 +182,7 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
+        'traffic_ip_mode' => TrafficIpMode::class,
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
@@ -218,7 +234,8 @@ class ServerSetting extends Model
                 $settings->wasChanged('traffic_retention_1d_days') ||
                 $settings->wasChanged('is_geoip_enabled') ||
                 $settings->wasChanged('geoip_refresh_days') ||
-                $settings->wasChanged('geoip_maxmind_license_key')
+                $settings->wasChanged('geoip_maxmind_license_key') ||
+                $settings->wasChanged('traffic_ip_mode')
             ) {
                 // Only recreate Sentinel when it is already enabled. Otherwise a change to a
                 // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
@@ -302,7 +319,9 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
-        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+        // The local Sentinel runs on the coolify network. A host gateway URL leaves that network
+        // through the host INPUT chain, where host firewalls such as UFW drop it.
+        if ($this->server->isLocalhost() && strtolower((string) parse_url((string) $url, PHP_URL_HOST)) === 'host.docker.internal') {
             $url = null;
         }
 
@@ -325,7 +344,7 @@ class ServerSetting extends Model
         return match (true) {
             filled($fqdn) => $fqdn,
             filled($publicIpv4) => 'http://'.$publicIpv4.':8000',
-            filled($publicIpv6) => 'http://'.$publicIpv6.':8000',
+            filled($publicIpv6) => 'http://'.formatHostForUrl($publicIpv6).':8000',
             default => null,
         };
     }
@@ -387,7 +406,7 @@ class ServerSetting extends Model
         }
 
         $request = request();
-        $host = strtolower($request->getHost());
+        $host = normalizeIpAddress(strtolower($request->getHost()));
 
         if (
             $host === 'localhost' ||

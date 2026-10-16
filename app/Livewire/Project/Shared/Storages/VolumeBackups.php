@@ -61,6 +61,8 @@ class VolumeBackups extends Component
 
     public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
 
+    public int $missingBackupNotificationDays = 0;
+
     public int $perPage = 10;
 
     public function updatedPerPage(): void
@@ -94,6 +96,7 @@ class VolumeBackups extends Component
             'retentionDaysS3' => ['required', 'integer', 'min:0'],
             'retentionMaxStorageS3' => ['required', 'numeric', 'min:0'],
             'timeout' => ['required', 'integer', 'min:60', 'max:36000'],
+            'missingBackupNotificationDays' => ['required', 'integer', 'min:0', 'max:365'],
         ];
     }
 
@@ -123,6 +126,7 @@ class VolumeBackups extends Component
             $this->retentionDaysS3 = $this->backup->retention_days_s3;
             $this->retentionMaxStorageS3 = $this->backup->retention_max_storage_s3;
             $this->timeout = $this->backup->timeout;
+            $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
         } else {
             $this->s3StorageId = $this->availableS3Storages->first()?->id;
         }
@@ -435,6 +439,7 @@ class VolumeBackups extends Component
             'retention_days_s3' => $this->retentionDaysS3,
             'retention_max_storage_s3' => $this->retentionMaxStorageS3,
             'timeout' => $this->timeout,
+            'missing_backup_notification_days' => $this->missingBackupNotificationDays,
         ]);
         $changedFields = auditChangedFields($backup);
         $backup->save();

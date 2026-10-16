@@ -241,7 +241,7 @@ class ConnectApplication extends Component
     private function composeVolumeSnippet(Application $application): string
     {
         try {
-            $services = data_get(Yaml::parse((string) $application->docker_compose_raw), 'services');
+            $services = data_get(parseDockerComposeYaml((string) $application->docker_compose_raw), 'services');
         } catch (\Throwable) {
             $services = null;
         }

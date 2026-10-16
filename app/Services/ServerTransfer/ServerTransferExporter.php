@@ -733,6 +733,7 @@ class ServerTransferExporter
             'is_include_timestamps' => (bool) ($app->is_include_timestamps ?? false),
             'is_gzip_enabled' => (bool) ($app->is_gzip_enabled ?? true),
             'is_stripprefix_enabled' => (bool) ($app->is_stripprefix_enabled ?? true),
+            'traefik_certificate_resolver' => $app->traefik_certificate_resolver ?? null,
             'environment_variables' => method_exists($app, 'environment_variables')
                 ? $this->exportEnvVars($app->environment_variables()->get())
                 : [],
@@ -862,6 +863,7 @@ class ServerTransferExporter
                 'is_shown_once' => (bool) $variable->is_shown_once,
                 'is_shared' => (bool) $variable->is_shared,
                 'is_required' => (bool) ($variable->is_required ?? false),
+                'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
                 'comment' => $variable->comment,
                 'order' => $variable->order,
             ];

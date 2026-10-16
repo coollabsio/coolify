@@ -1,6 +1,7 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
+# Pinned: v5 moved user bundles to /etc/s6-overlay/user-bundles.d and breaks startup (#12141)
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v4.5.1
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.7.3
 # https://www.postgresql.org/support/versioning/
@@ -135,6 +136,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     git-lfs \
     jq \
     lsof \
+    procps \
     vim
 
 # Install PHP extensions
@@ -181,6 +183,8 @@ COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
+# Version data for Traefik, Sentinel, and helper checks until CheckForUpdatesJob refreshes it
+COPY --chown=www-data:www-data versions.json ./versions.json
 
 RUN composer dump-autoload
 

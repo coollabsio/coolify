@@ -117,15 +117,30 @@ test('MCP endpoint rejects unauthenticated requests', function () {
     $response->assertStatus(401);
 });
 
-test('MCP endpoint works when the REST API is disabled and its IP allow-list excludes the client', function () {
-    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10']);
+test('MCP endpoint works when the REST API is disabled', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false]);
     Once::flush();
     $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
 
     mcpListTools($token)->assertOk();
-    test()->withHeader('Authorization', 'Bearer '.$token)
-        ->getJson('/api/v1/version')
-        ->assertForbidden();
+});
+
+test('MCP endpoint rejects a token from an IP outside the allow-list', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '192.0.2.10']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    mcpListTools($token)
+        ->assertForbidden()
+        ->assertJson(['message' => 'You are not allowed to access the API.']);
+});
+
+test('MCP endpoint accepts a token from an IP inside the allow-list', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10, 127.0.0.0/8']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    mcpListTools($token)->assertOk();
 });
 
 test('MCP endpoint lists tools for an authenticated token', function () {

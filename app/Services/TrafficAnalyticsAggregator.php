@@ -122,7 +122,8 @@ class TrafficAnalyticsAggregator
 
     /**
      * Merge path rows keyed by (app, path), so the same path under two apps stays two
-     * rows, each with the domain of the row's Sentinel `app` key.
+     * rows, each with the domain of the row's Sentinel `app` key. Sentinel's `__other__`
+     * overflow rows (the long tail past its top-N cap) fold into one row without a domain.
      *
      * @param  iterable<int, mixed>  $paths
      * @param  callable(string): ?string  $domainForKey
@@ -132,7 +133,7 @@ class TrafficAnalyticsAggregator
         foreach ($paths as $path) {
             $data = $path->toArray();
             $pathStr = (string) ($data['path'] ?? '');
-            $appId = (string) ($data['app'] ?? '');
+            $appId = $pathStr === '__other__' ? '' : (string) ($data['app'] ?? '');
             $key = $appId."\n".$pathStr;
 
             $this->paths[$key] ??= [

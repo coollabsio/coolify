@@ -67,6 +67,10 @@ class Create extends Component
                 'group_name' => 'nullable|string',
             ]);
 
+            if ($this->is_system_wide) {
+                $this->authorize('makeSystemWide', GitlabApp::class);
+            }
+
             $gitlab_app = GitlabApp::create([
                 'name' => $this->name,
                 'api_url' => $this->api_url,

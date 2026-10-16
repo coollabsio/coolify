@@ -5,9 +5,8 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.4.0',
+        'version' => env('COOLIFY_VERSION') ?: '4.4.6',
         'helper_version' => '1.0.17',
-        'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -15,6 +14,8 @@ return [
         // devHostDockerPath() uses them only for that server. The defaults are the legacy docker-compose.dev.yml names.
         'dev_data_volume' => env('DEV_COOLIFY_DATA_VOLUME', 'coolify_dev_coolify_data'),
         'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
+        // Development only: IP for the seeded sslip.io wildcard domain and application domains (for example a Tailscale IP).
+        'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
@@ -22,6 +23,8 @@ return [
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
         'releases_url' => env('RELEASES_URL', 'https://cdn.coollabs.io/coolify/releases.json'),
+        // "sequential" or "concurrent". Empty uses sequential on self-hosted and concurrent on Coolify Cloud.
+        'scheduled_jobs_dispatch_mode' => env('SCHEDULED_JOBS_DISPATCH_MODE'),
     ],
 
     'urls' => [

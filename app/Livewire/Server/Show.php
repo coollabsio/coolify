@@ -231,9 +231,12 @@ class Show extends Component
     {
         if ($toModel) {
             $this->validate();
-            $foundServer = Server::where('ip', $this->ip)
+            $this->ip = Server::normalizeIp($this->ip);
+            // Check only a changed IP, so that an old duplicate does not block saving other fields.
+            $ipChanged = $this->ip !== Server::normalizeIp($this->server->getRawOriginal('ip'));
+            $foundServer = $ipChanged ? Server::where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
-                ->first();
+                ->first() : null;
             if ($foundServer) {
                 $this->ip = $this->server->ip;
                 throw new \Exception('A server with this IP/Domain already exists.');
@@ -476,9 +479,9 @@ class Show extends Component
             $newRole = ServerRole::from($this->serverRole);
             $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
 
-            if ($newRole !== ServerRole::BUILD && $this->server->hasEnabledGithubRunners()) {
+            if ($newRole === ServerRole::DEPLOYMENT && $this->server->hasEnabledGithubRunners()) {
                 $this->serverRole = $currentRole->value;
-                $this->dispatch('error', 'Disable the GitHub runners before you change the role of this server.');
+                $this->dispatch('error', 'Disable the GitHub runners before you set this server to deployments only.');
 
                 return;
             }
@@ -586,7 +589,7 @@ class Show extends Component
                 $this->server->update(['hetzner_server_status' => $this->hetznerServerStatus]);
             }
 
-            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? data_get($serverData, 'public_net.ipv6.ip');
+            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? hetznerServerIpv6(data_get($serverData, 'public_net.ipv6.ip'));
             if ($this->server->backfillPlaceholderIp($assignedIp)) {
                 $this->ip = $this->server->ip;
             }

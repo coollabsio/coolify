@@ -12,13 +12,12 @@
 
                     <x-application.settings-section title="Instance database">
                         <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.input label="Name" readonly id="name" />
+                            <x-forms.input label="Name" readonly :value="$database->name" />
                             <x-forms.input label="Description" id="description" />
                             <div class="lg:col-span-2">
-                                <x-forms.input label="UUID" readonly id="uuid" />
+                                <x-forms.input label="UUID" readonly :value="$database->uuid" />
                             </div>
-                            <x-forms.input label="User" readonly id="postgres_user" />
-                            <x-forms.input type="password" label="Password" readonly id="postgres_password" />
+                            <x-forms.input label="User" readonly :value="$database->postgres_user" />
                         </div>
                     </x-application.settings-section>
                 </form>

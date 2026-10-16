@@ -56,7 +56,7 @@ services:
       retries: 10
 
   minio:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z # Released on 15 October 2026
     command: server /data --console-address ":9001"
     environment:
       - MINIO_SERVER_URL=$MINIO_SERVER_URL

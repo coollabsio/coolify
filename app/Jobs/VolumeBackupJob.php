@@ -7,6 +7,8 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Notifications\VolumeBackup\BackupFailed;
+use App\Notifications\VolumeBackup\BackupSuccess;
 use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
 use App\Support\BackupCompression;
@@ -238,6 +240,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->execution->update(['finished_at' => now()]);
             BackupCreated::dispatch($team->id);
         }
+
+        $team->notify(new BackupSuccess($this->backup, $warning));
     }
 
     public function failed(?Throwable $exception): void
@@ -277,15 +281,26 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 'local_storage_deleted' => $localStorageDeleted,
             ]);
         }
+
+        $this->backup->team?->notify(new BackupFailed(
+            $this->backup,
+            $exception?->getMessage() ?? 'Volume backup timed out or was terminated.',
+        ));
     }
 
     /**
      * @return array<int, string>
      */
+    /**
+     * Containers can exit and be removed (e.g. `--rm` backup helpers) between `docker ps` and
+     * `docker inspect`. Skip those, but still fail when an existing container cannot be inspected.
+     *
+     * @return array<int, string>
+     */
     private function containersUsingVolume(string $source, Server $server): array
     {
         $output = instant_remote_process(
-            ["containers=\$(docker ps -q) || exit 1; for container in \$containers; do paused=\$(docker inspect --format '{{.State.Paused}}' \"\$container\") || exit 1; [ \"\$paused\" = true ] && continue; mounts=\$(docker inspect --format '{{range .Mounts}}{{println .Source}}{{println .Name}}{{end}}' \"\$container\") || exit 1; if printf '%s\\n' \"\$mounts\" | grep -Fqx -- ".escapeshellarg($source).'; then echo "$container"; fi; done'],
+            ["containers=\$(docker ps -q) || exit 1; for container in \$containers; do mounts=\$(docker inspect --format '{{if not .State.Paused}}{{range .Mounts}}{{println .Source}}{{println .Name}}{{end}}{{end}}' \"\$container\" 2>/dev/null) || { remaining=\$(docker ps -aq --filter \"id=\$container\") || exit 1; [ -z \"\$remaining\" ] && continue; docker inspect \"\$container\" >/dev/null; exit 1; }; if printf '%s\\n' \"\$mounts\" | grep -Fqx -- ".escapeshellarg($source).'; then echo "$container"; fi; done'],
             $server,
             disableMultiplexing: true,
         );
@@ -363,7 +378,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                     .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
                 'docker exec '.escapeshellarg($containerName).' mc alias set'.$resolveOptions.' temporary '
                     .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret),
-                'docker exec '.escapeshellarg($containerName).' mc cp '.escapeshellarg($backupLocation).' '
+                'docker exec '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
                     .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/'),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
         } finally {
@@ -392,9 +407,13 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             ->implode(' ');
         $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
         $destination = 'temporary/'.$s3->bucket.$backupLocation;
+        // `mc pipe --quiet` panics in recent mc releases, so keep its progress bar out of the error output instead.
+        // Each progress frame starts with "\r", so printing the last field per line keeps only the final frame and real errors.
+        $mcPipeLog = '/tmp/mc-pipe.log';
         $streamScript = 'set -o pipefail; mc alias set'.$resolveOptions.' temporary '
             .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret)
-            .' >/dev/null && ('.$archiveScript.' | mc pipe --quiet'.$resolveOptions.' '.escapeshellarg($destination).' >/dev/null)'
+            .' >/dev/null && ('.$archiveScript.' | mc pipe'.$resolveOptions.' '.escapeshellarg($destination).' >/dev/null 2>'.$mcPipeLog
+            .' || { status=$?; awk -F '.escapeshellarg('\r').' '.escapeshellarg('{ print $NF }').' '.$mcPipeLog.' >&2; exit $status; })'
             .' && mc stat --json'.$resolveOptions.' '.escapeshellarg($destination)
             .' | sed -n '.escapeshellarg('s/.*"size":\([0-9][0-9]*\).*/\1/p');
 

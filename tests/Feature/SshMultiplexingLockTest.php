@@ -223,6 +223,7 @@ it('kills only old orphaned ssh masters whose control socket no longer exists', 
 ".
             "333 1 30 ssh -fN -o ControlMaster=auto -o ControlPath={$youngSocket} root@1.2.3.4
 "),
+        '*ssh -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
@@ -236,6 +237,59 @@ it('kills only old orphaned ssh masters whose control socket no longer exists', 
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '333'));
 
     File::delete($liveSocket);
+});
+
+it('kills ssh -fN processes that share a live ControlPath but do not own it', function () {
+    config(['constants.ssh.mux_orphan_reap_enabled' => true]);
+    $muxDir = storage_path('app/ssh/mux');
+    File::ensureDirectoryExists($muxDir);
+
+    $socket = $muxDir.'/mux_shared_'.uniqid();
+    File::put($socket, 'x');
+
+    Process::fake([
+        'ps*' => Process::result(output: "111 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n".
+            "222 1 7000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n".
+            "333 1 9000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n"),
+        '*ssh -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
+        'kill*' => Process::result(exitCode: 0),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupOrphanedSshProcesses');
+    $method->setAccessible(true);
+    $method->invoke($job);
+
+    Process::assertRan(fn ($process) => $process->command === 'kill -9 '.escapeshellarg('222'));
+    Process::assertRan(fn ($process) => $process->command === 'kill -9 '.escapeshellarg('333'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '111'));
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -O check'), 1);
+
+    File::delete($socket);
+});
+
+it('does not kill ssh -fN processes when the socket owner is unknown', function () {
+    config(['constants.ssh.mux_orphan_reap_enabled' => true]);
+    $muxDir = storage_path('app/ssh/mux');
+    File::ensureDirectoryExists($muxDir);
+
+    $socket = $muxDir.'/mux_unknown_'.uniqid();
+    File::put($socket, 'x');
+
+    Process::fake([
+        'ps*' => Process::result(output: "111 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n"),
+        '*ssh -O check*' => Process::result(exitCode: 255, errorOutput: 'Control socket connect: Connection refused'),
+        'kill*' => Process::result(exitCode: 0),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupOrphanedSshProcesses');
+    $method->setAccessible(true);
+    $method->invoke($job);
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill'));
+
+    File::delete($socket);
 });
 
 it('does not reap an ssh master that is intentionally retiring', function () {
@@ -333,31 +387,45 @@ it('does not mark a mux process as retiring when stop fails', function () {
     expect(SshMultiplexingHelper::isMuxProcessRetiring('444', "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}"))->toBeFalse();
 });
 
-it('kills only old orphaned cloudflared proxies whose parent ssh is gone', function () {
+it('kills only old cloudflared proxies whose stdin pipe no live ssh holds', function () {
     config(['constants.ssh.mux_orphan_reap_enabled' => true]);
 
+    // This test process stands in for a live ssh master: it holds the write end
+    // of the reparented proxy's stdin pipe. The orphan's writer is closed.
+    $descriptors = [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']];
+    $reparented = proc_open(['sleep', '60'], $descriptors, $reparentedPipes);
+    $orphan = proc_open(['sleep', '60'], $descriptors, $orphanPipes);
+    $tunnelSsh = proc_open(['sleep', '60'], $descriptors, $tunnelSshPipes);
+    fclose($orphanPipes[0]);
+    fclose($tunnelSshPipes[0]);
+    $reparentedPid = proc_get_status($reparented)['pid'];
+    $orphanPid = proc_get_status($orphan)['pid'];
+    $tunnelSshPid = proc_get_status($tunnelSsh)['pid'];
+    $sshPid = getmypid();
+
     Process::fake([
-        'ps*' => Process::result(output: '100 1 5000 ssh -fN -o ControlMaster=auto root@1.2.3.4
-'.
-            '200 100 5000 cloudflared access ssh --hostname host.example.com
-'.
-            '300 2176 5000 cloudflared access ssh --hostname host.example.com
-'.
-            '400 2176 30 cloudflared access ssh --hostname host.example.com
-'.
-            '2176 1 9000 /usr/bin/some-supervisor
-'),
+        'ps*' => Process::result(output: "{$sshPid} 1 5000 ssh -fN -o ControlMaster=auto root@1.2.3.4\n".
+            "200 {$sshPid} 5000 cloudflared access ssh --hostname host.example.com\n".
+            "{$reparentedPid} 1 5000 cloudflared access ssh --hostname host.example.com\n".
+            "{$orphanPid} 1 5000 cloudflared access ssh --hostname host.example.com\n".
+            "400 1 30 cloudflared access ssh --hostname host.example.com\n".
+            "{$tunnelSshPid} 1 5000 ssh -fN -o ProxyCommand=cloudflared access ssh --hostname %h root@1.2.3.4\n"),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
     $job = new CleanupStaleMultiplexedConnections;
     $method = new ReflectionMethod($job, 'cleanupOrphanedCloudflaredProcesses');
-    $method->setAccessible(true);
     $method->invoke($job);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '300'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '200'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '400'));
+    proc_terminate($reparented);
+    proc_terminate($orphan);
+    proc_terminate($tunnelSsh);
+    proc_close($reparented);
+    proc_close($orphan);
+    proc_close($tunnelSsh);
+
+    Process::assertRan(fn ($process) => $process->command === 'kill '.escapeshellarg((string) $orphanPid));
+    Process::assertRanTimes(fn ($process) => str_starts_with($process->command, 'kill'), 1);
 });
 
 it('dry-run mode logs orphans but kills nothing when reaping is disabled', function () {

@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
 use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
+use App\Http\Middleware\ApiIpAllowed;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -53,7 +54,7 @@ Route::post('/feedback', [OtherController::class, 'feedback'])
     ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.token.team', 'api.ability:write'],
+    'middleware' => ['auth:sanctum', 'api.token.team', ApiIpAllowed::class, 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
     Route::get('/enable', [OtherController::class, 'post_required']);

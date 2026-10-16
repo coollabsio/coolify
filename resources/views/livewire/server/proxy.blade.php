@@ -80,6 +80,11 @@
                                 label="Redirect URL"
                                 helper="Leave empty to keep a custom 503 response without redirecting." />
                         @endif
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="letsencrypt"
+                                id="certificateResolver" label="Certificate resolver"
+                                helper="Traefik certificate resolver for generated HTTPS routes. Leave empty if Traefik uses your own certificates (for example Cloudflare Origin CA certificates in a dynamic configuration). Redeploy resources to apply the change." />
+                        @endif
                     </div>
                 </x-application.settings-section>
 
@@ -125,6 +130,9 @@
                                     v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
                                     for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
                                     to production servers.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
                             @if ($this->newerTraefikBranchAvailable)
@@ -138,9 +146,11 @@
                             <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
-                        <div wire:loading.flex wire:target="loadProxyConfiguration"
-                            class="min-h-32 items-center justify-center">
-                            <x-loading text="Loading proxy configuration…" />
+                        <div wire:loading.flex wire:target="loadProxyConfiguration" role="status"
+                            class="mt-4 hidden flex-col gap-2">
+                            <span class="sr-only">Loading proxy configuration</span>
+                            <x-skeleton class="h-2.5 w-56 rounded-full" />
+                            <x-skeleton class="h-96 w-full rounded-lg" />
                         </div>
 
                         @if ($proxySettings)

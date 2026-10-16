@@ -201,6 +201,31 @@ class Index extends Component
         }
     }
 
+    /**
+     * Look up the public IPs of this host again and save them.
+     */
+    public function detectPublicIps()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+
+            $detected = detect_public_ips();
+            if ($detected === []) {
+                $this->dispatch('error', 'Could not detect a public IP address.');
+
+                return;
+            }
+
+            $this->settings->fill($detected);
+            $this->saveAndAudit();
+            $this->public_ipv4 = $this->settings->public_ipv4;
+            $this->public_ipv6 = $this->settings->public_ipv6;
+            $this->dispatch('success', 'Detected '.implode(' and ', $detected).'.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function buildHelperImage()
     {
         try {

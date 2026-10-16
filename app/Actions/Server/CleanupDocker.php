@@ -131,10 +131,7 @@ class CleanupDocker implements ShouldBeUnique
             }
         }
         $helperImageVersion = getHelperVersion();
-        $helperImage = coolifyHelperImage();
-        $helperImageWithVersion = "$helperImage:$helperImageVersion";
-        $helperImageWithoutPrefix = 'coollabsio/coolify-helper';
-        $helperImageWithoutPrefixVersion = "coollabsio/coolify-helper:$helperImageVersion";
+        $helperImageWithVersion = coolifyHelperImage().":$helperImageVersion";
         $buildxMetadataVolume = isDev() && $server->isLocalhost()
             ? 'coolify-buildx'
             : '$HOME/.docker/buildx';
@@ -161,12 +158,11 @@ class CleanupDocker implements ShouldBeUnique
         );
 
         $commands = [
-            'docker container prune -f --filter "label=coolify.managed=true" --filter "label!=coolify.proxy=true" --filter "label!=coolify.type=database" --filter "label!=coolify.type=application" --filter "label!=coolify.type=service"',
+            $this->buildContainerPruneCommand(),
             $imagePruneCmd,
             'docker builder prune -af',
             "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImageWithVersion} docker buildx prune --builder coolify-railpack -af 2>/dev/null || true",
-            "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
-            "docker images --filter before=$helperImageWithoutPrefixVersion --filter reference=$helperImageWithoutPrefix | grep $helperImageWithoutPrefix | awk '{print $3}' | xargs -r docker rmi -f",
+            $this->buildCoolifyImageCleanupCommand($helperImageVersion),
         ];
 
         if ($deleteUnusedVolumes) {
@@ -208,6 +204,36 @@ class CleanupDocker implements ShouldBeUnique
     }
 
     /**
+     * Build a command that removes stopped Coolify containers, except the proxy and the
+     * containers of databases, applications and services.
+     *
+     * docker container prune only excludes a container that matches all of its label!= filters
+     * together, so we list the stopped containers and filter them by label in the shell.
+     */
+    private function buildContainerPruneCommand(): string
+    {
+        return "docker ps -a --filter status=created --filter status=exited --filter status=dead --filter label=coolify.managed=true --format '{{.ID}} coolify.proxy={{.Label \"coolify.proxy\"}} coolify.type={{.Label \"coolify.type\"}}' | ".
+            "grep -v -E 'coolify\.proxy=true |coolify\.type=(database|application|service)$' | ".
+            "awk '{print $1}' | xargs -r docker rm";
+    }
+
+    /**
+     * Build a command that removes unused images of the Coolify helper, realtime and sentinel,
+     * from any registry. They have the coolify.managed=true label, so the generic image prune
+     * skips them. The current helper version stays, and docker rmi (without -f) keeps images
+     * that a container uses, for example the running sentinel.
+     */
+    private function buildCoolifyImageCleanupCommand(string $helperImageVersion): string
+    {
+        $escapedHelperVersion = preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $helperImageVersion);
+
+        return "docker images --format '{{.Repository}}:{{.Tag}}' | ".
+            "grep -E '(^|/)coollabsio/(coolify-helper|coolify-realtime|sentinel):' | ".
+            "grep -v -E ':<none>$|(^|/)coollabsio/coolify-helper:{$escapedHelperVersion}$' | ".
+            'xargs -r docker rmi 2>/dev/null || true';
+    }
+
+    /**
      * Build a docker image prune command that excludes application image repositories.
      *
      * Since docker image prune doesn't support excluding by repository name directly,
@@ -242,17 +268,18 @@ class CleanupDocker implements ShouldBeUnique
         // - Don't have coolify.managed=true label
         // Images in use by containers will fail silently with docker rmi
         // Pattern matches both uuid:tag and uuid_servicename:tag (Docker Compose with build)
+        // Images pulled by digest have no tag and are not dangling, so they are listed as repo@digest
         $grepCommands = "grep -v '<none>'";
 
         // Add application repo exclusion if there are applications
         if ($applicationImageRepos->isNotEmpty()) {
-            $grepCommands .= " | grep -v -E '^({$appExcludePatterns})[_:].+'";
+            $grepCommands .= " | grep -v -E '^({$appExcludePatterns})[_:@].+'";
         }
 
         // Add infrastructure image exclusion (matches any registry prefix)
         $grepCommands .= " | grep -v -E '{$infraExcludePattern}'";
 
-        $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | ".
+        $commands[] = "docker images --digests --format '{{if eq .Tag \"<none>\"}}{{.Repository}}@{{.Digest}}{{else}}{{.Repository}}:{{.Tag}}{{end}}' | ".
             $grepCommands.' | '.
             "xargs -r -I {} sh -c 'docker inspect --format \"{{index .Config.Labels \\\"coolify.managed\\\"}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
 

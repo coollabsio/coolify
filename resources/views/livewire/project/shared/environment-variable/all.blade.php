@@ -15,7 +15,8 @@
     }
     $activeFilterText = $activeFilterLabels->implode(', ');
 @endphp
-<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables">
+<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables"
+    x-on:focus-compose-environment-variable.window="const key = $event.detail.key; const focus = () => { const row = document.querySelector(`[data-env-key='${CSS.escape(key)}']`); if (!row) return false; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.querySelector('[data-env-settings-trigger]')?.click(); return true; }; if (!focus()) { $wire.focusComposeEnvironmentVariable(key).then(() => requestAnimationFrame(focus)); }">
     <x-application.settings-section id="environment-variables-section" title="Environment variables"
         helper="Environment variables (secrets) for this resource.">
         @can('manageEnvironment', $resource)
@@ -180,9 +181,9 @@
     @if ($view === 'normal')
         @if (! $readyToLoad)
             <div id="environment-table-section"
-                class="application-settings-section-body mt-1 flex min-h-40 w-full scroll-mt-28 items-center justify-center"
-                wire:loading.class="opacity-100" wire:target="loadEnvironmentVariables">
-                <x-loading text="Loading environment variables..." />
+                class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28" role="status">
+                <span class="sr-only">Loading environment variables</span>
+                <x-skeleton.table flush :rows="6" />
             </div>
         @else
             @php
@@ -225,7 +226,8 @@
                             @endif
                             @if ($row['kind'] === 'managed')
                                 <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
-                                    :env="$row['environmentVariable']" :type="$resource->type()" :showEnvironmentType="$showEnvironmentType" />
+                                    :env="$row['environmentVariable']" :type="$resource->type()"
+                                    :composeInfo="$row['composeInfo']" :showEnvironmentType="$showEnvironmentType" />
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"

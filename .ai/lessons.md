@@ -13,12 +13,14 @@
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
 - Browser `click('Text')` can match a hidden element first (for example inactive modal steps) and wait forever; use `button:visible:has-text("Text")`.
 - Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
+- Do not symlink `vendor` into another worktree. Composer resolves the base path from the real `vendor` path, so the tests load the app classes of the other checkout. Run `composer install --ignore-platform-req=ext-zip` in the worktree.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
 - Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.
 - When the request covers more than one interface or resource type, inventory and verify each supported path.
+- When a change alters how stored data reaches running containers, simulate the upgrade on the dev VM: start resources on the old code, then migrate and restart them on the new code, and compare the results.
 
 ## Preserve product scope
 - Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.
@@ -58,6 +60,7 @@
 ## Trace infrastructure changes end to end
 - For container image changes, inspect Compose services and every relevant Dockerfile build stage.
 - Pin a stable release tag instead of using a floating `latest` tag.
+- Never give a test build an official image tag (for example `coollabsio/sentinel:<version>`) in the host Docker. Dev instances that use `testing-host` share the host Docker socket and run that tag without a pull. Load such a tag only inside a dev VM, and give the build the same version string, or Coolify's Sentinel check restarts it every minute.
 - A successful image pull does not prove that the complete application build no longer uses the old image.
 - Do not use `docker compose up --wait` for a stack with one-shot services; wait for the required long-running service's health instead.
 
@@ -100,3 +103,10 @@
 - In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`, `--project-directory <dir>`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs. scp also runs as the SSH user; stage files outside `/data/coolify`.
 - The parsers add sudo only to line starts (and after `&&`, `||`, `|`, `$(`). Put `if`/`else` branches on their own lines. When a redirect or `cd` must stay, make the whole line one `sh -c '...'` script; it runs as `sudo sh -c` without inner sudo or bash.
 - Tests that replace `DatabaseStartCommandExecutor` or use root servers miss non-root bugs. Test the parsed commands of a non-root server.
+
+## Cached and stored state
+- `StandaloneDocker`/`SwarmDocker` `server` uses `Server::findCached()`, a per-process identity map that is flushed only when the `servers` row updates. A `ServerSetting` save does not flush it, so pass the current `Server` instance (`setRelation('server', $server)`) when generated output depends on just-saved settings.
+- Application deployments use the stored `custom_labels` when they exist. When a server-level setting changes the generated labels, regenerate the stored labels of read-only (`is_container_label_readonly_enabled`) applications, or a redeploy keeps the old labels.
+
+## Keep browser form restore away from app state
+- Firefox session restore writes saved input values back and fires a trusted `input` event. Add `autocomplete="off"` to inputs that only mirror client state (for example an Alpine-bound color picker), or their handlers run without a user action.

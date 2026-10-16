@@ -17,7 +17,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 
 /**
- * Compares runner executions with the runner containers on each build server. It cleans up
+ * Compares runner executions with the runner containers on each runner server. It cleans up
  * stopped and orphaned runners, applies the wait, idle, and job timeouts, and restarts
  * provisioning for queued executions whose dispatch was lost.
  */
@@ -161,7 +161,7 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
             foreach ($executions as $execution) {
                 if (($execution->queued_at ?? $execution->created_at)->lt(now()->subMinutes($timeout))) {
-                    $execution->finish(GithubRunnerStatus::TimedOut, "No build server had free capacity within {$timeout} minutes.");
+                    $execution->finish(GithubRunnerStatus::TimedOut, "No runner server had free capacity within {$timeout} minutes.");
                 }
             }
 

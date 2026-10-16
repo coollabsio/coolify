@@ -911,6 +911,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -991,7 +996,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -1502,6 +1507,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -1582,7 +1592,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -2093,6 +2103,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -2173,7 +2188,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -2579,6 +2594,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -2659,7 +2679,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -3045,6 +3065,11 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
                                         "description": "Deploy the raw Docker Compose definition."
@@ -3125,7 +3150,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -3391,18 +3416,6 @@
                         "application\/json": {
                             "schema": {
                                 "properties": {
-                                    "project_uuid": {
-                                        "type": "string",
-                                        "description": "The project UUID."
-                                    },
-                                    "server_uuid": {
-                                        "type": "string",
-                                        "description": "The server UUID."
-                                    },
-                                    "environment_name": {
-                                        "type": "string",
-                                        "description": "The environment name."
-                                    },
                                     "github_app_uuid": {
                                         "type": "string",
                                         "description": "The Github App UUID."
@@ -3418,10 +3431,6 @@
                                     "ports_exposes": {
                                         "type": "string",
                                         "description": "The ports to expose."
-                                    },
-                                    "destination_uuid": {
-                                        "type": "string",
-                                        "description": "The destination UUID."
                                     },
                                     "build_pack": {
                                         "type": "string",
@@ -3755,6 +3764,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -7063,6 +7077,10 @@
                                         "type": "integer",
                                         "description": "CPU shares of the database"
                                     },
+                                    "instant_deploy": {
+                                        "type": "boolean",
+                                        "description": "Restart the database after the update. Requires the deploy ability."
+                                    },
                                     "postgres_user": {
                                         "type": "string",
                                         "description": "PostgreSQL user"
@@ -9161,6 +9179,9 @@
                     },
                     "409": {
                         "description": "Another start, restart or import of this database is already in progress."
+                    },
+                    "422": {
+                        "description": "The database cannot start yet, for example because a CA certificate is missing."
                     }
                 },
                 "security": [
@@ -9279,6 +9300,9 @@
                     },
                     "409": {
                         "description": "Another start, restart or import of this database is already in progress."
+                    },
+                    "422": {
+                        "description": "The database cannot start yet, for example because a CA certificate is missing."
                     }
                 },
                 "security": [
@@ -16664,6 +16688,14 @@
                                             "type": "boolean",
                                             "example": false
                                         },
+                                        "traefik_certificate_resolver": {
+                                            "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "example": "letsencrypt"
+                                        },
                                         "configuration": {
                                             "description": "Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.",
                                             "type": [
@@ -16698,7 +16730,7 @@
                     "Servers"
                 ],
                 "summary": "Update server proxy",
-                "description": "Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.",
+                "description": "Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.",
                 "operationId": "update-server-proxy",
                 "parameters": [
                     {
@@ -16729,6 +16761,13 @@
                                     },
                                     "generate_exact_labels": {
                                         "type": "boolean"
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
                                     },
                                     "proxy_type": {
                                         "description": "Proxy type (case-insensitive).",
@@ -16776,6 +16815,12 @@
                                         },
                                         "generate_exact_labels": {
                                             "type": "boolean"
+                                        },
+                                        "traefik_certificate_resolver": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
                                         },
                                         "configuration": {
                                             "type": [
@@ -17045,6 +17090,15 @@
                                         "geoip_refresh_days": {
                                             "type": "integer"
                                         },
+                                        "traffic_ip_mode": {
+                                            "description": "How Sentinel stores client IPs for the Top IPs breakdown.",
+                                            "type": "string",
+                                            "enum": [
+                                                "full",
+                                                "anonymized",
+                                                "off"
+                                            ]
+                                        },
                                         "geoip_maxmind_license_key": {
                                             "description": "Only present with read:sensitive.",
                                             "type": "string"
@@ -17152,6 +17206,15 @@
                                         "type": [
                                             "string",
                                             "null"
+                                        ]
+                                    },
+                                    "traffic_ip_mode": {
+                                        "description": "How Sentinel stores client IPs: full, anonymized (IPv4 \/24, IPv6 \/48), or off.",
+                                        "type": "string",
+                                        "enum": [
+                                            "full",
+                                            "anonymized",
+                                            "off"
                                         ]
                                     }
                                 },
@@ -17990,6 +18053,13 @@
                                     "is_gzip_enabled": {
                                         "type": [
                                             "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for this service application. Null uses the server setting, \"none\" uses no resolver.",
+                                        "type": [
+                                            "string",
                                             "null"
                                         ]
                                     },
@@ -19172,6 +19242,11 @@
                                     "docker_compose_raw": {
                                         "type": "string",
                                         "description": "The base64 encoded Docker Compose content."
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Connect the service to the predefined docker network."
                                     },
                                     "urls": {
                                         "type": "array",
@@ -23224,6 +23299,13 @@
                         "default": 36000,
                         "maximum": 36000,
                         "minimum": 60
+                    },
+                    "missing_backup_notification_days": {
+                        "description": "Alert after this many days without an execution; 0 disables alerts",
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 365,
+                        "minimum": 0
                     }
                 },
                 "type": "object",
@@ -23246,7 +23328,8 @@
                     "retention_amount_s3",
                     "retention_days_s3",
                     "retention_max_storage_s3",
-                    "timeout"
+                    "timeout",
+                    "missing_backup_notification_days"
                 ],
                 "properties": {
                     "uuid": {
@@ -23307,6 +23390,9 @@
                         "format": "float"
                     },
                     "timeout": {
+                        "type": "integer"
+                    },
+                    "missing_backup_notification_days": {
                         "type": "integer"
                     }
                 },
@@ -23883,6 +23969,11 @@
                     "is_gzip_enabled": {
                         "type": "boolean"
                     },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver override. Null uses the server setting, \"none\" uses no resolver."
+                    },
                     "is_stripprefix_enabled": {
                         "type": "boolean"
                     },
@@ -24343,6 +24434,19 @@
                     },
                     "geoip_refresh_days": {
                         "type": "integer"
+                    },
+                    "traffic_ip_mode": {
+                        "type": "string",
+                        "enum": [
+                            "full",
+                            "anonymized",
+                            "off"
+                        ]
+                    },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates."
                     },
                     "is_reachable": {
                         "type": "boolean"

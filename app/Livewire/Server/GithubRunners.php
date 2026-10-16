@@ -183,8 +183,8 @@ class GithubRunners extends Component
         }
 
         try {
-            if (! $this->server->isBuildServer()) {
-                throw new \RuntimeException('GitHub Actions runners can only run on servers with the Build role.');
+            if (! $this->server->canBuildApplications()) {
+                throw new \RuntimeException('GitHub Actions runners need a server with the Builds only or Deployments and builds role.');
             }
 
             if ($this->config?->is_enabled ?? true) {
@@ -242,8 +242,8 @@ class GithubRunners extends Component
                     });
                 $this->dispatch('success', 'GitHub runners disabled. Running jobs continue until they finish.');
             } else {
-                if (! $this->server->isBuildServer()) {
-                    throw new \RuntimeException('GitHub Actions runners can only run on servers with the Build role.');
+                if (! $this->server->canBuildApplications()) {
+                    throw new \RuntimeException('GitHub Actions runners need a server with the Builds only or Deployments and builds role.');
                 }
                 $this->authorize('update', $config->githubApp);
                 $this->prepareRunnerGroup($config->githubApp);

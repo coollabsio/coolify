@@ -216,11 +216,38 @@ test('configure backup creates the instance database instead of using a team dat
 
     Livewire::test(SettingsBackup::class)
         ->call('addCoolifyDatabase')
-        ->assertHasNoErrors()
-        ->assertSet('postgres_password', 'instance-secret');
+        ->assertHasNoErrors();
 
     $instanceDatabase = StandalonePostgresql::query()->findOrFail(0);
-    expect($instanceDatabase->scheduledBackups()->sole()->team_id)->toBe(0)
+    expect($instanceDatabase->postgres_password)->toBe('instance-secret')
+        ->and($instanceDatabase->scheduledBackups()->sole()->team_id)->toBe(0)
         ->and($tenantDatabase->fresh()->scheduledBackups()->exists())->toBeFalse()
         ->and($tenantDatabase->fresh()->postgres_password)->toBe('tenant-secret');
+});
+
+test('saving instance backup settings only persists the description', function () {
+    $database = settingsBackupInstanceDatabaseWithoutSchedule();
+    $database->forceFill(['postgres_password' => 'instance-db-secret'])->save();
+    $database->scheduledBackups()->create([
+        'enabled' => true,
+        'save_s3' => false,
+        'frequency' => '0 0 * * *',
+        'team_id' => 0,
+    ]);
+
+    Livewire::test(SettingsBackup::class)
+        ->assertSee('Instance database')
+        ->assertSee('coolify')
+        ->assertDontSeeHtml('wire:model=postgres_user')
+        ->assertDontSeeHtml('wire:model=postgres_password')
+        ->assertDontSee('instance-db-secret', stripInitialData: false)
+        ->set('description', 'Updated description')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $database->refresh();
+    expect($database->description)->toBe('Updated description')
+        ->and($database->name)->toBe('coolify-db')
+        ->and($database->postgres_user)->toBe('coolify')
+        ->and($database->postgres_password)->toBe('instance-db-secret');
 });
