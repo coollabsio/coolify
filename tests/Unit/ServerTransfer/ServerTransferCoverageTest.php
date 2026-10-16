@@ -104,6 +104,7 @@ function transferCoverageBundleKeys(array $bundle, array $paths, string $modelCl
 }
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Process::fake();
     Storage::fake('ssh-keys');
     Storage::fake('images');

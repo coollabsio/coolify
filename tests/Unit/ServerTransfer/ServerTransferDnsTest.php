@@ -31,6 +31,7 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Process::fake();
     Storage::fake('ssh-keys');
     // Deleting the source resources must not release their DNS records at the provider.
