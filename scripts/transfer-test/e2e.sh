@@ -14,7 +14,11 @@ for profile in "${TRANSFER_PROFILES[@]}"; do
 
   echo '-- start the transfer on A'
   r="$(api POST "$A_PORT" "/servers/$S/migrate" "$TA" "$(jq -nc --arg u "http://localhost:$B_PORT" --arg t "$TB" '{target_url:$u,target_token:$t}')")"
-  check 'transfer request accepted' test "$(jq -r .migration.status <<<"$r")" = running
+  if [[ "$(jq -r .migration.status <<<"$r" 2>/dev/null)" != running ]]; then
+    bad "transfer request accepted: $r"
+    continue
+  fi
+  ok 'transfer request accepted'
   for _ in $(seq 1 40); do sleep 3; st="$(api GET "$A_PORT" "/servers/$S/transfer" "$TA" | jq -r .migration.status)"; [[ "$st" != running ]] && break; done
   check "transfer finished ($st)" test "$st" = succeeded
 
