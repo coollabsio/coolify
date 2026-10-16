@@ -11,6 +11,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckTraefikVersionForServerJob;
@@ -175,6 +176,9 @@ class Server extends BaseModel
         static::saved(function ($server) {
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
+            } elseif ($server->wasChanged(['user', 'ip', 'port'])) {
+                // An open multiplexed connection keeps the old user and host until it is closed.
+                SshMultiplexingHelper::removeMuxFile($server);
             }
         });
         static::created(function ($server) {

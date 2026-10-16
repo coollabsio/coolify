@@ -603,11 +603,11 @@ describe('provisioning', function () {
 
     it('does not start runners on the Coolify host', function () {
         Queue::fake();
-        Process::fake();
         $server = runnerTestServer($this->team);
         $server->update(['ip' => 'host.docker.internal']);
         runnerTestConfig($server, $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
+        Process::fake();
 
         (new ProvisionGithubRunnerJob($execution->id))->handle();
 

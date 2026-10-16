@@ -8,6 +8,7 @@
 - Several dev instances can run from one checkout (see `./scripts/dev urls`). After you add a migration, run it on each running instance of that checkout, or those instances fail on the new code.
 - The checkout is shared with other sessions. When the full suite fails, rerun each failing file alone and compare with a clean `git archive HEAD` copy before you connect a failure to your change. The dev instance of the checkout runs its live files, so a live repro also runs the uncommitted edits of other sessions: run `git diff` on the code under test before you trust the result.
 - Run seeders and other artisan commands that write SSH keys in a dev container as `www-data` (`docker exec -u www-data`). Root-owned files in `storage/app/ssh` make every SSH call from the web process fail.
+- Files written on a server with `tee` get the server umask (027/077 on hardened hosts). Set the mode explicitly (`chmod 644`) for files that a non-root container user reads through a read-only bind mount.
 - `sshd` keeps the login shell of an open multiplexed SSH connection. Call `SshMultiplexingHelper::removeMuxFile()` before a live test of SSH or login-shell behavior.
 - SSH retries replay the full command batch. Only exit code 255 is an SSH transport failure; other exit codes come from the remote command, so do not retry them. Keep batches safe to run twice (for example `docker rm -f <name> || true` before `docker run --name <name>`).
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.

@@ -342,5 +342,7 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $config_file_path";
     }
 }

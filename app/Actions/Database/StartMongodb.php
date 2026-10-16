@@ -372,6 +372,8 @@ class StartMongodb
         $content = $this->database->mongo_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
     }
 
     private function add_default_database()
