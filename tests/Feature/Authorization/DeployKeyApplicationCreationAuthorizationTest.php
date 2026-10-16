@@ -99,6 +99,20 @@ test('deploy key application keeps an ssh url with a custom port', function () {
         ->toBe('ssh://git@gitea.example.local:2222/myuser/my-repository.git');
 });
 
+test('deploy key application keeps an scp-style ssh url with a custom username', function () {
+    actAsDeployKeyUser($this->admin, $this->team);
+
+    deployKeyComponent()
+        ->call('setPrivateKey', $this->privateKey->id)
+        ->set('repository_url', 'custom-user@github.example.com:organization/repository.git')
+        ->set('branch', 'main')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Application::query()->sole()->git_repository)
+        ->toBe('custom-user@github.example.com:organization/repository.git');
+});
+
 test('member cannot invoke the deploy key selection action directly', function () {
     actAsDeployKeyUser($this->member, $this->team);
     $this->withoutExceptionHandling();
