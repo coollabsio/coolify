@@ -5,24 +5,6 @@
 
     <x-security.settings-layout>
 
-    @if (!$isApiEnabled)
-        <div class="application-settings-form">
-            <x-application.settings-section title="API disabled"
-                description="Enable the Coolify API before creating access tokens.">
-                <x-empty title="API access is turned off"
-                    description="{{ isInstanceAdmin() ? 'Enable API access in instance settings to issue tokens.' : 'Ask an instance admin to enable API access.' }}"
-                    icon-name="keys" size="sm">
-                    @if (isInstanceAdmin())
-                        <x-slot:actions>
-                            <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                                Enable API access
-                            </a>
-                        </x-slot:actions>
-                    @endif
-                </x-empty>
-            </x-application.settings-section>
-        </div>
-    @else
         @php
             $expirationList = collect($expirationOptions)
                 ->map(fn ($label, $days) => ['value' => (string) $days, 'label' => $label])
@@ -32,6 +14,9 @@
         @endphp
 
         <div class="application-settings-form flex flex-col gap-6">
+            <x-api-disabled-callout
+                message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
+
             @can('create', App\Models\PersonalAccessToken::class)
                 <form wire:submit="addNewToken">
                     <x-application.settings-section title="New API token">
@@ -262,6 +247,5 @@
                 </div>
             </x-application.settings-section>
         </div>
-    @endif
     </x-security.settings-layout>
 </div>
