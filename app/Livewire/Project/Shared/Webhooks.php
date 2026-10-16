@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Models\Application;
+use App\Models\GitlabApp;
 use App\Rules\ManualWebhookSecret;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Spatie\Url\Url;
 
 // Refactored ✅
 class Webhooks extends Component
@@ -24,6 +27,12 @@ class Webhooks extends Component
     public ?string $bitbucketManualWebhook;
 
     public ?string $giteaManualWebhook;
+
+    /**
+     * Source-level endpoint for GitLab App sources. GitLab has no app-level webhooks,
+     * so users add this URL to each GitLab project themselves.
+     */
+    public ?string $gitlabAppWebhook = null;
 
     public ?string $githubManualWebhookSecret = null;
 
@@ -60,6 +69,10 @@ class Webhooks extends Component
         $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
         $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
         $this->giteaManualWebhook = generateGitManualWebhook($this->resource, 'gitea');
+
+        if ($this->resource instanceof Application && $this->resource->source instanceof GitlabApp) {
+            $this->gitlabAppWebhook = Url::fromString(base_url()).'/webhooks/source/gitlab/events';
+        }
     }
 
     public function canViewSecrets(): bool

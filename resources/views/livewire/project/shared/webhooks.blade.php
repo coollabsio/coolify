@@ -99,6 +99,37 @@
                         </div>
                     </x-application.settings-section>
                 </form>
+            @elseif ($gitlabAppWebhook)
+                <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
+                    helper="GitLab Apps cannot register repository webhooks, so add this webhook to the GitLab project yourself." flush>
+                    <x-slot:actions>
+                        @can('view', $resource->source)
+                            <a class="button" href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => $resource->source->uuid]) }}"
+                                {{ wireNavigate() }}>
+                                Source settings
+                            </a>
+                        @endcan
+                        @if (filled($resource?->gitWebhook))
+                            <a class="button" href="{{ $resource->gitWebhook }}" target="_blank"
+                                rel="noopener noreferrer">
+                                Repository settings
+                                <x-external-link />
+                            </a>
+                        @endif
+                    </x-slot:actions>
+
+                    <section class="px-4 py-5">
+                        <div class="mb-4">
+                            <h4 class="text-sm font-semibold text-black dark:text-fg">GitLab</h4>
+                            <p class="mt-1 text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                Add this URL in the GitLab project under Settings → Webhooks. Set the Secret token to
+                                the Webhook secret token from the source settings, and enable Push events and Merge
+                                request events.
+                            </p>
+                        </div>
+                        <x-forms.copy-input label="Webhook URL" :text="$gitlabAppWebhook" />
+                    </section>
+                </x-application.settings-section>
             @else
                 <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
                     helper="Manual repository webhooks are only required when a repository is not connected through an official Git App.">
