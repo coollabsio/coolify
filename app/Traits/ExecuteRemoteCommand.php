@@ -268,7 +268,22 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}";
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error);
+    }
+
+    /**
+     * Docker Engine 27.0 to 28.0.0 reports an IPv6 network gateway with its prefix length (fd00::1/64) until the
+     * daemon restarts, and newer Docker CLI and Compose versions fail to parse it.
+     *
+     * @see https://github.com/moby/moby/pull/49520
+     */
+    private function dockerNetworkGatewayHint(string $error): string
+    {
+        if (! preg_match('~ParseAddr\("[0-9A-Fa-f:.]+/\d+"\)~', $error)) {
+            return '';
+        }
+
+        return "\nDocker Engine on this server reports a Docker network gateway with a prefix length, which is a Docker Engine bug fixed in 28.0.1. Run 'systemctl restart docker' on the server (this restarts all containers) or upgrade Docker Engine, then deploy again.";
     }
 
     /**

@@ -256,6 +256,33 @@ it('keeps the command in the error message for failed commands that are not sens
         ->not->toContain('[command hidden because it contains sensitive data]');
 });
 
+it('explains how to fix a Docker network that Docker Engine reports with an IPv6 gateway prefix', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'ParseAddr("fde4:75c5:b9d4::1/64"): unexpected character, want colon (at "/64")', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose up -d',
+    ]));
+
+    expect($exception->getMessage())
+        ->toContain('ParseAddr("fde4:75c5:b9d4::1/64")')
+        ->toContain('systemctl restart docker')
+        ->toContain('28.0.1');
+});
+
+it('does not add the Docker network hint to other failures', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'ParseAddr("fde4:75c5:b9d4::1 "): unexpected character', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose up -d',
+    ]));
+
+    expect($exception->getMessage())->not->toContain('systemctl restart docker');
+});
+
 it('redacts locked values from the error output of failed commands', function () {
     [$job] = makeSensitiveCommandFailureJob([
         ['key' => 'LOCKED_SECRET', 'value' => SENSITIVE_FAILURE_SECRET, 'is_shown_once' => true],
