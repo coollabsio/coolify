@@ -948,7 +948,7 @@ describe('service application lifecycle command escaping', function () {
         $service->setRelation('destination', (new StandaloneDocker)->forceFill(['network' => 'coolify']));
 
         expect(StartService::predefinedNetworkConnectCommand($service, 'app$(id)', []))
-            ->toBe("docker network connect --alias 'app$(id)-svc-uuid' 'coolify' 'app$(id)-svc-uuid' || echo 'Warning: Could not connect app$(id) to the coolify network.'");
+            ->toContain(" 'app$(id)-svc-uuid' | grep -qxF 'coolify' || docker network connect --alias 'app$(id)-svc-uuid' 'coolify' 'app$(id)-svc-uuid' || echo 'Warning: Could not connect app$(id) to the coolify network.'");
     });
 
     test('service application restart and stop actions escape container names', function (string $path) {

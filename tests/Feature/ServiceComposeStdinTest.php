@@ -66,7 +66,7 @@ function serviceComposeStdinService(string $sshUser, ?string $composeRaw = null)
  *
  * @return list<string> the commands that ran, and the lines the prompt consumed
  */
-function runServiceScriptLikeSsh(string $script, string $stubDirectory): array
+function runServiceScriptLikeSsh(string $script, string $stubDirectory, string $connectedNetworks = ''): array
 {
     File::ensureDirectoryExists($stubDirectory);
     $log = "{$stubDirectory}/calls.log";
@@ -74,6 +74,9 @@ function runServiceScriptLikeSsh(string $script, string $stubDirectory): array
 #!/bin/sh
 echo "docker $*" >> "$STUB_LOG"
 case " $* " in
+  *" container inspect "*)
+    printf '%s\n' $STUB_CONNECTED_NETWORKS
+    ;;
   *" compose "*" up "*|*" compose "*" pull"*)
     if IFS= read -r answer; then echo "prompt read: $answer" >> "$STUB_LOG"; fi
     ;;
@@ -86,7 +89,7 @@ SH);
         chmod("{$stubDirectory}/{$stub}", 0755);
     }
 
-    $process = new SymfonyProcess(['bash', '-se'], env: ['PATH' => $stubDirectory.':'.getenv('PATH'), 'STUB_LOG' => $log], input: $script."\n", timeout: 30);
+    $process = new SymfonyProcess(['bash', '-se'], env: ['PATH' => $stubDirectory.':'.getenv('PATH'), 'STUB_LOG' => $log, 'STUB_CONNECTED_NETWORKS' => $connectedNetworks], input: $script."\n", timeout: 30);
     $process->run();
 
     expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
@@ -167,13 +170,23 @@ it('connects service containers to the predefined network before compose starts 
     }
 })->with(['root' => 'root', 'non-root' => 'deploy']);
 
-it('does not connect containers that use a network mode or already declare the predefined network', function () {
-    $compose = "services:\n  vpn:\n    image: busybox:latest\n    networks:\n      - default\n      - coolify\n  app:\n    image: busybox:latest\n    network_mode: service:vpn\nnetworks:\n  coolify:\n    external: true\n";
+it('does not connect a running service container that is already on the predefined network', function (string $sshUser) {
+    $service = serviceComposeStdinService($sshUser);
+    $service->parse();
+
+    $calls = runServiceScriptLikeSsh(RemoteProcessCommand::read(DeployServiceApplication::run($service->applications()->firstOrFail())), $this->stubDirectory, connectedNetworks: "{$service->uuid} coolify");
+
+    expect(collect($calls)->filter(fn (string $call) => str_contains($call, 'network connect --alias'))->all())->toBe([]);
+})->with(['root' => 'root', 'non-root' => 'deploy']);
+
+it('does not connect containers that use a network mode', function () {
+    $compose = "services:\n  vpn:\n    image: busybox:latest\n  app:\n    image: busybox:latest\n    network_mode: service:vpn\n";
     $service = serviceComposeStdinService('root', $compose);
 
     $calls = runServiceScriptLikeSsh(RemoteProcessCommand::read(StartService::run($service)), $this->stubDirectory);
 
-    expect(collect($calls)->filter(fn (string $call) => str_contains($call, 'network connect --alias'))->all())->toBe([]);
+    expect(collect($calls)->filter(fn (string $call) => str_contains($call, 'network connect --alias'))->values()->all())
+        ->toBe(["docker network connect --alias vpn-{$service->uuid} coolify vpn-{$service->uuid}"]);
 });
 
 it('connects a single service container to the predefined network before it starts', function (string $sshUser) {

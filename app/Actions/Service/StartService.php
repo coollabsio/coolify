@@ -76,19 +76,21 @@ class StartService
     }
 
     /**
-     * Connects a created container to the predefined network of the destination. Containers with
-     * a network_mode, or that already declare the network in the compose file, are skipped.
+     * Connects a container to the predefined network of the destination, unless it is already
+     * connected (declared in the compose file, or a running container that was not recreated).
+     * Containers with a network_mode cannot join other networks and are skipped.
      */
     public static function predefinedNetworkConnectCommand(Service $service, string $serviceName, mixed $serviceConfig): ?string
     {
-        $network = $service->destination->network;
-        if (data_get($serviceConfig, 'network_mode') !== null || array_key_exists($network, data_get($serviceConfig, 'networks') ?? [])) {
+        if (data_get($serviceConfig, 'network_mode') !== null) {
             return null;
         }
+        $network = escapeshellarg($service->destination->network);
         $containerName = escapeshellarg("{$serviceName}-{$service->uuid}");
-        $warning = escapeshellarg("Warning: Could not connect {$serviceName} to the {$network} network.");
+        $warning = escapeshellarg("Warning: Could not connect {$serviceName} to the {$service->destination->network} network.");
+        $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
 
-        return 'docker network connect --alias '.$containerName.' '.escapeshellarg($network)." {$containerName} || echo {$warning}";
+        return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
     }
 
     /**
