@@ -471,14 +471,73 @@ services:
                                                 - any: true
 
                                 - match:
-                                    prefix: /.well-known/oauth-authorization-server
+                                    prefix: /auth/v1/.well-known/oauth-authorization-server
                                   route:
                                     cluster: auth
+                                    prefix_rewrite: /.well-known/oauth-authorization-server
                                     timeout: 30s
                                   request_headers_to_add:
                                     - header:
                                         key: X-Forwarded-Prefix
-                                        value: /.well-known/oauth-authorization-server
+                                        value: /auth/v1/.well-known/oauth-authorization-server
+                                      append_action: ADD_IF_ABSENT
+                                  typed_per_filter_config:
+                                    envoy.filters.http.basic_auth:
+                                      '@type': >-
+                                        type.googleapis.com/envoy.config.route.v3.FilterConfig
+                                      disabled: true
+                                    envoy.filters.http.rbac:
+                                      '@type': >-
+                                        type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+                                      rbac:
+                                        rules:
+                                          action: ALLOW
+                                          policies:
+                                            allow_all:
+                                              permissions:
+                                                - any: true
+                                              principals:
+                                                - any: true
+
+                                - match:
+                                    prefix: /auth/v1/.well-known/openid-configuration
+                                  route:
+                                    cluster: auth
+                                    prefix_rewrite: /.well-known/openid-configuration
+                                    timeout: 30s
+                                  request_headers_to_add:
+                                    - header:
+                                        key: X-Forwarded-Prefix
+                                        value: /auth/v1/.well-known/openid-configuration
+                                      append_action: ADD_IF_ABSENT
+                                  typed_per_filter_config:
+                                    envoy.filters.http.basic_auth:
+                                      '@type': >-
+                                        type.googleapis.com/envoy.config.route.v3.FilterConfig
+                                      disabled: true
+                                    envoy.filters.http.rbac:
+                                      '@type': >-
+                                        type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+                                      rbac:
+                                        rules:
+                                          action: ALLOW
+                                          policies:
+                                            allow_all:
+                                              permissions:
+                                                - any: true
+                                              principals:
+                                                - any: true
+
+                                - match:
+                                    path: /.well-known/oauth-authorization-server/auth/v1
+                                  route:
+                                    cluster: auth
+                                    prefix_rewrite: /.well-known/oauth-authorization-server
+                                    timeout: 30s
+                                  request_headers_to_add:
+                                    - header:
+                                        key: X-Forwarded-Prefix
+                                        value: /.well-known/oauth-authorization-server/auth/v1
                                       append_action: ADD_IF_ABSENT
                                   typed_per_filter_config:
                                     envoy.filters.http.basic_auth:
@@ -562,7 +621,9 @@ services:
                                   route:
                                     cluster: functions
                                     prefix_rewrite: /
+                                    # Allow the runtime's 400s wall clock to expire first.
                                     timeout: 410s
+                                    # Limit inactivity, matching Kong's read_timeout.
                                     idle_timeout: 160s
                                   request_headers_to_add:
                                     - header:
@@ -1339,6 +1400,107 @@ services:
                                   end
                                 end
 
+                          # Functions: mirror the platform behavior. Translate opaque sb_
+                          # keys to the pre-signed internal asymmetric JWT and inject it as a
+                          # raw `sb-api-key` header (no Bearer prefix), leaving Authorization
+                          # untouched. The apikey is read from the header only (+ an
+                          # Authorization `Bearer sb_` fallback) - no query-string source.
+                          # Strips any client-supplied sb-api-key (anti-spoof). Returns 401 only
+                          # for an sb_-prefixed key that is invalid/unregistered, or an
+                          # apikey-vs-bearer sb_ conflict; any non-sb_ value (legacy/user/
+                          # third-party JWT, or anything else) passes through to the runtime.
+                          - name: envoy.filters.http.lua
+                            typed_config:
+                              '@type': >-
+                                type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+                              inline_code: |
+                                local FUNCTIONS_ROUTE = "functions-v1-all"
+                                local FUNCTIONS_PREFIX = "/functions/v1/"
+                                local PUBLISHABLE_KEY = "${SUPABASE_PUBLISHABLE_KEY}"
+                                local SECRET_KEY = "${SUPABASE_SECRET_KEY}"
+                                local ANON_JWT = "${ANON_KEY_ASYMMETRIC}"
+                                local SERVICE_ROLE_JWT = "${SERVICE_ROLE_KEY_ASYMMETRIC}"
+                                local TRANSLATION_ENABLED = SECRET_KEY ~= "" and PUBLISHABLE_KEY ~= "" and SERVICE_ROLE_JWT ~= "" and ANON_JWT ~= ""
+
+                                local function is_functions_request(request_handle, headers)
+                                  if request_handle:streamInfo():routeName() == FUNCTIONS_ROUTE then
+                                    return true
+                                  end
+
+                                  local path = headers:get(":path")
+                                  if path == nil then
+                                    return false
+                                  end
+
+                                  return string.sub(path, 1, string.len(FUNCTIONS_PREFIX)) == FUNCTIONS_PREFIX
+                                end
+
+                                local function bearer_token(auth)
+                                  if auth == nil then
+                                    return nil
+                                  end
+
+                                  return string.match(auth, "^[Bb]earer%s+(.+)$")
+                                end
+
+                                local function unauthorized(request_handle, message)
+                                  request_handle:respond(
+                                    { [":status"] = "401", ["content-type"] = "text/plain" },
+                                    message
+                                  )
+                                end
+
+                                function envoy_on_request(request_handle)
+                                  local headers = request_handle:headers()
+                                  if not is_functions_request(request_handle, headers) then
+                                    return
+                                  end
+
+                                  -- Strip any client-supplied sb-api-key (anti-spoof).
+                                  headers:remove("sb-api-key")
+
+                                  -- No opaque keys configured: nothing to translate, pass through.
+                                  if not TRANSLATION_ENABLED then
+                                    return
+                                  end
+
+                                  local apikey = headers:get("apikey")
+                                  local bearer = bearer_token(headers:get("authorization"))
+
+                                  -- No key at all: pass through (verify_jwt:false / unauthenticated).
+                                  if (apikey == nil or apikey == "") and (bearer == nil or bearer == "") then
+                                    return
+                                  end
+
+                                  -- Conflict: bearer carries an sb_ key that disagrees with apikey.
+                                  if bearer ~= nil and string.sub(bearer, 1, 3) == "sb_"
+                                     and apikey ~= nil and apikey ~= "" and apikey ~= bearer then
+                                    unauthorized(request_handle, "Conflicting API keys")
+                                    return
+                                  end
+
+                                  -- Resolve the key from apikey, else an Authorization `Bearer sb_` fallback.
+                                  local key = apikey
+                                  if (key == nil or key == "") and bearer ~= nil and string.sub(bearer, 1, 3) == "sb_" then
+                                    key = bearer
+                                  end
+
+                                  -- Non-sb_ value (legacy/user/third-party JWT, or anything else):
+                                  -- pass through; the runtime verifies it.
+                                  if key == nil or key == "" or string.sub(key, 1, 3) ~= "sb_" then
+                                    return
+                                  end
+
+                                  -- sb_ key: translate publishable/secret, otherwise reject.
+                                  if key == SECRET_KEY then
+                                    headers:replace("sb-api-key", SERVICE_ROLE_JWT)
+                                  elseif key == PUBLISHABLE_KEY then
+                                    headers:replace("sb-api-key", ANON_JWT)
+                                  else
+                                    unauthorized(request_handle, "Invalid API key")
+                                  end
+                                end
+
                           - name: envoy.filters.http.rbac
                             typed_config:
                               '@type': >-
@@ -1451,6 +1613,7 @@ services:
       timeout: 5s
       interval: 5s
       retries: 3
+      start_period: 20s
     depends_on:
       supabase-analytics:
         condition: service_healthy
@@ -1461,7 +1624,8 @@ services:
       - POSTGRES_HOST=${POSTGRES_HOST:-supabase-db}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,storage,graphql_public}'
+      - POSTGRES_USER_READ_WRITE=postgres
+      - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,graphql_public}'
       - PGRST_DB_MAX_ROWS=${PGRST_DB_MAX_ROWS:-1000}
       - PGRST_DB_EXTRA_SEARCH_PATH=${PGRST_DB_EXTRA_SEARCH_PATH:-public}
 
@@ -1473,20 +1637,15 @@ services:
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}
+      - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY:-}
       - PG_META_CRYPTO_KEY=${SERVICE_PASSWORD_PGMETACRYPTO}
 
-      - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
-      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLAREPRIVATE}
       - LOGFLARE_URL=http://supabase-analytics:4000
       # Next.js client-side environment variables (required for browser access)
       - 'NEXT_PUBLIC_SUPABASE_URL=${SERVICE_URL_SUPABASEENVOY}'
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
-      - NEXT_PUBLIC_ENABLE_LOGS=true
-      # Comment to use Big Query backend for analytics
-      - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
-      # Uncomment to use Big Query backend for analytics
-      # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
       - SNIPPETS_MANAGEMENT_FOLDER=/app/snippets
       - EDGE_FUNCTIONS_MANAGEMENT_FOLDER=/app/edge-functions
@@ -1672,6 +1831,7 @@ services:
           ALTER table "supabase_functions".hooks OWNER TO supabase_functions_admin;
           ALTER function "supabase_functions".http_request() OWNER TO supabase_functions_admin;
           GRANT supabase_functions_admin TO postgres;
+          GRANT USAGE ON SCHEMA extensions TO supabase_functions_admin;
           -- Remove unused supabase_pg_net_admin role
           DO
           $$
@@ -1792,10 +1952,11 @@ services:
   supabase-analytics:
     image: supabase/logflare:1.50.10
     healthcheck:
-      test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
+      test: ["CMD", "curl", "-sSfL", "-o", "/dev/null", "http://127.0.0.1:4000/health"]
       timeout: 5s
       interval: 5s
       retries: 10
+      start_period: 30s
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -2126,17 +2287,23 @@ services:
         condition: service_healthy
       supabase-analytics:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
     environment:
       - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-      - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,storage,graphql_public}'
+      - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,graphql_public}'
       - PGRST_DB_MAX_ROWS=${PGRST_DB_MAX_ROWS:-1000}
       - PGRST_DB_EXTRA_SEARCH_PATH=${PGRST_DB_EXTRA_SEARCH_PATH:-public}
       - PGRST_DB_ANON_ROLE=anon
+      - PGRST_ADMIN_SERVER_PORT=3001
+      - PGRST_ADMIN_SERVER_HOST=localhost
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_DB_USE_LEGACY_GUCS=false
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
-    exclude_from_hc: true
   supabase-auth:
     image: supabase/gotrue:v2.196.0
     depends_on:
@@ -2176,6 +2343,7 @@ services:
       - GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
       - GOTRUE_JWT_EXP=${JWT_EXPIRY:-3600}
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - GOTRUE_JWT_ISSUER=${API_EXTERNAL_URL:-${SERVICE_URL_SUPABASEENVOY}/auth/v1}
 
       - GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}
       - GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=${ENABLE_ANONYMOUS_USERS:-false}
@@ -2262,7 +2430,7 @@ services:
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_NAME=${POSTGRES_DB:-postgres}
       - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
-      - DB_ENC_KEY=supabaserealtime
+      - DB_ENC_KEY=${REALTIME_DB_ENC_KEY:-supabaserealtime}
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_REALTIME}
       - METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -2358,7 +2526,6 @@ services:
       - IMGPROXY_URL=http://imgproxy:8080
       - IMGPROXY_REQUEST_TIMEOUT=15
       - DATABASE_SEARCH_PATH=storage
-      - NODE_ENV=production
       - REQUEST_ALLOW_X_FORWARDED_PATH=true
       - ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
@@ -2366,6 +2533,8 @@ services:
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - STORAGE_PUBLIC_URL=${SERVICE_URL_SUPABASEENVOY}
       - TENANT_ID=${STORAGE_TENANT_ID:-storage-single-tenant}
+      - S3_PROTOCOL_ACCESS_KEY_ID=${SERVICE_HEX_32_S3PROTOCOLID}
+      - S3_PROTOCOL_ACCESS_KEY_SECRET=${SERVICE_HEX_64_S3PROTOCOLSECRET}
     volumes:
       - ./volumes/storage:/var/lib/storage
   imgproxy:
@@ -2397,7 +2566,7 @@ services:
       - PG_META_DB_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - PG_META_DB_PORT=${POSTGRES_PORT:-5432}
       - PG_META_DB_NAME=${POSTGRES_DB:-postgres}
-      - PG_META_DB_USER=supabase_admin
+      - PG_META_DB_USER=postgres
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - CRYPTO_KEY=${SERVICE_PASSWORD_PGMETACRYPTO}
 
@@ -2407,7 +2576,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "echo", "Edge Functions is healthy"]
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/127.0.0.1/9000'"]
       timeout: 5s
       interval: 5s
       retries: 3
@@ -2417,6 +2586,8 @@ services:
       - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEENVOY}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - 'SUPABASE_PUBLISHABLE_KEYS={"default":"${SUPABASE_PUBLISHABLE_KEY:-}"}'
+      - 'SUPABASE_SECRET_KEYS={"default":"${SUPABASE_SECRET_KEY:-}"}'
       - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # TODO: Allow configuring VERIFY_JWT per function.
       - VERIFY_JWT=${FUNCTIONS_VERIFY_JWT:-false}
@@ -2427,89 +2598,34 @@ services:
         source: ./volumes/functions/main/index.ts
         target: /home/deno/functions/main/index.ts
         content: |
-          import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
+          import * as jose from 'jsr:@panva/jose@6'
 
           console.log('main function started')
 
+          const MAX_WORKER_RETRIES = 3
+
           const JWT_SECRET = Deno.env.get('JWT_SECRET')
-          const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+          const SUPABASE_JWKS = parseJwks(Deno.env.get('SUPABASE_JWKS'))
+          const LOCAL_JWKS = SUPABASE_JWKS ? jose.createLocalJWKSet(SUPABASE_JWKS) : null
           const VERIFY_JWT = Deno.env.get('VERIFY_JWT') === 'true'
 
-          // Create JWKS for ES256/RS256 tokens (newer tokens)
-          let SUPABASE_JWT_KEYS: ReturnType<typeof jose.createRemoteJWKSet> | null = null
-          if (SUPABASE_URL) {
-            try {
-              SUPABASE_JWT_KEYS = jose.createRemoteJWKSet(
-                new URL('/auth/v1/.well-known/jwks.json', SUPABASE_URL)
-              )
-            } catch (e) {
-              console.error('Failed to fetch JWKS from SUPABASE_URL:', e)
-            }
+          type AuthFailure = {
+            code: RequestErrors
+            message?: string
           }
 
-          function getAuthToken(req: Request) {
-            const authHeader = req.headers.get('authorization')
-            if (!authHeader) {
-              throw new Error('Missing authorization header')
-            }
-            const [bearer, token] = authHeader.split(' ')
-            if (bearer !== 'Bearer') {
-              throw new Error(`Auth header is not 'Bearer {token}'`)
-            }
-            return token
+          type FunctionFailure = {
+            code: RequestErrors
+            message: string
+            status: number
           }
 
-          async function isValidLegacyJWT(jwt: string): Promise<boolean> {
-            if (!JWT_SECRET) {
-              console.error('JWT_SECRET not available for HS256 token verification')
-              return false
-            }
-
-            const encoder = new TextEncoder();
-            const secretKey = encoder.encode(JWT_SECRET)
-
-            try {
-              await jose.jwtVerify(jwt, secretKey);
-            } catch (e) {
-              console.error('Symmetric Legacy JWT verification error', e);
-              return false;
-            }
-            return true;
-          }
-
-          async function isValidJWT(jwt: string): Promise<boolean> {
-            if (!SUPABASE_JWT_KEYS) {
-              console.error('JWKS not available for ES256/RS256 token verification')
-              return false
-            }
-
-            try {
-              await jose.jwtVerify(jwt, SUPABASE_JWT_KEYS)
-            } catch (e) {
-              console.error('Asymmetric JWT verification error', e);
-              return false
-            }
-
-            return true;
-          }
-
-          async function isValidHybridJWT(jwt: string): Promise<boolean> {
-            const { alg: jwtAlgorithm } = jose.decodeProtectedHeader(jwt)
-
-            if (jwtAlgorithm === 'HS256') {
-              console.log(`Legacy token type detected, attempting ${jwtAlgorithm} verification.`)
-
-              return await isValidLegacyJWT(jwt)
-            }
-
-            if (jwtAlgorithm === 'ES256' || jwtAlgorithm === 'RS256') {
-              return await isValidJWT(jwt)
-            }
-
-            return false;
-          }
-
-          enum RequestErrors {
+          export enum RequestErrors {
+            InvalidLegacyJWT = 'UNAUTHORIZED_LEGACY_JWT',
+            InvalidAsymmetricJWT = 'UNAUTHORIZED_ASYMMETRIC_JWT',
+            InvalidTokenFormat = 'UNAUTHORIZED_INVALID_JWT_FORMAT',
+            UnsupportedTokenAlgorithm = 'UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM',
+            MissingAuthHeader = 'UNAUTHORIZED_NO_AUTH_HEADER',
             NotFound = 'NOT_FOUND',
             BootError = 'BOOT_ERROR',
             EdgeFunctionError = 'EDGE_FUNCTION_ERROR',
@@ -2517,12 +2633,6 @@ services:
             WorkerResourceLimit = 'WORKER_RESOURCE_LIMIT',
             WorkerError = 'WORKER_ERROR',
             InvalidResponseStatusCode = 'INVALID_RESPONSE_STATUS_CODE',
-          }
-
-          type FunctionFailure = {
-            code: RequestErrors
-            message: string
-            status: number
           }
 
           function getFunctionErrorResponse({ code, message, status }: FunctionFailure): Response {
@@ -2561,6 +2671,7 @@ services:
           }
 
           function resolveRuntimeError(e: unknown): FunctionFailure {
+            // These error classes are supplied by Edge Runtime, rather than stock Deno.
             if (e instanceof Deno.errors.InvalidWorkerCreation) {
               return {
                 code: RequestErrors.BootError,
@@ -2582,6 +2693,8 @@ services:
                 status: 504,
               }
             }
+            // No dedicated runtime error class exists for invalid response statuses.
+            // The Response constructor throws directly here or inside the user worker.
             if (
               (e instanceof RangeError || e instanceof Deno.errors.InvalidWorkerResponse) &&
               e.message.includes('is not equal to 101 and outside the range [200, 599]')
@@ -2605,23 +2718,185 @@ services:
             return { code: RequestErrors.EdgeFunctionError, message: 'Internal Server Error', status: 500 }
           }
 
+          // NOTE:(kallebysantos) We don't check for valid keys but just the bare array parsing,
+          // let this for 'jose' lib verification
+          export function parseJwks(raw: string | undefined): jose.JSONWebKeySet | null {
+            if (!raw) return null
+            try {
+              const parsed = JSON.parse(raw)
+              if (parsed?.keys && Array.isArray(parsed.keys)) {
+                return parsed as jose.JSONWebKeySet
+              }
+              return null
+            } catch {
+              return null
+            }
+          }
+
+          /**
+           * Extract JWT token from 'Authorization' header or fallback to 'sb-api-key' compatibility
+           *
+           * Parses the Authorization header to extract the Bearer token.
+           * Expects format: "Bearer <token>"
+           *
+           * @param req - The HTTP request object
+           * @returns The JWT token string or an authentication failure
+           */
+          function extractBearerToken(authHeader: string | null): string | null {
+            const tokenParts = (authHeader ?? '').trim().split(/\s+/)
+            const [bearer, token] = tokenParts
+            if (bearer.toLowerCase() !== 'bearer' || tokenParts.length !== 2 || !token) {
+              return null
+            }
+            return token
+          }
+
+          function getAuthToken(req: Request): string | AuthFailure {
+            const authHeader = req.headers.get('authorization')
+            const sbApiKeyCompatibilityToken = req.headers.get('sb-api-key')
+
+            if (!authHeader && !sbApiKeyCompatibilityToken) {
+              return {
+                code: RequestErrors.MissingAuthHeader,
+                message: 'Missing authorization header',
+              }
+            }
+
+            // NOTE:(kallebysantos) Compatibility mode is triggered when all conditions match:
+            // - API proxy mints a temp token
+            // - Original bearer is not present or is ApiKey
+            const bearerToken = extractBearerToken(authHeader)
+            const token = !bearerToken || bearerToken.startsWith('sb_')
+              ? sbApiKeyCompatibilityToken
+              : bearerToken
+
+            if (!token) {
+              return {
+                code: RequestErrors.InvalidTokenFormat,
+                message: 'Invalid JWT format',
+              }
+            }
+
+            return token
+          }
+
+          function getAuthErrorResponse({ code, message = 'Invalid JWT' }: AuthFailure) {
+            return Response.json(
+              {
+                code,
+                message,
+                // DEPRECATED: Retained for backward compatibility.
+                msg: message,
+              },
+              {
+                status: 401,
+                headers: {
+                  'sb-error-code': code,
+                  'Access-Control-Expose-Headers': 'sb-error-code',
+                },
+              }
+            )
+          }
+
+          async function isValidLegacyJWT(jwt: string): Promise<AuthFailure | null> {
+            if (!JWT_SECRET) {
+              console.error('JWT_SECRET not available for HS256 token verification')
+              return { code: RequestErrors.InvalidLegacyJWT }
+            }
+
+            const encoder = new TextEncoder();
+            const secretKey = encoder.encode(JWT_SECRET);
+
+            try {
+              await jose.jwtVerify(jwt, secretKey);
+            } catch (e) {
+              console.error('Symmetric Legacy JWT verification error', e);
+              return { code: RequestErrors.InvalidLegacyJWT }
+            }
+            return null
+          }
+
+          async function isValidJWT(jwt: string): Promise<AuthFailure | null> {
+            if (!LOCAL_JWKS) {
+              console.error('JWKS not available for ES256/RS256 token verification')
+              return { code: RequestErrors.InvalidAsymmetricJWT }
+            }
+
+            try {
+              await jose.jwtVerify(jwt, LOCAL_JWKS);
+            } catch (e) {
+              console.error('Asymmetric JWT verification error', e);
+              return { code: RequestErrors.InvalidAsymmetricJWT }
+            }
+
+            return null
+          }
+
+          /**
+           * Verify JWT token, handling both legacy (HS256) and newer (ES256/RS256) algorithms
+           * 
+           * This function automatically detects the algorithm used in the token and applies
+           * the appropriate verification method:
+           * - HS256: Uses JWT_SECRET (symmetric key)
+           * - ES256/RS256: Uses JWKS endpoint (asymmetric public keys)
+           * 
+           * This fix ensures compatibility with both legacy tokens and newer asymmetric tokens,
+           * resolving the "Key for the ES256 algorithm must be of type CryptoKey" error.
+           * 
+           * @param jwt - The JWT token string to verify
+           * @returns Authentication failure details, or null when verification succeeds
+           */
+          async function isValidHybridJWT(jwt: string): Promise<AuthFailure | null> {
+            let jwtAlgorithm: string | undefined
+            try {
+              jwtAlgorithm = jose.decodeProtectedHeader(jwt).alg
+            } catch (e) {
+              console.error('JWT format error', e)
+              return {
+                code: RequestErrors.InvalidTokenFormat,
+                message: 'Invalid JWT format',
+              }
+            }
+
+            if (!jwtAlgorithm) {
+              return {
+                code: RequestErrors.InvalidTokenFormat,
+                message: 'Invalid JWT format',
+              }
+            }
+
+            if (jwtAlgorithm === 'HS256') {
+              console.log(`Legacy token type detected, attempting ${jwtAlgorithm} verification.`)
+
+              return await isValidLegacyJWT(jwt)
+            }
+
+            if (jwtAlgorithm === 'ES256' || jwtAlgorithm === 'RS256') {
+              return await isValidJWT(jwt)
+            }
+
+            return {
+              code: RequestErrors.UnsupportedTokenAlgorithm,
+              message: `Unsupported JWT algorithm ${jwtAlgorithm}`,
+            }
+          }
+
           Deno.serve(async (req: Request) => {
             if (req.method !== 'OPTIONS' && VERIFY_JWT) {
               try {
                 const token = getAuthToken(req)
-                const isValidJWT = await isValidHybridJWT(token);
-
-                if (!isValidJWT) {
-                  return new Response(JSON.stringify({ msg: 'Invalid JWT' }), {
-                    status: 401,
-                    headers: { 'Content-Type': 'application/json' },
-                  })
+                if (typeof token !== 'string') {
+                  return getAuthErrorResponse(token)
+                }
+                const authFailure = await isValidHybridJWT(token)
+                if (authFailure) {
+                  return getAuthErrorResponse(authFailure)
                 }
               } catch (e) {
                 console.error(e)
-                return new Response(JSON.stringify({ msg: e.toString() }), {
-                  status: 401,
-                  headers: { 'Content-Type': 'application/json' },
+                return getAuthErrorResponse({
+                  code: RequestErrors.InvalidTokenFormat,
+                  message: 'Invalid JWT format',
                 })
               }
             }
@@ -2668,28 +2943,56 @@ services:
             }
 
             const memoryLimitMb = 150
+            // Keep the wall clock above the 150s request idle timeout configured in Compose.
             const workerTimeoutMs = 400_000
             const requestAbsentTimeoutMs = 60_000
             const noModuleCache = false
-            const importMapPath = null
-            const envVarsObj = Deno.env.toObject()
+            // Using a common Import Map for all functions 
+            // to use a scope 'deno.json' it must be dinamically resolved base on the 'service_name'
+            const importMapPath = `/home/deno/functions/deno.jsonc`
+            // SUPABASE_FUNCTION_SLUG is listed after the container env snapshot so
+            // nothing in it can shadow the value, and it is per-request because only this
+            // worker knows which function the request resolved to.
+            const envVarsObj = { ...Deno.env.toObject(), SUPABASE_FUNCTION_SLUG: service_name }
             const envVars = Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]])
 
-            try {
-              const worker = await EdgeRuntime.userWorkers.create({
-                servicePath,
-                memoryLimitMb,
-                workerTimeoutMs,
-                context: { supervisor: { requestAbsentTimeoutMs } },
-                noModuleCache,
-                importMapPath,
-                envVars,
-              })
-              return handleWorkerResponse(await worker.fetch(req))
-            } catch (e) {
-              console.error(e)
-              return getFunctionErrorResponse(resolveRuntimeError(e))
+            const callWorker = async (req: Request, retriesLeft = MAX_WORKER_RETRIES): Promise<Response> => {
+              // Preserve the body before fetch() can consume it, even on a failed attempt.
+              // Must run before `new Request(req)` below, which takes over the body.
+              // The unread retry branch can buffer the entire body in main-worker memory,
+              // even when the first attempt succeeds.
+              const retryReq = retriesLeft > 0 ? req.clone() : null
+
+              try {
+                const worker = await EdgeRuntime.userWorkers.create({
+                  servicePath,
+                  memoryLimitMb,
+                  workerTimeoutMs,
+                  context: { supervisor: { requestAbsentTimeoutMs } },
+                  noModuleCache,
+                  importMapPath,
+                  envVars,
+                })
+                // Gateway-minted internal JWT is for this router only; never expose it to user functions.
+                const userReq = new Request(req)
+                userReq.headers.delete('sb-api-key')
+                EdgeRuntime.applySupabaseTag(req, userReq)
+                return handleWorkerResponse(await worker.fetch(userReq))
+              } catch (e) {
+                // Retirement rejects before dispatch, so user code has not run yet.
+                if (e instanceof Deno.errors.WorkerAlreadyRetired && retryReq) {
+                  console.warn(`${service_name}: worker retired before dispatch; retrying (${retriesLeft} left)`)
+                  // Request.clone() does not copy the tag that connects streaming to the client.
+                  EdgeRuntime.applySupabaseTag(req, retryReq)
+                  return await callWorker(retryReq, retriesLeft - 1)
+                }
+
+                console.error(e)
+                return getFunctionErrorResponse(resolveRuntimeError(e))
+              }
             }
+
+            return await callWorker(req)
           })
       - type: bind
         source: ./volumes/functions/hello/index.ts
@@ -2709,6 +3012,16 @@ services:
           // To invoke:
           // curl 'http://localhost:<KONG_HTTP_PORT>/functions/v1/hello' \
           //   --header 'Authorization: Bearer <anon/service_role API key>'
+      - type: bind
+        source: ./volumes/functions/deno.jsonc
+        target: /home/deno/functions/deno.jsonc
+        content: |
+          {
+            "imports": {
+              "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
+              "@supabase/server": "npm:@supabase/server@^1"
+            }
+          }
 
     command:
       - start
