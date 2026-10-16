@@ -167,17 +167,16 @@ it('uses the browser host and page TLS mode for development Reverb connections',
         ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"');
 });
 
-it('proxies Reverb and terminal websocket traffic to the Coolify app container', function () {
+it('routes dashboard traffic through the Coolify app nginx server', function () {
     $serverModel = file_get_contents(app_path('Models/Server.php'));
 
     expect($serverModel)
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/app`)\"")
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/apps`)\"")
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/terminal/ws`)\"")
-        ->toContain("'url' => 'http://coolify:6001'")
-        ->toContain("'url' => 'http://coolify:6002'")
-        ->toContain('reverse_proxy coolify:6001')
-        ->toContain('reverse_proxy coolify:6002')
+        ->toContain("'url' => 'http://coolify:8080'")
+        ->toContain('reverse_proxy coolify:8080')
+        ->not->toContain("'url' => 'http://coolify:6001'")
+        ->not->toContain("'url' => 'http://coolify:6002'")
+        ->not->toContain('reverse_proxy coolify:6001')
+        ->not->toContain('reverse_proxy coolify:6002')
         ->not->toContain('http://coolify-realtime:6001')
         ->not->toContain('http://coolify-realtime:6002')
         ->not->toContain('reverse_proxy coolify-realtime');
@@ -290,7 +289,7 @@ it('keeps TERMINAL_PORT browser-only in the Windows compose files', function (st
     'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
 ]);
 
-it('resolves the browser websocket port like 4.3.23', function (string $pageUrl, ?string $pusherPort, ?string $expectedPort) {
+it('resolves the browser websocket port from the dashboard origin unless explicitly configured', function (string $pageUrl, ?string $pusherPort, int|string|null $expectedPort) {
     config()->set('constants.pusher.port', $pusherPort);
     RequestFacade::swap(Request::create($pageUrl));
 
@@ -298,7 +297,7 @@ it('resolves the browser websocket port like 4.3.23', function (string $pageUrl,
 })->with([
     'https domain through the Coolify proxy' => ['https://coolify.example.com/', null, null],
     'https domain with an empty PUSHER_PORT' => ['https://coolify.example.com/', '', null],
-    'direct IP and port access' => ['http://203.0.113.10:8000/', null, '6001'],
+    'direct IP and port access' => ['http://203.0.113.10:8000/', null, 8000],
     'Cloudflare Tunnel guide' => ['https://coolify.example.com/', '443', '443'],
 ]);
 

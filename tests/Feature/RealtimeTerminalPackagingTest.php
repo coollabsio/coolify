@@ -1,5 +1,67 @@
 <?php
 
+it('proxies realtime websocket traffic through the bundled nginx server', function (string $environment) {
+    $nginxConfiguration = file_get_contents(base_path("docker/{$environment}/etc/nginx/site-opts.d/http.conf"));
+    $locationFound = preg_match('/location \^~ \/app\/ \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
+
+    expect($locationFound)
+        ->toBe(1)
+        ->and($location['body'])
+        ->toContain('proxy_pass http://127.0.0.1:6001;')
+        ->toContain('proxy_http_version 1.1;')
+        ->toContain('proxy_set_header Upgrade $http_upgrade;')
+        ->toContain('proxy_set_header Connection "upgrade";');
+})->with(['development', 'production']);
+
+it('proxies terminal websocket traffic through the bundled nginx server', function (string $environment) {
+    $nginxConfiguration = file_get_contents(base_path("docker/{$environment}/etc/nginx/site-opts.d/http.conf"));
+    $locationFound = preg_match('/location = \/terminal\/ws \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
+
+    expect($locationFound)
+        ->toBe(1)
+        ->and($location['body'])
+        ->toContain('proxy_pass http://127.0.0.1:6002;')
+        ->toContain('proxy_http_version 1.1;')
+        ->toContain('proxy_set_header Upgrade $http_upgrade;')
+        ->toContain('proxy_set_header Connection "upgrade";')
+        ->toContain('proxy_read_timeout 3600s;')
+        ->toContain('proxy_send_timeout 3600s;');
+})->with(['development', 'production']);
+
+it('does not route realtime services directly from the generated external proxy configuration', function () {
+    $serverConfiguration = file_get_contents(app_path('Models/Server.php'));
+
+    foreach (['coolify-realtime', 'coolify'] as $host) {
+        foreach ([6001, 6002] as $port) {
+            expect($serverConfiguration)
+                ->not->toContain("'url' => 'http://{$host}:{$port}'")
+                ->not->toContain("reverse_proxy {$host}:{$port}");
+        }
+    }
+});
+
+it('uses the dashboard port for same-origin realtime and terminal websocket connections', function () {
+    $helpers = file_get_contents(base_path('bootstrap/helpers/shared.php'));
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($helpers)
+        ->toContain('return $url->getPort();')
+        ->not->toContain("return '6001';")
+        ->and($terminalClient)
+        ->toContain("port: window.location.port ? `:\${window.location.port}` : ''")
+        ->not->toContain('port: ":6002"');
+});
+
+it('proxies the reverb API through the bundled nginx server', function (string $environment) {
+    $nginxConfiguration = file_get_contents(base_path("docker/{$environment}/etc/nginx/site-opts.d/http.conf"));
+    $locationFound = preg_match('/location \^~ \/apps\/ \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
+
+    expect($locationFound)
+        ->toBe(1)
+        ->and($location['body'])
+        ->toContain('proxy_pass http://127.0.0.1:6001;');
+})->with(['development', 'production']);
+
 it('copies the terminal utilities into the Coolify container images', function (string $dockerfile) {
     $dockerfile = file_get_contents(base_path($dockerfile));
 
