@@ -142,7 +142,7 @@
             {{-- ============ DESKTOP SIDEBAR (below top bar) ============ --}}
             <div class="hidden lg:fixed lg:top-12 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col min-w-0"
                 :class="[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']">
-                <div class="flex grow min-w-0 flex-col overflow-visible">
+                <div class="flex min-h-0 grow min-w-0 flex-col overflow-visible">
                     <x-navbar deployments-indicator />
                 </div>
             </div>
