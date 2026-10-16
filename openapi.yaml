@@ -542,7 +542,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -932,7 +932,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1322,7 +1322,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -2430,7 +2430,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true

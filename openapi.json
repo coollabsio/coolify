@@ -846,7 +846,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -1442,7 +1442,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -2038,7 +2038,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -3701,7 +3701,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
