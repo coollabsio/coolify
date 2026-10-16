@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Server;
+use App\Rules\ValidServerIp;
 use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferImporter;
@@ -185,7 +186,7 @@ class ServerTransferController extends Controller
 
         $validator = customApiValidator($request->query(), [
             'server_uuid' => 'required|string',
-            'ip' => 'required|string',
+            'ip' => ['required', 'string', new ValidServerIp],
             'port' => 'nullable|integer|between:1,65535',
             'schema_version' => 'nullable|integer',
         ]);
@@ -197,12 +198,12 @@ class ServerTransferController extends Controller
         }
 
         $schemaVersion = (int) $request->query('schema_version', ServerTransferBundle::SCHEMA_VERSION);
-        $ip = (string) $request->query('ip');
+        $ip = trim((string) $request->query('ip'));
         $port = (int) $request->query('port', 22);
 
         // The target connects to the server over SSH when it takes over management, so an unreachable
         // server would leave an imported server here that this instance cannot manage.
-        $connection = @fsockopen($ip, $port, $errorCode, $errorMessage, 5);
+        $connection = @fsockopen($ip, $port, timeout: 5);
         if ($connection !== false) {
             fclose($connection);
         }
@@ -221,7 +222,7 @@ class ServerTransferController extends Controller
                 'label' => "the target can reach the SSH port of the server ({$ip}:{$port})",
                 'ok' => $connection !== false,
                 'message' => $connection !== false ? null
-                    : "This instance cannot reach the server at {$ip}:{$port} ({$errorMessage}). Allow SSH from this instance to the server, then transfer again.",
+                    : "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
             ],
         ];
 

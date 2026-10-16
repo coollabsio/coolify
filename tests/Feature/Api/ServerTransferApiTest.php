@@ -413,6 +413,14 @@ describe('GET /api/v1/servers/import/check', function () {
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'cannot reach the server at 127.0.0.1'));
     });
 
+    test('rejects a target that is not an IP address or hostname before it opens a socket', function (string $ip) {
+        $this->withHeaders(transferHeaders($this->writeToken))
+            ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip='.urlencode($ip))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('ip')
+            ->assertJsonMissingPath('checks');
+    })->with(['tcp://127.0.0.1', 'unix:///var/run/docker.sock', 'ssl://example.com']);
+
     test('rejects another transfer bundle version', function () {
         $this->withHeaders(transferHeaders($this->writeToken))
             ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&schema_version=999')
