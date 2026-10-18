@@ -26,14 +26,110 @@ function service_logo_urls(mixed $logo): array
 }
 
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+
+/**
+ * The URL of a logo in public/svgs/resources. The file's modification time is the version, so
+ * browsers load a changed logo instead of their cached copy.
+ */
+function resource_logo_url(string $name): string
+{
+    $path = "svgs/resources/{$name}.svg";
+    $modifiedAt = is_file(public_path($path)) ? filemtime(public_path($path)) : false;
+
+    return asset($path).($modifiedAt ? "?v={$modifiedAt}" : '');
+}
+
+/**
+ * The logo of a resource, the same one shown on the "New resource" page: the database engine,
+ * the service template, or how the application is built. Null when there is no specific logo.
+ *
+ * Applications with a domain also get the favicon URL of their first domain. The browser loads it
+ * and shows it in place of the logo when it loads. Coolify itself never requests it.
+ *
+ * @return array{src: string, dark: ?string, fallback: ?string, padded: bool, favicon: ?string}|null
+ */
+function resource_logo(Model $resource): ?array
+{
+    $resourceLogo = function (string $name, bool $hasDarkVariant = false): array {
+        return [
+            'src' => resource_logo_url($name),
+            'dark' => $hasDarkVariant ? resource_logo_url("{$name}-dark") : null,
+            'fallback' => null,
+            'padded' => false,
+            'favicon' => null,
+        ];
+    };
+
+    if ($resource instanceof Service) {
+        $templates = once(fn () => get_service_templates());
+        $type = filled($resource->service_type) ? $resource->service_type : str($resource->name)->beforeLast('-')->value();
+        $logo = data_get($templates->get(resolve_service_template_key($type, $templates)), 'logo');
+        if (! is_string($logo) || $logo === '' || basename($logo) === 'default.webp') {
+            return null;
+        }
+        $urls = service_logo_urls($logo);
+
+        return ['src' => $urls['logo'], 'dark' => null, 'fallback' => $urls['logo_cdn_url'], 'padded' => true, 'favicon' => null];
+    }
+
+    if ($resource instanceof Application) {
+        $logo = match (true) {
+            $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
+            $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
+            $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
+            $resource->source_type === GithubApp::class => $resourceLogo('github-app', true),
+            $resource->source_type === GitlabApp::class => $resourceLogo('gitlab-app'),
+            default => $resourceLogo('public-repo'),
+        };
+
+        return [...$logo, 'favicon' => resource_favicon_url($resource->fqdn)];
+    }
+
+    if (! method_exists($resource, 'type')) {
+        return null;
+    }
+
+    return match (str($resource->type())->after('standalone-')->value()) {
+        'postgresql' => $resourceLogo('postgres'),
+        'mysql' => $resourceLogo('mysql'),
+        'mariadb' => $resourceLogo('mariadb'),
+        'mongodb' => $resourceLogo('mongodb'),
+        'redis' => $resourceLogo('redis'),
+        'keydb' => $resourceLogo('keydb', true),
+        'dragonfly' => $resourceLogo('dragonfly', true),
+        'clickhouse' => $resourceLogo('clickhouse'),
+        'sqlite' => $resourceLogo('sqlite'),
+        default => null,
+    };
+}
+
+/**
+ * The favicon URL of the first domain in a comma-separated domain list, or null when there is no usable domain.
+ */
+function resource_favicon_url(?string $fqdn): ?string
+{
+    $domain = str((string) $fqdn)->explode(',')->map(fn (string $url) => trim($url))->first(fn (string $url) => $url !== '');
+    $parts = parse_url((string) $domain);
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = (string) ($parts['host'] ?? '');
+    if (! in_array($scheme, ['http', 'https'], true) || $host === '' || str_contains($host, '*')) {
+        return null;
+    }
+    $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
+    return "{$scheme}://{$host}{$port}/favicon.ico";
+}
 
 function replaceRegex(?string $name = null)
 {
@@ -201,18 +297,14 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $escapedWorkdir = escapeshellarg($workdir);
         $commands = collect([
             "mkdir -p -- {$escapedWorkdir} > /dev/null 2>&1 || true",
-            "cd {$escapedWorkdir}",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
-            $path = str(data_get($fileVolume, 'fs_path'));
             $content = data_get($fileVolume, 'content');
-            if ($path->startsWith('.')) {
-                $path = $path->after('.');
-                $fileLocation = $workdir.$path;
-            } else {
-                $fileLocation = $path;
-            }
+            // A relative path is inside the resource directory, never in the SSH user's working
+            // directory. A persisted Compose expression (`${VAR:-/path}`) stays as it is.
+            $fsPath = trim((string) $fileVolume->fs_path);
+            $fileLocation = str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
             $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
             // Exists and is a file
             $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
@@ -238,16 +330,14 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
-                // Does not exists (no dir or file), not flagged as directory, is init, has content.
-                // Content is written only inside the resource directory, as a literal path.
-                $escapedContentLocation = escapeshellarg($fileVolume->confinedContentPath((string) $fileLocation, $server));
+                // Does not exists (no dir or file), not flagged as directory, is init, has content
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedContentLocation.')"',
-                    "echo '$content' | base64 -d | tee -- {$escapedContentLocation}",
+                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
+                    "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
@@ -275,7 +365,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         if (! $dockerComposeRaw) {
             throw new Exception('No compose file found or not a valid YAML file.');
         }
-        $dockerCompose = Yaml::parse($dockerComposeRaw);
+        $dockerCompose = parseDockerComposeYaml($dockerComposeRaw);
 
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');

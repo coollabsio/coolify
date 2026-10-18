@@ -247,6 +247,10 @@ class GithubController extends Controller
             ], 422);
         }
 
+        if (! isCloud() && $request->boolean('is_system_wide')) {
+            $this->authorize('makeSystemWide', GithubApp::class);
+        }
+
         try {
             // Verify the private key belongs to the team
             $privateKey = PrivateKey::where('uuid', $request->input('private_key_uuid'))
@@ -661,6 +665,10 @@ class GithubController extends Controller
             }
             if (isset($payload['html_url']) && ! filled($payload['api_url'] ?? null)) {
                 $payload['api_url'] = githubApiUrlFromHtmlUrl($payload['html_url']);
+            }
+
+            if (! isCloud() && filter_var($payload['is_system_wide'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! $githubApp->is_system_wide) {
+                $this->authorize('makeSystemWide', GithubApp::class);
             }
 
             // Handle private_key_uuid -> private_key_id conversion

@@ -42,7 +42,9 @@ class Swarm extends Component
             }
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->isSwarmManager = $this->server->settings->is_swarm_manager;
             $this->isSwarmWorker = $this->server->settings->is_swarm_worker;
@@ -63,5 +65,22 @@ class Swarm extends Component
     public function render()
     {
         return view('livewire.server.swarm');
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.settings_updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

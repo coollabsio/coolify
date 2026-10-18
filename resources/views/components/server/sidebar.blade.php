@@ -26,7 +26,7 @@
             'active' => $activeMenu === 'advanced',
             'icon' => 'grid',
             'group' => 'Settings',
-            'visible' => $server->isFunctional(),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Private Key',
@@ -41,7 +41,7 @@
             'active' => $activeMenu === 'cloud-provider-token',
             'icon' => 'subscription',
             'group' => 'Settings',
-            'visible' => (bool) ($server->hetzner_server_id || $server->vultr_instance_id),
+            'visible' => (bool) ($server->hetzner_server_id || $server->vultr_instance_id || $server->digitalocean_droplet_id || $server->hostinger_virtual_machine_id),
         ],
         [
             'label' => 'CA Certificate',
@@ -70,6 +70,7 @@
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
                 ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => $activeSubMenu === 'dynamic-confs', 'icon' => 'sliders', 'visible' => $server->proxySet()],
+                ['label' => 'TLS Certificates', 'route' => 'server.proxy.certificates', 'active' => $activeSubMenu === 'certificates', 'icon' => 'shield-star', 'visible' => $server->proxyType() === \App\Enums\ProxyTypes::TRAEFIK->value],
                 ['label' => 'Logs', 'route' => 'server.proxy.logs', 'active' => $activeSubMenu === 'logs', 'icon' => 'file-content', 'visible' => $server->proxySet(), 'navigate' => false],
             ],
         ],
@@ -79,7 +80,8 @@
             'active' => request()->routeIs('server.sentinel', 'server.sentinel.*'),
             'icon' => 'shield-star',
             'group' => 'Platform',
-            'visible' => $server->isFunctional() && ! $server->isSwarm() && $server->canHostResources() && auth()->user()?->can('viewSentinel', $server),
+            'visible' => ! $server->isSwarm() && $server->canHostResources() && auth()->user()?->can('viewSentinel', $server),
+            'disabled' => ! $server->isFunctional(),
             'warning' => $server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
             'tracks_sentinel_status' => true,
             'children' => [
@@ -109,7 +111,7 @@
             'active' => $activeMenu === 'destinations',
             'icon' => 'destinations',
             'group' => 'Networking',
-            'visible' => $server->isFunctional(),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Swarm',
@@ -120,12 +122,37 @@
             'visible' => $server->team->usesSwarm() && ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
         ],
         [
+            'label' => 'Images',
+            'route' => 'server.docker-images',
+            'active' => $activeMenu === 'docker-images',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'disabled' => ! $server->isFunctional(),
+        ],
+        [
             'label' => 'Docker Cleanup',
             'route' => 'server.docker-cleanup',
             'active' => $activeMenu === 'docker-cleanup',
             'icon' => 'broom',
             'group' => 'Operations',
-            'visible' => $server->isFunctional(),
+            'disabled' => ! $server->isFunctional(),
+        ],
+        [
+            'label' => 'GitHub Runners',
+            'route' => 'server.github-runners',
+            'active' => $activeMenu === 'github-runners',
+            'icon' => 'play-circle',
+            'group' => 'Operations',
+            'visible' => ! $server->isLocalhost(),
+            'beta' => true,
+        ],
+        [
+            'label' => 'Registries',
+            'route' => 'server.registries',
+            'active' => $activeMenu === 'registries',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => auth()->user()?->can('update', $server),
         ],
         [
             'label' => 'Log Drains',
@@ -133,7 +160,7 @@
             'active' => $activeMenu === 'log-drains',
             'icon' => 'notifications',
             'group' => 'Operations',
-            'visible' => $server->isFunctional(),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Metrics',
@@ -141,7 +168,7 @@
             'active' => $activeMenu === 'metrics',
             'icon' => 'graph',
             'group' => 'Operations',
-            'visible' => $server->isFunctional(),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Analytics',
@@ -149,7 +176,8 @@
             'active' => $activeMenu === 'analytics',
             'icon' => 'analytics',
             'group' => 'Operations',
-            'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->isBuildServer(),
+            'visible' => ! $server->isSwarm() && ! $server->isBuildServer(),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Security',
@@ -197,6 +225,7 @@
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start"
+    data-settings-search-items="{{ json_encode(settingsSearchItems($groupedServerMenuItems, $serverRouteParameters)) }}"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
         traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),
@@ -239,6 +268,15 @@
             </button>
             <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
             @foreach ($groupItems as $menuItem)
+                @if ($menuItem['disabled'] ?? false)
+                    <span wire:key="server-settings-link-{{ str($menuItem['label'])->slug() }}"
+                        class="menu-item cursor-not-allowed opacity-40" aria-disabled="true"
+                        title="Validate the server connection first.">
+                        <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
+                        <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                    </span>
+                    @continue
+                @endif
                 <a wire:key="server-settings-link-{{ str($menuItem['label'])->slug() }}"
                     @class([
                         'menu-item',
@@ -258,6 +296,8 @@
                     @elseif ($menuItem['warning'] ?? false)
                         <x-reicon name="alert-triangle"
                             class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @elseif ($menuItem['beta'] ?? false)
+                        <x-beta-badge class="ml-auto shrink-0" />
                     @endif
                 </a>
                 @if ($menuItem['active'] && isset($menuItem['children']))

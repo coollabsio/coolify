@@ -42,6 +42,9 @@ class Advanced extends Component
     public bool $disable_two_step_confirmation;
 
     #[Validate('boolean')]
+    public bool $is_passkey_enabled;
+
+    #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
     #[Validate('boolean')]
@@ -72,6 +75,7 @@ class Advanced extends Component
             'allowed_ips' => ['nullable', 'string', new ValidIpOrCidr],
             'is_sponsorship_popup_enabled' => 'boolean',
             'disable_two_step_confirmation' => 'boolean',
+            'is_passkey_enabled' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
             'is_mcp_server_enabled' => 'boolean',
             'webhook_allowed_internal_hosts' => 'nullable|string',
@@ -95,6 +99,7 @@ class Advanced extends Component
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
+        $this->is_passkey_enabled = $this->settings->is_passkey_enabled ?? true;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
@@ -216,13 +221,14 @@ class Advanced extends Component
             $this->settings->allowed_ips = $this->allowed_ips;
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
+            $this->settings->is_passkey_enabled = $this->is_passkey_enabled;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
             $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -260,12 +266,32 @@ class Advanced extends Component
             }
             $this->authorize('update', $this->settings);
             $this->settings->domain_connect_private_key = null;
-            $this->settings->save();
+            $this->saveAndAudit();
             $this->domain_connect_private_key = null;
             $this->dispatch('success', 'Domain Connect private key removed.');
         } catch (\Exception $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * Save the instance settings and record the changed field names (never their values).
+     */
+    private function saveAndAudit(): void
+    {
+        $changedFields = auditChangedFields($this->settings);
+        $this->settings->save();
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.instance.settings.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'section' => 'advanced',
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     private function normalizeDomainConnectPrivateKey(string $key): string

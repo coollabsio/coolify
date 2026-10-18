@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
 use App\Support\ValidationPatterns;
@@ -202,7 +203,7 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(All::class);
         }
     }
 

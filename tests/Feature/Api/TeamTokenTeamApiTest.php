@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
@@ -69,6 +70,18 @@ describe('token team endpoints', function () {
             ->assertJsonPath('is_build_server_fallback_enabled', false);
 
         expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeFalse();
+    });
+
+    test('PATCH /team records an audit event', function () {
+        $this->withHeaders(teamTokenApiHeaders($this->bearerToken))
+            ->patchJson('/api/v1/team', [
+                'is_build_server_fallback_enabled' => false,
+            ])
+            ->assertOk();
+
+        $event = AuditEvent::query()->where('event', 'api.team.updated')->sole();
+        expect($event->team_id)->toBe($this->team->id)
+            ->and(data_get($event->metadata, 'changed_fields'))->toBe(['is_build_server_fallback_enabled']);
     });
 
     test('PATCH /team validates the build server fallback policy', function () {

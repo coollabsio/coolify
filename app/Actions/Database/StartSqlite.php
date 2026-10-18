@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Models\StandaloneSqlite;
 use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -32,6 +33,7 @@ class StartSqlite
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
 
@@ -95,7 +97,7 @@ class StartSqlite
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
@@ -147,7 +149,7 @@ class StartSqlite
             $environment_variables->push($env->key.'='.$resolvedValue);
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('SQLITE_DATABASES'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'SQLITE_DATABASES')) {
             $environment_variables->push("SQLITE_DATABASES={$this->database->sqlite_databases}");
         }
 

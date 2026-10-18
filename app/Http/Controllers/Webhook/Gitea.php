@@ -74,9 +74,6 @@ class Gitea extends Controller
             }
             $matched_branch = $x_gitea_event === 'pull_request' ? $base_branch : $branch;
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitea', $full_name, $matched_branch);
-            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
-                return $this->tooManyManualWebhookFailuresResponse($failure_key);
-            }
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
             $applications = Application::query();

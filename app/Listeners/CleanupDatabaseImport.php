@@ -111,6 +111,11 @@ SH;
             if ($server && $commands !== []) {
                 instant_remote_process($commands, $server);
             }
+
+            // A failed import task keeps blocking the database until its restore is stopped.
+            if ($claimed && ($event->data['stopRestore'] ?? false) === true) {
+                DatabaseImportCleanup::finishStop($operation);
+            }
         } catch (Throwable $exception) {
             if ($claimed) {
                 DatabaseImportCleanup::release($operation);

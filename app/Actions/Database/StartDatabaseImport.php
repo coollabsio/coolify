@@ -5,6 +5,7 @@ namespace App\Actions\Database;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
@@ -30,7 +31,26 @@ class StartDatabaseImport
 
     public const LOCK_SECONDS = 1800;
 
+    /**
+     * Added to the SSH command timeout, so the remote restore ends (or times out) before the job.
+     * The job stays this far below the Horizon worker timeout too.
+     */
+    public const JOB_TIMEOUT_MARGIN_SECONDS = 300;
+
     public function __construct(private readonly DatabaseImportCommandBuilder $commands) {}
+
+    /**
+     * The CoolifyTask timeout of an import. A restore can run until the SSH command timeout, so the
+     * job must not time out before it. It stays below the Horizon worker timeout, which is below the
+     * queue retry_after, so the worker does not kill or run the job again while it runs.
+     */
+    public static function jobTimeoutSeconds(): int
+    {
+        $timeout = (int) config('constants.ssh.command_timeout') + self::JOB_TIMEOUT_MARGIN_SECONDS;
+        $workerTimeout = (int) config('horizon.worker_timeout');
+
+        return $workerTimeout > 0 ? min($timeout, $workerTimeout - self::JOB_TIMEOUT_MARGIN_SECONDS) : $timeout;
+    }
 
     public static function lockKey(string $resourceUuid): string
     {
@@ -45,6 +65,7 @@ class StartDatabaseImport
         if (! str($resource->status)->startsWith('running')) {
             throw new DatabaseImportException('The database must be running before an import can start.');
         }
+        $sqliteDatabase = $this->sqliteRestoreTarget($resource, $source);
 
         [$server, $container, $network] = $this->target($resource);
         $destination = $resource instanceof ServiceDatabase ? $resource->service?->destination : $resource->destination;
@@ -71,14 +92,14 @@ class StartDatabaseImport
                 throw new DatabaseImportException(ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE, 409);
             }
 
-            return $this->startImport($resource, $source, $teamId, $server, $container, $network);
+            return $this->startImport($resource, $source, $teamId, $server, $container, $network, $sqliteDatabase);
         } finally {
             DatabaseOperationReservation::release($resource->uuid, $reservation);
             $lock->release();
         }
     }
 
-    private function startImport(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $container, string $network): Activity
+    private function startImport(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $container, string $network, ?string $sqliteDatabase): Activity
     {
         $active = ResourceStartActivity::active($resource->uuid, ResourceStartActivity::DATABASE_IMPORT_OPERATION, $teamId);
         if (ResourceStartActivity::failStale($active)->isNotEmpty()) {
@@ -150,18 +171,20 @@ class StartDatabaseImport
         if ($safety = $this->commands->buildPostgresSafetyCommand($resource, $container, $containerPath)) {
             $commandList[] = $safety;
         }
-        $restore = base64_encode($this->commands->buildRestoreCommand($resource, $containerPath, $source->dumpAll, $source->replaceExisting));
+        $restore = base64_encode($this->commands->buildRestoreCommand($resource, $containerPath, $source->dumpAll, $source->replaceExisting, $source->keepOwners, $sqliteDatabase, $source->restoreMysqlUsers));
         $commandList[] = 'echo '.escapeshellarg($restore).' | base64 -d > '.escapeshellarg($scriptPath);
         $commandList[] = 'chmod +x '.escapeshellarg($scriptPath);
         $commandList[] = 'docker cp '.escapeshellarg($scriptPath).' '.escapeshellarg("{$container}:{$scriptPath}");
         $commandList[] = 'rm -f '.escapeshellarg($scriptPath);
-        $commandList[] = 'docker exec '.escapeshellarg($container).' sh -c '.escapeshellarg($scriptPath);
+        // The restore reports its own 124 and 255 as 1: Coolify reads those exit codes of the SSH
+        // command as a local timeout or a lost connection and then stops the restore.
+        $commandList[] = 'docker exec '.escapeshellarg($container).' sh -c '.escapeshellarg('"$0"; status=$?; [ "$status" -ne 124 ] && [ "$status" -ne 255 ] || status=1; exit "$status"').' '.escapeshellarg($scriptPath);
 
         // The operation properties are set when the activity is created: the CoolifyTask job can
         // load and save the activity before a later update, which would drop them again.
         // The cleanup data (names and paths only, no credentials) lets Coolify stop and clean up
         // an import that it fails after a restart or because it is stale.
-        return remote_process($commandList, $server, type_uuid: $resource->uuid, model: $resource, callEventOnFinish: 'DatabaseImportFinished', callEventData: $cleanup, properties: [
+        return remote_process($commandList, $server, type_uuid: $resource->uuid, model: $resource, callEventOnFinish: 'DatabaseImportFinished', callEventData: $cleanup, timeout: self::jobTimeoutSeconds(), properties: [
             'operation' => ResourceStartActivity::DATABASE_IMPORT_OPERATION,
             'resource_kind' => $resource instanceof ServiceDatabase ? 'service_database' : 'standalone_database',
             'operation_uuid' => $operation,
@@ -178,9 +201,30 @@ class StartDatabaseImport
         return [$resource->destination?->server, $resource->uuid, $resource->destination?->network ?? 'coolify'];
     }
 
+    /**
+     * The SQLite file a backup is restored into. It must be one of the database's own files; without
+     * a choice it is the file named in the backup path, else the first file.
+     */
+    private function sqliteRestoreTarget(Model $resource, DatabaseImportSource $source): ?string
+    {
+        if (! $resource instanceof StandaloneSqlite) {
+            return null;
+        }
+
+        $file = $source->sqliteDatabase ?? $resource->defaultRestoreFile($source->type === 'upload' ? null : $source->path);
+        if ($file === null || ! in_array($file, $resource->databaseFiles(), true)) {
+            throw new DatabaseImportException('The SQLite database file is not one of the files of this database.');
+        }
+
+        return $file;
+    }
+
+    /**
+     * Server backups can have any file name; the restore script checks the format.
+     */
     private function assertServerPath(?string $path): void
     {
-        if (! $path || ! str_starts_with($path, '/') || preg_match('/\.\.|[$()`|;&><\r\n\0\'"\\\\]/', $path) || ! DatabaseBackupFileValidator::hasAllowedExtension(basename($path))) {
+        if (! $path || ! str_starts_with($path, '/') || preg_match('/\.\.|[$()`|;&><\r\n\0\'"\\\\]/', $path)) {
             throw new DatabaseImportException('The server path is invalid.');
         }
     }

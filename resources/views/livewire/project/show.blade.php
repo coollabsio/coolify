@@ -33,17 +33,7 @@
                             </button>
                         </x-slot:content>
 
-                        <form class="space-y-4" wire:submit="submit">
-                            <x-forms.input placeholder="staging" id="name" label="Name" required />
-
-                            <footer
-                                class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="submit"
-                                    defaultClass="button button-highlighted">
-                                    Create environment
-                                </x-forms.button>
-                            </footer>
-                        </form>
+                        @include('livewire.project.partials.new-environment-form')
                     </x-modal-input>
                 </div>
             @endcan
@@ -86,7 +76,7 @@
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                         <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
                                             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
@@ -95,27 +85,9 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle
+                        :list-url="route('project.show', ['project_uuid' => $project->uuid])"
+                        :canvas-url="route('project.canvas', ['project_uuid' => $project->uuid])" />
                 </div>
             </div>
 
@@ -239,7 +211,7 @@
             search: '',
             sortBy: 'name-asc',
             sortOpen: false,
-            viewMode: localStorage.getItem('project-environments-view') || 'grid',
+            viewMode: @js($this->listView('project', 'grid')),
             page: 1,
             pageSize: 12,
             environments: @js($environmentsJs),
@@ -299,7 +271,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 this.page = 1;
-                localStorage.setItem('project-environments-view', mode);
+                this.$wire.saveListView('project', mode);
             },
             previousPage() {
                 this.page = Math.max(1, this.page - 1);

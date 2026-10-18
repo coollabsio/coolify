@@ -11,7 +11,7 @@
                     <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
                         class="button w-fit shrink-0 whitespace-nowrap">
                         <x-reicon name="upload" class="size-3.5" />
-                        Import transfer
+                        Import server
                         <x-status-badge label="Dev" />
                     </a>
                 @endcan
@@ -28,7 +28,7 @@
 
     @php
         $serverRows = $servers->map(function ($server) {
-            $isTransferredAway = $server->isTransferredAway();
+            $isTransferredAway = isDev() && $server->isTransferredAway();
             $isReady = $server->settings->is_reachable
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
@@ -38,6 +38,7 @@
             $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
+                $isTransferredAway && $server->isManagementDisabled() => 'Transferable',
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
@@ -59,7 +60,6 @@
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
-                'ip' => $server->isLocalhost() ? 'localhost' : ($server->ip ?: '-'),
                 'resourceCount' => $server->definedResources()->count(),
             ];
         })->values();
@@ -67,7 +67,7 @@
 
     <div x-data="{
         search: '',
-        viewMode: localStorage.getItem('coolify-servers-view') || 'table',
+        viewMode: @js($this->listView('servers', 'table')),
         servers: @js($serverRows),
         get filteredServers() {
             const query = this.search.trim().toLowerCase();
@@ -79,7 +79,7 @@
         },
         setViewMode(mode) {
             this.viewMode = mode;
-            localStorage.setItem('coolify-servers-view', mode);
+            this.$wire.saveListView('servers', mode);
         }
     }">
         @if ($servers->isEmpty())
@@ -105,25 +105,8 @@
                         <span x-text="filteredServers.length"></span>
                         <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
                     </span>
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle :list-url="route('server.index')"
+                        :canvas-url="route('server.canvas.index')" />
                 </div>
             </div>
 
@@ -147,13 +130,15 @@
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
-                            <div class="min-w-0 flex-1">
+                            <div class="min-w-0 flex-1 self-center">
                                 <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                     {{ $serverRow['name'] }}
                                 </h2>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    {{ $serverRow['description'] }}
-                                </p>
+                                @if (filled($serverRow['description']))
+                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        {{ $serverRow['description'] }}
+                                    </p>
+                                @endif
                             </div>
                             @if ($serverRow['statusType'] !== 'success')
                                 <span data-tooltip="{{ $serverRow['status'] }}"
@@ -174,15 +159,14 @@
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
-                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[640px] md:grid-cols-[minmax(0,1fr)_11rem_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Server</div>
-                    <div class="hidden md:block">IP address</div>
                     <div class="hidden md:block">Resources</div>
                     <div>Status</div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
                     <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[640px] md:grid-cols-[minmax(0,1fr)_11rem_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -200,10 +184,6 @@
                                 :class="server.statusType === 'warning' ? 'text-orange-500 dark:text-warning' : 'text-red-500 dark:text-red-400'">
                                 <x-reicon name="alert-triangle" class="size-4" />
                             </span>
-                        </div>
-                        <div class="hidden min-w-0 items-center gap-1.5 truncate font-mono text-[12px] text-neutral-600 md:flex dark:text-fg-dim">
-                            <x-reicon name="network" class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" />
-                            <span class="truncate" x-text="server.ip"></span>
                         </div>
                         <div class="hidden text-[12px] font-medium text-neutral-600 md:block dark:text-fg-dim">
                             <span class="inline-flex items-center gap-1" :title="`${server.resourceCount} ${server.resourceCount === 1 ? 'resource' : 'resources'}`">

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -12,10 +13,11 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 class StandaloneSqlite extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     public const DATA_DIRECTORY = '/var/lib/sqlite';
 
@@ -179,6 +181,9 @@ class StandaloneSqlite extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
+            if ($storage->isSharedWithAnotherResource()) {
+                continue;
+            }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
@@ -272,9 +277,52 @@ class StandaloneSqlite extends BaseModel
         return 'standalone-sqlite';
     }
 
-    public function databaseFilePath(): string
+    /**
+     * The database file names configured for this database, in their configured order.
+     *
+     * @return list<string>
+     */
+    public function databaseFiles(): array
     {
-        return self::DATA_DIRECTORY.'/'.str($this->sqlite_databases)->before(',')->trim();
+        return collect(explode(',', (string) $this->sqlite_databases))
+            ->map(fn (string $file): string => trim($file))
+            ->filter(fn (string $file): bool => $file !== '' && preg_match(self::DATABASES_PATTERN, $file) === 1)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The absolute path of one of this database's own files: the given file, or the first file.
+     *
+     * @throws InvalidArgumentException when the file is not one of this database's files
+     */
+    public function databaseFilePath(?string $file = null): string
+    {
+        $files = $this->databaseFiles();
+        $file ??= $files[0] ?? null;
+
+        if ($file === null || ! in_array($file, $files, true)) {
+            throw new InvalidArgumentException('The SQLite database file is not one of the files of this database.');
+        }
+
+        return self::DATA_DIRECTORY.'/'.$file;
+    }
+
+    /**
+     * The file a backup is restored into by default: the file whose name appears in the
+     * backup file name (Coolify names backups sqlite-backup-<file>-<timestamp>.gz), else the first file.
+     */
+    public function defaultRestoreFile(?string $backupName): ?string
+    {
+        $files = $this->databaseFiles();
+        $backupName = basename((string) $backupName);
+
+        $matches = array_filter($files, fn (string $file): bool => $backupName === $file
+            || str_starts_with($backupName, $file.'.')
+            || str_starts_with($backupName, "sqlite-backup-{$file}-"));
+        usort($matches, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+
+        return $matches[0] ?? $files[0] ?? null;
     }
 
     public function environment()

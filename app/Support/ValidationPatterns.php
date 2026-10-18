@@ -137,10 +137,11 @@ class ValidationPatterns
      * Pattern for Docker image repository names without a tag.
      *
      * Allows an optional registry host/port followed by lowercase repository
-     * path components. A trailing @sha256 marker is accepted for existing
+     * path components. A bracketed IPv6 registry host ([2a01:4f8::1]:5000) may
+     * only hold hex digits, ':' and '.'. A trailing @sha256 marker is accepted for existing
      * digest-based dockerimage records that store the digest hash separately.
      */
-    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
+    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
 
     /**
      * Pattern for Docker image tags.
@@ -325,6 +326,24 @@ class ValidationPatterns
         }
 
         return preg_match(self::DOCKER_IMAGE_NAME_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Check if a string is a safe health check host: a hostname or IPv4 address, or an IPv6 address
+     * with or without brackets (::1, [::1]).
+     */
+    public static function isValidHealthCheckHost(?string $value): bool
+    {
+        if (! is_string($value)) {
+            return false;
+        }
+
+        if (preg_match('/^[a-zA-Z0-9.\-_]+$/', $value) === 1) {
+            return true;
+        }
+
+        return preg_match('/^(?:\[[0-9a-fA-F:.]+\]|[0-9a-fA-F:.]+)$/', $value) === 1
+            && filter_var(trim($value, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
     }
 
     /**

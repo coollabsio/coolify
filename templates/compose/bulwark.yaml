@@ -10,8 +10,8 @@ services:
     image: 'ghcr.io/bulwarkmail/webmail:v1.8.1'
     environment:
       - SERVICE_URL_BULWARK_3000
-      - JMAP_SERVER_URL='${JMAP_SERVER_URL:?}'
-      - SESSION_SECRET='${SERVICE_HEX_64_BULWARK}'
+      - JMAP_SERVER_URL=${JMAP_SERVER_URL:?}
+      - SESSION_SECRET=${SERVICE_HEX_64_BULWARK}
     volumes:
       - 'bulwark-config:/app/data/admin'
       - 'bulwark-state:/app/data/admin-state'

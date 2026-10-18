@@ -16,7 +16,9 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -218,6 +220,28 @@ it('forbids team members from mounting the volume into an application', function
     expect($this->application->persistentStorages()->count())->toBe(0);
 });
 
+it('rejects a client-supplied volume name so the mount cannot become a host bind mount', function (string $volumeName) {
+    expect(fn () => Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
+        ->set('applicationUuid', $this->application->uuid)
+        ->set('volumeName', $volumeName)
+        ->call('connect'))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+
+    expect($this->application->persistentStorages()->count())->toBe(0);
+})->with(['/', '../x', '/etc']);
+
+it('does not mount a stored data volume whose name is not a docker volume name', function () {
+    $this->sqlite->persistentStorages()->update(['name' => '/etc']);
+
+    Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
+        ->set('applicationUuid', $this->application->uuid)
+        ->call('connect')
+        ->assertHasErrors('volumeName')
+        ->assertNoRedirect();
+
+    expect($this->application->persistentStorages()->count())->toBe(0);
+});
+
 it('keeps a docker volume shared with another resource when the application volumes are deleted', function () {
     Process::fake();
 
@@ -242,6 +266,25 @@ it('keeps a docker volume shared with another resource when the application volu
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume rm -f '.escapeshellarg($this->application->uuid.'-data')));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'sqlite-data-'.$this->sqlite->uuid));
+});
+
+it('keeps the sqlite data volume when the database volumes are deleted while an application mounts it', function () {
+    Process::fake();
+    connectSqliteVolume($this->application, $this->sqlite);
+    $databaseVolume = $this->sqlite->persistentStorages()->sole();
+
+    $this->sqlite->deleteVolumes();
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, $databaseVolume->name));
+});
+
+it('removes the sqlite data volume when no application mounts it', function () {
+    Process::fake();
+    $databaseVolume = $this->sqlite->persistentStorages()->sole();
+
+    $this->sqlite->deleteVolumes();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume rm -f '.escapeshellarg($databaseVolume->name)));
 });
 
 function connectSqliteVolume(Application $application, StandaloneSqlite $sqlite): LocalPersistentVolume
@@ -283,4 +326,45 @@ it('blocks deleting the sqlite volume or database while an application is connec
 
     expect($databaseVolume->fresh())->not->toBeNull()
         ->and(StandaloneSqlite::find($this->sqlite->id))->not->toBeNull();
+});
+
+it('does not connect a cloned application to the sqlite database', function () {
+    Process::fake();
+    $this->application->update(['redirect' => 'both']);
+    $this->application->refresh();
+    $originalVolume = connectSqliteVolume($this->application, $this->sqlite);
+
+    $clone = clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $clonedVolume = $clone->persistentStorages()->sole();
+
+    expect($clonedVolume->standalone_sqlite_id)->toBeNull()
+        ->and($clonedVolume->name)->toBe($clone->uuid.'-sqlite-data-'.$this->sqlite->uuid)
+        ->and($clonedVolume->mount_path)->toBe(StandaloneSqlite::DATA_DIRECTORY)
+        ->and($clonedVolume->isSharedWithAnotherResource())->toBeFalse()
+        ->and($this->sqlite->connectedVolumes()->pluck('id')->all())->toBe([$originalVolume->id])
+        ->and($this->sqlite->connectedApplicationNames()->all())->toBe([$this->application->name])
+        ->and($originalVolume->fresh()->standalone_sqlite_id)->toBe($this->sqlite->id);
+});
+
+it('allows deleting the sqlite database once the original application is gone, even if it was cloned', function () {
+    Process::fake();
+    Queue::fake();
+    $this->application->update(['redirect' => 'both']);
+    $this->application->refresh();
+    $originalVolume = connectSqliteVolume($this->application, $this->sqlite);
+
+    clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $originalVolume->delete();
+
+    expect($this->sqlite->fresh()->hasConnectedApplications())->toBeFalse();
+
+    Livewire::test(Danger::class, ['resource' => $this->sqlite])
+        ->call('delete', 'password')
+        ->assertNotDispatched('error', fn (string $name, array $params) => str_contains($params[0] ?? '', 'is mounted by'));
 });

@@ -60,13 +60,14 @@ trait MatchesManualWebhookApplications
     {
         return [
             'status' => 'failed',
-            'message' => 'Invalid signature.',
+            'message' => 'No matching application or invalid signature.',
         ];
     }
 
     /**
      * Respond to a delivery that could not be authenticated (no matching
-     * application or no signature) and count it as a failed attempt.
+     * application or no valid signature). A locked scope gets a 429 without
+     * counting again; otherwise the delivery is counted as a failed attempt.
      *
      * Deliveries without a matching application are counted too: the failure
      * key is scoped to the repository and branch, so this cannot lock out other
@@ -77,12 +78,19 @@ trait MatchesManualWebhookApplications
      */
     protected function unauthenticatedManualWebhookResponse(string $failureKey, string $attempt): Response
     {
+        if ($this->hasTooManyManualWebhookFailures($failureKey)) {
+            return $this->tooManyManualWebhookFailuresResponse($failureKey);
+        }
+
         $this->recordManualWebhookFailure($failureKey, $attempt);
 
         return response([$this->unauthenticatedManualWebhookFailurePayload()]);
     }
 
     /**
+     * Return the authorized payloads. When no matched application authorized
+     * the delivery, respond as an unauthenticated delivery.
+     *
      * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
      */
     protected function manualWebhookResponse(Collection $payloads, string $failureKey, string $attempt): Response

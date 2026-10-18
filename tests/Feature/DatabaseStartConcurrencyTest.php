@@ -35,6 +35,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('cache.default', 'array');
+    Server::flushIdentityMap();
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -376,6 +377,139 @@ describe('pending operation reservation', function () {
         expect($firstJob->handle())->toBe(ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE)
             ->and(databaseOperationReserved($this->database->uuid))->toBeTrue()
             ->and(databaseStartActivityCount($this->database->uuid))->toBe(0);
+    });
+
+    it('fails an expired queued start instead of running it late', function () {
+        Queue::fake();
+        Event::fake([DatabaseStatusChanged::class]);
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/start")
+            ->assertOk();
+
+        $this->travel(DatabaseOperationReservation::TTL_SECONDS + 1)->seconds();
+
+        expect(runPushedDatabaseAction(StartDatabase::class))->toBe(DatabaseOperationReservation::EXPIRED_MESSAGE)
+            ->and(databaseOperationReserved($this->database->uuid))->toBeFalse();
+        Queue::assertNotPushed(DatabaseStartJob::class);
+        Event::assertDispatched(DatabaseStatusChanged::class);
+
+        $failed = Activity::query()->where('properties->type_uuid', $this->database->uuid)->sole();
+        expect(data_get($failed, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
+            ->and(data_get($failed, 'properties.operation'))->toBe(ResourceStartActivity::DATABASE_START_OPERATION)
+            ->and(data_get($failed, 'properties.error'))->toBe(DatabaseOperationReservation::EXPIRED_MESSAGE)
+            ->and(ResourceStartActivity::latestRunning($this->database->uuid))->toBeNull();
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/start")
+            ->assertOk();
+    });
+
+    it('does not start the database a second time when an expired queued start runs after a newer start finished', function () {
+        Queue::fake();
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/start")
+            ->assertOk();
+
+        $this->travel(DatabaseOperationReservation::TTL_SECONDS + 1)->seconds();
+        $uiActivity = StartDatabase::run($this->database);
+        expect($uiActivity)->toBeInstanceOf(Activity::class);
+        $uiActivity->properties = $uiActivity->properties->merge(['status' => ProcessStatus::FINISHED->value]);
+        $uiActivity->save();
+
+        expect(runPushedDatabaseAction(StartDatabase::class))->toBe(DatabaseOperationReservation::EXPIRED_MESSAGE);
+        Queue::assertPushed(DatabaseStartJob::class, 1);
+    });
+
+    it('fails an expired queued restart without stopping the database', function () {
+        Queue::fake();
+        StopDatabase::shouldRun()->never();
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/restart")
+            ->assertOk();
+
+        $this->travel(DatabaseOperationReservation::TTL_SECONDS + 1)->seconds();
+
+        expect(runPushedDatabaseAction(RestartDatabase::class))->toBe(DatabaseOperationReservation::EXPIRED_MESSAGE);
+        Queue::assertNotPushed(DatabaseStartJob::class);
+        $failed = Activity::query()->where('properties->type_uuid', $this->database->uuid)->sole();
+        expect(data_get($failed, 'properties.error'))->toBe(DatabaseOperationReservation::EXPIRED_MESSAGE);
+    });
+
+    it('keeps the reservation of a queued restart while the database stops', function () {
+        Queue::fake();
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/restart")
+            ->assertOk();
+
+        $this->travel(DatabaseOperationReservation::TTL_SECONDS - 10)->seconds();
+        StopDatabase::shouldRun()->once()->andReturnUsing(function () {
+            $this->travel(20)->seconds();
+
+            return 'Database stopped successfully';
+        });
+
+        expect(runPushedDatabaseAction(RestartDatabase::class))->toBeInstanceOf(Activity::class);
+        Queue::assertPushed(DatabaseStartJob::class, 1);
+    });
+
+    it('records a failed start when the queued action cannot start the database', function () {
+        Queue::fake();
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/start")
+            ->assertOk();
+
+        $job = Queue::pushed(JobDecorator::class, fn (JobDecorator $job) => $job->getAction() instanceof StartDatabase)->last();
+        $job->getParameters()[0]->destination->server->settings->is_reachable = false;
+
+        expect($job->handle())->toBe('Server is not functional')
+            ->and(databaseOperationReserved($this->database->uuid))->toBeFalse();
+        $failed = Activity::query()->where('properties->type_uuid', $this->database->uuid)->sole();
+        expect(data_get($failed, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
+            ->and(data_get($failed, 'properties.error'))->toBe('Server is not functional');
+    });
+
+    it('records a failed start when the queued restart action throws', function () {
+        Queue::fake();
+        StopDatabase::shouldRun()->once()->andThrow(new RuntimeException('ssh: connection refused'));
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/restart")
+            ->assertOk();
+
+        expect(fn () => runPushedDatabaseAction(RestartDatabase::class))->toThrow(RuntimeException::class);
+
+        expect(databaseOperationReserved($this->database->uuid))->toBeFalse();
+        $failed = Activity::query()->where('properties->type_uuid', $this->database->uuid)->sole();
+        expect(data_get($failed, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
+            ->and(data_get($failed, 'properties.error'))->toBe('Database restart failed.');
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/start")
+            ->assertOk();
+    });
+
+    it('does not record a second failed start when the queued start already failed its own activity', function () {
+        Queue::fake();
+
+        $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/databases/{$this->database->uuid}/start")
+            ->assertOk();
+
+        $job = Queue::pushed(JobDecorator::class, fn (JobDecorator $job) => $job->getAction() instanceof StartDatabase)->last();
+        $queue = Queue::partialMock();
+        $queue->shouldReceive('connection')->andReturnSelf();
+        $queue->shouldReceive('push', 'pushOn')->andThrow(new RuntimeException('redis down'));
+
+        expect(fn () => $job->handle())->toThrow(RuntimeException::class, 'redis down');
+
+        $activities = Activity::query()->where('properties->type_uuid', $this->database->uuid)->get();
+        expect($activities)->toHaveCount(1)
+            ->and(data_get($activities->first(), 'properties.error'))->toBe('Database start could not be queued.');
     });
 
     it('does not start from the UI while an API start is still in the queue', function () {

@@ -13,11 +13,14 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class ConfigurationChecker extends Component
 {
+    use ListensToTeamChannel;
+
     public bool $isConfigurationChanged = false;
 
     public array $configurationDiff = [];
@@ -30,12 +33,12 @@ class ConfigurationChecker extends Component
 
     public function getListeners(): array
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'configurationChanged',
             'configurationChanged' => 'configurationChanged',
             'envsUpdated' => 'configurationChanged',
+            ...$this->teamChannelListeners([
+                'ApplicationConfigurationChanged' => 'configurationChanged',
+            ]),
         ];
     }
 
@@ -104,7 +107,8 @@ class ConfigurationChecker extends Component
             $array = $diff->toArray();
 
             // Fail closed: only owners/admins may see unlocked env values.
-            $redactEnvironment = ! (bool) auth()->user()?->isAdmin();
+            $teamId = $this->resource->team()?->id;
+            $redactEnvironment = is_null($teamId) || ! (bool) auth()->user()?->isAdminOfTeam($teamId);
             $array['changes'] = $this->redactHiddenChanges($array['changes'] ?? [], $redactEnvironment);
             $this->configurationDiff = $array;
 

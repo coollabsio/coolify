@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Models\Subscription;
 use App\Models\Team;
+use App\Notifications\Server\Unreachable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -16,7 +18,6 @@ it('sets unreachable fields on servers when subscription ends', function () {
     $server = Server::factory()->create([
         'team_id' => $team->id,
         'unreachable_count' => 0,
-        'unreachable_notification_sent' => false,
     ]);
 
     $team->subscriptionEnded();
@@ -34,9 +35,9 @@ it('cleans up unsubscribed server IP after 7 days via cleanup command', function
     $server = Server::factory()->create([
         'team_id' => $team->id,
         'unreachable_count' => 3,
-        'unreachable_notification_sent' => true,
         'updated_at' => now()->subDays(8),
     ]);
+    NotificationThrottle::record($server, Unreachable::class);
 
     $this->artisan('cleanup:unreachable-servers')->assertSuccessful();
 
@@ -49,9 +50,9 @@ it('does not clean up unsubscribed server IP within 7 day grace period', functio
     $server = Server::factory()->create([
         'team_id' => $team->id,
         'unreachable_count' => 3,
-        'unreachable_notification_sent' => true,
         'updated_at' => now()->subDays(3),
     ]);
+    NotificationThrottle::record($server, Unreachable::class);
 
     $originalIp = (string) $server->ip;
 
@@ -70,7 +71,6 @@ it('does not affect servers with active subscriptions', function () {
     $server = Server::factory()->create([
         'team_id' => $team->id,
         'unreachable_count' => 0,
-        'unreachable_notification_sent' => false,
     ]);
 
     $originalCount = $server->unreachable_count;

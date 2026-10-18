@@ -6,12 +6,15 @@ use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckMissingDatabaseBackupsJob;
+use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\ReconcileGithubRunnersJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
@@ -57,6 +60,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping(60)
             ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
+        $this->scheduleInstance->command('cleanup:database-import-uploads')->hourly()->onOneServer();
         $this->scheduleInstance->command('dns:release-orphaned-records')
             ->hourly()
             ->onOneServer()
@@ -64,6 +68,9 @@ class Kernel extends ConsoleKernel
             ->runInBackground();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new CheckMissingVolumeBackupsJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new RevalidateUnusableS3StoragesJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new ReconcileGithubRunnersJob)->everyMinute()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
@@ -75,7 +82,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
@@ -96,7 +103,7 @@ class Kernel extends ConsoleKernel
             $this->pullImages();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
@@ -114,6 +121,43 @@ class Kernel extends ConsoleKernel
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
+    }
+
+    /**
+     * Run the manager from the scheduler, not from a queue worker. A busy queue could delay it
+     * past the catch-up window, and then due backups and tasks would be skipped.
+     *
+     * Sequential mode runs all schedule types after each other in one process. Concurrent mode runs
+     * each type in its own process with its own overlap lock, so a slow type cannot make another type
+     * skip a run, but each process loads the full application every minute (more CPU and memory).
+     */
+    private function scheduleScheduledJobManager(): void
+    {
+        $commands = $this->scheduledJobsDispatchMode() === 'concurrent'
+            ? array_map(fn (string $type) => "scheduled:dispatch --type={$type}", array_keys(ScheduledJobManager::TYPES))
+            : ['scheduled:dispatch'];
+
+        foreach ($commands as $command) {
+            $this->scheduleInstance->command($command)
+                ->everyMinute()
+                ->onOneServer()
+                ->withoutOverlapping(5)
+                ->runInBackground();
+        }
+    }
+
+    /**
+     * SCHEDULED_JOBS_DISPATCH_MODE, or the default: sequential on self-hosted, concurrent on Coolify Cloud.
+     */
+    private function scheduledJobsDispatchMode(): string
+    {
+        $mode = strtolower(trim((string) config('constants.coolify.scheduled_jobs_dispatch_mode')));
+
+        if (in_array($mode, ['sequential', 'concurrent'], true)) {
+            return $mode;
+        }
+
+        return isCloud() ? 'concurrent' : 'sequential';
     }
 
     private function scheduleUpdates(): void

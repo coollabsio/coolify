@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ManagedDnsDeletionResult;
 use App\Jobs\ReleaseManagedDnsRecordsJob;
 use App\Livewire\Project\Application\Domains;
 use App\Livewire\Project\Service\Domains as ServiceDomains;
@@ -434,4 +435,31 @@ test('releasing a hostname never touches records of another team', function () {
         ->and($cloudflare['records'])->toHaveKey('record-foreign')
         ->and($foreignRecord->fresh())->not->toBeNull()
         ->and($foreignRecord->references()->count())->toBe(1);
+});
+
+test('an existing AAAA record written in another IPv6 notation satisfies the request', function () {
+    fakeCloudflareDns([
+        ['id' => 'record-1', 'type' => 'AAAA', 'name' => 'app.example.com', 'content' => '2001:db8::1', 'comment' => null],
+    ]);
+    $application = createDnsTestApplication($this, 'https://app.example.com');
+
+    $record = app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '2001:0DB8:0:0::1', $application);
+
+    expect($record->provider_record_id)->toBe('record-1')->and($record->owned)->toBeFalse();
+    expect(sentDnsRequests('POST'))->toBe(0);
+});
+
+test('an owned AAAA record is deleted when the provider returns it in canonical IPv6 notation', function () {
+    $cloudflare = fakeCloudflareDns();
+    $application = createDnsTestApplication($this, 'https://app.example.com');
+    $record = app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '2001:0db8:0000:0000:0000:0000:0000:0001', $application);
+
+    $records = $cloudflare['records'];
+    $records[$record->provider_record_id]['content'] = '2001:db8::1';
+    $cloudflare['records'] = $records;
+
+    $result = app(CloudflareDnsProvider::class)->deleteRecord($record->fresh(), $application);
+
+    expect($result)->toBe(ManagedDnsDeletionResult::Deleted)
+        ->and($cloudflare['records'])->not->toHaveKey($record->provider_record_id);
 });

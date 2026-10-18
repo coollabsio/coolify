@@ -3,11 +3,15 @@
 namespace App\Livewire\Server;
 
 use App\Models\Server;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class DockerCleanupExecutions extends Component
 {
+    use AuthorizesRequests, ListensToTeamChannel;
+
     public Server $server;
 
     public Collection $executions;
@@ -24,21 +28,22 @@ class DockerCleanupExecutions extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},DockerCleanupDone" => 'refreshExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'DockerCleanupDone' => 'refreshExecutions',
+        ]);
     }
 
     public function mount(Server $server)
     {
+        $this->authorize('view', $server);
         $this->server = $server;
         $this->refreshExecutions();
     }
 
     public function refreshExecutions(): void
     {
+        $this->authorize('view', $this->server);
+
         $this->executions = $this->server->dockerCleanupExecutions()
             ->orderBy('created_at', 'desc')
             ->take(20)
@@ -54,6 +59,8 @@ class DockerCleanupExecutions extends Component
 
     public function selectExecution($key): void
     {
+        $this->authorize('view', $this->server);
+
         if ($key == $this->selectedKey) {
             $this->selectedKey = null;
             $this->selectedExecution = null;
@@ -73,6 +80,8 @@ class DockerCleanupExecutions extends Component
 
     public function polling()
     {
+        $this->authorize('view', $this->server);
+
         if ($this->selectedExecution && $this->isPollingActive) {
             $this->selectedExecution->refresh();
             if ($this->selectedExecution->status !== 'running') {
@@ -84,6 +93,8 @@ class DockerCleanupExecutions extends Component
 
     public function loadMoreLogs()
     {
+        $this->authorize('view', $this->server);
+
         $this->currentPage++;
     }
 
@@ -104,6 +115,8 @@ class DockerCleanupExecutions extends Component
 
     public function downloadLogs(int $executionId)
     {
+        $this->authorize('view', $this->server);
+
         $execution = $this->executions->firstWhere('id', $executionId);
         if (! $execution) {
             return;

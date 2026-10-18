@@ -85,11 +85,12 @@
     $currentTag = $tags->firstWhere('name', $tagName);
     $dashboardContext = match (true) {
         request()->routeIs('dashboard') => 'Dashboard',
-        request()->routeIs('project.index') => 'Projects',
+        request()->routeIs('project.index', 'project.canvas.index') => 'Projects',
         request()->routeIs('terminal') => 'Terminal',
         request()->routeIs('server.*') => 'Servers',
         request()->routeIs('source.*') => 'Sources',
         request()->routeIs('destination.*') => 'Destinations',
+        request()->routeIs('registries.*') => 'Registries',
         request()->routeIs('storage.*') => 'S3 Storage',
         request()->routeIs('shared-variables.*') => 'Shared Variables',
         request()->routeIs('team.*') => 'Team',
@@ -114,6 +115,9 @@
             ['label' => 'Servers', 'href' => url('/servers')],
             ['label' => 'Sources', 'href' => route('source.all')],
             ['label' => 'Destinations', 'href' => route('destination.index')],
+            auth()->user()?->isAdmin()
+                ? ['label' => 'Registries', 'href' => route('registries.index')]
+                : null,
             ['label' => 'S3 Storage', 'href' => route('storage.index')],
             ['label' => 'Shared Variables', 'href' => route('shared-variables.index')],
             ['label' => 'Team', 'href' => route('team.index')],

@@ -85,7 +85,7 @@ it('throttles only failed authentication on manual webhook routes', function (st
     $helper->reply([['status' => 'success', 'message' => 'queued']], $failureKey);
     expect(RateLimiter::attempts($failureKey))->toBe(0);
 
-    $helper->reply([['status' => 'failed', 'message' => 'Invalid signature.']], $failureKey);
+    $helper->reply([['status' => 'failed', 'message' => 'No matching application or invalid signature.']], $failureKey);
     expect(RateLimiter::attempts($failureKey))->toBe(1);
 })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
@@ -99,11 +99,11 @@ it('does not reveal how many applications share a manual webhook repository', fu
             return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test', $this->manualWebhookTokenAttempt('wrong-token'))->getContent();
         }
     };
-    $failure = ['status' => 'failed', 'message' => 'Invalid signature.'];
+    $failure = ['status' => 'failed', 'message' => 'No matching application or invalid signature.'];
 
     expect($helper->reply([$failure, $failure]))->toBe($helper->reply([$failure]));
     expect($helper->reply([$failure, ['status' => 'success', 'message' => 'queued']]))
-        ->not->toContain('Invalid signature.');
+        ->not->toContain('No matching application or invalid signature.');
 });
 
 it('never exposes a shown-once database variable even with sensitive read access', function () {

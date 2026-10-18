@@ -4,6 +4,8 @@ namespace App\Services\ServerTransfer;
 
 use App\Models\Server;
 use App\Rules\SafeWebhookUrl;
+use App\Services\Security\SensitiveDataRedactor;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -34,8 +36,6 @@ class ServerTransferMigrator
         Server $server,
         string $targetUrl,
         string $targetToken,
-        bool $writeRemote = false,
-        bool $rebindSentinel = true,
         bool $preserveUuids = true,
         bool $adoptMode = true,
     ): array {
@@ -56,8 +56,6 @@ class ServerTransferMigrator
             targetUrl: $targetUrl,
             token: $token,
             bundle: $bundle,
-            writeRemote: $writeRemote,
-            rebindSentinel: $rebindSentinel,
             preserveUuids: $preserveUuids,
             adoptMode: $adoptMode,
         );
@@ -66,8 +64,17 @@ class ServerTransferMigrator
             $warnings = array_values(array_unique(array_merge($warnings, $importBody['warnings'])));
         }
 
+        // Keep managing the server here until the target really manages it, so it is never left unmanaged.
+        if (data_get($importBody, 'claimed') !== true) {
+            throw new RuntimeException(
+                "Server was imported on {$targetUrl}, but the target could not take management of it. ".
+                'This instance still manages the server. Fix the problem on the target, click Enable management there, then click Disable management here. '.
+                'Target warnings: '.(implode(' ', (array) data_get($importBody, 'warnings', [])) ?: 'none')
+            );
+        }
+
         // Cross-instance 2PC is impossible: if complete fails after a successful import, the target
-        // already owns the server. Surface that clearly so the operator can retry complete only.
+        // already owns the server. Surface that clearly so the operator can disable management here.
         try {
             $complete = $this->claimer->markTransferred(
                 $server,
@@ -75,9 +82,11 @@ class ServerTransferMigrator
                 targetInstanceUrl: $targetUrl,
             );
         } catch (Throwable $e) {
+            // Query errors include SQL and bindings, so they are never shown to the user.
+            $reason = $e instanceof QueryException ? 'a database error occurred' : remove_iip($e->getMessage());
             throw new RuntimeException(
-                "Server was imported on {$targetUrl}, but this instance could not mark it as transferred: {$e->getMessage()}. ".
-                'Retry complete (API: POST /api/v1/servers/{uuid}/complete) so automations stay disabled here. Do not re-import on the target.',
+                "Server was imported on {$targetUrl}, but this instance could not mark it as transferred: {$reason}. ".
+                'Disable management of this server here (or API: POST /api/v1/servers/{uuid}/transfer/complete) so automations stay disabled. Do not re-import on the target.',
                 previous: $e
             );
         }
@@ -86,7 +95,7 @@ class ServerTransferMigrator
             'server_uuid' => $server->uuid,
             'export_id' => is_string($exportId) ? $exportId : null,
             'target_url' => $targetUrl,
-            'import' => $importBody,
+            'import' => app(SensitiveDataRedactor::class)->redactValue($importBody),
             'complete' => $complete,
             'warnings' => $warnings,
             'message' => 'Server migrated to '.$targetUrl.'. Automations disabled on this instance.',
@@ -147,8 +156,6 @@ class ServerTransferMigrator
         string $targetUrl,
         string $token,
         array $bundle,
-        bool $writeRemote,
-        bool $rebindSentinel,
         bool $preserveUuids,
         bool $adoptMode,
     ): array {
@@ -167,19 +174,16 @@ class ServerTransferMigrator
                     'dry_run' => false,
                     'preserve_uuids' => $preserveUuids,
                     'adopt_mode' => $adoptMode,
-                    'claim' => true,
-                    'write_remote' => $writeRemote,
-                    'rebind_sentinel' => $rebindSentinel,
                 ]);
         } catch (ConnectionException $e) {
-            throw new RuntimeException("Could not reach target instance at {$importUrl}: {$e->getMessage()}", previous: $e);
+            throw new RuntimeException('Could not reach target instance at '.remove_iip($importUrl).': '.remove_iip($e->getMessage()), previous: $e);
         } catch (Throwable $e) {
-            throw new RuntimeException("Transfer to target failed: {$e->getMessage()}", previous: $e);
+            throw new RuntimeException('Transfer to target failed: '.remove_iip($e->getMessage()), previous: $e);
         }
 
         $importBody = $response->json();
         if (! is_array($importBody)) {
-            $importBody = ['raw' => $response->body()];
+            $importBody = ['raw' => remove_iip($response->body())];
         }
 
         if (! $response->successful()) {
@@ -189,7 +193,7 @@ class ServerTransferMigrator
             if (is_array($message)) {
                 $message = json_encode($message);
             }
-            throw new RuntimeException("Target import failed (HTTP {$response->status()}): {$message}");
+            throw new RuntimeException("Target import failed (HTTP {$response->status()}): ".remove_iip((string) $message));
         }
 
         return $importBody;

@@ -7,7 +7,6 @@ use App\Models\Project;
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Symfony\Component\Yaml\Yaml;
 
 class DockerCompose extends Component
 {
@@ -38,7 +37,7 @@ class DockerCompose extends Component
             $this->validate([
                 'dockerComposeRaw' => 'required',
             ]);
-            Yaml::parse($this->dockerComposeRaw);
+            parseDockerComposeYaml($this->dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             validateDockerComposeForInjection($this->dockerComposeRaw);

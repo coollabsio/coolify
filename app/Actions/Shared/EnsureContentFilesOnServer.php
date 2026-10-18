@@ -66,7 +66,7 @@ class EnsureContentFilesOnServer
         $written = 0;
         foreach ($toWrite as [$fileStorage, $path]) {
             try {
-                $fileStorage->saveStorageOnServer();
+                $fileStorage->saveStorageOnServer($server);
                 $written++;
             } catch (\Throwable $e) {
                 $log("Warning: Coolify cannot write the configuration file {$path}: ".$this->plainText($e->getMessage()), 'stderr');

@@ -131,7 +131,8 @@ it('removes only the network and volumes that Coolify generated for the preview'
 
     expect($resourceCommands)
         ->toContain("sudo docker volume rm -f '{$this->uuid}_app-data-pr-42'")
-        ->not->toContain('shared-data-pr-42')
+        // A preview gets its own volume instead of the external one.
+        ->toContain("sudo docker volume rm -f '{$this->uuid}_shared-data-pr-42'")
         ->toContain("sudo docker network disconnect '{$this->previewNetwork}' coolify-proxy")
         ->toContain("sudo docker network rm '{$this->previewNetwork}'")
         ->not->toContain("'app-data'")

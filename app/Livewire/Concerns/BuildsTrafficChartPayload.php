@@ -11,24 +11,19 @@ namespace App\Livewire\Concerns;
 trait BuildsTrafficChartPayload
 {
     /**
-     * Per-bucket total requests, for the Requests spark. Derived from the status-class
-     * counts (every request carries a status class), so it always matches real traffic
-     * regardless of whether Sentinel populates the explicit per-bucket `requests` field.
+     * Per-bucket total requests, for the Requests spark.
      *
      * @return array<int, int>
      */
     public function requestsSpark(): array
     {
-        return array_map(
-            fn ($b) => (int) ($b['s2xx'] ?? 0) + (int) ($b['s3xx'] ?? 0) + (int) ($b['s4xx'] ?? 0) + (int) ($b['s5xx'] ?? 0),
-            $this->series,
-        );
+        return array_map(fn ($b) => (int) ($b['requests'] ?? 0), $this->series);
     }
 
     /**
      * Whether there is plottable request-over-time data for the Requests chart. False when
-     * Sentinel returned no series buckets (older builds) or every bucket is empty (no traffic
-     * in the range), so the views can render a no-data state instead of a blank chart.
+     * there are no series buckets (no data) or every bucket is empty (no traffic in the
+     * range), so the views can render a no-data state instead of a blank chart.
      */
     public function hasRequestSeries(): bool
     {
@@ -49,8 +44,7 @@ trait BuildsTrafficChartPayload
     }
 
     /**
-     * Per-bucket bandwidth (bytes in + out), for the Bandwidth spark. Empty for
-     * older Sentinel builds that don't emit per-bucket byte counts.
+     * Per-bucket bandwidth (bytes in + out), for the Bandwidth spark.
      *
      * @return array<int, int>
      */

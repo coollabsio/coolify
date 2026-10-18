@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\DnsRecordConfigurationFinished;
 use App\Models\DnsProviderZone;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -40,6 +41,12 @@ class ConfigureDnsRecordJob implements ShouldQueue
             ->whereKey($this->zoneId)
             ->whereHas('integrationToken', fn ($query) => $query->where('team_id', $this->teamId))
             ->firstOrFail();
+
+        if (! DnsRecordHints::isPublicAddress($this->content)) {
+            $this->finished($zone, false, DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
+
+            return;
+        }
 
         try {
             $provider->createRecord($zone, $this->hostname, $this->content, $this->resource());

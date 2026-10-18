@@ -8,6 +8,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use Illuminate\Http\JsonResponse;
@@ -358,7 +359,7 @@ class ServiceDatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get service database logs',
-        description: 'Get Docker logs for a compose database container.',
+        description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/databases/{database_uuid}/logs',
         operationId: 'get-service-database-logs-by-service-and-database-uuid',
         security: [['bearerAuth' => []]],
@@ -401,7 +402,10 @@ class ServiceDatabasesController extends Controller
         $lines = normalizeLogLines($request->query('lines'));
 
         return response()->json([
-            'logs' => getContainerLogs($server, $containerName, $lines),
+            'logs' => sanitizeLogsForExport(
+                getContainerLogs($server, $containerName, $lines),
+                EnvironmentVariable::logRedactionSecretsFor($serviceDatabase->service),
+            ),
         ]);
     }
 

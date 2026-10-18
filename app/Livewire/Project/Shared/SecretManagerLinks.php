@@ -2,9 +2,13 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\IntegrationToken;
+use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 /**
@@ -41,8 +45,7 @@ class SecretManagerLinks extends Component
     private function loadData(): void
     {
         $this->link = $this->resource->secretManagerLink()->with('integrationToken')->first();
-        $this->availableTokens = IntegrationToken::ownedByCurrentTeam()
-            ->whereIn('provider', IntegrationToken::SECRET_MANAGER_PROVIDERS)
+        $this->availableTokens = $this->resourceTeamTokens()
             ->get()
             ->filter(fn (IntegrationToken $token) => in_array('secrets', $token->capabilities ?? [], true))
             ->values();
@@ -59,7 +62,19 @@ class SecretManagerLinks extends Component
             return null;
         }
 
-        return $this->availableTokens->firstWhere('uuid', $this->integration_token_uuid);
+        return $this->resourceTeamTokens()->where('uuid', $this->integration_token_uuid)->get()
+            ->first(fn (IntegrationToken $token) => in_array('secrets', $token->capabilities ?? [], true));
+    }
+
+    /**
+     * Secret manager tokens of the resource's team. The session team can differ: a user can
+     * switch teams in another tab while this component is still open.
+     */
+    private function resourceTeamTokens(): Builder
+    {
+        return IntegrationToken::query()
+            ->where('team_id', $this->resource->team()?->id)
+            ->whereIn('provider', IntegrationToken::SECRET_MANAGER_PROVIDERS);
     }
 
     protected function rules(): array
@@ -110,7 +125,8 @@ class SecretManagerLinks extends Component
                 $this->settings = [];
             }
 
-            $settings = array_filter($this->settings, fn ($value) => filled($value));
+            $validated = $this->validate($this->tokenChangeRules());
+            $settings = array_filter(data_get($validated, 'settings', []), fn ($value) => filled($value));
 
             $this->resource->secretManagerLink()->updateOrCreate([], [
                 'integration_token_id' => $token->id,
@@ -124,9 +140,26 @@ class SecretManagerLinks extends Component
             $this->resetKeys();
             $this->loadData();
             $this->dispatch('success', 'Secret manager source saved. References resolve at the next deployment.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * The settings rules of the selected provider, with the fields still optional: a token is
+     * saved before the user fills in its settings.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function tokenChangeRules(): array
+    {
+        return collect($this->rules())
+            ->map(fn (array $rules, string $field): array => str_starts_with($field, 'settings.')
+                ? array_map(fn (string $rule): string => $rule === 'required' ? 'nullable' : $rule, $rules)
+                : $rules)
+            ->all();
     }
 
     /**
@@ -206,6 +239,12 @@ class SecretManagerLinks extends Component
                 return;
             }
 
+            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                $this->dispatch('error', "{$key} is not a valid variable name.");
+
+                return;
+            }
+
             if ($this->resource->environment_variables()->where('key', $key)->exists()) {
                 $this->dispatch('error', "A variable with the key {$key} already exists.");
 
@@ -218,7 +257,7 @@ class SecretManagerLinks extends Component
             ]);
             $this->auditSecretManagerAction('reference_created', ['secret_key' => $key]);
 
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('success', "Added {$key} as {{vault.{$key}}}.");
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -234,19 +273,45 @@ class SecretManagerLinks extends Component
                 return;
             }
 
-            $imported = $this->link->importMissingReferences();
+            ['imported' => $imported, 'skipped' => $skipped] = $this->link->importMissingReferences();
             $this->auditSecretManagerAction('references_imported', [
                 'key_count' => count($imported),
                 'secret_keys' => $imported,
+                'skipped_key_count' => count($skipped),
             ]);
 
-            $this->dispatch('refreshEnvs');
-            $this->dispatch('success', $imported === []
-                ? 'All remote keys already exist as variables.'
-                : 'Imported '.count($imported).' keys as {{vault.KEY}} references.');
+            $this->dispatch('refreshEnvs')->to(All::class);
+            $this->dispatch('success', $this->importResultMessage($imported, $skipped));
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * @param  list<string>  $imported
+     * @param  list<string>  $skipped
+     */
+    private function importResultMessage(array $imported, array $skipped): string
+    {
+        if ($imported === [] && $skipped === []) {
+            return 'All remote keys already exist as variables.';
+        }
+
+        $message = $imported === []
+            ? 'No keys imported.'
+            : 'Imported '.count($imported).' keys as {{vault.KEY}} references.';
+
+        if ($skipped === []) {
+            return $message;
+        }
+
+        $shownNames = array_map(fn (string $key): string => e($key), array_slice($skipped, 0, 10));
+        $moreCount = count($skipped) - count($shownNames);
+        $names = implode(', ', $shownNames).($moreCount > 0 ? " and {$moreCount} more" : '');
+
+        return $message.' '.(count($skipped) === 1
+            ? "Skipped 1 key that is not a valid variable name: {$names}."
+            : 'Skipped '.count($skipped)." keys that are not valid variable names: {$names}.");
     }
 
     private function resetKeys(): void
@@ -285,6 +350,10 @@ class SecretManagerLinks extends Component
         return view('livewire.project.shared.secret-manager-links', [
             'selectedToken' => $this->selectedToken,
             'filteredKeys' => $this->filteredKeys,
+            'invalidKeys' => array_flip(array_filter(
+                $this->keys,
+                fn (string $key) => ! ValidationPatterns::isValidEnvironmentVariableKey($key),
+            )),
         ]);
     }
 }

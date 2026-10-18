@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared;
 
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -150,6 +151,9 @@ class GetLogs extends Component
     #[Renderless]
     public function getLogs(?string $since = null): string
     {
+        if (! $this->canReadLogs()) {
+            return 'Unauthorized.';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return 'Unauthorized.';
         }
@@ -174,6 +178,9 @@ class GetLogs extends Component
 
     public function copyLogs(): string
     {
+        if (! $this->canReadLogs()) {
+            return '';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return '';
         }
@@ -186,11 +193,14 @@ class GetLogs extends Component
 
         $options = "-n {$this->resolveLogTail()}".($this->showTimeStamps ? ' -t' : '');
 
-        return sanitizeLogsForExport($this->runLogCommand($this->logCommand($options), self::MAX_DISPLAY_SIZE_BYTES, '5MB', $this->showTimeStamps));
+        return sanitizeLogsForExport($this->runLogCommand($this->logCommand($options), self::MAX_DISPLAY_SIZE_BYTES, '5MB', $this->showTimeStamps), $this->logRedactionSecrets());
     }
 
     public function downloadAllLogs(): string
     {
+        if (! $this->canReadLogs()) {
+            return '';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return '';
         }
@@ -203,7 +213,19 @@ class GetLogs extends Component
 
         $command = $this->logCommand($this->showTimeStamps ? '-t' : '');
 
-        return sanitizeLogsForExport($this->runLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES, '50MB', $this->showTimeStamps));
+        return sanitizeLogsForExport($this->runLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES, '50MB', $this->showTimeStamps), $this->logRedactionSecrets());
+    }
+
+    /**
+     * Environment values and database credentials of the resource whose logs are exported.
+     *
+     * @return array{known: array<int, string>, locked: array<int, string>}
+     */
+    private function logRedactionSecrets(): array
+    {
+        $resource = $this->resource ?? $this->servicesubtype?->service;
+
+        return EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: $resource instanceof Application && filled($this->pull_request));
     }
 
     private function resolveLogTail(): int|string
@@ -263,8 +285,19 @@ class GetLogs extends Component
         return "({$command}) 2>&1 | head -c ".($maxBytes + 1);
     }
 
+    /**
+     * Container output can contain secrets, so only users who can edit the resource (or the server,
+     * for server-level containers) may read it.
+     */
+    private function canReadLogs(): bool
+    {
+        return auth()->user()?->can('update', $this->resource ?? $this->server) ?? false;
+    }
+
     public function render()
     {
-        return view('livewire.project.shared.get-logs');
+        return view('livewire.project.shared.get-logs', [
+            'canReadLogs' => $this->canReadLogs(),
+        ]);
     }
 }

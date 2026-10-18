@@ -7,6 +7,8 @@ use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Service\UpdateServiceApplicationFromApi;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
@@ -257,6 +259,7 @@ class ServiceApplicationsController extends Controller
                         'exclude_from_status' => new OA\Property(property: 'exclude_from_status', type: 'boolean', nullable: true),
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
+                        'traefik_certificate_resolver' => new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
                         'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
                         'max_restart_count' => new OA\Property(property: 'max_restart_count', type: 'integer', minimum: 0, nullable: true, description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'),
@@ -331,6 +334,7 @@ class ServiceApplicationsController extends Controller
             'exclude_from_status',
             'is_log_drain_enabled',
             'is_gzip_enabled',
+            'traefik_certificate_resolver',
             'is_stripprefix_enabled',
             'is_force_https_enabled',
             'max_restart_count',
@@ -346,6 +350,7 @@ class ServiceApplicationsController extends Controller
             'exclude_from_status' => 'sometimes|boolean',
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
+            'traefik_certificate_resolver' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
             'is_stripprefix_enabled' => 'sometimes|boolean',
             'is_force_https_enabled' => 'sometimes|boolean',
             'max_restart_count' => 'sometimes|integer|min:0',
@@ -373,12 +378,19 @@ class ServiceApplicationsController extends Controller
 
         $serviceApplication->refresh();
 
+        auditLog('api.service_application.updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_application_uuid' => $serviceApplication->uuid,
+            'changed_fields' => array_keys($payload),
+        ]);
+
         return response()->json($this->removeSensitiveData($serviceApplication));
     }
 
     #[OA\Get(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'get-service-application-logs-by-service-and-app-uuid',
         security: [
@@ -447,7 +459,7 @@ class ServiceApplicationsController extends Controller
     )]
     #[OA\Post(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'post-service-application-logs-by-service-and-app-uuid',
         security: [['bearerAuth' => []]],
@@ -521,7 +533,10 @@ class ServiceApplicationsController extends Controller
         }
 
         $lines = normalizeLogLines($request->query('lines'));
-        $logs = getContainerLogs($server, $containerName, $lines);
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($server, $containerName, $lines),
+            EnvironmentVariable::logRedactionSecretsFor($serviceApplication->service),
+        );
 
         return response()->json([
             'logs' => $logs,

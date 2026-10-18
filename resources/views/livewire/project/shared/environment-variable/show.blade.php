@@ -8,7 +8,7 @@
     $showBuildtime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showRuntime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
 @endphp
-<div class="env-table-item"
+<div class="env-table-item" data-env-key="{{ $env->key }}"
     @if ($isSharedVariable) :style="`order: ${sharedSort === 'alphabetical' ? {{ $tableAlphabeticalOrder }} : {{ $tableCreationOrder }}}`" @endif
     x-show="(typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $rowScope }}')
         && (typeof sharedSearch === 'undefined' || @js(mb_strtolower($env->key . ' ' . ($comment ?? '') . ' ' . $rowScopeLabel)).includes(sharedSearch.trim().toLowerCase()))">
@@ -35,6 +35,10 @@
             @endif
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
+            @endif
+            @if ($composeInfo)
+                <span class="table-badge shrink-0"
+                    title="Used by Compose services: {{ implode(', ', $composeInfo['services']) }}">Used by Compose</span>
             @endif
         </div>
         @if (! $isSharedVariable)
@@ -84,13 +88,19 @@
             @endforeach
         @endif
         <div class="flex items-center gap-0.5 justify-self-end">
+            @if ($this->connectLink)
+                <a href="{{ $this->connectLink }}" class="icon-button shrink-0"
+                    title="Connect {{ $key }} to resources" aria-label="Connect {{ $key }} to resources">
+                    <x-reicon name="link" class="size-3.5" />
+                </a>
+            @endif
             @if (! $isLocked && ! $isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen"
-                @environment-variable-updated.window="if ($event.detail.envId === @js($env->id)) modalOpen = false">
+                @environment-variable-updated.window="if ($event.detail.envId === {{ (int) $env->id }}) modalOpen = false">
                 <x-slot:content>
                     <button type="button" wire:click="loadValues" data-env-settings-trigger class="icon-button shrink-0"
                         title="Edit environment variable" aria-label="Edit environment variable">
@@ -102,7 +112,7 @@
                     x-data="{ isMultiline: $wire.entangle('is_multiline') }">
                     <div class="grid items-end gap-4 sm:grid-cols-2">
                         <x-forms.input id="key" label="Name" :required="$is_redis_credential"
-                            :disabled="!$canEditValue || $is_redis_credential" />
+                            :disabled="!$canEditValue || $is_redis_credential || $composeInfo !== null" />
                         <x-forms.input id="comment" label="Comment" placeholder="Optional note"
                             helper="Add a note to document what this environment variable is used for." maxlength="256"
                             :disabled="!$canUpdate" />
@@ -159,6 +169,7 @@
                                         <x-forms.env-var-input id="value" type="password"
                                             canGate="manageEnvironment" :canResource="$this->resource"
                                             :required="$is_redis_credential" :disabled="!$canEditValue"
+                                            :placeholder="$composeInfo['default'] ?? null"
                                             :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
                                             :hasVaultSource="$this->hasSecretManagerSource()"
                                             :projectUuid="data_get($parameters, 'project_uuid')"
@@ -179,8 +190,33 @@
                         @endif
                     </div>
 
+                    @if ($legacyEscapingChangesValue)
+                        <x-callout type="warning" title="Old escaping">
+                            This variable was saved before Coolify passed exact values, so the container gets a
+                            changed value (for example, with extra backslashes or quotes). To pass the exact value,
+                            delete this variable and add it again, then restart. If a database already uses this
+                            value as a password, update the password in the database too.
+                        </x-callout>
+                    @endif
+
                     @if ($is_shared)
                         <x-forms.input disabled type="password" id="real_value" label="Resolved value" />
+                    @endif
+                    @if ($composeInfo)
+                        <x-callout type="info" title="Used by Docker Compose">
+                            Used by: {{ implode(', ', $composeInfo['services']) }}.
+                            @if ($composeInfo['default'] !== null)
+                                Compose default: <span class="font-mono">{{ $composeInfo['default'] }}</span>.
+                            @endif
+                            @if ($composeInfo['default'] !== null && !$composeInfo['required'] && $canEditValue && !$isLocked)
+                                <x-forms.button type="button" wire:click="useComposeDefault">
+                                    Use Compose default
+                                </x-forms.button>
+                            @endif
+                            @if ($composeInfo['required'])
+                                Compose requires this variable to have a value.
+                            @endif
+                        </x-callout>
                     @endif
 
                     @if ($showValueType || $showInterpolation || $showBuildtime || $showRuntime)
@@ -240,6 +276,12 @@
                                 @endcan
                             </div>
                             <div class="ml-auto flex flex-wrap gap-2" data-environment-variable-update-actions>
+                                @if ($this->connectLink)
+                                    <a href="{{ $this->connectLink }}" class="button" title="Add this variable to resources, and see which resources use it">
+                                        <x-reicon name="link" class="size-3.5" />
+                                        Connect to resources
+                                    </a>
+                                @endif
                                 @if ($canUpdate && !$isLocked && !$isMagicVariable)
                                     <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
                                 @endif

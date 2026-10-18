@@ -136,7 +136,6 @@ class Webhook extends Component
     public function instantSaveWebhookEnabled()
     {
         try {
-            $original = $this->webhookEnabled;
             $this->validate([
                 'webhookUrl' => 'required',
             ], [
@@ -144,7 +143,7 @@ class Webhook extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->webhookEnabled = $original;
+            $this->webhookEnabled = (bool) $this->settings->refresh()->webhook_enabled;
 
             return handleError($e, $this);
         }

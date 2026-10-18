@@ -157,7 +157,7 @@ class Pushover extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->pushoverEnabled = false;
+            $this->pushoverEnabled = (bool) $this->settings->refresh()->pushover_enabled;
 
             return handleError($e, $this);
         } finally {

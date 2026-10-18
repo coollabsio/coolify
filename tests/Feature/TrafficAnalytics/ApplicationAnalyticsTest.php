@@ -172,7 +172,6 @@ it('loads the per-app status time series when Sentinel exposes the series endpoi
 
     loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
-        ->assertSet('hasSeries', true)
         ->assertSet('series', [
             ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytesIn' => 1000, 'bytesOut' => 5000, 'uniqueVisitors' => 12, 'p95' => 30.0],
             ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytesIn' => 1500, 'bytesOut' => 8000, 'uniqueVisitors' => 20, 'p95' => 45.0],
@@ -201,20 +200,22 @@ it('decorates per-app paths with the app domain and surfaces AI agents', functio
     expect($component->instance()->topPaths[0]['domain'])->toBe('api.example.com');
 });
 
-it('falls back to the donut for the per-app chart when the series endpoint is absent', function () {
+it('hides the IP breakdown when the server does not record client IPs', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
+    $server = $application->destination->server;
+    $server->settings->traffic_ip_mode = 'off';
+    // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+    $server->settings->saveQuietly();
 
-    $responses = fakeAnalyticsResponses();
-    unset($responses['/traffic/series']);
-
-    $fake = new FakeAnalyticsTrafficClient($application->destination->server);
-    $fake->responses = $responses;
+    $fake = new FakeAnalyticsTrafficClient($server);
+    $fake->responses = fakeAnalyticsResponses();
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application->fresh()]))
         ->assertOk()
-        ->assertSet('hasSeries', false)
-        ->assertSet('series', []);
+        ->assertSee('Top user agents')
+        ->assertDontSee('Top IPs')
+        ->assertDontSee('198.51.100.42');
 });
 
 it('shows an empty state when traffic analytics is disabled for the server', function () {
