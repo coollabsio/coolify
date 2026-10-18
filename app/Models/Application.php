@@ -2132,7 +2132,7 @@ class Application extends BaseModel
                             continue;
                         }
                         if ($source->startsWith('.')) {
-                            $source = str($workdir.$source->after('.'));
+                            $source = replaceLocalSource($source, str($workdir));
                         }
                         $mkdirCommand = rawComposeBindMkdirCommand($source->value());
                         if ($mkdirCommand !== null) {
