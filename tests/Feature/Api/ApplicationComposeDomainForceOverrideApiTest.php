@@ -1,8 +1,8 @@
 <?php
 
-use App\Jobs\LoadComposeFile;
 use App\Models\Application;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -14,10 +14,8 @@ use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
 
-// A sibling application already serves https://shared.example.com. Creating a
-// Docker Compose application whose docker_compose_domains names the same
-// hostname must succeed when the request sets force_domain_override, exactly as
-// it does for `domains` and for docker_compose_domains on PATCH.
+// create_application() strips force_domain_override from the request before the
+// docker_compose_domains checks run, so the flag must be read up front.
 
 beforeEach(function () {
     // The create dispatches LoadComposeFile, which would clone the repository.
@@ -53,42 +51,57 @@ beforeEach(function () {
     ]);
 });
 
-function createComposeAppOnSharedDomain(string $token, array $context, bool $force)
+function createComposeApplication(string $endpoint, array $composeDomains, bool $force)
 {
-    return test()->withToken($token)->postJson('/api/v1/applications/public', [
-        'project_uuid' => $context['project'],
-        'environment_uuid' => $context['environment'],
-        'server_uuid' => $context['server'],
-        // Not github.com: that path looks up the seeded public GithubApp (id 0).
-        'git_repository' => 'https://gitlab.com/coollabsio/coolify-examples',
+    $payload = [
+        'project_uuid' => test()->project->uuid,
+        'environment_uuid' => test()->environment->uuid,
+        'server_uuid' => test()->server->uuid,
         'git_branch' => 'v4.x',
         'build_pack' => 'dockercompose',
-        'docker_compose_domains' => [
-            ['name' => 'web', 'domain' => 'https://shared.example.com'],
-        ],
+        'docker_compose_domains' => $composeDomains,
         'force_domain_override' => $force,
-    ]);
+    ];
+
+    if ($endpoint === 'private-deploy-key') {
+        $payload['private_key_uuid'] = PrivateKey::factory()->create(['team_id' => test()->team->id])->uuid;
+        $payload['git_repository'] = 'git@gitlab.com:coollabsio/coolify-examples.git';
+    } else {
+        // Not github.com: that path looks up the seeded public GithubApp (id 0).
+        $payload['git_repository'] = 'https://gitlab.com/coollabsio/coolify-examples';
+    }
+
+    return test()->withToken(test()->bearerToken)->postJson("/api/v1/applications/{$endpoint}", $payload);
 }
 
-it('refuses conflicting docker_compose_domains on create without force_domain_override', function () {
-    createComposeAppOnSharedDomain($this->bearerToken, [
-        'project' => $this->project->uuid,
-        'environment' => $this->environment->uuid,
-        'server' => $this->server->uuid,
-    ], false)
-        ->assertStatus(409)
-        ->assertJsonPath('message', 'Domain conflicts detected. Use force_domain_override=true to proceed.');
-});
+dataset('endpoints', ['public', 'private-deploy-key']);
 
-it('creates the application when force_domain_override is true', function () {
-    $count = Application::count();
+dataset('conflicts', [
+    'domain used by another application' => [
+        [['name' => 'web', 'domain' => 'https://shared.example.com']],
+        409,
+    ],
+    'same domain twice in the request' => [
+        [
+            ['name' => 'web', 'domain' => 'https://dup.example.com'],
+            ['name' => 'worker', 'domain' => 'https://dup.example.com'],
+        ],
+        422,
+    ],
+]);
 
-    createComposeAppOnSharedDomain($this->bearerToken, [
-        'project' => $this->project->uuid,
-        'environment' => $this->environment->uuid,
-        'server' => $this->server->uuid,
-    ], true)
-        ->assertCreated();
+it('refuses conflicting docker_compose_domains without force_domain_override', function (string $endpoint, array $composeDomains, int $status) {
+    createComposeApplication($endpoint, $composeDomains, false)
+        ->assertStatus($status)
+        ->assertSeeText('Use force_domain_override=true to proceed.');
+})->with('endpoints')->with('conflicts');
 
-    expect(Application::count())->toBe($count + 1);
-});
+it('creates the application with conflicting docker_compose_domains when force_domain_override is true', function (string $endpoint, array $composeDomains) {
+    $response = createComposeApplication($endpoint, $composeDomains, true)->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+    $savedDomains = collect(json_decode($application->docker_compose_domains, true))
+        ->map(fn ($entry) => $entry['domain']);
+
+    expect($savedDomains->all())->toBe(collect($composeDomains)->pluck('domain', 'name')->all());
+})->with('endpoints')->with('conflicts');
