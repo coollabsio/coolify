@@ -40,7 +40,7 @@ it('accepts content volumes with any host path, like Coolify v4.3.23', function 
 
 it('rejects shell injection in a content volume source', function (string $source) {
     expect(fn () => validateDockerComposeForInjection(contentVolumeCompose($source)))
-        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)');
+        ->toThrow(Exception::class, 'Invalid Docker volume definition');
 })->with([
     'command substitution' => ['/etc/$(id)/app.conf'],
     'backtick' => ['/etc/`id`/app.conf'],

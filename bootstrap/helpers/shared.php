@@ -196,15 +196,8 @@ function rawComposeBindMkdirCommand(string $source): ?string
         throw new Exception('Invalid volume source: path is empty.');
     }
 
-    $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source) === 1;
-    $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}(?:\/[\w.\-]+)*\/?$/', $source) === 1;
-    if ($isSimpleEnvVar || $isEnvVarWithPath) {
-        return null;
-    }
-
-    if (preg_match('/^\$\{([a-zA-Z_][a-zA-Z0-9_]*):-(.*)\}$/', $source, $matches) === 1) {
-        validateShellSafePath($matches[2], 'volume source');
-
+    validateComposeBindSource($source);
+    if (str_contains($source, '$')) {
         return null;
     }
 
@@ -424,15 +417,21 @@ function confinePathToBase(string $baseDirectory, string $path, string $context 
  *
  * @throws Exception
  */
-function normalizeUnixPath(string $path): string
+function normalizeUnixPath(string $path, bool $allowLiteralBindCharacters = false): string
 {
-    validateShellSafePath($path, 'path');
+    if ($allowLiteralBindCharacters) {
+        if (preg_match('/[\x00-\x1F\x7F`|&;<>]|\$\(/', $path)) {
+            throw new Exception('Invalid path: unsafe resolved bind source.');
+        }
+    } else {
+        validateShellSafePath($path, 'path');
+    }
 
     if (str_contains($path, "\0")) {
         throw new Exception('Invalid path: contains null byte.');
     }
 
-    if (str_contains($path, '\\')) {
+    if (! $allowLiteralBindCharacters && str_contains($path, '\\')) {
         throw new Exception('Invalid path: backslash directory separators are not allowed.');
     }
 
@@ -1876,13 +1875,54 @@ function getTopLevelNetworks(Service|Application $resource): Collection
 
     return collect();
 }
+/**
+ * A Compose expression source (`${VAR:-./data}`, `${VAR}/data`) is a host path only when it contains `/`.
+ * `${VAR}` and `${VAR:-name}` stay named volumes.
+ */
 function sourceIsLocal(Stringable $source)
 {
+    if ($source->startsWith('$')) {
+        return $source->contains('/');
+    }
     if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
         return true;
     }
 
     return false;
+}
+
+/**
+ * Decide the type of a short-syntax volume source for a resource.
+ *
+ * Before Compose expressions were kept, `${VAR}/data` became the named volume `{uuid}_var-data`.
+ * Keep that volume when it already exists so existing data stays mounted.
+ */
+function composeShortSyntaxIsBind(Stringable $source, Model $resource, string $uuid): bool
+{
+    if (! sourceIsLocal($source)) {
+        return false;
+    }
+    if (! $source->startsWith('$')) {
+        return true;
+    }
+
+    return ! $resource->persistentStorages()
+        ->where('name', "{$uuid}_".Str::slug(composeNamedVolumeSource($source), '-'))
+        ->exists();
+}
+
+/**
+ * Return the source text used to name a short-syntax named volume.
+ *
+ * `${VAR:-db}` was named from its default (`db`), and `${VAR:-}` from `${VAR}`. Keep these names.
+ */
+function composeNamedVolumeSource(Stringable $source): Stringable
+{
+    if (preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-([^{}]*)\}$/', $source->value(), $matches) === 1) {
+        return str($matches[2] !== '' ? $matches[2] : '${'.$matches[1].'}');
+    }
+
+    return $source;
 }
 
 /**
@@ -1895,6 +1935,23 @@ function sourceIsLocal(Stringable $source)
  */
 function replaceLocalSource(Stringable $source, Stringable $replacedWith): Stringable
 {
+    if ($source->startsWith('${')) {
+        $value = $source->value();
+        $depth = 0;
+        $end = null;
+        for ($i = 0; $i < strlen($value); $i++) {
+            if ($value[$i] === '$' && ($value[$i + 1] ?? '') === '{') {
+                $depth++;
+                $i++;
+            } elseif ($value[$i] === '}' && --$depth === 0) {
+                $end = $i;
+                break;
+            }
+        }
+        if ($end !== null && preg_match('/^([A-Za-z_][A-Za-z0-9_]*)(:-|-|:\+|\+)(.+)$/s', substr($value, 2, $end - 2), $matches) === 1) {
+            return str('${'.$matches[1].$matches[2].replaceLocalSource(str($matches[3]), $replacedWith)->value().'}'.substr($value, $end + 1));
+        }
+    }
     $path = $source->value();
     if (! in_array('..', explode('/', $path), true)) {
         return legacyReplaceLocalSource($source, $replacedWith);
@@ -3114,9 +3171,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $content = null;
                         $isDirectory = false;
                         if (is_string($volume)) {
-                            $source = str($volume)->before(':');
-                            $target = str($volume)->after(':')->beforeLast(':');
-                            if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
+                            $parsed = parseDockerVolumeString($volume);
+                            $source = $parsed['source'];
+                            $target = $parsed['target'];
+                            if (composeShortSyntaxIsBind($source, $savedService, $savedService->service->uuid)) {
                                 $type = str('bind');
                                 // By default, we cannot determine if the bind is a directory or not, so we set it to directory
                                 $isDirectory = true;
@@ -3126,7 +3184,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         } elseif (is_array($volume)) {
                             $type = data_get_str($volume, 'type');
                             $source = data_get_str($volume, 'source');
+                            validateComposeBindSource($source->value());
                             $target = data_get_str($volume, 'target');
+                            validateShellSafePath($target->value(), 'volume target');
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                             validateComposeContentVolumeSource($volume);
@@ -3182,8 +3242,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
-                                $source = str($volume)->before(':');
-                                $target = str($volume)->after(':')->beforeLast(':');
                                 $source = $name;
                                 $volume = "$source:$target";
                             } elseif (is_array($volume)) {
@@ -3760,10 +3818,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
-                                $name = $volume->before(':');
-                                $mount = $volume->after(':');
-                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                $parsedVolume = parseDockerVolumeString($volume->value());
+                                $name = $parsedVolume['source'];
+                                $mount = $parsedVolume['target'];
+                                if ($parsedVolume['mode']) {
+                                    $mount .= ':'.$parsedVolume['mode'];
+                                }
+                                if ($name->startsWith('.') || $name->startsWith('~') || ($name->startsWith('$') && $name->contains('/'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('$')) {
+                                        $name = replaceLocalSource($name, str($dir));
+                                    }
                                     if ($name->startsWith('.')) {
                                         $name = $name->replaceFirst('.', $dir);
                                     }
@@ -3809,8 +3874,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                             } else {
                                 if ($volume->startsWith('/')) {
-                                    $name = $volume->before(':');
-                                    $mount = $volume->after(':');
+                                    $parsedVolume = parseDockerVolumeString($volume->value());
+                                    $name = $parsedVolume['source'];
+                                    $mount = $parsedVolume['target'];
+                                    if ($parsedVolume['mode']) {
+                                        $mount .= ':'.$parsedVolume['mode'];
+                                    }
                                     if ($pull_request_id !== 0) {
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
@@ -3820,6 +3889,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         } elseif (is_array($volume)) {
                             $source = data_get($volume, 'source');
                             $target = data_get($volume, 'target');
+                            if (is_string($source)) {
+                                validateComposeBindSource($source);
+                            }
+                            if (is_string($target)) {
+                                validateShellSafePath($target, 'volume target');
+                            }
                             $read_only = data_get($volume, 'read_only');
                             if ($source && $target) {
                                 if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
@@ -3880,10 +3955,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
-                                $name = $volume->before(':');
-                                $mount = $volume->after(':');
-                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                $parsedVolume = parseDockerVolumeString($volume->value());
+                                $name = $parsedVolume['source'];
+                                $mount = $parsedVolume['target'];
+                                if ($parsedVolume['mode']) {
+                                    $mount .= ':'.$parsedVolume['mode'];
+                                }
+                                if ($name->startsWith('.') || $name->startsWith('~') || ($name->startsWith('$') && $name->contains('/'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('$')) {
+                                        $name = replaceLocalSource($name, str($dir));
+                                    }
                                     if ($name->startsWith('.')) {
                                         $name = $name->replaceFirst('.', $dir);
                                     }
@@ -3933,8 +4015,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                             } else {
                                 if ($volume->startsWith('/')) {
-                                    $name = $volume->before(':');
-                                    $mount = $volume->after(':');
+                                    $parsedVolume = parseDockerVolumeString($volume->value());
+                                    $name = $parsedVolume['source'];
+                                    $mount = $parsedVolume['target'];
+                                    if ($parsedVolume['mode']) {
+                                        $mount .= ':'.$parsedVolume['mode'];
+                                    }
                                     if ($pull_request_id !== 0) {
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
@@ -3944,6 +4030,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         } elseif (is_array($volume)) {
                             $source = data_get($volume, 'source');
                             $target = data_get($volume, 'target');
+                            if (is_string($source)) {
+                                validateComposeBindSource($source);
+                            }
+                            if (is_string($target)) {
+                                validateShellSafePath($target, 'volume target');
+                            }
                             $read_only = data_get($volume, 'read_only');
                             if ($source && $target) {
                                 $uuid = $resource->uuid;

@@ -100,6 +100,19 @@ function fakeContentFilesServer(array $states): void
         $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
         ContentFilesUpRecorder::$commands[] = ['ssh', $command];
 
+        if (str_contains($process->command, 'config --format json')) {
+            $services = [];
+            foreach (LocalFileVolume::query()->get() as $volume) {
+                $owner = $volume->resource;
+                $name = data_get($owner, 'service') ? $owner->name : 'app';
+                $workdir = data_get($owner, 'service') ? $owner->service->workdir() : $owner->workdir();
+                $path = str_starts_with($volume->fs_path, '/') ? $volume->fs_path : $workdir.'/'.ltrim($volume->fs_path, './');
+                $services[$name]['volumes'][] = ['type' => 'bind', 'source' => $path, 'target' => $volume->mount_path];
+            }
+
+            return Process::result(output: json_encode(['services' => $services]));
+        }
+
         if (str_contains($command, 'empty-directory')) {
             $positions = collect($states)
                 ->map(fn (string $state, string $path) => strpos($command, escapeshellarg($path)))
@@ -194,6 +207,7 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
 {
     $job = new ContentFilesUpDeploymentJob;
     $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->updated_at = now();
     $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout') use ($test) {
         $test->logEntries[] = [$message, $type];
     });
@@ -214,6 +228,10 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
         ...$properties,
     ] as $property => $value) {
         (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    if ($properties['preserveRepository'] ?? false) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, 'generated_docker_compose'))->setValue($job, "services:\n  app:\n    image: nginx:alpine\n");
     }
 
     (new ReflectionMethod(ApplicationDeploymentJob::class, 'start_docker_compose_services'))->invoke($job);
@@ -417,6 +435,7 @@ test('the content file check and write are safe for non-root servers', function 
 
     runComposeStart($this, ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
 
+    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     expect(contentFilesStateChecks())->not->toBeEmpty()
         ->and(contentFilesStateChecks()[0])->toContain("sudo bash -c 'sh -c ");
@@ -436,6 +455,7 @@ test('starting a service writes missing content files before docker compose up',
     $service->parse();
     $appConf = LocalFileVolume::query()->where('mount_path', '/etc/app.conf')->firstOrFail();
     $workerConf = LocalFileVolume::query()->where('mount_path', '/etc/worker.conf')->firstOrFail();
+    LocalFileVolume::query()->update(['pending_initialization' => false]);
     fakeContentFilesServer([$appConf->fs_path => 'missing', $workerConf->fs_path => 'directory']);
 
     $activity = StartService::run($service->fresh());
@@ -464,6 +484,7 @@ test('deploying one service application writes only its missing content files', 
     $service->parse();
     $appConf = LocalFileVolume::query()->where('mount_path', '/etc/app.conf')->firstOrFail();
     $workerConf = LocalFileVolume::query()->where('mount_path', '/etc/worker.conf')->firstOrFail();
+    LocalFileVolume::query()->update(['pending_initialization' => false]);
     fakeContentFilesServer([$appConf->fs_path => 'missing', $workerConf->fs_path => 'missing']);
 
     $activity = DeployServiceApplication::run($service->applications()->where('name', 'app')->firstOrFail());
@@ -533,6 +554,7 @@ test('the storage save job replaces an empty directory with the content file', f
 
     (new ServerStorageSaveJob($volume))->handle();
 
+    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     Process::assertRan(fn ($process) => str_contains($process->command, "rmdir {$escapedPath}")
         && str_contains($process->command, base64_encode(CONTENT_FILES_UP_CONTENT))
@@ -604,3 +626,26 @@ test('starting a service runs its commands on the deployment queue', function (b
     'cloud' => [false, 'deployments'],
     'self-hosted' => [true, 'high'],
 ]);
+
+test('a preserve-repository deployment keeps a Git file that a new storage mounts', function () {
+    $this->application->settings()->update(['is_preserve_repository_enabled' => true]);
+    $volume = contentFilesVolume($this->application, 'config/from-git.conf', ['content' => null, 'is_directory' => true]);
+    $volume->forceFill(['pending_initialization' => true])->saveQuietly();
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+
+    runComposeStart($this, [
+        'preserveRepository' => true,
+        'saved_outputs' => collect(['file_stat_'.$volume->id => 'regular file']),
+    ]);
+
+    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
+    $escapedPath = escapeshellarg($volume->fs_path);
+    $changesGitFile = fn (string $command) => str_contains($command, "rm -rf {$escapedPath}")
+        || str_contains($command, "touch {$escapedPath}")
+        || str_contains($command, "tee {$escapedPath}");
+    expect(array_filter(ContentFilesUpRecorder::ssh(), $changesGitFile))->toBeEmpty();
+    $volume = $volume->fresh();
+    expect($volume->is_directory)->toBeFalse()
+        ->and((bool) $volume->is_based_on_git)->toBeTrue()
+        ->and($volume->pending_initialization)->toBeFalse();
+});

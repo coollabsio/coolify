@@ -63,7 +63,7 @@ test('parses volumes with other modes', function () {
 test('parses volumes with environment variables', function () {
     // Variable with default value
     $result = parseDockerVolumeString('${VOLUME_DB_PATH:-db}:/data/db');
-    expect($result['source']->value())->toBe('db');
+    expect($result['source']->value())->toBe('${VOLUME_DB_PATH:-db}');
     expect($result['target']->value())->toBe('/data/db');
     expect($result['mode'])->toBeNull();
 
@@ -75,13 +75,13 @@ test('parses volumes with environment variables', function () {
 
     // Variable with empty default - keeps variable reference for env resolution
     $result = parseDockerVolumeString('${VOLUME_PATH:-}:/data');
-    expect($result['source']->value())->toBe('${VOLUME_PATH}');
+    expect($result['source']->value())->toBe('${VOLUME_PATH:-}');
     expect($result['target']->value())->toBe('/data');
     expect($result['mode'])->toBeNull();
 
     // Variable with mode
     $result = parseDockerVolumeString('${DATA_PATH:-./data}:/app/data:ro');
-    expect($result['source']->value())->toBe('./data');
+    expect($result['source']->value())->toBe('${DATA_PATH:-./data}');
     expect($result['target']->value())->toBe('/app/data');
     expect($result['mode']->value())->toBe('ro');
 });
@@ -113,17 +113,8 @@ test('parses edge cases', function () {
     expect($result['target']->value())->toBe('myvolume');
     expect($result['mode'])->toBeNull();
 
-    // Path with colon in target (not a mode)
-    $result = parseDockerVolumeString('source:/path:8080');
-    expect($result['source']->value())->toBe('source');
-    expect($result['target']->value())->toBe('/path:8080');
-    expect($result['mode'])->toBeNull();
-
-    // Multiple colons in path (not Windows)
-    $result = parseDockerVolumeString('data:/var/lib/docker:data:backup');
-    expect($result['source']->value())->toBe('data');
-    expect($result['target']->value())->toBe('/var/lib/docker:data:backup');
-    expect($result['mode'])->toBeNull();
+    expect(fn () => parseDockerVolumeString('source:/path:8080'))->toThrow(Exception::class);
+    expect(fn () => parseDockerVolumeString('data:/var/lib/docker:data:backup'))->toThrow(Exception::class);
 });
 
 test('parses tmpfs and other special cases', function () {
@@ -175,7 +166,7 @@ test('parses all valid Docker volume modes', function () {
 test('parses complex real-world examples', function () {
     // MongoDB volume with environment variable
     $result = parseDockerVolumeString('${VOLUME_DB_PATH:-./data/db}:/data/db');
-    expect($result['source']->value())->toBe('./data/db');
+    expect($result['source']->value())->toBe('${VOLUME_DB_PATH:-./data/db}');
     expect($result['target']->value())->toBe('/data/db');
     expect($result['mode'])->toBeNull();
 
