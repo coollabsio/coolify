@@ -1741,7 +1741,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $ports = $this->application->main_port();
         $coolify_envs = $this->generate_coolify_env_variables();
         $coolify_envs->each(function ($item, $key) use ($envs) {
-            $envs->push($key.'='.$item);
+            $envs->push($key.'='.escapeComposeEnvFileValue($item));
         });
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
@@ -3962,7 +3962,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables_preview);
+            // Runtime only, so a project or server change does not break the Docker build cache
+            if (! $forBuildTime) {
+                $coolify_envs = $coolify_envs->merge(coolifyDefaultEnvironmentVariables($this->application, $this->application->environment_variables_preview->pluck('key'), $this->mainServer));
+            }
 
         } else {
             // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
@@ -4006,7 +4009,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables);
+            // Runtime only, so a project or server change does not break the Docker build cache
+            if (! $forBuildTime) {
+                $coolify_envs = $coolify_envs->merge(coolifyDefaultEnvironmentVariables($this->application, $this->application->environment_variables->pluck('key'), $this->mainServer));
+            }
 
         }
 

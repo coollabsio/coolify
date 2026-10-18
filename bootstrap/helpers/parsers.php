@@ -2031,7 +2031,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
@@ -3337,7 +3339,9 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');

@@ -27,4 +27,23 @@ trait ExecutesDatabaseStartCommands
     {
         return $environmentVariables->contains(fn ($variable) => str($variable)->before('=')->value() === $key);
     }
+
+    /**
+     * Adds the Coolify variables that applications and services also get. A key that the user
+     * defines wins.
+     *
+     * @param  Collection<int, string>  $environmentVariables
+     */
+    private function addCoolifyEnvironmentVariables(Collection $environmentVariables): void
+    {
+        $definedKeys = $environmentVariables->map(fn ($variable) => str($variable)->before('=')->value());
+        $coolifyVariables = collect([
+            'COOLIFY_RESOURCE_UUID' => $this->database->uuid,
+            'COOLIFY_CONTAINER_NAME' => $this->database->uuid,
+        ])->except($definedKeys->all())->merge(coolifyDefaultEnvironmentVariables($this->database, $definedKeys));
+
+        foreach ($coolifyVariables as $key => $value) {
+            $environmentVariables->push($key.'='.escapeDollarSign($value));
+        }
+    }
 }

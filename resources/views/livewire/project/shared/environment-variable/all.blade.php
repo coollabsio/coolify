@@ -28,8 +28,8 @@
             </x-slot:actions>
         @endcan
         @if ($view === 'normal')
-            @if ($resourceClass === 'App\Models\Application')
-                <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+            <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                @if ($resourceClass === 'App\Models\Application')
                     @if (data_get($resource, 'build_pack') !== 'dockercompose')
                         <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
                             onChange="instantSave"
@@ -45,10 +45,12 @@
                             ['value' => false, 'label' => 'Standard build arguments'],
                             ['value' => true, 'label' => 'Docker BuildKit secrets'],
                         ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
-                </div>
-            @else
-                <p class="text-sm text-neutral-500 dark:text-fg-dim">Manage this resource's environment variables below.</p>
-            @endif
+                @endif
+                <x-forms.checkbox instantSave="saveCoolifyDefaultVariables" id="include_coolify_default_variables"
+                    label="Include Coolify default variables"
+                    helper="Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, COOLIFY_ENVIRONMENT_NAME and COOLIFY_SERVER_IP to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy or restart."
+                    :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+            </div>
         @else
             <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
                 @can('manageEnvironment', $resource)

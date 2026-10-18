@@ -112,6 +112,10 @@
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
           COOLIFY_FQDN: web-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -192,6 +196,10 @@
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
           COOLIFY_FQDN: api-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -264,6 +272,10 @@
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
           COOLIFY_FQDN: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -337,6 +349,10 @@
           SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
           SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -366,6 +382,10 @@
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
           COOLIFY_FQDN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -429,6 +449,10 @@
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
           COOLIFY_FQDN: 'blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -493,6 +517,10 @@
           SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
           SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -559,6 +587,10 @@
           SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
           SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -592,6 +624,10 @@
           SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
           SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
           SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -771,6 +807,10 @@
           SERVICE_FQDN_API_V2: api-v2.example.com
           COOLIFY_URL: 'https://web.example.com'
           COOLIFY_FQDN: web.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -860,6 +900,10 @@
           SERVICE_FQDN_API_V2: api-v2.example.com
           COOLIFY_URL: 'https://www.api.example.com'
           COOLIFY_FQDN: www.api.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -945,6 +989,10 @@
           SERVICE_FQDN_API_V2: api-v2.example.com
           COOLIFY_URL: 'https://my-app.example.com'
           COOLIFY_FQDN: my-app.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1048,6 +1096,10 @@
           SERVICE_FQDN_API_V2: api-v2.example.com
           COOLIFY_URL: 'https://api-v2.example.com'
           COOLIFY_FQDN: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1079,6 +1131,10 @@
           SERVICE_FQDN_API_V2: api-v2.example.com
           COOLIFY_URL: 'https://admin.example.com'
           COOLIFY_FQDN: admin.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1151,6 +1207,10 @@
           SERVICE_FQDN_API_V2: api-v2.example.com
           COOLIFY_URL: 'https://blog.example.com/blog:2368'
           COOLIFY_FQDN: 'blog.example.com/blog:2368'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1222,6 +1282,10 @@
           SERVICE_FQDN_BLOG: blog.example.com
           SERVICE_URL_API_V2: 'https://api-v2.example.com'
           SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1290,6 +1354,10 @@
           SERVICE_FQDN_BLOG: blog.example.com
           SERVICE_URL_API_V2: 'https://api-v2.example.com'
           SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1325,6 +1393,10 @@
           SERVICE_FQDN_BLOG: blog.example.com
           SERVICE_URL_API_V2: 'https://api-v2.example.com'
           SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1527,6 +1599,10 @@
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
           COOLIFY_URL: 'https://7.web.example.com'
           COOLIFY_FQDN: 7.web.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -1618,6 +1694,10 @@
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
           COOLIFY_URL: 'https://7.www.api.example.com'
           COOLIFY_FQDN: 7.www.api.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -1701,6 +1781,10 @@
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
           COOLIFY_URL: 'https://7.my-app.example.com'
           COOLIFY_FQDN: 7.my-app.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -1808,6 +1892,10 @@
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
           COOLIFY_URL: 'https://7.api-v2.example.com'
           COOLIFY_FQDN: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -1839,6 +1927,10 @@
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
           COOLIFY_URL: 'https://7.admin.example.com'
           COOLIFY_FQDN: 7.admin.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -1913,6 +2005,10 @@
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
           COOLIFY_URL: 'https://7.blog.example.com/blog:2368'
           COOLIFY_FQDN: '7.blog.example.com/blog:2368'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -1986,6 +2082,10 @@
           SERVICE_FQDN_BLOG: 7.blog.example.com
           SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -2054,6 +2154,10 @@
           SERVICE_FQDN_BLOG: 7.blog.example.com
           SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -2089,6 +2193,10 @@
           SERVICE_FQDN_BLOG: 7.blog.example.com
           SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
           SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-7
           SERVICE_NAME_API: api-pr-7
           SERVICE_NAME_MY_APP: my-app-pr-7
@@ -2275,6 +2383,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: web-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2327,6 +2439,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: api-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2371,6 +2487,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2418,6 +2538,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: api.v2-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2435,6 +2559,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: admin-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2470,6 +2598,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: blog-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2505,6 +2637,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: db-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2561,6 +2697,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: sidecar-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8
@@ -2584,6 +2724,10 @@
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: worker-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web-pr-8
           SERVICE_NAME_API: api-pr-8
           SERVICE_NAME_MY_APP: my-app-pr-8

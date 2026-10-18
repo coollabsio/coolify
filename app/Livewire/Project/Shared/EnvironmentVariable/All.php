@@ -57,6 +57,8 @@ class All extends Component
 
     public bool $use_build_secrets = false;
 
+    public bool $include_coolify_default_variables = true;
+
     /**
      * Environment variable rows are loaded after first paint via wire:init
      * so the surrounding configuration page can render immediately.
@@ -109,6 +111,8 @@ class All extends Component
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
+        $coolifyDefaultVariablesOwner = $this->resource instanceof Application ? $this->resource->settings : $this->resource;
+        $this->include_coolify_default_variables = data_get($coolifyDefaultVariablesOwner, 'include_coolify_default_variables') !== false;
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -153,6 +157,25 @@ class All extends Component
             $this->clearEnvironmentVariableCaches();
             if ($this->readyToLoad && $this->view === 'dev') {
                 $this->getDevView();
+            }
+            $this->dispatch('success', 'Environment variable settings updated.');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveCoolifyDefaultVariables()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resource instanceof Application) {
+                $this->resource->settings->include_coolify_default_variables = $this->include_coolify_default_variables;
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } else {
+                $this->resource->include_coolify_default_variables = $this->include_coolify_default_variables;
+                $this->resource->save();
             }
             $this->dispatch('success', 'Environment variable settings updated.');
             $this->dispatch('configurationChanged');

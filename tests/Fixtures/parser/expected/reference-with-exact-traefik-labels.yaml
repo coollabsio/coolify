@@ -182,6 +182,10 @@
           COOLIFY_CONTAINER_NAME: web-referenceservice00000001
           COOLIFY_FQDN: web-referenceservice00000001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://web-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -263,6 +267,10 @@
           COOLIFY_CONTAINER_NAME: api-referenceservice00000001
           COOLIFY_FQDN: api-referenceservice00000001.10.0.0.1.sslip.io/api
           COOLIFY_URL: 'http://api-referenceservice00000001.10.0.0.1.sslip.io/api'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -334,6 +342,10 @@
           COOLIFY_CONTAINER_NAME: my-app-referenceservice00000001
           COOLIFY_FQDN: my_app-referenceservice00000001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -382,6 +394,10 @@
           COOLIFY_CONTAINER_NAME: www-referenceservice00000001
           COOLIFY_FQDN: www-referenceservice00000001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://www-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -428,6 +444,10 @@
           COOLIFY_CONTAINER_NAME: blog-referenceservice00000001
           COOLIFY_FQDN: blog-referenceservice00000001.10.0.0.1.sslip.io/blog
           COOLIFY_URL: 'http://blog-referenceservice00000001.10.0.0.1.sslip.io/blog'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -481,6 +501,10 @@
           COOLIFY_CONTAINER_NAME: gateway-referenceservice00000001
           COOLIFY_FQDN: gateway-referenceservice00000001.10.0.0.1.sslip.io
           COOLIFY_URL: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -527,6 +551,10 @@
           COOLIFY_CONTAINER_NAME: gateway-ws-referenceservice00000001
           COOLIFY_FQDN: gateway-referenceservice00000001.10.0.0.1.sslip.io/ws
           COOLIFY_URL: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io/ws'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -576,6 +604,10 @@
           APP_URL: '${SERVICE_URL_WEB}'
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: worker-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -615,6 +647,10 @@
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: scheduler-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -655,6 +691,10 @@
           SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: db-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -719,6 +759,10 @@
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: sidecar-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -946,6 +990,10 @@
           COOLIFY_CONTAINER_NAME: web-referenceservice00000001
           COOLIFY_FQDN: web.example.com
           COOLIFY_URL: 'https://web.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1034,6 +1082,10 @@
           COOLIFY_CONTAINER_NAME: api-referenceservice00000001
           COOLIFY_FQDN: api.example.com/api
           COOLIFY_URL: 'https://api.example.com/api'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1112,6 +1164,10 @@
           COOLIFY_CONTAINER_NAME: my-app-referenceservice00000001
           COOLIFY_FQDN: my_app.example.com
           COOLIFY_URL: 'https://my_app.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1167,6 +1223,10 @@
           COOLIFY_CONTAINER_NAME: www-referenceservice00000001
           COOLIFY_FQDN: www.example.com
           COOLIFY_URL: 'https://www.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1218,6 +1278,10 @@
           COOLIFY_CONTAINER_NAME: blog-referenceservice00000001
           COOLIFY_FQDN: blog.example.com/blog
           COOLIFY_URL: 'https://blog.example.com/blog'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1278,6 +1342,10 @@
           COOLIFY_CONTAINER_NAME: gateway-referenceservice00000001
           COOLIFY_FQDN: gateway.example.com
           COOLIFY_URL: 'https://gateway.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1329,6 +1397,10 @@
           COOLIFY_CONTAINER_NAME: gateway-ws-referenceservice00000001
           COOLIFY_FQDN: gateway.example.com/ws
           COOLIFY_URL: 'https://gateway.example.com/ws'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1383,6 +1455,10 @@
           APP_URL: '${SERVICE_URL_WEB}'
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: worker-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1422,6 +1498,10 @@
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: scheduler-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1462,6 +1542,10 @@
           SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: db-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1526,6 +1610,10 @@
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: sidecar-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1756,6 +1844,10 @@
           COOLIFY_CONTAINER_NAME: web-referenceservice00000001
           COOLIFY_FQDN: web.example.com
           COOLIFY_URL: 'https://web.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1844,6 +1936,10 @@
           COOLIFY_CONTAINER_NAME: api-referenceservice00000001
           COOLIFY_FQDN: api.example.com/api
           COOLIFY_URL: 'https://api.example.com/api'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1922,6 +2018,10 @@
           COOLIFY_CONTAINER_NAME: my-app-referenceservice00000001
           COOLIFY_FQDN: my_app.example.com
           COOLIFY_URL: 'https://my_app.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -1977,6 +2077,10 @@
           COOLIFY_CONTAINER_NAME: www-referenceservice00000001
           COOLIFY_FQDN: www.example.com
           COOLIFY_URL: 'https://www.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2028,6 +2132,10 @@
           COOLIFY_CONTAINER_NAME: blog-referenceservice00000001
           COOLIFY_FQDN: blog.example.com/blog
           COOLIFY_URL: 'https://blog.example.com/blog'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2088,6 +2196,10 @@
           COOLIFY_CONTAINER_NAME: gateway-referenceservice00000001
           COOLIFY_FQDN: gateway.example.com
           COOLIFY_URL: 'https://gateway.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2139,6 +2251,10 @@
           COOLIFY_CONTAINER_NAME: gateway-ws-referenceservice00000001
           COOLIFY_FQDN: gateway.example.com/ws
           COOLIFY_URL: 'https://gateway.example.com/ws'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2195,6 +2311,10 @@
           COOLIFY_CONTAINER_NAME: worker-referenceservice00000001
           COOLIFY_FQDN: worker-extra.example.com
           COOLIFY_URL: 'https://worker-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2252,6 +2372,10 @@
           COOLIFY_CONTAINER_NAME: scheduler-referenceservice00000001
           COOLIFY_FQDN: scheduler-extra.example.com
           COOLIFY_URL: 'https://scheduler-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2308,6 +2432,10 @@
           SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
           COOLIFY_RESOURCE_UUID: referenceservice00000001
           COOLIFY_CONTAINER_NAME: db-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app
@@ -2385,6 +2513,10 @@
           COOLIFY_CONTAINER_NAME: sidecar-referenceservice00000001
           COOLIFY_FQDN: sidecar-extra.example.com
           COOLIFY_URL: 'https://sidecar-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
           SERVICE_NAME_WEB: web
           SERVICE_NAME_API: api
           SERVICE_NAME_MY_APP: my-app

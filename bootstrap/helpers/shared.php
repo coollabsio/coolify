@@ -3634,19 +3634,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $parsedServiceVariables->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
 
-                // TODO: move this in a shared function
-                if (! $parsedServiceVariables->has('COOLIFY_APP_NAME')) {
-                    $parsedServiceVariables->put('COOLIFY_APP_NAME', "\"{$resource->name}\"");
-                }
-                if (! $parsedServiceVariables->has('COOLIFY_SERVER_IP')) {
-                    $parsedServiceVariables->put('COOLIFY_SERVER_IP', "\"{$resource->destination->server->ip}\"");
-                }
-                if (! $parsedServiceVariables->has('COOLIFY_ENVIRONMENT_NAME')) {
-                    $parsedServiceVariables->put('COOLIFY_ENVIRONMENT_NAME', "\"{$resource->environment->name}\"");
-                }
-                if (! $parsedServiceVariables->has('COOLIFY_PROJECT_NAME')) {
-                    $parsedServiceVariables->put('COOLIFY_PROJECT_NAME', "\"{$resource->project()->name}\"");
-                }
+                coolifyDefaultEnvironmentVariables($resource, $parsedServiceVariables->keys())
+                    ->each(fn ($value, $key) => $parsedServiceVariables->put($key, escapeDollarSign($value)));
 
                 $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
                     if (! str($value)->startsWith('$')) {
@@ -4494,56 +4483,32 @@ function isAssociativeArray($array)
 }
 
 /**
- * This method adds the default environment variables to the resource.
- * - COOLIFY_APP_NAME
- * - COOLIFY_PROJECT_NAME
- * - COOLIFY_SERVER_IP
- * - COOLIFY_ENVIRONMENT_NAME
+ * The variables that tell a container where it runs. Values are raw: each caller escapes them
+ * for its output (compose file, .env file, or build arguments). Keys in $definedKeys are
+ * skipped, so a variable that the user defines wins. Pass $server when the container runs on
+ * another server than the main destination (an application on an additional server).
  *
- *  Theses variables are added in place to the $where_to_add array.
+ * @param  iterable<int, string>  $definedKeys
+ * @return Collection<string, string>
  */
-function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
+function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
 {
-    // Currently disabled
-    return;
-    if ($resource instanceof Service) {
-        $ip = $resource->server->ip;
-    } else {
-        $ip = $resource->destination->server->ip;
+    // A model created in this request has no column default loaded yet (null), which means on.
+    $isEnabled = $resource instanceof Application
+        ? $resource->settings?->include_coolify_default_variables
+        : $resource->include_coolify_default_variables;
+    if ($isEnabled === false) {
+        return collect();
     }
-    if (isAssociativeArray($where_to_add)) {
-        $isAssociativeArray = true;
-    } else {
-        $isAssociativeArray = false;
-    }
-    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_APP_NAME')->isEmpty()) {
-        if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_APP_NAME', "\"{$resource->name}\"");
-        } else {
-            $where_to_add->push("COOLIFY_APP_NAME=\"{$resource->name}\"");
-        }
-    }
-    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
-        if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_SERVER_IP', "\"{$ip}\"");
-        } else {
-            $where_to_add->push("COOLIFY_SERVER_IP=\"{$ip}\"");
-        }
-    }
-    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
-        if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_ENVIRONMENT_NAME', "\"{$resource->environment->name}\"");
-        } else {
-            $where_to_add->push("COOLIFY_ENVIRONMENT_NAME=\"{$resource->environment->name}\"");
-        }
-    }
-    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_PROJECT_NAME')->isEmpty()) {
-        if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_PROJECT_NAME', "\"{$resource->project()->name}\"");
-        } else {
-            $where_to_add->push("COOLIFY_PROJECT_NAME=\"{$resource->project()->name}\"");
-        }
-    }
+
+    $server ??= $resource instanceof Service ? $resource->server : $resource->destination?->server;
+
+    return collect([
+        'COOLIFY_APP_NAME' => $resource->name,
+        'COOLIFY_PROJECT_NAME' => $resource->project()?->name,
+        'COOLIFY_ENVIRONMENT_NAME' => $resource->environment?->name,
+        'COOLIFY_SERVER_IP' => $server?->ip,
+    ])->whereNotNull()->map(fn ($value) => (string) $value)->except(collect($definedKeys)->all());
 }
 
 function convertToKeyValueCollection($environment)
