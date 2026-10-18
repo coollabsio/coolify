@@ -13108,6 +13108,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "The token needs the deploy ability to set post_install_script_id or public_key_ids."
+                    },
                     "422": {
                         "description": "Validation failed."
                     },
