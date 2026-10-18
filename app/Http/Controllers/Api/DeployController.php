@@ -74,8 +74,7 @@ class DeployController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = Server::whereTeamId($teamId)->get();
-        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get()->sortBy('id');
+        $deployments_per_server = ApplicationDeploymentQueue::ownedByTeam((int) $teamId)->whereIn('status', ['in_progress', 'queued'])->get()->sortBy('id');
         $deployments_per_server = $deployments_per_server->map(function ($deployment) {
             return $this->removeSensitiveData($deployment);
         });
@@ -228,9 +227,9 @@ class DeployController extends Controller
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
 
-        // Check if the deployment belongs to the user's team
-        $servers = Server::whereTeamId($teamId)->pluck('id');
-        if (! $servers->contains($deployment->server_id)) {
+        // Include soft-deleted apps so in-flight deploys stay cancellable.
+        $application = $deployment->application()->withTrashed()->first();
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
             return response()->json(['message' => 'You do not have permission to cancel this deployment.'], 403);
         }
 
@@ -278,7 +277,7 @@ class DeployController extends Controller
                 'team_id' => $teamId,
                 'deployment_uuid' => $deployment->deployment_uuid,
                 'application_id' => $deployment->application_id,
-                'application_uuid' => $deployment->application?->uuid,
+                'application_uuid' => $application->uuid,
                 'server_id' => $deployment->server_id,
             ]);
 
@@ -294,7 +293,7 @@ class DeployController extends Controller
         } finally {
             if ($cancelled) {
                 try {
-                    next_after_cancel($deploymentServer, $deployment->application);
+                    next_after_cancel($deploymentServer, $application);
                 } catch (\Throwable $e) {
                     \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
                 }
@@ -698,8 +697,6 @@ class DeployController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = Server::whereTeamId($teamId)->get();
-
         if (is_null($app_uuid)) {
             return response()->json(['message' => 'Application uuid is required'], 400);
         }
