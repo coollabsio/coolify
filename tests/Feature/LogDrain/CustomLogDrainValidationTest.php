@@ -115,7 +115,7 @@ describe('custom log drain API', function () {
 
         customLogDrainPatch($token, $this->server->uuid, $payload)
             ->assertForbidden()
-            ->assertJsonPath('message', 'Missing required permissions: deploy. A custom log drain needs a token with the deploy permission.');
+            ->assertJsonPath('message', 'Missing required permissions: deploy');
 
         $settings = $this->server->settings->fresh();
         expect((bool) $settings->is_logdrain_custom_enabled)->toBeFalse()

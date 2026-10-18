@@ -109,7 +109,7 @@ class ServerLogDrainsController extends Controller
 
     #[OA\Patch(
         summary: 'Update log drain settings',
-        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Custom log drain changes require the deploy or root token ability. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
+        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Changing `logdrain_custom_config` or `logdrain_custom_config_parser` needs a token with the `deploy` permission. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
         path: '/servers/{uuid}/log-drains',
         operationId: 'update-server-log-drains',
         security: [['bearerAuth' => []]],
@@ -162,14 +162,12 @@ class ServerLogDrainsController extends Controller
 
         $this->authorize('update', $server);
 
-        // Custom log drain changes need the deploy permission.
-        $changesCustomDrain = $request->has('logdrain_custom_config')
-            || $request->has('logdrain_custom_config_parser')
-            || $request->boolean('is_logdrain_custom_enabled');
-        if ($changesCustomDrain && ! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
-            return response()->json([
-                'message' => 'Missing required permissions: deploy. A custom log drain needs a token with the deploy permission.',
-            ], 403);
+        // The custom config is applied on the server, like a deployment.
+        $customConfigChanged = collect(['logdrain_custom_config', 'logdrain_custom_config_parser'])
+            ->contains(fn (string $field) => $request->has($field)
+                && (! is_string($request->input($field) ?? '') || (string) $request->input($field) !== (string) $server->settings->{$field}));
+        if ($customConfigChanged && ! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
+            return response()->json(['message' => 'Missing required permissions: deploy'], 403);
         }
 
         $validator = customApiValidator($request->all(), [
@@ -198,6 +196,7 @@ class ServerLogDrainsController extends Controller
         }
 
         $settings = $server->settings;
+
         foreach (self::ALLOWED_FIELDS as $field) {
             if ($request->has($field)) {
                 $settings->{$field} = $request->input($field);

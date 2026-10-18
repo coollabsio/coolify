@@ -270,7 +270,7 @@ class ServerProxyController extends Controller
 
     #[OA\Put(
         summary: 'Save server proxy configuration',
-        description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).',
+        description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).',
         path: '/servers/{uuid}/proxy/configuration',
         operationId: 'save-server-proxy-configuration',
         security: [['bearerAuth' => []]],
@@ -320,6 +320,11 @@ class ServerProxyController extends Controller
         $teamId = $this->teamIdOrAbort();
         if (! is_int($teamId)) {
             return $teamId;
+        }
+
+        // The proxy compose file is applied on the server, like a deployment.
+        if (! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
+            return response()->json(['message' => 'Missing required permissions: deploy'], 403);
         }
 
         $return = validateIncomingRequest($request);
@@ -391,7 +396,7 @@ class ServerProxyController extends Controller
 
     #[OA\Post(
         summary: 'Restart server proxy',
-        description: 'Queue a proxy restart for a team-owned server.',
+        description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.',
         path: '/servers/{uuid}/proxy/restart',
         operationId: 'restart-server-proxy',
         security: [['bearerAuth' => []]],
