@@ -12,6 +12,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -794,8 +795,9 @@ describe('delete', function () {
             ->not->toContain("{$uuid}_shared-data");
     });
 
-    it('lets Docker Compose keep the external volume when a Compose application is deleted with its volumes', function () {
+    it('never removes the external volume when a Compose application is deleted with its volumes', function () {
         $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        $uuid = $application->uuid;
         applicationParser($application);
         $application->delete();
         $commands = [];
@@ -804,11 +806,29 @@ describe('delete', function () {
         (new DeleteResourceJob($application))->handle();
 
         $all = implode("\n", $commands);
-        // --project-directory, not cd: a non-root SSH user cannot enter the directory on the Coolify host.
-        expect($all)->toContain("docker compose --project-directory {$application->dirOnServer()} down -v")
-            ->not->toContain("cd {$application->dirOnServer()}")
-            ->not->toContain('docker volume rm')
-            ->and($application->docker_compose)->toContain("shared-data:\n    external: true");
+        expect($all)->toContain("docker volume rm -f '{$uuid}_app-data'")
+            ->not->toContain("'shared-data'")
+            ->not->toContain("{$uuid}_shared-data");
+    });
+
+    it('removes the volumes by name without Docker Compose when a Compose application is deleted', function () {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        applicationParser($application);
+        LocalFileVolume::create([
+            'fs_path' => $application->dirOnServer().'/compose.yaml',
+            'mount_path' => '/compose.yaml',
+            'content' => "services:\n  other:\n    image: busybox\n",
+            'resource_id' => $application->id,
+            'resource_type' => $application->getMorphClass(),
+        ]);
+        $application->delete();
+        $commands = [];
+        fakeExternalVolumeServer($commands);
+
+        (new DeleteResourceJob($application, deleteConfigurations: false))->handle();
+
+        expect(implode("\n", $commands))->not->toContain('docker compose')
+            ->toContain("docker volume rm -f '{$application->uuid}_app-data'");
     });
 
     it('removes only the old prefixed volume when a service with an old storage entry is deleted with its volumes', function () {

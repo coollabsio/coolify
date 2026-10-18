@@ -142,6 +142,18 @@ it('gives service compose up and pull no stdin and never answers the recreate pr
     }
 });
 
+it('runs every service compose command with the compose file that Coolify wrote', function () {
+    $service = serviceComposeStdinService('deploy');
+    $workdir = $service->workdir();
+
+    $lines = serviceComposeCommandLines(StartService::run($service, pullLatestImages: true));
+
+    expect($lines)->toHaveCount(3);
+    foreach ($lines as $line) {
+        expect($line)->toContain("-f {$workdir}/docker-compose.yml --project-name {$service->uuid} ");
+    }
+});
+
 /**
  * @param  list<string>  $calls
  */
