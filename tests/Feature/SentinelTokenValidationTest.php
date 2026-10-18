@@ -193,6 +193,30 @@ describe('ServerSetting::ensureSentinelUrl', function () {
             ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
     });
 
+    it('replaces a local host gateway endpoint on any port, because the Coolify network firewall can block it', function (string $legacyUrl) {
+        $this->server->update(['ip' => 'host.docker.internal']);
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update([
+            'sentinel_custom_url' => $legacyUrl,
+        ]);
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('http://coolify:8080')
+            ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
+    })->with([
+        'custom APP_PORT' => 'http://host.docker.internal:8010',
+        'trailing slash' => 'http://host.docker.internal:8000/',
+        'uppercase host' => 'HTTP://Host.Docker.Internal:8010',
+    ]);
+
+    it('keeps a host gateway endpoint for a remote server', function () {
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update([
+            'sentinel_custom_url' => 'http://host.docker.internal:8010',
+        ]);
+
+        expect($this->server->settings->fresh()->ensureSentinelUrl())->toBe('http://host.docker.internal:8010');
+    });
+
     it('preserves an explicit custom URL for the local server', function () {
         $this->server->update(['ip' => 'host.docker.internal']);
         DB::table('server_settings')->where('id', $this->server->settings->id)->update([

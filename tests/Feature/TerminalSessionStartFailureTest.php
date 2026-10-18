@@ -8,6 +8,9 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -104,6 +107,27 @@ function createTerminalApplication(Server $server, Team $team): Application
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
     ]);
+}
+
+/**
+ * A degraded service: app0 has exited, app1 and postgres are running.
+ */
+function createDegradedTerminalService(Server $server, Team $team): Service
+{
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $service = Service::factory()->create([
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    ServiceApplication::create(['service_id' => $service->id, 'name' => 'app0', 'status' => 'exited']);
+    ServiceApplication::create(['service_id' => $service->id, 'name' => 'app1', 'status' => 'running:unhealthy']);
+    ServiceDatabase::create(['service_id' => $service->id, 'name' => 'postgres', 'status' => 'running:healthy']);
+
+    return $service;
 }
 
 describe('Terminal::sendTerminalCommand', function () {
@@ -268,5 +292,33 @@ describe('ExecuteContainerCommand', function () {
             ->call('loadContainers')
             ->assertDispatchedTo(Terminal::class, Terminal::AUTO_START_CANCELLED_EVENT)
             ->assertNotDispatched('send-terminal-command');
+    });
+
+    it('lists the running containers of a degraded service', function () {
+        Process::fake();
+        $service = createDegradedTerminalService($this->server, $this->team);
+        bindTerminalRouteParameters(['service_uuid' => $service->uuid]);
+
+        expect($service->fresh()->status)->toStartWith('degraded');
+
+        $component = Livewire::test(ExecuteContainerCommand::class)
+            ->call('loadContainers')
+            ->assertDispatchedTo(Terminal::class, Terminal::AUTO_START_CANCELLED_EVENT);
+
+        expect(collect($component->get('containerOptions'))->pluck('value')->all())->toBe([
+            "{$this->server->uuid}:app1-{$service->uuid}",
+            "{$this->server->uuid}:postgres-{$service->uuid}",
+        ]);
+    });
+
+    it('lists no service containers when terminal access is disabled on the server', function () {
+        Process::fake();
+        $service = createDegradedTerminalService($this->server, $this->team);
+        $this->server->settings->update(['is_terminal_enabled' => false]);
+        bindTerminalRouteParameters(['service_uuid' => $service->uuid]);
+
+        Livewire::test(ExecuteContainerCommand::class)
+            ->call('loadContainers')
+            ->assertSet('containerOptions', []);
     });
 });
