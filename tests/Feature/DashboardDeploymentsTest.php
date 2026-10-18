@@ -151,27 +151,28 @@ it('does not include active deployments in the recent list', function () {
         ->assertSee('Failed');
 });
 
-it('only includes deployments for servers owned by the current team', function () {
+it('only includes deployments of applications owned by the current team', function () {
     $otherTeam = Team::factory()->create();
-    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
 
     createDashboardDeployment([
         'application_name' => 'Team Deployment',
         'status' => ApplicationDeploymentStatus::FINISHED->value,
     ]);
-
-    ApplicationDeploymentQueue::create([
-        'application_id' => $this->application->id,
+    createDashboardDeployment([
+        'application_id' => $otherApplication->id,
         'application_name' => 'Other Team Deployment',
-        'deployment_uuid' => 'deploy-other-'.fake()->uuid(),
-        'deployment_url' => '/deployments/other',
-        'server_id' => $otherServer->id,
-        'server_name' => $otherServer->name,
-        'status' => ApplicationDeploymentStatus::FINISHED->value,
-        'pull_request_id' => 0,
+        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
     ]);
 
     Livewire::test(ActiveDeployments::class)
         ->assertSee('Team Deployment')
-        ->assertDontSee('Other Team Deployment');
+        ->assertDontSee('Other Team Deployment')
+        ->assertDontSee('Running or queued right now');
 });

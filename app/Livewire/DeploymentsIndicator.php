@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\Server;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -17,11 +16,9 @@ class DeploymentsIndicator extends Component
     #[Computed]
     public function deployments()
     {
-        $servers = Server::ownedByCurrentTeamCached();
-
         return ApplicationDeploymentQueue::with(['application.environment.project'])
+            ->ownedByTeam(currentTeam()->id)
             ->whereIn('status', ['in_progress', 'queued'])
-            ->whereIn('server_id', $servers->pluck('id'))
             ->orderBy('id')
             ->get([
                 'id',

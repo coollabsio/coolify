@@ -64,11 +64,11 @@ it('hides the indicator when no deployment is running', function () {
         ->assertDontSee('Active deployments');
 });
 
-it('does not show deployments of another team', function () {
+it('does not show deployments of applications owned by another team', function () {
     $otherTeam = Team::factory()->create();
-    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
 
-    ApplicationDeploymentQueue::query()->update(['server_id' => $otherServer->id]);
+    $this->environment->update(['project_id' => $otherProject->id]);
 
     Livewire::test(DeploymentsIndicator::class)
         ->assertDontSee('Indicator App')
