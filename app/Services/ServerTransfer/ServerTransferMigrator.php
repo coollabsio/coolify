@@ -7,6 +7,8 @@ use App\Jobs\MigrateServerToInstanceJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -58,6 +60,13 @@ class ServerTransferMigrator
     public const MAX_LOG_ENTRIES = 100;
 
     /**
+     * System-wide git sources that the target of the last precheck does not have.
+     *
+     * @var array{github: list<string>, gitlab: list<string>}
+     */
+    private array $missingSystemSources = ['github' => [], 'gitlab' => []];
+
+    /**
      * Run the prechecks now, so the user sees problems at once, then run the transfer in a queued job.
      * Every check writes a line to the transfer log; a failed check stops the transfer before it starts.
      */
@@ -83,7 +92,7 @@ class ServerTransferMigrator
                 null => ['at' => $check['at'], 'level' => 'warning', 'message' => "NOT CHECKED: {$check['label']}. {$check['message']}"],
             };
         }
-        foreach ($this->sharedProjectNotes($server) as $note) {
+        foreach ([...$this->sharedProjectNotes($server), ...$this->systemSourceNotes($server)] as $note) {
             $log[] = $this->logEntry($note);
         }
 
@@ -296,6 +305,51 @@ class ServerTransferMigrator
             $this->check('no deployment is queued or running on the server', $activeDeployments === 0,
                 "{$activeDeployments} deployment(s) on this server are queued or running. Wait until they finish or cancel them, then transfer the server."),
         ];
+    }
+
+    /**
+     * System-wide git sources are not transferred: an application re-links only to one with the same uuid on the
+     * target. One note per source that the target does not have, with the applications that lose their source.
+     *
+     * @return list<string>
+     */
+    private function systemSourceNotes(Server $server): array
+    {
+        $notes = [];
+        foreach ($this->systemSources($server) as $kind => $sources) {
+            foreach ($sources as $uuid => $source) {
+                if (in_array($uuid, $this->missingSystemSources[$kind], true)) {
+                    $label = $kind === 'github' ? 'GitHub App' : 'GitLab App';
+                    $notes[] = "NOTE: the system-wide {$label} '{$source['name']}' of this instance is not transferred, and the target has no matching one. "
+                        .'These applications need a new git source on the target: '.implode(', ', $source['applications']).'. The finish list on the target shows them.';
+                }
+            }
+        }
+
+        return $notes;
+    }
+
+    /**
+     * @return array{github: array<string, array{name: string, applications: list<string>}>, gitlab: array<string, array{name: string, applications: list<string>}>}
+     */
+    private function systemSources(Server $server): array
+    {
+        $sources = ['github' => [], 'gitlab' => []];
+        foreach ($server->applications()->unique('id') as $application) {
+            $source = $application->source;
+            $kind = match (true) {
+                $source instanceof GithubApp => 'github',
+                $source instanceof GitlabApp => 'gitlab',
+                default => null,
+            };
+            if ($kind === null || ! $source->is_system_wide) {
+                continue;
+            }
+            $sources[$kind][$source->uuid]['name'] = $source->name;
+            $sources[$kind][$source->uuid]['applications'][] = $application->name;
+        }
+
+        return $sources;
     }
 
     /**
@@ -616,6 +670,8 @@ class ServerTransferMigrator
         $reachLabel = 'the target instance at '.remove_iip($targetUrl).' can be reached';
         $notChecked = fn (string $label) => $this->check('the checks on the target instance', null, "They did not run, because \"{$label}\" failed.");
 
+        $systemSources = $this->systemSources($server);
+        $this->missingSystemSources = ['github' => [], 'gitlab' => []];
         try {
             $response = $this->targetRequest($checkUrl, $token, self::CHECK_TIMEOUT_SECONDS)
                 ->get($checkUrl, [
@@ -623,6 +679,8 @@ class ServerTransferMigrator
                     'ip' => $server->ip,
                     'port' => $server->port,
                     'schema_version' => ServerTransferBundle::SCHEMA_VERSION,
+                    'system_github_apps' => array_keys($systemSources['github']),
+                    'system_gitlab_apps' => array_keys($systemSources['gitlab']),
                 ]);
         } catch (ConnectionException $e) {
             return [
@@ -646,6 +704,10 @@ class ServerTransferMigrator
                 return [...$checks, $this->check($label, false, $failMessage), $notChecked($label)];
             }
             $checks[] = $this->check($label, true);
+        }
+
+        foreach (['github', 'gitlab'] as $kind) {
+            $this->missingSystemSources[$kind] = array_values(array_filter((array) data_get($response->json(), "missing_system_sources.{$kind}", []), 'is_string'));
         }
 
         $remoteChecks = data_get($response->json(), 'checks');

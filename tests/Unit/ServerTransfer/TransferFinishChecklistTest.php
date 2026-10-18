@@ -10,6 +10,7 @@ use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
@@ -181,4 +182,20 @@ test('a Docker image application has no manual webhook step', function () {
     $application = finishTestApplication($this, ['source_type' => null, 'source_id' => null, 'build_pack' => 'dockerimage', 'git_repository' => 'coollabsio/coolify']);
 
     expect(array_column($this->checklist->start($this->server), 'key'))->not->toContain("manual_webhook:{$application->uuid}");
+});
+
+test('an application that lost its system-wide git source gets a git source step with a link', function () {
+    $environment = Project::factory()->create(['team_id' => $this->team->id])->environments()->first();
+    $application = finishTestApplication($this, ['source_type' => null, 'source_id' => null, 'environment_id' => $environment->id]);
+    $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'claimed', 'git_source_applications' => [$application->uuid]]]])->save();
+    $key = "git_source:{$application->uuid}";
+
+    $item = collect($this->checklist->start($this->server))->firstWhere('key', $key);
+    expect($item['link'])->toStartWith('/project/')->toEndWith("/application/{$application->uuid}/source")
+        ->and($this->checklist->check($this->server, $key)['status'])->toBe('action');
+
+    $gitlabApp = GitlabApp::create(['name' => 'gitlab', 'api_url' => 'https://gitlab.com/api/v4', 'html_url' => 'https://gitlab.com', 'team_id' => $this->team->id, 'is_system_wide' => false]);
+    $application->forceFill(['source_type' => GitlabApp::class, 'source_id' => $gitlabApp->id])->save();
+
+    expect($this->checklist->check($this->server, $key)['status'])->toBe('ok');
 });

@@ -208,7 +208,22 @@ class TransferFinishChecklist
 
         if ($runnerConfig) {
             $items[] = $this->item('github_runners', $runnerConfig->uuid, 'GitHub runners on this server',
-                'They are disabled after a transfer. When the GitHub App sends its webhooks here, enable them on the GitHub runners page of the server.');
+                'They are disabled after a transfer. When the GitHub App sends its webhooks here, enable them on the GitHub runners page of the server.',
+                route('server.github-runners', ['server_uuid' => $server->uuid], false));
+        }
+
+        // Links are relative: the list is built during the import request, whose host can be an internal one.
+        // The importer lists applications that used a system-wide git source, or a source that this instance lacks.
+        $gitSourceApplications = (array) data_get($server->server_metadata, 'transfer.git_source_applications', []);
+        foreach ($applications->whereIn('uuid', $gitSourceApplications) as $application) {
+            $environment = $application->environment;
+            $items[] = $this->item('git_source', $application->uuid, "Git source of {$application->name}",
+                'System-wide git sources are not transferred. Select a git source of this instance on the Source page of the application.',
+                $environment?->project ? route('project.application.source', [
+                    'project_uuid' => $environment->project->uuid,
+                    'environment_uuid' => $environment->uuid,
+                    'application_uuid' => $application->uuid,
+                ], false) : null);
         }
 
         return $items;
@@ -234,6 +249,7 @@ class TransferFinishChecklist
             'dns_record' => $this->checkDnsRecord($item['subject']),
             'domain' => $this->checkDomain($server, $item['subject']),
             's3_storage' => $this->checkS3Storage($item['subject']),
+            'git_source' => $this->checkGitSource($item['subject']),
             'github_runners' => $server->githubRunnerConfig()->value('is_enabled')
                 ? ['ok', 'GitHub runners are enabled.']
                 : ['action', 'GitHub runners are disabled. Enable them on the GitHub runners page of the server.'],
@@ -429,9 +445,33 @@ class TransferFinishChecklist
     }
 
     /**
+     * @return array{0: string, 1: string}
+     */
+    private function checkGitSource(string $applicationUuid): array
+    {
+        $application = Application::where('uuid', $applicationUuid)->first();
+        $source = $application?->source;
+        if (! $source instanceof GithubApp && ! $source instanceof GitlabApp) {
+            return ['action', 'The application has no git source on this instance, so deployments from git fail. Select a source on its Source page.'];
+        }
+        $webhookNote = $source->is_system_wide
+            ? ' Push webhooks of a system-wide App go to the instance where the App is registered, so use a manual webhook for push-to-deploy if that is not this instance.'
+            : '';
+        if ($source instanceof GithubApp && ! $source->is_public) {
+            try {
+                generateGithubInstallationToken($source);
+            } catch (Throwable $e) {
+                return ['action', "GitHub App {$source->name} cannot access its installation: ".$e->getMessage()];
+            }
+        }
+
+        return ['ok', "The application uses {$source->name}.".$webhookNote];
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function item(string $type, string $subject, string $label, ?string $message = null): array
+    private function item(string $type, string $subject, string $label, ?string $message = null, ?string $link = null): array
     {
         return [
             'key' => "{$type}:{$subject}",
@@ -440,6 +480,7 @@ class TransferFinishChecklist
             'label' => $label,
             'status' => 'pending',
             'message' => $message,
+            'link' => $link,
             'checked_at' => null,
         ];
     }

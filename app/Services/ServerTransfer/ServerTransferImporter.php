@@ -148,6 +148,14 @@ class ServerTransferImporter
     private array $importWarnings = [];
 
     /**
+     * Applications whose git source needs a check after the transfer: a system-wide source of the source
+     * instance, or a source that this instance does not have.
+     *
+     * @var list<string>
+     */
+    private array $gitSourceApplications = [];
+
+    /**
      * @param  array<string, mixed>  $bundle
      * @return array{
      *     dry_run: bool,
@@ -287,6 +295,7 @@ class ServerTransferImporter
             $this->databaseMap = [];
             $this->pendingSqliteLinks = [];
             $this->importWarnings = [];
+            $this->gitSourceApplications = [];
 
             // Import shared dependencies first
             $keyPayloads = data_get($bundle, 'private_keys', []);
@@ -402,6 +411,7 @@ class ServerTransferImporter
                 'source_instance_url' => data_get($bundle, 'source_instance.url'),
                 'imported_at' => now()->toIso8601String(),
                 'adopt_mode' => $adoptMode,
+                'git_source_applications' => array_values(array_unique($this->gitSourceApplications)),
             ];
             $server->server_metadata = $metadata;
             $server->save();
@@ -1233,7 +1243,11 @@ class ServerTransferImporter
                 }
             }
         }
-        if (data_get($payload, 'had_git_source') && ! isset($attributes['source_id'])) {
+        $sourceMissing = data_get($payload, 'had_git_source') && ! isset($attributes['source_id']);
+        if ($sourceMissing || data_get($payload, 'source.system_wide') === true) {
+            $this->gitSourceApplications[] = $uuid;
+        }
+        if ($sourceMissing) {
             $sourceLabel = match (data_get($payload, 'source.type')) {
                 'github_app' => 'GitHub App',
                 'gitlab_app' => 'GitLab App',

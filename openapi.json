@@ -17751,6 +17751,30 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "name": "system_github_apps[]",
+                        "in": "query",
+                        "description": "UUIDs of system-wide GitHub Apps that the server uses. The response lists the ones this instance does not have.",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "name": "system_gitlab_apps[]",
+                        "in": "query",
+                        "description": "UUIDs of system-wide GitLab Apps that the server uses. The response lists the ones this instance does not have.",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
                     }
                 ],
                 "responses": {

@@ -4,6 +4,7 @@ use App\Jobs\MigrateServerToInstanceJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -674,3 +675,27 @@ test('a refused transfer back deletes the token and shows the reason of the othe
     expect($user->tokens()->count())->toBe(0)
         ->and(data_get($this->server->fresh()->server_metadata, 'transfer.transfer_back'))->toBeNull();
 });
+
+test('start notes system-wide git sources that the target does not have', function (bool $noted) {
+    Queue::fake();
+    $systemApp = GithubApp::create([
+        'name' => 'Coolify GitHub', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com',
+        'team_id' => 0, 'is_system_wide' => true, 'is_public' => false,
+    ]);
+    Application::where('name', 'app-on-server')->update(['source_type' => GithubApp::class, 'source_id' => $systemApp->id]);
+    Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => [], 'missing_system_sources' => ['github' => $noted ? [$systemApp->uuid] : [], 'gitlab' => []]])]);
+
+    app(ServerTransferMigrator::class)->start($this->server, 'https://8.8.8.8', 'token');
+
+    $notes = collect(data_get($this->server->fresh()->server_metadata, 'migration.log'))->pluck('message')
+        ->filter(fn (string $message) => str_contains($message, 'system-wide'));
+    expect($notes->isNotEmpty())->toBe($noted);
+    if ($noted) {
+        expect($notes->first())->toBe("NOTE: the system-wide GitHub App 'Coolify GitHub' of this instance is not transferred, and the target has no matching one. These applications need a new git source on the target: app-on-server. The finish list on the target shows them.");
+    }
+    Http::assertSent(fn ($request) => str_contains(urldecode($request->url()), "system_github_apps[0]={$systemApp->uuid}"));
+    Queue::assertPushed(MigrateServerToInstanceJob::class, 1);
+})->with([
+    'the target has no matching App' => [true],
+    'the target has the App' => [false],
+]);

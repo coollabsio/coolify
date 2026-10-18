@@ -894,9 +894,9 @@ class ServerTransferExporter
 
         $source = null;
         if ($application->source_type === GithubApp::class && $application->source) {
-            $source = ['type' => 'github_app', 'uuid' => $application->source->uuid];
+            $source = ['type' => 'github_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
         } elseif ($application->source_type === GitlabApp::class && $application->source) {
-            $source = ['type' => 'gitlab_app', 'uuid' => $application->source->uuid];
+            $source = ['type' => 'gitlab_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
         }
 
         return [

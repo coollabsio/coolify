@@ -246,9 +246,9 @@
                                                         <x-forms.button wire:click="fixTransferStep('{{ $step['key'] }}')" canGate="update"
                                                             :canResource="$server" wire:loading.attr="disabled">{{ $fixLabel }}</x-forms.button>
                                                     @endif
-                                                    @if ($step['type'] === 'github_runners')
-                                                        <a href="{{ route('server.github-runners', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
-                                                            class="self-center text-xs underline">Open GitHub runners</a>
+                                                    @if ($step['link'] ?? null)
+                                                        <a href="{{ $step['link'] }}" {{ wireNavigate() }}
+                                                            class="self-center text-xs underline">Open</a>
                                                     @endif
                                                     <x-forms.button wire:click="markTransferStepDone('{{ $step['key'] }}')" canGate="update"
                                                         :canResource="$server">Mark as done</x-forms.button>

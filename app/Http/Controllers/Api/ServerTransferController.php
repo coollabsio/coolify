@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\Server;
 use App\Rules\ValidServerIp;
 use App\Services\ServerTransfer\ServerTransferBundle;
@@ -168,6 +170,8 @@ class ServerTransferController extends Controller
             new OA\Parameter(name: 'ip', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'port', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 22)),
             new OA\Parameter(name: 'schema_version', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'system_github_apps[]', in: 'query', required: false, description: 'UUIDs of system-wide GitHub Apps that the server uses. The response lists the ones this instance does not have.', schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'))),
+            new OA\Parameter(name: 'system_gitlab_apps[]', in: 'query', required: false, description: 'UUIDs of system-wide GitLab Apps that the server uses. The response lists the ones this instance does not have.', schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'))),
         ],
         responses: [
             new OA\Response(response: 200, description: 'The server can be imported. Lists every check with its result.'),
@@ -189,6 +193,10 @@ class ServerTransferController extends Controller
             'ip' => ['required', 'string', new ValidServerIp],
             'port' => 'nullable|integer|between:1,65535',
             'schema_version' => 'nullable|integer',
+            'system_github_apps' => 'nullable|array|max:100',
+            'system_github_apps.*' => 'string|max:64',
+            'system_gitlab_apps' => 'nullable|array|max:100',
+            'system_gitlab_apps.*' => 'string|max:64',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -196,6 +204,12 @@ class ServerTransferController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
+
+        // System-wide git sources are not transferred. Applications re-link only to one with the same uuid here.
+        $missingSystemSources = [
+            'github' => array_values(array_diff((array) $request->query('system_github_apps', []), GithubApp::query()->where('is_system_wide', true)->whereIn('uuid', (array) $request->query('system_github_apps', []))->pluck('uuid')->all())),
+            'gitlab' => array_values(array_diff((array) $request->query('system_gitlab_apps', []), GitlabApp::query()->where('is_system_wide', true)->whereIn('uuid', (array) $request->query('system_gitlab_apps', []))->pluck('uuid')->all())),
+        ];
 
         $schemaVersion = (int) $request->query('schema_version', ServerTransferBundle::SCHEMA_VERSION);
         $ip = trim((string) $request->query('ip'));
@@ -233,6 +247,7 @@ class ServerTransferController extends Controller
                 ? 'This instance can import the server.'
                 : $failed->pluck('message')->implode(' '),
             'checks' => $checks,
+            'missing_system_sources' => $missingSystemSources,
         ], $failed->isEmpty() ? 200 : 422);
     }
 

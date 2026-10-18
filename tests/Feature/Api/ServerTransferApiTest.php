@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -459,4 +460,18 @@ describe('GET /api/v1/servers/import/check', function () {
             ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=10.66.0.99')
             ->assertUnauthorized();
     });
+});
+
+test('the import check lists the system-wide git sources that this instance does not have', function () {
+    $present = GithubApp::create(['name' => 'present', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 0, 'is_system_wide' => true]);
+    $listener = stream_socket_server('tcp://127.0.0.1:0');
+    $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
+
+    $this->withHeaders(transferHeaders($this->writeToken))
+        ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}&system_github_apps[]={$present->uuid}&system_github_apps[]=missing-uuid&system_gitlab_apps[]=other-missing")
+        ->assertOk()
+        ->assertJsonPath('missing_system_sources.github', ['missing-uuid'])
+        ->assertJsonPath('missing_system_sources.gitlab', ['other-missing']);
+
+    fclose($listener);
 });

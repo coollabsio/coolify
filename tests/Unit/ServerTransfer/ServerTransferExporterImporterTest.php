@@ -1794,3 +1794,21 @@ test('a claimed import starts the finish list and returns the server URL', funct
         ->and(data_get($server->server_metadata, 'transfer.status'))->toBe('claimed')
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain('server_connection:server');
 });
+
+test('an application with a system-wide GitHub App that the target lacks is listed for a git source check', function () {
+    $systemApp = GithubApp::create(['name' => 'Coolify GitHub', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 0, 'is_system_wide' => true]);
+    $this->application->forceFill(['source_type' => GithubApp::class, 'source_id' => $systemApp->id])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $systemApp->delete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    expect(data_get($bundle, 'projects.0.environments.0.applications.0.source.system_wide'))->toBeTrue()
+        ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
+        ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
+});
