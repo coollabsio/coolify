@@ -10522,7 +10522,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Changing `logdrain_custom_config` or `logdrain_custom_config_parser` needs a token with the `deploy` permission.'
+      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Changing `logdrain_custom_config` or `logdrain_custom_config_parser` needs a token with the `deploy` permission. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -10564,6 +10564,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'Missing the deploy permission for a custom log drain change.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -15308,6 +15310,8 @@ components:
         is_container_label_escape_enabled:
           type: boolean
         is_env_sorting_enabled:
+          type: boolean
+        include_coolify_default_variables:
           type: boolean
         is_container_label_readonly_enabled:
           type: boolean
