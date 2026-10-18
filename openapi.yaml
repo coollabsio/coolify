@@ -10510,7 +10510,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team.'
+      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Changing `logdrain_custom_config` or `logdrain_custom_config_parser` needs a token with the `deploy` permission.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -10664,7 +10664,7 @@ paths:
       tags:
         - Servers
       summary: 'Save server proxy configuration'
-      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
+      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
       operationId: save-server-proxy-configuration
       parameters:
         -
@@ -10717,7 +10717,7 @@ paths:
       tags:
         - Servers
       summary: 'Restart server proxy'
-      description: 'Queue a proxy restart for a team-owned server.'
+      description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.'
       operationId: restart-server-proxy
       parameters:
         -
