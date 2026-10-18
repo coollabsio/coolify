@@ -19,6 +19,7 @@ use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
 use App\Services\GithubRunner\GithubRunnerApi;
 use App\Services\GithubRunner\GithubRunnerContainer;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
@@ -136,6 +137,7 @@ class Github extends Controller
 
                         continue;
                     }
+                    TransferFinishChecklist::recordWebhook('application', $application->uuid);
                     $isFunctional = $application->destination->server->isFunctional();
                     if (! $isFunctional) {
                         $return_payloads->push([
@@ -428,6 +430,7 @@ class Github extends Controller
                     return response('Invalid signature.');
                 }
             }
+            TransferFinishChecklist::recordWebhook('github_app', $github_app->uuid);
             if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
                 // Installation handled by setup redirect url. Repositories queried on-demand.
                 $action = data_get($payload, 'action');

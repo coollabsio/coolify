@@ -165,4 +165,19 @@ class GithubApp extends BaseModel
 
         return filled($this->app_id) && filled($this->installation_id);
     }
+
+    /**
+     * The settings page of this App at GitHub.
+     */
+    public function settingsUrl(): string
+    {
+        $name = encodeGithubPathSegment($this->name);
+        $organization = normalizeGithubOrganization($this->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
+        }
+
+        return rtrim($this->html_url, '/')."/settings/apps/{$name}";
+    }
 }

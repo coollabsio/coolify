@@ -395,43 +395,46 @@ class Show extends Component
         }
     }
 
-    public function toggleManagement(ServerTransferClaimer $claimer): void
+    /**
+     * Take back a server that was transferred to another instance.
+     */
+    public function enableManagement(ServerTransferClaimer $claimer): void
     {
-        abort_unless(isDev(), 404);
         $this->authorize('update', $this->server);
 
-        if ($this->server->isLocalhost()) {
-            $this->dispatch('error', 'The Coolify host cannot be transferred.');
-
+        if ($this->server->isLocalhost() || ! $this->server->isTransferredAway()) {
             return;
         }
 
-        if ($this->server->isTransferredAway() && $this->server->team->serverOverflow()) {
+        if ($this->server->team->serverOverflow()) {
             $this->dispatch('error', 'Your team is over its server limit. Upgrade your subscription or remove a server first.');
 
             return;
         }
 
-        if ($this->server->isTransferredAway()) {
+        try {
             $claimer->claim($this->server);
-            $event = 'ui.server.management_enabled';
-            $message = 'This Coolify instance now manages the server.';
-        } else {
-            $claimer->markTransferred($this->server, managementDisabled: true);
-            $event = 'ui.server.management_disabled';
-            $message = 'Server automations are disabled on this Coolify instance.';
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return;
         }
 
+        $claimer->restoreAfterTakeBack($this->server->refresh());
         $this->server->refresh();
+        // Sentinel must report here. While it reports to the other instance, that instance does not run
+        // the connection check that reads the owner marker and makes it stop managing the server.
+        $this->server->restartSentinel();
         $this->syncData();
+        $this->dispatch('transferFinishStarted')->to(TransferFinish::class);
 
-        auditLog($event, [
+        auditLog('ui.server.management_enabled', [
             'team_id' => $this->server->team_id,
             'server_uuid' => $this->server->uuid,
             'server_name' => $this->server->name,
         ]);
 
-        $this->dispatch('success', $message);
+        $this->dispatch('success', 'This Coolify instance now manages the server.');
     }
 
     public function checkLocalhostConnection()
