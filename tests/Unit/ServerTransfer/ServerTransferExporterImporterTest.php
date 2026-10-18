@@ -1779,3 +1779,18 @@ test('the checklist does not ask about manual webhooks for an application that d
 
     expect($checklist)->not->toContain('manual webhook');
 });
+
+test('a claimed import starts the finish list and returns the server URL', function () {
+    $bundle = $this->exporter->export($this->server);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    expect($result['server_url'])->toBe('https://coolify-a.test/server/'.$server->uuid)
+        ->and(data_get($server->server_metadata, 'transfer.status'))->toBe('claimed')
+        ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain('server_connection:server');
+});

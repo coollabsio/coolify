@@ -430,6 +430,7 @@ class ServerTransferMigrator
             'complete' => $complete,
             'warnings' => $warnings,
             'checklist' => $checklist,
+            'target_server_url' => is_string(data_get($importBody, 'server_url')) ? data_get($importBody, 'server_url') : null,
             'message' => 'Server migrated to '.$targetUrl.'. Automations disabled on this instance.',
         ];
     }

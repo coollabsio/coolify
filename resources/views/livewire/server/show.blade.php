@@ -173,7 +173,7 @@
                                         'This instance starts to run deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server again.',
                                         'The server records that this instance owns it. The next time the other instance connects to the server, it stops managing it automatically.',
                                         'Sentinel on the server is reconfigured to send its data to this instance.',
-                                        'This instance takes back its DNS records and lists the steps that are left: webhook URLs and GitHub runners.',
+                                        'This instance takes back its DNS records and shows the steps that finish the take back: webhooks, DNS, Sentinel, backups, and runners.',
                                     ]">
                                     <x-slot:trigger>
                                         <x-forms.button type="button" isError canGate="update" :canResource="$server">
@@ -196,17 +196,68 @@
                             </x-callout>
                         @endif
 
-                        @if (! $server->isTransferredAway() && count((array) data_get($server->server_metadata, 'transfer.checklist', [])) > 0)
-                            <x-callout type="warning" title="After taking the server back" class="mb-4">
-                                Do these steps to finish the take back. Coolify cannot do them for you.
-                                <ul class="mt-2 list-disc space-y-1 pl-5">
-                                    @foreach ((array) data_get($server->server_metadata, 'transfer.checklist', []) as $step)
-                                        <li wire:key="take-back-step-{{ hash('xxh128', (string) $step) }}">{{ $step }}</li>
+                        @if ($finish = $this->transferFinish)
+                            @php
+                                $checklist = app(\App\Services\ServerTransfer\TransferFinishChecklist::class);
+                                $openSteps = $checklist->openItems($server);
+                                $badgeTypes = ['ok' => 'success', 'done' => 'success', 'action' => 'warning', 'unchecked' => 'neutral', 'pending' => 'neutral'];
+                                $badgeLabels = ['ok' => 'OK', 'done' => 'Done', 'action' => 'Needs action', 'unchecked' => 'Cannot check', 'pending' => 'Not checked'];
+                            @endphp
+                            <div class="mb-4 rounded-lg border border-warning/40 p-4" data-testid="transfer-finish">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">Finish the transfer</h3>
+                                        <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                            {{ count($openSteps) }} of {{ count($finish['items']) }} steps are open. Coolify checks
+                                            each step where it can; mark the other steps as done when you did them.
+                                        </p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <x-forms.button wire:click="checkAllTransferSteps" canGate="update" :canResource="$server"
+                                            wire:loading.attr="disabled" wire:target="checkAllTransferSteps">Check all</x-forms.button>
+                                        <x-modal-confirmation title="Finish the transfer?" submitAction="finishTransfer"
+                                            :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="I finished"
+                                            :warningMessage="count($openSteps) > 0 ? '<strong>'.count($openSteps).' steps are not OK or done.</strong> Coolify does not check them again. Webhooks, DNS records, or runners can still point to the other instance.' : null"
+                                            :actions="array_map(fn ($step) => 'Skipped: '.$step['label'], $openSteps)">
+                                            <x-slot:trigger>
+                                                <x-forms.button canGate="update" :canResource="$server">I finished</x-forms.button>
+                                            </x-slot:trigger>
+                                        </x-modal-confirmation>
+                                    </div>
+                                </div>
+                                <ul class="mt-3 flex flex-col divide-y divide-neutral-200 dark:divide-coolgray-300">
+                                    @foreach ($finish['items'] as $step)
+                                        <li wire:key="transfer-step-{{ $step['key'] }}" class="flex flex-wrap items-center gap-3 py-2">
+                                            <x-status-badge :label="$badgeLabels[$step['status']] ?? $step['status']"
+                                                :type="$badgeTypes[$step['status']] ?? 'neutral'" />
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-sm text-neutral-950 dark:text-fg">{{ $step['label'] }}</p>
+                                                @if ($step['message'])
+                                                    <p class="text-xs leading-5 break-words text-neutral-500 dark:text-fg-dim">{{ $step['message'] }}</p>
+                                                @endif
+                                            </div>
+                                            @if (in_array($step['status'], \App\Services\ServerTransfer\TransferFinishChecklist::OPEN_STATUSES, true))
+                                                <div class="flex flex-wrap gap-2">
+                                                    @if ($checklist->canCheck($step))
+                                                        <x-forms.button wire:click="checkTransferStep('{{ $step['key'] }}')" canGate="update"
+                                                            :canResource="$server" wire:loading.attr="disabled">Check</x-forms.button>
+                                                    @endif
+                                                    @if ($fixLabel = $checklist->fixLabel($step))
+                                                        <x-forms.button wire:click="fixTransferStep('{{ $step['key'] }}')" canGate="update"
+                                                            :canResource="$server" wire:loading.attr="disabled">{{ $fixLabel }}</x-forms.button>
+                                                    @endif
+                                                    @if ($step['type'] === 'github_runners')
+                                                        <a href="{{ route('server.github-runners', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                                                            class="self-center text-xs underline">Open GitHub runners</a>
+                                                    @endif
+                                                    <x-forms.button wire:click="markTransferStepDone('{{ $step['key'] }}')" canGate="update"
+                                                        :canResource="$server">Mark as done</x-forms.button>
+                                                </div>
+                                            @endif
+                                        </li>
                                     @endforeach
                                 </ul>
-                                <x-forms.button class="mt-3" wire:click="dismissTakeBackChecklist" canGate="update"
-                                    :canResource="$server">Done</x-forms.button>
-                            </x-callout>
+                            </div>
                         @endif
 
                         @if ($this->limaStartCommand)

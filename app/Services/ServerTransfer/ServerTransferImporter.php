@@ -45,6 +45,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
+use App\Notifications\Internal\GeneralNotification;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidServerIp;
 use App\Services\Dns\CloudflareDnsProvider;
@@ -52,6 +53,7 @@ use App\Services\ProjectIconStorageService;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -430,6 +432,8 @@ class ServerTransferImporter
                     $result['claimed'] = true;
                     // Same check as the Validate button. A running proxy and Docker are kept as they are.
                     ValidateAndInstallServerJob::dispatch($server);
+                    $this->startFinishChecklist($server);
+                    $result['server_url'] = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/').'/server/'.$server->uuid;
                 } catch (Throwable $e) {
                     $result['claimed'] = false;
                     $result['claim'] = null;
@@ -503,6 +507,22 @@ class ServerTransferImporter
                 'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
             ],
         ];
+    }
+
+    /**
+     * The steps that finish the transfer here, and one notification that points the team to them.
+     * A failure here never fails the import: the server is imported and claimed already.
+     */
+    private function startFinishChecklist(Server $server): void
+    {
+        try {
+            $items = app(TransferFinishChecklist::class)->start($server);
+            $server->team?->notify(new GeneralNotification(
+                "Server '{$server->name}' was transferred to this instance. Open the server to finish the transfer: ".count($items).' steps to check.'
+            ));
+        } catch (Throwable $e) {
+            Log::warning('Could not start the transfer finish checklist', ['server_uuid' => $server->uuid, 'error' => $e->getMessage()]);
+        }
     }
 
     /**

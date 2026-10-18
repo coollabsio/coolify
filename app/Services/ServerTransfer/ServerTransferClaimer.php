@@ -129,7 +129,7 @@ class ServerTransferClaimer
                 'target_instance_url' => $targetInstanceUrl,
                 'transferred_at' => now()->toIso8601String(),
             ]);
-            unset($metadata['transfer']['checklist'], $metadata['transfer']['taken_back_at']);
+            unset($metadata['transfer']['finish'], $metadata['transfer']['taken_back_at']);
             $server->server_metadata = $metadata;
             $server->save();
 
@@ -192,44 +192,33 @@ class ServerTransferClaimer
     }
 
     /**
-     * After a take back: own the DNS records of the server again, and save the manual steps that move webhooks and
-     * runners back to this instance. Provider calls run here, after the claim committed; a failure only adds a step.
+     * After a take back: own the parked DNS records again where Cloudflare confirms them, then start the steps that
+     * finish the take back (webhooks, runners, records that this instance could not take back). Provider calls run
+     * here, after the claim committed.
      *
-     * @return list<string> the manual steps
+     * @return list<array<string, mixed>> the steps
      */
     public function restoreAfterTakeBack(Server $server): array
     {
-        $steps = [];
         $dns = app(CloudflareDnsProvider::class);
         $parkedIds = (array) data_get($server->server_metadata, 'transfer.parked_dns_record_ids', []);
         foreach (ManagedDnsRecord::query()->whereIn('id', $parkedIds)->get() as $record) {
             if ($dns->reclaimRecord($record)) {
                 $record->update(['owned' => true]);
-            } else {
-                $steps[] = "Check DNS record {$record->name} at the DNS provider. This instance could not take it back, so it does not change or delete it.";
             }
         }
 
-        $instanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
-        try {
-            $exportSteps = app(ServerTransferExporter::class)->postTransferChecklistFor($server);
-        } catch (Throwable $e) {
-            $exportSteps = [];
-            Log::warning('Could not build the take back checklist', ['server_uuid' => $server->uuid, 'error' => $e->getMessage()]);
-        }
-        $steps = [...array_map(fn (string $step) => str_replace('{target_url}', $instanceUrl, $step), $exportSteps), ...$steps];
-
-        DB::transaction(function () use ($server, $steps) {
+        DB::transaction(function () use ($server) {
             $locked = Server::query()->lockForUpdate()->findOrFail($server->id);
             $metadata = $locked->server_metadata ?? [];
             unset($metadata['transfer']['parked_dns_record_ids']);
             $metadata['transfer']['taken_back_at'] = now()->toIso8601String();
-            $metadata['transfer']['checklist'] = $steps;
             $locked->server_metadata = $metadata;
             $locked->save();
+            $server->server_metadata = $metadata;
         });
 
-        return $steps;
+        return app(TransferFinishChecklist::class)->start($server);
     }
 
     private function releaseGithubRunners(Server $server): void

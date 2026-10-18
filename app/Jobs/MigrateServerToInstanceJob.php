@@ -46,6 +46,7 @@ class MigrateServerToInstanceJob implements ShouldBeEncrypted, ShouldBeUnique, S
                 'export_id' => $result['export_id'],
                 'warnings' => $result['warnings'],
                 'checklist' => $result['checklist'],
+                'target_server_url' => $result['target_server_url'] ?? null,
             ]);
         } catch (Throwable $e) {
             $migrator->recordMigration($this->server, 'failed', ['error' => $e->getMessage()]);

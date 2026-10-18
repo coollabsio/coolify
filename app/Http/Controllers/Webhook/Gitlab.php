@@ -13,6 +13,7 @@ use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GitlabApp;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -118,6 +119,7 @@ class Gitlab extends Controller
                 ], 401);
             }
 
+            TransferFinishChecklist::recordWebhook('gitlab_app', $gitlab_app->uuid);
             $project_id = $this->webhookPayloadDatabaseId($payload, 'project.id', required: true);
             $applications = Application::where('source_id', $gitlab_app->id)
                 ->where('source_type', GitlabApp::class)
@@ -469,6 +471,7 @@ class Gitlab extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([

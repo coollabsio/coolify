@@ -186,9 +186,10 @@ test('taking back a transferred server fails without changes when the host canno
         ->and((bool) $this->server->settings->force_disabled)->toBeTrue();
 });
 
-test('after a take back the server page lists the steps that are left until the user dismisses them', function () {
+test('after a take back the server page shows the finish list until the user finishes the transfer', function () {
     markServerTransferredAway($this->server);
     Application::factory()->create([
+        'name' => 'shop',
         'destination_id' => $this->server->standaloneDockers()->first()->id,
         'destination_type' => StandaloneDocker::class,
         'git_repository' => 'https://github.com/coollabsio/coolify',
@@ -196,9 +197,9 @@ test('after a take back the server page lists the steps that are left until the 
 
     $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->call('enableManagement')
-        ->assertSee('After taking the server back')
-        ->assertSee('https://coolify-a.test/webhooks/source/github/events/manual');
+        ->assertSee('Finish the transfer')
+        ->assertSee('Manual webhook of shop');
 
-    $component->call('dismissTakeBackChecklist')->assertDontSee('After taking the server back');
-    expect(data_get($this->server->fresh()->server_metadata, 'transfer.checklist'))->toBeNull();
+    $component->call('finishTransfer')->assertDontSee('Finish the transfer');
+    expect(data_get($this->server->fresh()->server_metadata, 'transfer.finish.finished_at'))->not->toBeNull();
 });

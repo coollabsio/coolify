@@ -144,25 +144,24 @@
                                 disabled on this instance.
                             </x-callout>
                             @php $checklist = $this->postTransferChecklist; @endphp
-                            @if (count($checklist) > 0)
-                                <div x-data="{ done: [] }" data-testid="post-transfer-checklist">
-                                    <div class="flex items-baseline justify-between gap-3">
-                                        <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">After the transfer</h3>
-                                        <span class="text-xs text-neutral-500 dark:text-fg-dim"
-                                            x-text="`${done.length} of {{ count($checklist) }} done`"></span>
-                                    </div>
+                            @if (count($checklist) > 0 || data_get($migration, 'target_server_url'))
+                                <div data-testid="post-transfer-checklist">
+                                    <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">Finish the transfer on the target</h3>
                                     <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                                        Do these steps to finish the move. The target instance cannot do them for you.
+                                        The target shows these steps on the server page, checks them where it can, and keeps
+                                        their state.
+                                        @if ($targetServerUrl = data_get($migration, 'target_server_url'))
+                                            <a href="{{ $targetServerUrl }}" target="_blank" rel="noopener noreferrer"
+                                                class="underline">Open the server on the target</a>.
+                                        @endif
                                     </p>
-                                    <div class="mt-2 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
-                                        @foreach ($checklist as $step)
-                                            @php $stepKey = hash('xxh128', $step); @endphp
-                                            <div wire:key="post-transfer-step-{{ $stepKey }}">
-                                                <x-forms.checkbox :id="'post-transfer-step-' . $stepKey" :label="e($step)"
-                                                    :domValue="$stepKey" fullWidth x-model="done" />
-                                            </div>
-                                        @endforeach
-                                    </div>
+                                    @if (count($checklist) > 0)
+                                        <ul class="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-neutral-600 dark:text-fg-dim">
+                                            @foreach ($checklist as $step)
+                                                <li wire:key="post-transfer-step-{{ hash('xxh128', $step) }}">{{ $step }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 </div>
                             @endif
                         @endif

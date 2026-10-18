@@ -47,7 +47,7 @@ tinker "$A" "$login_php Livewire\\Livewire::test(App\\Livewire\\Server\\Show::cl
 ca="$(claim_id "$A")"
 check 'A claimed again' test "$(status "$A")" = claimed
 check "marker = new claim of A ($ca)" test "$(marker)" = "$ca"
-check 'A saved the take back checklist' test "$(tinker "$A" "echo (int) is_array(data_get(App\\Models\\Server::where('uuid','$S')->first()->server_metadata,'transfer.checklist'));" | tail -1)" = 1
+check 'A started the finish list' test "$(tinker "$A" "echo count((array) data_get(App\\Models\\Server::where('uuid','$S')->first()->server_metadata,'transfer.finish.items')) > 0 ? 1 : 0;" | tail -1)" = 1
 check 'B still claimed before its check' test "$(status "$B")" = claimed
 tinker "$B" "(new App\\Jobs\\ServerConnectionCheckJob(App\\Models\\Server::where('uuid','$S')->first()))->handle();" >/dev/null
 check 'B released the server after its check' test "$(status "$B")" = transferred

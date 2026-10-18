@@ -188,7 +188,7 @@ A server transfer moves a server and every record that belongs to it to another 
 - Application, Service, and the standalone databases export their `$fillable` columns, plus hand-written lists for hidden columns. A column that is not fillable is lost unless you add it to those lists.
 - Do not copy a foreign key as a raw ID. IDs are different on the target. Link the record by UUID, or leave the column out with a reason.
 - Team credentials that a moved record needs (integration tokens, S3 storages, git sources, private keys, cloud provider tokens) move with it.
-- When the user must do a step by hand after the transfer (for example, change a webhook URL at GitHub), add it to the `post_transfer_checklist` of the bundle. Write `{target_url}` for the URL of the target. The Transfer page shows the list after the transfer.
+- When the user must do a step after the transfer (for example, change a webhook URL at GitHub), add an item type to `TransferFinishChecklist`: the "Finish the transfer" list on the server page of the instance that manages the server now. Give it a check where Coolify can verify the step, and a fix where it can do the step. Also add it to the `post_transfer_checklist` of the bundle (`{target_url}` stands for the URL of the target), which the source shows as text.
 - On the source, a transferred server (`Server::isTransferredAway()`) is only an archive, because another instance manages the host. Do not run remote commands, cloud provider calls, or DNS provider calls for it, also not when the archive is deleted.
 
 ### Instance sentinels (`id = 0`)

@@ -43,6 +43,8 @@ for profile in "${TRANSFER_PROFILES[@]}"; do
   check "automatic validation filled the metadata ($(jq -r .os <<<"$meta"))" test "$(jq -r .os <<<"$meta")" != null
   check 'B reachable + usable, no validation error' test "$(jq -c '[.reach,.usable,.logs]' <<<"$meta")" = '[true,true,null]'
   check 'transfer state kept after validation' test "$(jq -r .transfer <<<"$meta")" = claimed
+  check 'B started the finish list' test "$(tinker "$B" "echo count((array) data_get(App\\Models\\Server::where('uuid','$S')->first()->server_metadata,'transfer.finish.items')) > 0 ? 1 : 0;" | tail -1)" = 1
+  check 'A links to the server on B' test "$(jq -r .migration.target_server_url <<<"$a")" = "$B_URL/server/$S"
   check 'B has all applications' test "$(tinker "$B" "echo App\\Models\\Server::where('uuid','$S')->first()->applications()->pluck('uuid')->implode(' ');" | tail -1)" = "$apps"
   check 'B validates the server over SSH' test "$(tinker "$B" "\$r=App\\Models\\Server::where('uuid','$S')->first()->validateConnection(); echo (int)(bool)\$r['uptime'];" | tail -1)" = 1
 

@@ -19,7 +19,7 @@ macOS with Lima is not supported yet.
 scripts/transfer-test/setup.sh             # start B and connect A, B, and A's VMs (safe to run again)
 scripts/transfer-test/reset.sh             # WIPES BOTH DEV DATABASES, then seeds A with deployed resources (~4 min)
 
-scripts/transfer-test/e2e.sh               # transfer both VMs A -> B through the API (37 checks)
+scripts/transfer-test/e2e.sh               # transfer both VMs A -> B through the API (41 checks)
 scripts/transfer-test/reset.sh
 scripts/transfer-test/reverse-e2e.sh       # undo paths: transfer back, transfer over an archive, take back, archive delete (18 checks)
 scripts/transfer-test/reset.sh
