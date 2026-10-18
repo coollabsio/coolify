@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
+use App\Rules\ValidFluentBitConfig;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -158,8 +159,8 @@ class LogDrains extends Component
         } elseif ($this->isLogDrainCustomEnabled) {
             try {
                 $this->validate([
-                    'logDrainCustomConfig' => ['required'],
-                    'logDrainCustomConfigParser' => ['string', 'nullable'],
+                    'logDrainCustomConfig' => ['required', new ValidFluentBitConfig],
+                    'logDrainCustomConfigParser' => ['string', 'nullable', new ValidFluentBitConfig(parsersOnly: true)],
                 ]);
             } catch (\Throwable $e) {
                 $this->isLogDrainCustomEnabled = false;
@@ -279,8 +280,8 @@ class LogDrains extends Component
                 'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
             ]),
             'custom' => $this->validate([
-                'logDrainCustomConfig' => ['required'],
-                'logDrainCustomConfigParser' => ['string', 'nullable'],
+                'logDrainCustomConfig' => ['required', new ValidFluentBitConfig],
+                'logDrainCustomConfigParser' => ['string', 'nullable', new ValidFluentBitConfig(parsersOnly: true)],
             ]),
             default => throw new \InvalidArgumentException('Unknown log drain type.'),
         };

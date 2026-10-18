@@ -4,6 +4,7 @@ namespace App\Actions\Server;
 
 use App\Models\Server;
 use App\Models\Service;
+use App\Rules\ValidFluentBitConfig;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartLogDrain
@@ -131,6 +132,14 @@ class StartLogDrain
                 if (! $server->settings->is_logdrain_custom_enabled) {
                     throw new \Exception('Custom log drain is not enabled.');
                 }
+                $configError = (new ValidFluentBitConfig)->check($server->settings->logdrain_custom_config);
+                if ($configError !== null) {
+                    throw new \Exception("Custom log drain config is not allowed: {$configError}");
+                }
+                $parsersError = (new ValidFluentBitConfig(parsersOnly: true))->check($server->settings->logdrain_custom_config_parser);
+                if ($parsersError !== null) {
+                    throw new \Exception("Custom log drain parser config is not allowed: {$parsersError}");
+                }
                 $config = base64_encode($server->settings->logdrain_custom_config);
                 $parsers = base64_encode($server->settings->logdrain_custom_config_parser);
             } else {
@@ -153,8 +162,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./fluent-bit.conf:/fluent-bit.conf
-      - ./parsers.conf:/parsers.conf
+      - ./fluent-bit.conf:/fluent-bit.conf:ro
+      - ./parsers.conf:/parsers.conf:ro
     ports:
       - 127.0.0.1:24224:24224
     labels:
