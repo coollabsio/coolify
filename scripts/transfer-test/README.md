@@ -21,7 +21,7 @@ scripts/transfer-test/reset.sh             # WIPES BOTH DEV DATABASES, then seed
 
 scripts/transfer-test/e2e.sh               # transfer both VMs A -> B through the API (37 checks)
 scripts/transfer-test/reset.sh
-scripts/transfer-test/reverse-e2e.sh       # owner marker, reverse transfer, archive delete, take back (18 checks)
+scripts/transfer-test/reverse-e2e.sh       # undo paths: transfer back, transfer over an archive, take back, archive delete (18 checks)
 scripts/transfer-test/reset.sh
 scripts/transfer-test/extras-e2e.sh        # fake tokens, DNS, secret links, runner config, links, icon ... (28 checks)
 scripts/transfer-test/reset.sh

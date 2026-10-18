@@ -103,6 +103,21 @@ ssh_vm() {
     "$user@$ip" "${sudo}sh -c $(printf '%q' "$2")"
 }
 
+# workloads <profile>: the containers on a VM, without Sentinel, which a claim restarts on purpose.
+workloads() { ssh_vm "$1" 'docker ps --format "{{.Names}} {{.ID}}" | grep -v coolify-sentinel | sort'; }
+
+# stable_workloads <profile>: the workloads once they stop changing. reset.sh returns while databases still start.
+stable_workloads() {
+  local previous='' current
+  for _ in $(seq 1 30); do
+    current="$(workloads "$1")"
+    [[ -n "$current" && "$current" == "$previous" ]] && break
+    previous="$current"
+    sleep 10
+  done
+  echo "$current"
+}
+
 # require_dev_instance <container>: refuse to wipe anything that is not a running local dev instance.
 require_dev_instance() {
   running "$1" || die "Container $1 is not running."

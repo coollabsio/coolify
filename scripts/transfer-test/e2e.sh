@@ -9,7 +9,7 @@ for profile in "${TRANSFER_PROFILES[@]}"; do
   S="$(vm_field "$profile" uuid)"
   ip="$(vm_field "$profile" ip)"
   echo "=== $S"
-  before="$(ssh_vm "$profile" 'docker ps --format "{{.Names}} {{.ID}}" | grep -v coolify-sentinel | sort')"
+  before="$(stable_workloads "$profile")"
   apps="$(tinker "$A" "echo App\\Models\\Server::where('uuid','$S')->first()->applications()->pluck('uuid')->implode(' ');" | tail -1)"
 
   echo '-- start the transfer on A'
@@ -48,7 +48,7 @@ for profile in "${TRANSFER_PROFILES[@]}"; do
 
   echo '-- server'
   sleep 5
-  after="$(ssh_vm "$profile" 'docker ps --format "{{.Names}} {{.ID}}" | grep -v coolify-sentinel | sort')"
+  after="$(workloads "$profile")"
   check 'proxy + workloads not recreated' test "$before" = "$after"
   sentinel_env="$(ssh_vm "$profile" "docker inspect coolify-sentinel --format '{{range .Config.Env}}{{println .}}{{end}}'")"
   check 'Sentinel sends to B' grep -qx "PUSH_ENDPOINT=$B_URL" <<<"$sentinel_env"
