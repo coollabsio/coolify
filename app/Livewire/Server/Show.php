@@ -12,7 +12,6 @@ use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\HostingerService;
 use App\Services\ServerTransfer\ServerTransferClaimer;
-use App\Services\ServerTransfer\TransferFinishChecklist;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -397,60 +396,6 @@ class Show extends Component
     }
 
     /**
-     * The open "finish the transfer" list of this server, or null.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function getTransferFinishProperty(): ?array
-    {
-        $checklist = app(TransferFinishChecklist::class);
-
-        return $checklist->isOpen($this->server) ? $checklist->of($this->server) : null;
-    }
-
-    public function checkTransferStep(TransferFinishChecklist $checklist, string $key): void
-    {
-        $this->authorize('update', $this->server);
-        $item = $checklist->check($this->server, $key);
-        $this->dispatch($item['status'] === 'ok' ? 'success' : 'info', $item['message'] ?? 'Checked.');
-    }
-
-    public function fixTransferStep(TransferFinishChecklist $checklist, string $key): void
-    {
-        $this->authorize('update', $this->server);
-        $item = $checklist->fix($this->server, $key);
-        $this->dispatch($item['status'] === 'ok' ? 'success' : 'info', $item['message'] ?? 'Done.');
-    }
-
-    public function markTransferStepDone(TransferFinishChecklist $checklist, string $key): void
-    {
-        $this->authorize('update', $this->server);
-        $checklist->markDone($this->server, $key);
-    }
-
-    public function checkAllTransferSteps(TransferFinishChecklist $checklist): void
-    {
-        $this->authorize('update', $this->server);
-        $checklist->checkAll($this->server);
-        $this->dispatch('success', 'All steps were checked.');
-    }
-
-    public function finishTransfer(TransferFinishChecklist $checklist): void
-    {
-        $this->authorize('update', $this->server);
-        $skipped = count($checklist->openItems($this->server));
-        $checklist->finish($this->server, auth()->user());
-
-        auditLog('ui.server.transfer_finished', [
-            'team_id' => $this->server->team_id,
-            'server_uuid' => $this->server->uuid,
-            'skipped_steps' => $skipped,
-        ]);
-
-        $this->dispatch('success', 'The transfer is finished.');
-    }
-
-    /**
      * Take back a server that was transferred to another instance.
      */
     public function enableManagement(ServerTransferClaimer $claimer): void
@@ -481,6 +426,7 @@ class Show extends Component
         // the connection check that reads the owner marker and makes it stop managing the server.
         $this->server->restartSentinel();
         $this->syncData();
+        $this->dispatch('transferFinishStarted')->to(TransferFinish::class);
 
         auditLog('ui.server.management_enabled', [
             'team_id' => $this->server->team_id,

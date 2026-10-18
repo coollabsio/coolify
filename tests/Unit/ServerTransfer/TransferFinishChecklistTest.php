@@ -1,6 +1,7 @@
 <?php
 
-use App\Livewire\Server\Show;
+use App\Jobs\CheckTransferFinishStepsJob;
+use App\Livewire\Server\TransferFinish;
 use App\Models\Application;
 use App\Models\DnsProviderZone;
 use App\Models\GithubApp;
@@ -20,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -153,17 +155,53 @@ test('I finished closes the list and keeps the open steps as skipped', function 
         ->and($this->checklist->isOpen($this->server->fresh()))->toBeFalse();
 });
 
-test('the server page shows the open steps and the user can mark them done and finish', function () {
+test('the panel shows the open steps by group, collapses done steps, and finishes', function () {
     $this->checklist->start($this->server);
 
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+    Livewire::test(TransferFinish::class, ['server' => $this->server])
         ->assertSee('Finish the transfer')
-        ->assertSee('Sentinel sends its data to this instance')
-        ->call('markTransferStepDone', 'sentinel:server')
+        ->assertSee('0 of 2 done.')
+        ->assertSee('Server')
+        ->assertSee('Restart Sentinel')
+        ->call('markStepDone', 'sentinel:server')
+        ->assertSee('1 of 2 done.')
+        ->assertSee('1 step is OK or done')
+        ->assertSee('Finish with open steps')
+        ->call('markStepDone', 'server_connection:server')
+        ->assertDontSee('Finish with open steps')
         ->call('finishTransfer')
         ->assertDontSee('Finish the transfer');
 
     expect(finishTestItem($this->server, 'sentinel:server')['status'])->toBe('done');
+});
+
+test('the panel starts background checks when they are stale, and not again within 30 seconds', function () {
+    Queue::fake();
+    $this->checklist->start($this->server);
+    $component = Livewire::test(TransferFinish::class, ['server' => $this->server]);
+
+    $component->call('refreshSteps');
+    Queue::assertPushed(CheckTransferFinishStepsJob::class, 1);
+
+    $this->checklist->checkAll($this->server->fresh());
+    $component->call('refreshSteps');
+    Queue::assertPushed(CheckTransferFinishStepsJob::class, 1);
+});
+
+test('a failed check shows a short message and keeps the technical reason as details', function () {
+    finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id]);
+    $this->checklist->start($this->server);
+    Http::fake([
+        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
+        'https://api.github.com/app/hook/config' => Http::response(['message' => 'Bad credentials'], 401),
+    ]);
+
+    $item = $this->checklist->check($this->server, "github_app_webhook:{$this->githubApp->uuid}");
+
+    expect($item['message'])->toBe('GitHub cannot be asked with the App key. No webhook arrived since the transfer.')
+        ->and($item['error'])->toContain('Bad credentials')
+        ->and($item['hint'])->toBe('GitHub must send webhooks to this instance.')
+        ->and($item['details'][0]['value'])->toBe('https://coolify-b.test/webhooks/source/github/events');
 });
 
 test('team members cannot check or finish the transfer', function () {
@@ -172,8 +210,9 @@ test('team members cannot check or finish the transfer', function () {
     $this->team->members()->attach($member->id, ['role' => 'member']);
     $this->actingAs($member);
 
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])->call('finishTransfer')->assertForbidden();
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])->call('markTransferStepDone', 'sentinel:server')->assertForbidden();
+    Livewire::test(TransferFinish::class, ['server' => $this->server])->call('finishTransfer')->assertForbidden();
+    Livewire::test(TransferFinish::class, ['server' => $this->server])->call('markStepDone', 'sentinel:server')->assertForbidden();
+    Livewire::test(TransferFinish::class, ['server' => $this->server])->call('fixStep', 'sentinel:server')->assertForbidden();
 
     expect($this->checklist->isOpen($this->server->fresh()))->toBeTrue();
 });
@@ -190,8 +229,10 @@ test('an application that lost its system-wide git source gets a git source step
     $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'claimed', 'git_source_applications' => [$application->uuid]]]])->save();
     $key = "git_source:{$application->uuid}";
 
-    $item = collect($this->checklist->start($this->server))->firstWhere('key', $key);
-    expect($item['link'])->toStartWith('/project/')->toEndWith("/application/{$application->uuid}/source")
+    $items = collect($this->checklist->start($this->server));
+    $item = $items->firstWhere('key', $key);
+    expect($items->pluck('key'))->not->toContain("manual_webhook:{$application->uuid}")
+        ->and($item['link'])->toStartWith('/project/')->toEndWith("/application/{$application->uuid}/source")
         ->and($this->checklist->check($this->server, $key)['status'])->toBe('action');
 
     $gitlabApp = GitlabApp::create(['name' => 'gitlab', 'api_url' => 'https://gitlab.com/api/v4', 'html_url' => 'https://gitlab.com', 'team_id' => $this->team->id, 'is_system_wide' => false]);

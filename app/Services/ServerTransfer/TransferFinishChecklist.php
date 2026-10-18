@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Jobs\CheckTransferFinishStepsJob;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -25,12 +26,32 @@ use Throwable;
  * and runners. Coolify checks each step where it can, and fixes some. The list is saved in
  * server_metadata.transfer.finish, so its state survives a reload and is the same for every user of the team.
  *
- * An item is {key, type, subject, label, status, message, checked_at}. Status: pending (not checked yet), ok,
- * action (the user must do something), done (the user marked it), or unchecked (Coolify cannot check it).
+ * An item is {key, type, subject, label, status, hint, message, details, error, link, link_label, checked_at}. The hint
+ * says what to do; message is the short result of the last check; details are values to copy (URLs); error is the
+ * technical reason of the last check.
+ * Status: pending (not checked yet), ok, action (the user must do something), done (the user marked it), or
+ * unchecked (Coolify cannot check it).
  */
 class TransferFinishChecklist
 {
     public const OPEN_STATUSES = ['pending', 'action', 'unchecked'];
+
+    /** Open steps are checked again in the background when the last check is older than this. */
+    public const RECHECK_AFTER_SECONDS = 30;
+
+    /** @var array<string, string> */
+    public const GROUPS = [
+        'server' => 'Server',
+        'git' => 'Git and webhooks',
+        'dns' => 'Domains and DNS',
+    ];
+
+    private const GROUP_OF_TYPE = [
+        'server_connection' => 'server', 'sentinel' => 'server', 's3_storage' => 'server',
+        'github_app_webhook' => 'git', 'github_app_urls' => 'git', 'gitlab_webhook' => 'git', 'manual_webhook' => 'git',
+        'git_source' => 'git', 'github_runners' => 'git',
+        'dns_record' => 'dns', 'domain' => 'dns',
+    ];
 
     /** Types that the user can only mark as done. */
     private const MANUAL_TYPES = ['github_app_urls'];
@@ -86,6 +107,28 @@ class TransferFinishChecklist
         return array_values(array_filter((array) data_get($this->of($server), 'items', []), fn (array $item) => in_array($item['status'], self::OPEN_STATUSES, true)));
     }
 
+    public function groupOf(array $item): string
+    {
+        return self::GROUP_OF_TYPE[$item['type']] ?? 'server';
+    }
+
+    /**
+     * Run the checks of the open steps in a queued job when the last run is older than RECHECK_AFTER_SECONDS.
+     */
+    public function checkWhenStale(Server $server): void
+    {
+        $finish = $this->of($server);
+        if (! $this->isOpen($server) || $this->openItems($server) === []) {
+            return;
+        }
+        $lastCheckedAt = data_get($finish, 'last_checked_at');
+        if (is_string($lastCheckedAt) && Carbon::parse($lastCheckedAt)->isAfter(now()->subSeconds(self::RECHECK_AFTER_SECONDS))) {
+            return;
+        }
+
+        CheckTransferFinishStepsJob::dispatch($server);
+    }
+
     public function canCheck(array $item): bool
     {
         return ! in_array($item['type'], self::MANUAL_TYPES, true);
@@ -108,6 +151,10 @@ class TransferFinishChecklist
                 $this->check($server, $item['key']);
             }
         }
+
+        $finish = (array) $this->of($server->fresh());
+        $finish['last_checked_at'] = now()->toIso8601String();
+        $this->save($server, $finish);
     }
 
     public function fix(Server $server, string $key): array
@@ -124,7 +171,7 @@ class TransferFinishChecklist
 
     public function markDone(Server $server, string $key): array
     {
-        return $this->update($server, $key, fn (array $item) => ['done', 'Marked as done by '.(auth()->user()?->name ?? 'a user').'.']);
+        return $this->update($server, $key, fn (array $item) => ['done', 'Marked as done by '.(auth()->user()?->name ?? 'a user').'.', null]);
     }
 
     /**
@@ -167,10 +214,13 @@ class TransferFinishChecklist
             ->filter(fn ($source) => $source instanceof GithubApp && ! $source->is_system_wide && ! $source->is_public)
             ->unique('id');
         foreach ($githubApps as $githubApp) {
-            $items[] = $this->item('github_app_webhook', $githubApp->uuid, "Webhook URL of GitHub App {$githubApp->name}");
-            $items[] = $this->item('github_app_urls', $githubApp->uuid, "Setup URL and Callback URL of GitHub App {$githubApp->name}",
-                'GitHub has no API for these. In the settings of the GitHub App, set the Setup URL to '.$this->instanceUrl().'/webhooks/source/github/install '
-                .'and the Callback URL to '.$this->instanceUrl().'/login/github/app.');
+            $items[] = $this->item('github_app_webhook', $githubApp->uuid, "Webhook URL of GitHub App {$githubApp->name}",
+                'GitHub must send webhooks to this instance.', [['label' => 'Webhook URL', 'value' => $this->githubWebhookUrl()]]);
+            $items[] = $this->item('github_app_urls', $githubApp->uuid, "Setup and Callback URL of GitHub App {$githubApp->name}",
+                'Set both in the GitHub App settings. GitHub has no API for them.', [
+                    ['label' => 'Setup URL', 'value' => $this->instanceUrl().'/webhooks/source/github/install'],
+                    ['label' => 'Callback URL', 'value' => $this->instanceUrl().'/login/github/app'],
+                ]);
         }
 
         $gitlabApps = $applications->map(fn (Application $application) => $application->source)
@@ -178,14 +228,19 @@ class TransferFinishChecklist
             ->unique('id');
         foreach ($gitlabApps as $gitlabApp) {
             $items[] = $this->item('gitlab_webhook', $gitlabApp->uuid, "GitLab webhooks of GitLab App {$gitlabApp->name}",
-                "In GitLab, set the webhook URL of each project that uses it to {$this->instanceUrl()}/webhooks/source/gitlab/events, then push once.");
+                'Set the webhook URL in each GitLab project that uses it, then push once.',
+                [['label' => 'Webhook URL', 'value' => $this->instanceUrl().'/webhooks/source/gitlab/events']]);
         }
 
+        // These applications get a git source step instead: their source is not on this instance.
+        $gitSourceApplications = (array) data_get($server->server_metadata, 'transfer.git_source_applications', []);
         foreach ($applications as $application) {
             // A Docker image application keeps a default git_repository, but it never deploys from git.
-            if ($application->build_pack !== 'dockerimage' && filled($application->git_repository) && (! $application->source || data_get($application->source, 'is_public') === true)) {
+            if (! in_array($application->uuid, $gitSourceApplications, true) && $application->build_pack !== 'dockerimage' && filled($application->git_repository) && (! $application->source || data_get($application->source, 'is_public') === true)) {
                 $items[] = $this->item('manual_webhook', $application->uuid, "Manual webhook of {$application->name}",
-                    "If its repository has a webhook to Coolify, change the URL to {$this->instanceUrl()}/webhooks/source/<github|gitlab|bitbucket|gitea>/events/manual, then push once.");
+                    'If the repository has a webhook to Coolify, change its URL, then push once.',
+                    array_map(fn (string $provider, string $label) => ['label' => $label, 'value' => "{$this->instanceUrl()}/webhooks/source/{$provider}/events/manual"],
+                        ['github', 'gitlab', 'bitbucket', 'gitea'], ['GitHub', 'GitLab', 'Bitbucket', 'Gitea']));
             }
         }
 
@@ -208,29 +263,28 @@ class TransferFinishChecklist
 
         if ($runnerConfig) {
             $items[] = $this->item('github_runners', $runnerConfig->uuid, 'GitHub runners on this server',
-                'They are disabled after a transfer. When the GitHub App sends its webhooks here, enable them on the GitHub runners page of the server.',
-                route('server.github-runners', ['server_uuid' => $server->uuid], false));
+                'Disabled after the transfer. Enable them when the GitHub App sends its webhooks here.', [],
+                route('server.github-runners', ['server_uuid' => $server->uuid], false), 'Open runners');
         }
 
         // Links are relative: the list is built during the import request, whose host can be an internal one.
         // The importer lists applications that used a system-wide git source, or a source that this instance lacks.
-        $gitSourceApplications = (array) data_get($server->server_metadata, 'transfer.git_source_applications', []);
         foreach ($applications->whereIn('uuid', $gitSourceApplications) as $application) {
             $environment = $application->environment;
             $items[] = $this->item('git_source', $application->uuid, "Git source of {$application->name}",
-                'System-wide git sources are not transferred. Select a git source of this instance on the Source page of the application.',
+                'System-wide git sources are not transferred. Select a source of this instance.', [],
                 $environment?->project ? route('project.application.source', [
                     'project_uuid' => $environment->project->uuid,
                     'environment_uuid' => $environment->uuid,
                     'application_uuid' => $application->uuid,
-                ], false) : null);
+                ], false) : null, 'Open source');
         }
 
         return $items;
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null} status, short message, technical reason
      */
     private function runCheck(Server $server, array $item): array
     {
@@ -238,11 +292,11 @@ class TransferFinishChecklist
 
         return match ($item['type']) {
             'server_connection' => ($result = $server->validateConnection())['uptime']
-                ? ['ok', 'This instance connects to the server over SSH.']
-                : ['action', 'This instance cannot connect to the server: '.$result['error']],
+                ? ['ok', 'This instance connects to the server over SSH.', null]
+                : ['action', 'This instance cannot connect to the server over SSH.', $result['error']],
             'sentinel' => $server->sentinel_updated_at && Carbon::parse($server->sentinel_updated_at)->isAfter($startedAt)
-                ? ['ok', 'Sentinel sent data at '.Carbon::parse($server->sentinel_updated_at)->format('H:i').'.']
-                : ['action', 'Sentinel did not send data to this instance since the transfer.'],
+                ? ['ok', 'Sentinel sent data at '.Carbon::parse($server->sentinel_updated_at)->format('H:i').'.', null]
+                : ['action', 'No data from Sentinel since the transfer.', null],
             'github_app_webhook' => $this->checkGithubAppWebhook($item['subject'], $startedAt),
             'gitlab_webhook' => $this->checkWebhookReceipt('gitlab_app', $item['subject'], $startedAt),
             'manual_webhook' => $this->checkWebhookReceipt('application', $item['subject'], $startedAt),
@@ -251,8 +305,8 @@ class TransferFinishChecklist
             's3_storage' => $this->checkS3Storage($item['subject']),
             'git_source' => $this->checkGitSource($item['subject']),
             'github_runners' => $server->githubRunnerConfig()->value('is_enabled')
-                ? ['ok', 'GitHub runners are enabled.']
-                : ['action', 'GitHub runners are disabled. Enable them on the GitHub runners page of the server.'],
+                ? ['ok', 'GitHub runners are enabled.', null]
+                : ['action', 'Disabled after the transfer. Enable them when the GitHub App sends its webhooks here.', null],
             default => throw new RuntimeException('Coolify cannot check this step. Do it by hand, then mark it as done.'),
         };
     }
@@ -269,59 +323,62 @@ class TransferFinishChecklist
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null}
      */
     private function checkGithubAppWebhook(string $uuid, Carbon $startedAt): array
     {
         $githubApp = GithubApp::where('uuid', $uuid)->first();
         if (! $githubApp) {
-            return ['unchecked', 'The GitHub App does not exist on this instance anymore.'];
+            return ['unchecked', 'The GitHub App does not exist on this instance anymore.', null];
         }
 
         try {
             $url = (string) data_get($this->githubAppRequest($githubApp, 'get', '/app/hook/config'), 'url');
         } catch (Throwable $e) {
-            return $this->checkWebhookReceipt('github_app', $uuid, $startedAt, 'GitHub cannot be asked ('.$e->getMessage().'). ');
+            // Without the API, a webhook that arrives here still proves the URL.
+            [$status, $message] = $this->checkWebhookReceipt('github_app', $uuid, $startedAt);
+
+            return [$status, $status === 'ok' ? $message : 'GitHub cannot be asked with the App key. '.$message, $e->getMessage()];
         }
 
         return rtrim($url, '/') === $this->githubWebhookUrl()
-            ? ['ok', "GitHub sends webhooks to {$url}."]
-            : ['action', 'GitHub sends webhooks to '.($url ?: 'no URL').'. It must be '.$this->githubWebhookUrl().'.'];
+            ? ['ok', 'GitHub sends webhooks to this instance.', null]
+            : ['action', 'GitHub sends webhooks to another URL.', 'Current URL: '.($url ?: 'none')];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null}
      */
-    private function checkWebhookReceipt(string $kind, string $uuid, Carbon $startedAt, string $prefix = ''): array
+    private function checkWebhookReceipt(string $kind, string $uuid, Carbon $startedAt): array
     {
         $receivedAt = Cache::get("transfer-finish:webhook:{$kind}:{$uuid}");
         if (is_string($receivedAt) && Carbon::parse($receivedAt)->isAfter($startedAt)) {
-            return ['ok', $prefix.'This instance received a webhook at '.Carbon::parse($receivedAt)->format('H:i').'.'];
+            return ['ok', 'A webhook arrived at '.Carbon::parse($receivedAt)->format('H:i').'.', null];
         }
 
-        return ['action', $prefix.'This instance did not receive a webhook since the transfer. Change the webhook URL, then push once.'];
+        return ['action', 'No webhook arrived since the transfer.', null];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null}
      */
     private function checkDnsRecord(string $uuid): array
     {
         $record = ManagedDnsRecord::where('uuid', $uuid)->first();
         if (! $record) {
-            return ['unchecked', 'This instance does not track this record anymore.'];
+            return ['unchecked', 'This instance does not track this record anymore.', null];
         }
         if ($record->owned && app(CloudflareDnsProvider::class)->reclaimRecord($record)) {
-            return ['ok', "This instance manages {$record->name} at Cloudflare."];
+            return ['ok', 'This instance manages the record at Cloudflare.', null];
         }
 
-        return ['action', $record->owned
-            ? "Cloudflare does not confirm {$record->name}: the record changed or cannot be read."
-            : "This instance does not own {$record->name} yet, so it does not change it. Take ownership, or mark it as done."];
+        return $record->owned
+            ? ['action', 'Cloudflare does not confirm the record.', 'The record changed at Cloudflare, or Cloudflare cannot be reached with the token.']
+            : ['action', 'This instance does not own the record yet.', 'Until it owns the record, this instance does not change or delete it.'];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null}
      */
     private function checkDomain(Server $server, string $host): array
     {
@@ -329,31 +386,31 @@ class TransferFinishChecklist
         $records = @dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
         $ips = array_values(array_filter(array_map(fn (array $record) => $record['ip'] ?? $record['ipv6'] ?? null, $records)));
         if ($ips === []) {
-            return ['action', "{$host} does not resolve."];
+            return ['action', 'The domain does not resolve.', null];
         }
         if (array_intersect($ips, $serverIps) !== []) {
-            return ['ok', "{$host} resolves to the server."];
+            return ['ok', 'The domain points to the server.', null];
         }
 
-        return ['action', "{$host} resolves to ".implode(', ', $ips).', not to the server ('.implode(', ', $serverIps ?: [$server->ip]).'). If a proxy or load balancer is in front, mark it as done.'];
+        return ['action', 'The domain points to another address.', 'Resolves to '.implode(', ', $ips).'; the server is '.implode(', ', $serverIps ?: [$server->ip]).'. If a proxy or load balancer is in front, mark it as done.'];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null}
      */
     private function checkS3Storage(string $uuid): array
     {
         $storage = S3Storage::where('uuid', $uuid)->first();
         if (! $storage) {
-            return ['unchecked', 'The S3 storage does not exist on this instance anymore.'];
+            return ['unchecked', 'The S3 storage does not exist on this instance anymore.', null];
         }
         try {
             $storage->testConnection(shouldSave: true);
         } catch (Throwable $e) {
-            return ['action', 'This instance cannot use the S3 storage: '.$e->getMessage()];
+            return ['action', 'This instance cannot use the S3 storage.', $e->getMessage()];
         }
 
-        return $storage->fresh()->is_usable ? ['ok', 'This instance can use the S3 storage.'] : ['action', 'This instance cannot use the S3 storage.'];
+        return $storage->fresh()->is_usable ? ['ok', 'This instance can use the S3 storage.', null] : ['action', 'This instance cannot use the S3 storage.', null];
     }
 
     private function githubAppRequest(GithubApp $githubApp, string $method, string $path, array $data = []): array
@@ -412,15 +469,15 @@ class TransferFinishChecklist
         }
 
         try {
-            [$status, $message] = $change($finish['items'][$index]);
+            [$status, $message, $error] = $change($finish['items'][$index]) + [2 => null];
         } catch (Throwable $e) {
-            [$status, $message] = ['action', $e->getMessage()];
+            [$status, $message, $error] = ['action', 'Coolify could not do this step.', $e->getMessage()];
         }
 
-        return DB::transaction(function () use ($server, $key, $status, $message) {
+        return DB::transaction(function () use ($server, $key, $status, $message, $error) {
             $finish = (array) data_get(Server::query()->lockForUpdate()->findOrFail($server->id)->server_metadata, 'transfer.finish');
             $index = array_search($key, array_column($finish['items'], 'key'), true);
-            $finish['items'][$index] = [...$finish['items'][$index], 'status' => $status, 'message' => $message, 'checked_at' => now()->toIso8601String()];
+            $finish['items'][$index] = [...$finish['items'][$index], 'status' => $status, 'message' => $message, 'error' => $error, 'checked_at' => now()->toIso8601String()];
             $this->save($server, $finish);
 
             return $finish['items'][$index];
@@ -452,26 +509,27 @@ class TransferFinishChecklist
         $application = Application::where('uuid', $applicationUuid)->first();
         $source = $application?->source;
         if (! $source instanceof GithubApp && ! $source instanceof GitlabApp) {
-            return ['action', 'The application has no git source on this instance, so deployments from git fail. Select a source on its Source page.'];
+            return ['action', 'No git source on this instance, so deployments from git fail.', null];
         }
-        $webhookNote = $source->is_system_wide
-            ? ' Push webhooks of a system-wide App go to the instance where the App is registered, so use a manual webhook for push-to-deploy if that is not this instance.'
-            : '';
         if ($source instanceof GithubApp && ! $source->is_public) {
             try {
                 generateGithubInstallationToken($source);
             } catch (Throwable $e) {
-                return ['action', "GitHub App {$source->name} cannot access its installation: ".$e->getMessage()];
+                return ['action', "GitHub App {$source->name} cannot read the repository.", $e->getMessage()];
             }
         }
 
-        return ['ok', "The application uses {$source->name}.".$webhookNote];
+        // Push webhooks of a system-wide App go to the instance where the App is registered.
+        return ['ok', "Uses {$source->name}.", $source->is_system_wide ? 'For push-to-deploy, use a manual webhook if the system-wide App is registered on another instance.' : null];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function item(string $type, string $subject, string $label, ?string $message = null, ?string $link = null): array
+    /**
+     * @param  list<array{label: string, value: string}>  $details
+     */
+    private function item(string $type, string $subject, string $label, ?string $hint = null, array $details = [], ?string $link = null, ?string $linkLabel = null): array
     {
         return [
             'key' => "{$type}:{$subject}",
@@ -479,8 +537,12 @@ class TransferFinishChecklist
             'subject' => $subject,
             'label' => $label,
             'status' => 'pending',
-            'message' => $message,
+            'hint' => $hint,
+            'message' => null,
+            'details' => $details,
+            'error' => null,
             'link' => $link,
+            'link_label' => $linkLabel,
             'checked_at' => null,
         ];
     }

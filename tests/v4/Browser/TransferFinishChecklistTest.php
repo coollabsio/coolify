@@ -19,6 +19,7 @@ beforeEach(function () {
         'git_repository' => 'https://github.com/acme/shop',
     ]);
     app(TransferFinishChecklist::class)->start($this->server);
+    app(TransferFinishChecklist::class)->markDone($this->server, 'server_connection:server');
 });
 
 it('shows the finish list on the server page and finishes it after a confirmation', function () {
@@ -33,11 +34,17 @@ it('shows the finish list on the server page and finishes it after a confirmatio
     $page->navigate('/server/transferred-1')
         ->assertSee('Finish the transfer')
         ->assertSee('Manual webhook of shop')
+        ->assertSee('1 step is OK or done')
         ->screenshot(filename: 'transfer-finish-list');
 
-    $page->click('button:visible:has-text("I finished")')
+    $page->click('li:has-text("Manual webhook of shop") button:has-text("Details")')
+        ->wait(0.5)
+        ->assertSee('/webhooks/source/github/events/manual')
+        ->screenshot(filename: 'transfer-finish-details');
+
+    $page->click('button:visible:has-text("Finish with open steps")')
         ->wait(1)
-        ->assertSee('Finish the transfer?')
+        ->assertSee('Finish with open steps?')
         ->assertSee('Skipped: Manual webhook of shop')
         ->screenshot(filename: 'transfer-finish-confirm');
 });

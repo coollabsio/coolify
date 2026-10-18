@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Server\Show;
+use App\Livewire\Server\TransferFinish;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -195,11 +196,14 @@ test('after a take back the server page shows the finish list until the user fin
         'git_repository' => 'https://github.com/coollabsio/coolify',
     ]);
 
-    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->call('enableManagement')
-        ->assertSee('Finish the transfer')
-        ->assertSee('Manual webhook of shop');
+        ->assertDispatched('transferFinishStarted');
 
-    $component->call('finishTransfer')->assertDontSee('Finish the transfer');
+    Livewire::test(TransferFinish::class, ['server' => $this->server->fresh()])
+        ->assertSee('Finish the transfer')
+        ->assertSee('Manual webhook of shop')
+        ->call('finishTransfer')
+        ->assertDontSee('Finish the transfer');
     expect(data_get($this->server->fresh()->server_metadata, 'transfer.finish.finished_at'))->not->toBeNull();
 });
