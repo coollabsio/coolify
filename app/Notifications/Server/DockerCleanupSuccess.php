@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -52,6 +53,15 @@ class DockerCleanupSuccess extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'Docker cleanup job succeeded',
+            level: 'success',
+            message: "Docker cleanup job succeeded on {$this->server->name}!\n\n{$this->message}",
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
             title: 'Docker cleanup job succeeded',
             level: 'success',
             message: "Docker cleanup job succeeded on {$this->server->name}!\n\n{$this->message}",
