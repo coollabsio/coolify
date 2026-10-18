@@ -93,8 +93,10 @@ it('writes the Caddyfile through sudo', function () {
 
     StartProxy::run($this->server, async: false, force: true);
 
+    $base64 = base64_encode("import /dynamic/*.caddy\n");
+
     expect(nonRootProxyScriptLines())
-        ->toContain("echo 'import /dynamic/*.caddy' | sudo tee /data/coolify/proxy/caddy/dynamic/Caddyfile > /dev/null");
+        ->toContain("echo '{$base64}' | sudo base64 -d | sudo tee /data/coolify/proxy/caddy/dynamic/Caddyfile > /dev/null");
 });
 
 it('deploys the swarm proxy stack with an absolute compose file path', function () {

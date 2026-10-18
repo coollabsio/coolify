@@ -6,16 +6,6 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         <div class="flex flex-wrap items-center gap-2">
-            @if (isDev())
-                @can('create', App\Models\Server::class)
-                    <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
-                        class="button w-fit shrink-0 whitespace-nowrap">
-                        <x-reicon name="upload" class="size-3.5" />
-                        Import server
-                        <x-status-badge label="Dev" />
-                    </a>
-                @endcan
-            @endif
             @can('createAnyResource')
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
@@ -28,7 +18,7 @@
 
     @php
         $serverRows = $servers->map(function ($server) {
-            $isTransferredAway = isDev() && $server->isTransferredAway();
+            $isTransferredAway = $server->isTransferredAway();
             $isReady = $server->settings->is_reachable
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
@@ -38,7 +28,6 @@
             $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
-                $isTransferredAway && $server->isManagementDisabled() => 'Transferable',
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
@@ -67,7 +56,7 @@
 
     <div x-data="{
         search: '',
-        viewMode: localStorage.getItem('coolify-servers-view') || 'table',
+        viewMode: @js($this->listView('servers', 'table')),
         servers: @js($serverRows),
         get filteredServers() {
             const query = this.search.trim().toLowerCase();
@@ -79,7 +68,7 @@
         },
         setViewMode(mode) {
             this.viewMode = mode;
-            localStorage.setItem('coolify-servers-view', mode);
+            this.$wire.saveListView('servers', mode);
         }
     }">
         @if ($servers->isEmpty())
@@ -100,31 +89,8 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
-                        <span x-text="filteredServers.length"></span>
-                        <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
-                    </span>
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
-                </div>
+                <x-canvas-view-toggle :list-url="route('server.index')"
+                    :canvas-url="route('server.canvas.index')" />
             </div>
 
             <div x-cloak x-show="viewMode === 'grid'"

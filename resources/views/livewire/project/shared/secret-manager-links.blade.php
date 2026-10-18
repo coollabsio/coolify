@@ -7,8 +7,14 @@
 
         @if (! $link && $availableTokens->isEmpty())
             <x-empty title="No secret manager tokens"
-                description="Add a Doppler, Infisical, or HashiCorp Vault token under Keys & Tokens > Integration Tokens first."
-                icon-name="keys" size="sm" />
+                description="Add a Doppler, Infisical, or HashiCorp Vault token first."
+                icon-name="keys" size="sm">
+                <x-slot:actions>
+                    <a class="button" href="{{ route('security.integration-tokens') }}" {{ wireNavigate() }}>
+                        Integration tokens
+                    </a>
+                </x-slot:actions>
+            </x-empty>
         @else
             @can('update', $resource)
                 <div class="application-settings-form flex w-full flex-col gap-4">

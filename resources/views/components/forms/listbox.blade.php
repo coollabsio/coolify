@@ -23,6 +23,7 @@
     'searchable' => false, // true = a search field filters the options
     'searchPlaceholder' => 'Search…',
     'searchEmptyText' => 'No matching options',
+    'allowCustom' => false, // true (with searchable) = the search text can be chosen as a custom value
 ])
 
 @php
@@ -92,9 +93,15 @@
             return this.options.filter((option) => !option.header && [option.label, option.value, option.description]
                 .some((text) => String(text ?? '').toLowerCase().includes(query)));
         },
+        get customOption() {
+            const query = this.query.trim();
+            if (!@js($allowCustom) || query === '' || this.options.some((option) => !option.header && String(option.value) === query)) return null;
+            return { value: query, label: query };
+        },
         chooseOnlyMatch() {
             const matches = this.visibleOptions.filter((option) => !option.disabled);
             if (matches.length === 1) this.choose(matches[0]);
+            else if (this.customOption) this.choose(this.customOption);
         },
         @else
         get visibleOptions() {
@@ -126,7 +133,8 @@
         },
         get current() {
             const found = this.options.find((option) => String(option.value) === String(this.value));
-            return found ? found.label : @js($placeholder);
+            if (found) return found.label;
+            return @js($allowCustom) && this.value ? String(this.value) : @js($placeholder);
         },
         get title() {
             return this.current;
@@ -237,7 +245,7 @@
                         </div>
                         <div class="searchable-listbox-options">
                     @endif
-                    <div x-show="visibleOptions.length === 0"
+                    <div x-show="visibleOptions.length === 0{{ $searchable && $allowCustom ? ' && !customOption' : '' }}"
                         class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
                         @if ($searchable)
                             <span x-text="options.length === 0 ? @js($emptyText) : @js($searchEmptyText)"></span>
@@ -272,6 +280,14 @@
                             </template>
                         </div>
                     </template>
+                    @if ($searchable && $allowCustom)
+                        <template x-if="customOption">
+                            <button type="button" class="listbox-option" role="option" aria-selected="false"
+                                @click="choose(customOption)">
+                                <span class="truncate">Use <span class="font-mono" x-text="customOption.label"></span></span>
+                            </button>
+                        </template>
+                    @endif
                     @if ($searchable)
                         </div>
                     @endif
@@ -296,7 +312,7 @@
                     </div>
                     <div class="searchable-listbox-options">
                 @endif
-                <div x-show="visibleOptions.length === 0"
+                <div x-show="visibleOptions.length === 0{{ $searchable && $allowCustom ? ' && !customOption' : '' }}"
                     class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
                     @if ($searchable)
                         <span x-text="options.length === 0 ? @js($emptyText) : @js($searchEmptyText)"></span>
@@ -329,6 +345,14 @@
                         </template>
                     </div>
                 </template>
+                @if ($searchable && $allowCustom)
+                    <template x-if="customOption">
+                        <button type="button" class="listbox-option" role="option" aria-selected="false"
+                            @click="choose(customOption)">
+                            <span class="truncate">Use <span class="font-mono" x-text="customOption.label"></span></span>
+                        </button>
+                    </template>
+                @endif
                 @if ($searchable)
                     </div>
                 @endif

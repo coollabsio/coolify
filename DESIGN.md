@@ -229,8 +229,13 @@ sub-header.
 The dashboard is a compact overview, not a metrics wall. It has no page header:
 live active deployments come first as a compact table, followed by traffic
 analytics when a server has it enabled, then two full-width sections (Projects,
-then Servers) that follow the projects-page grid pattern. Each section uses
-`x-section-heading` linking to its full index. Communicate server health with
+then Servers). Each section uses `x-section-heading` with a small "View all"
+link to its full index (next to the switcher) and a table / grid `x-canvas-view-toggle` (no canvas
+link). Table is the default; each section remembers its own choice. A page-level
+List / Canvas switch at the top opens `/dashboard/canvas`: the servers canvas
+with a "Deploying" / "Queued" pill on each application card that has an active
+deployment, and a foldable Recent deployments panel at the bottom left (active, then
+recent; a row shows its card, the status opens the deployment). Communicate server health with
 the shared status badge.
 
 ### Top-level dashboard destinations
@@ -736,10 +741,14 @@ Charts follow the application metrics implementation:
 - downsample long time ranges before rendering.
 
 Only add a metric if Sentinel exposes historical data for it. Current Sentinel
-history endpoints store CPU and memory. Root filesystem usage is included in
-the periodic push payload for threshold notifications, but it is not stored as
-a historical Sentinel metric and has no history endpoint, so it cannot power a
-disk-usage graph yet.
+history endpoints store CPU, memory, disk, network throughput, and load average
+(Sentinel PR #47 added disk, network, and load). Bulk snapshot endpoints
+(`/api/summary`, `/api/containers/current`) return the latest host and
+per-container values in one call for fleet-wide views.
+
+The fleet Metrics page (`/metrics`, top-level sidebar) aggregates these across
+every team server: KPI tiles, per-metric trend cards, a threshold-colored
+servers table, and a fleet-wide hottest-containers list.
 
 ---
 
@@ -759,6 +768,7 @@ Use these as implementation references:
 | Dense environment table and footer | `resources/views/livewire/project/shared/environment-variable/all.blade.php` |
 | Standard table toolbar controls | `resources/views/components/table/*` |
 | Application metrics charts | `resources/views/livewire/project/shared/metrics.blade.php` |
+| Fleet metrics page | `resources/views/livewire/fleet/metrics.blade.php` |
 | Browser terminal workspace | `resources/views/livewire/terminal/index.blade.php` |
 | Layer card | `resources/views/components/application/settings-section.blade.php` |
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |

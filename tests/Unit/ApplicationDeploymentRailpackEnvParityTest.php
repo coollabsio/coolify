@@ -81,13 +81,13 @@ it('generates escaped railpack env args from resolved values and includes instal
         'RAILPACK_CUSTOM_FLAG' => 'hello world',
         'RAILPACK_JSON' => '{"token":"abc"}',
         'RAILPACK_INSTALL_CMD' => 'npm ci && npm run postinstall',
-        'RAILPACK_DEPLOY_APT_PACKAGES' => 'curl wget',
+        'RAILPACK_DEPLOY_APT_PACKAGES' => '... curl wget',
     ]);
     expect($envArgs)->toContain("--env 'RAILPACK_NODE_VERSION=22'");
     expect($envArgs)->toContain("--env 'RAILPACK_CUSTOM_FLAG=hello world'");
     expect($envArgs)->toContain("--env 'RAILPACK_JSON={\"token\":\"abc\"}'");
     expect($envArgs)->toContain("--env 'RAILPACK_INSTALL_CMD=npm ci && npm run postinstall'");
-    expect($envArgs)->toContain("--env 'RAILPACK_DEPLOY_APT_PACKAGES=curl wget'");
+    expect($envArgs)->toContain("--env 'RAILPACK_DEPLOY_APT_PACKAGES=... curl wget'");
     expect($envArgs)->not->toContain('RAILPACK_NULL');
 });
 
@@ -136,7 +136,7 @@ it('uses preview railpack environment variables for preview deployments', functi
 
     expect($variables->all())->toBe([
         'RAILPACK_PREVIEW_ONLY' => 'preview-value',
-        'RAILPACK_DEPLOY_APT_PACKAGES' => 'curl wget',
+        'RAILPACK_DEPLOY_APT_PACKAGES' => '... curl wget',
     ]);
 });
 
@@ -195,7 +195,7 @@ it('merges coolify env variables into railpack build variables', function () {
 
     expect($variables->all())->toBe([
         'MY_BUILD_VAR' => 'hello',
-        'RAILPACK_DEPLOY_APT_PACKAGES' => 'curl wget',
+        'RAILPACK_DEPLOY_APT_PACKAGES' => '... curl wget',
         'COOLIFY_URL' => 'https://app.example.com',
         'COOLIFY_FQDN' => 'app.example.com',
         'COOLIFY_BRANCH' => 'main',
@@ -209,7 +209,7 @@ it('merges coolify env variables into railpack build variables', function () {
 
     expect($envArgs)->toContain("--env 'COOLIFY_URL=https://app.example.com'");
     expect($envArgs)->toContain("--env 'SOURCE_COMMIT=abc123'");
-    expect($envArgs)->toContain("--env 'RAILPACK_DEPLOY_APT_PACKAGES=curl wget'");
+    expect($envArgs)->toContain("--env 'RAILPACK_DEPLOY_APT_PACKAGES=... curl wget'");
     expect($envArgs)->not->toContain('EMPTY_VAR');
     expect($envArgs)->not->toContain('NULL_VAR');
 });
@@ -257,11 +257,11 @@ it('preserves user railpack deploy apt packages while adding healthcheck tools o
     $method->setAccessible(true);
     $variables = $method->invoke($job);
 
-    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('ffmpeg curl wget');
+    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('... ffmpeg curl wget');
 
     $envArgsProperty = $reflection->getProperty('env_railpack_args');
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    expect($envArgs)->toContain("--env 'RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg curl wget'");
+    expect($envArgs)->toContain("--env 'RAILPACK_DEPLOY_APT_PACKAGES=... ffmpeg curl wget'");
 });

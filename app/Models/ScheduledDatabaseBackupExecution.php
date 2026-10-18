@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Replicas;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScheduledDatabaseBackupExecution extends BaseModel
 {
+    use HasS3Replicas;
+
     protected static function booted(): void
     {
         static::created(function (ScheduledDatabaseBackupExecution $execution): void {
@@ -41,5 +45,10 @@ class ScheduledDatabaseBackupExecution extends BaseModel
     public function scheduledDatabaseBackup(): BelongsTo
     {
         return $this->belongsTo(ScheduledDatabaseBackup::class);
+    }
+
+    public function s3Replicas(): HasMany
+    {
+        return $this->hasMany(DatabaseBackupS3Replica::class, 'execution_id');
     }
 }

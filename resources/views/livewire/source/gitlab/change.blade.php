@@ -95,7 +95,7 @@
             </x-application.settings-section>
 
             <x-application.settings-section title="Webhook"
-                description="Configure this webhook URL in your GitLab project settings (Settings → Webhooks).">
+                description="Configure this webhook URL in your GitLab project settings (Settings → Webhooks). On self-managed GitLab, an admin can instead add the same URL and token once as a system hook (Admin Area → System hooks) with Push events and Merge request events enabled.">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div class="lg:col-span-2">
                         <x-forms.input readonly label="Webhook URL"

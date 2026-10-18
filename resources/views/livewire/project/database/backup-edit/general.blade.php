@@ -1,10 +1,11 @@
-<form wire:submit="submit">
+<form wire:submit="submit" class="flex flex-col gap-6">
     <x-unsaved-bar action="submit" />
 
     <x-application.settings-section title="Backup schedule"
         description="Choose what to back up, when it runs, and how long it may run.">
         <x-slot:actions>
-            <div class="flex items-center gap-2">
+            {{-- Below xl the header bar is hidden, so keep the buttons here. --}}
+            <div @class(['flex items-center gap-2', 'xl:hidden' => $actionsInHeader])>
                 @if (! $backupEnabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
                         wire:target="toggleEnabled" isHighlighted>
@@ -98,4 +99,7 @@
             </div>
         </div>
     </x-application.settings-section>
+
+    @include('livewire.project.database.backup-edit.s3')
+    @include('livewire.project.database.backup-edit.retention')
 </form>

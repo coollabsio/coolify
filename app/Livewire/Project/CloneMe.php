@@ -279,6 +279,7 @@ class CloneMe extends Component
                     'team_id' => $teamId,
                 ]);
                 $newBackup->save();
+                $backup->copyS3StoragesTo($newBackup);
             }
 
             $environmentVaribles = $database->environment_variables()->get();
@@ -469,6 +470,7 @@ class CloneMe extends Component
                         'team_id' => $teamId,
                     ]);
                     $newBackup->save();
+                    $backup->copyS3StoragesTo($newBackup);
                 }
             }
 

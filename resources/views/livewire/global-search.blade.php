@@ -252,7 +252,7 @@
             const exactMatchCommands = [
                 'new project', 'new server', 'new team', 'new storage', 'new s3',
                 'new private key', 'new privatekey', 'new key',
-                'new github app', 'new github', 'new source',
+                'new github app', 'new github', 'new source', 'new canvas',
                 'new public', 'new public git', 'new public repo', 'new public repository',
                 'new private github', 'new private gh', 'new private deploy', 'new deploy key',
                 'new dockerfile', 'new docker compose', 'new compose', 'new docker image', 'new image',

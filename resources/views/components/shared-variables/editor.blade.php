@@ -17,6 +17,12 @@
             'scope' => mb_strtolower(str($type)->headline()),
         ])
         ->values();
+    $canvasUrl = match ($type) {
+        'team' => route('shared-variables.team.canvas'),
+        'project' => route('shared-variables.project.canvas', ['project_uuid' => $resource->uuid]),
+        'environment' => route('shared-variables.environment.canvas', ['project_uuid' => $resource->project->uuid, 'environment_uuid' => $resource->uuid]),
+        'server' => route('shared-variables.server.canvas', ['server_uuid' => $resource->uuid]),
+    };
 @endphp
 
 <x-shared-variables.layout>
@@ -38,6 +44,8 @@
                 <span class="max-sm:hidden">{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</span>
                 <span class="sm:hidden">{{ $view === 'normal' ? 'Developer' : 'Normal' }}</span>
             </x-forms.button>
+            <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]" :list-url="url()->current()"
+                :canvas-url="$canvasUrl" />
         </x-slot:actions>
         @if ($view === 'normal')
             <div
