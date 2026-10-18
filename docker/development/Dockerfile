@@ -106,6 +106,8 @@ RUN chown -R www-data:www-data /terminal
 COPY docker/development/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
 COPY docker/development/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
 COPY --chmod=755 docker/development/etc/s6-overlay/ /etc/s6-overlay/
+# The base image stops the container when a oneshot fails. Keep it running to serve the migration-failed page.
+ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=1
 
 RUN mkdir -p /etc/nginx/conf.d && \
     chown -R www-data:www-data /etc/nginx && \
