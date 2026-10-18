@@ -76,8 +76,9 @@
                             AWS credentials are read by the Docker daemon on this server, not by Coolify. Attach an IAM
                             instance role, or configure <code>AWS_ACCESS_KEY_ID</code>/<code>AWS_SECRET_ACCESS_KEY</code>
                             for the Docker service or in <code>/root/.aws/credentials</code>. The credentials need
-                            <code>logs:CreateLogGroup</code>, <code>logs:CreateLogStream</code> and
-                            <code>logs:PutLogEvents</code>. The log group is created if it does not exist. Redeploy or
+                            <code>logs:CreateLogStream</code> and <code>logs:PutLogEvents</code>, plus
+                            <code>logs:CreateLogGroup</code> if the log group does not exist yet. Delivery errors do not
+                            stop containers; they appear in the Docker daemon logs (<code>journalctl -u docker</code>). Redeploy or
                             restart resources to apply the logging driver.
                         </p>
                         <div class="grid gap-4 lg:grid-cols-3">

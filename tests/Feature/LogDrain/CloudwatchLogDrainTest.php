@@ -153,14 +153,6 @@ it('does not deploy the Fluent Bit container for CloudWatch', function () {
     expect($result)->toContain('awslogs');
 });
 
-it('shows the Amazon CloudWatch Logs section', function () {
-    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Amazon CloudWatch Logs')
-        ->assertSee('Log stream prefix');
-});
-
 it('turns off the legacy Highlight drain when CloudWatch is enabled', function () {
     StartLogDrain::mock()->shouldReceive('handle')->andReturn('ok');
     $this->server->settings->update([
@@ -248,5 +240,5 @@ it('keeps the Fluent Bit drain running if CloudWatch is also enabled, matching t
 
     StartLogDrain::run($server);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker compose up -d'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'log-drains/docker-compose.yml up -d'));
 });

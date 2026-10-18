@@ -31,6 +31,7 @@ it('uses the awslogs driver with every configured option', function () {
             'awslogs-region' => 'eu-west-1',
             'awslogs-group' => '/coolify/prod',
             'awslogs-create-group' => 'true',
+            'mode' => 'non-blocking',
             'tag' => 'docker/{{.Name}}',
         ],
     ]);

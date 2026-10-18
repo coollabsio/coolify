@@ -4477,6 +4477,8 @@ function generate_log_drain_configuration(Server $server): array
         'awslogs-region' => $settings->logdrain_cloudwatch_region,
         'awslogs-group' => $settings->logdrain_cloudwatch_group,
         'awslogs-create-group' => 'true',
+        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
+        'mode' => 'non-blocking',
         // The stream is named after the container; awslogs-stream is never set because it would override this tag.
         'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
     ];

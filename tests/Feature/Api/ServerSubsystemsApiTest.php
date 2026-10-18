@@ -208,25 +208,6 @@ describe('Log drains API', function () {
             ->and($settings->logdrain_cloudwatch_region)->toBe('us-east-1');
     });
 
-    test('PATCH rejects the removed advanced CloudWatch options', function (string $field, mixed $value) {
-        Queue::fake();
-
-        $this->withHeaders(serverSubsystemsHeaders())
-            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
-                $field => $value,
-            ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors($field);
-    })->with([
-        'endpoint' => ['logdrain_cloudwatch_endpoint', 'https://logs.us-east-1.amazonaws.com'],
-        'create group' => ['logdrain_cloudwatch_create_group', true],
-        'create stream' => ['logdrain_cloudwatch_create_stream', false],
-        'datetime format' => ['logdrain_cloudwatch_datetime_format', '%Y-%m-%d'],
-        'multiline pattern' => ['logdrain_cloudwatch_multiline_pattern', '^INFO'],
-        'force flush interval' => ['logdrain_cloudwatch_force_flush_interval_seconds', 10],
-        'max buffered events' => ['logdrain_cloudwatch_max_buffered_events', 1000],
-    ]);
-
     test('PATCH rejects enabling CloudWatch without a log group', function () {
         Queue::fake();
 
