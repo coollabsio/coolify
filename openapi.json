@@ -14642,7 +14642,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -14667,6 +14667,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -14796,7 +14799,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -14821,6 +14824,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -14990,7 +14996,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -15015,6 +15021,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -15144,7 +15153,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -15169,6 +15178,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -15243,7 +15255,7 @@
                     "Scheduled Tasks"
                 ],
                 "summary": "Execute Task",
-                "description": "Queue immediate execution of a scheduled task for an application.",
+                "description": "Queue immediate execution of a scheduled task for an application. Requires the deploy ability.",
                 "operationId": "execute-scheduled-task-by-application-uuid",
                 "parameters": [
                     {
@@ -15272,6 +15284,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "The token needs the deploy ability."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -15289,7 +15304,7 @@
                     "Scheduled Tasks"
                 ],
                 "summary": "Execute Task",
-                "description": "Queue immediate execution of a scheduled task for a service.",
+                "description": "Queue immediate execution of a scheduled task for a service. Requires the deploy ability.",
                 "operationId": "execute-scheduled-task-by-service-uuid",
                 "parameters": [
                     {
@@ -15317,6 +15332,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"

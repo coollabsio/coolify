@@ -438,14 +438,14 @@ Route::group([
     Route::patch('/applications/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'update_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'delete_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/scheduled-tasks/{task_uuid}/executions', [ScheduledTasksController::class, 'executions_by_application_uuid'])->middleware(['api.ability:read']);
-    Route::post('/applications/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_application_uuid'])->middleware(['api.ability:deploy']);
 
     Route::get('/services/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'scheduled_tasks_by_service_uuid'])->middleware(['api.ability:read']);
     Route::post('/services/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'create_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
     Route::patch('/services/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'update_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'delete_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/scheduled-tasks/{task_uuid}/executions', [ScheduledTasksController::class, 'executions_by_service_uuid'])->middleware(['api.ability:read']);
-    Route::post('/services/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
+    Route::post('/services/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_service_uuid'])->middleware(['api.ability:deploy']);
 });
 
 Route::group([
