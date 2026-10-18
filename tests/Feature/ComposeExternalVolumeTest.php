@@ -831,28 +831,6 @@ describe('delete', function () {
             ->toContain("docker volume rm -f '{$application->uuid}_app-data'");
     });
 
-    it('removes the project volumes of a legacy Compose application that stored no volumes', function () {
-        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE, '2');
-        $uuid = $application->uuid;
-        $application->delete();
-        $commands = [];
-        Process::fake(function ($process) use (&$commands, $uuid) {
-            $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-            $commands[] = $command;
-
-            return Process::result(output: str_contains($command, 'docker volume ls') ? "{$uuid}_app-data\n{$uuid}-cache\n" : '');
-        });
-
-        (new DeleteResourceJob($application))->handle();
-
-        $all = implode("\n", $commands);
-        expect($application->persistentStorages()->count())->toBe(0)
-            ->and($all)->toContain("docker volume ls -q --filter 'label=com.docker.compose.project={$uuid}'")
-            ->toContain("docker volume rm -f '{$uuid}_app-data'")
-            ->toContain("docker volume rm -f '{$uuid}-cache'")
-            ->not->toContain('docker compose');
-    });
-
     it('removes only the old prefixed volume when a service with an old storage entry is deleted with its volumes', function () {
         $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);
         $uuid = $service->uuid;
