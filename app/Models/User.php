@@ -263,7 +263,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null, ?int $teamId = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
@@ -277,7 +277,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
             'token' => hash('sha256', $plainTextToken),
             'abilities' => $abilities,
             'expires_at' => $expiresAt,
-            'team_id' => session('currentTeam')->id,
+            'team_id' => $teamId ?? session('currentTeam')->id,
         ]);
 
         return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);

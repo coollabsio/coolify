@@ -10,6 +10,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\User;
 use App\Rules\SafeWebhookUrl;
 use App\Services\Security\SensitiveDataRedactor;
 use Carbon\Carbon;
@@ -447,6 +448,55 @@ class ServerTransferMigrator
             fn (string $step) => str_replace('{target_url}', $targetUrl, $step),
             $steps,
         )));
+    }
+
+    /**
+     * Undo a transfer: ask the instance that manages the server now to transfer it back to this instance. That
+     * instance runs its prechecks at once and then a normal transfer; the import here replaces the archive.
+     * This instance creates a short-lived token for the import, scoped to the team of the archive.
+     */
+    public function requestTransferBack(Server $archive, User $user, string $managerUrl, string $managerToken, string $thisInstanceUrl): void
+    {
+        if (! $archive->isTransferredAway()) {
+            throw new RuntimeException('Only a server that was transferred to another instance can be transferred back.');
+        }
+
+        $managerUrl = $this->normalizeTargetUrl($managerUrl);
+        $managerToken = $this->normalizeToken($managerToken);
+        $thisInstanceUrl = rtrim(trim($thisInstanceUrl), '/');
+        if (! filter_var($thisInstanceUrl, FILTER_VALIDATE_URL)) {
+            throw new RuntimeException('Enter the URL at which the other instance reaches this instance.');
+        }
+
+        $importToken = $user->createToken("transfer back {$archive->uuid}", ['read', 'write'], now()->addHours(3), $archive->team_id);
+        $migrateUrl = $managerUrl.'/api/v1/servers/'.rawurlencode($archive->uuid).'/migrate';
+
+        try {
+            $response = $this->targetRequest($migrateUrl, $managerToken, self::CHECK_TIMEOUT_SECONDS * 4)
+                ->post($migrateUrl, ['target_url' => $thisInstanceUrl, 'target_token' => $importToken->plainTextToken]);
+        } catch (ConnectionException $e) {
+            $importToken->accessToken->delete();
+            throw new RuntimeException('This instance cannot reach '.remove_iip($managerUrl).': '.remove_iip($e->getMessage()), previous: $e);
+        }
+
+        if ($response->status() !== 202) {
+            $importToken->accessToken->delete();
+            $message = remove_iip((string) (data_get($response->json(), 'message') ?: 'no details'));
+            throw new RuntimeException(match ($response->status()) {
+                401 => 'The other instance does not accept the API token.',
+                403 => 'The API token of the other instance needs root, or read:sensitive and write, from an admin or owner. '.$message,
+                404 => 'The other instance does not know this server, or does not support transfers. '.$message,
+                default => "The other instance did not start the transfer back (HTTP {$response->status()}): {$message}",
+            });
+        }
+
+        DB::transaction(function () use ($archive, $managerUrl) {
+            $locked = Server::query()->lockForUpdate()->findOrFail($archive->id);
+            $metadata = $locked->server_metadata ?? [];
+            $metadata['transfer']['transfer_back'] = ['requested_at' => now()->toIso8601String(), 'from' => $managerUrl];
+            $locked->server_metadata = $metadata;
+            $locked->save();
+        });
     }
 
     private function normalizeTargetUrl(string $targetUrl): string

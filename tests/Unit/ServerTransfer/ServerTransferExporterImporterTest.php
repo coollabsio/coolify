@@ -390,12 +390,46 @@ test('the Cloudflare tunnel token moves with the server by uuid and the raw toke
         ->and($imported->token)->toBe('cf-tunnel-token');
 });
 
-test('import back to the source instance asks to delete the archived copy first', function () {
+test('a transfer back replaces the archive of the same team in the import transaction', function () {
     $bundle = $this->exporter->export($this->server);
+    $bundle['server']['name'] = 'changed-on-the-other-instance';
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    $archiveId = $this->server->id;
+
+    expect(collect($this->importer->importChecks($this->server->uuid, $this->server->ip, $this->team->id))->every(fn ($check) => $check['ok']))->toBeTrue();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $this->server->uuid)->firstOrFail();
+    expect($result['claimed'])->toBeTrue()
+        ->and($server->id)->not->toBe($archiveId)
+        ->and($server->name)->toBe('changed-on-the-other-instance')
+        ->and($server->isTransferredAway())->toBeFalse()
+        ->and(Server::withTrashed()->find($archiveId))->toBeNull()
+        ->and(Application::where('uuid', $this->application->uuid)->firstOrFail()->destination->server_id)->toBe($server->id);
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'docker rm') || str_contains($process->command, 'docker stop'));
+});
+
+test('a failed transfer back keeps the archive', function () {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['projects'][0]['environments'][0]['databases'][] = [
+        'type' => 'NotARealDatabaseType', 'uuid' => 'broken-db-uuid', 'attributes' => ['name' => 'broken'], 'destination_uuid' => $this->destination->uuid,
+    ];
     app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
 
-    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))
-        ->toThrow(ValidationException::class, 'archived copy of server source-server');
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))->toThrow(RuntimeException::class, 'Unsupported database type');
+
+    expect($this->server->fresh()?->isTransferredAway())->toBeTrue()
+        ->and(Application::where('uuid', $this->application->uuid)->exists())->toBeTrue();
+});
+
+test('the archive of another team is not replaced', function () {
+    $bundle = $this->exporter->export($this->server);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    $otherTeam = Team::factory()->create();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $otherTeam->id))
+        ->toThrow(ValidationException::class, 'Another team of this instance has the archived copy');
 });
 
 test('import rolls back all created rows when a later resource fails', function () {

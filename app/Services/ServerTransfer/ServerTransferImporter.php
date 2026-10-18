@@ -185,8 +185,10 @@ class ServerTransferImporter
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $serverIp = (string) data_get($bundle, 'server.ip');
 
-        $uuidConflict = $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
-        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->exists();
+        // A server that comes back replaces the archived copy that this instance kept from the first transfer.
+        $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
+        $uuidConflict = $archive === null && $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
+        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
 
         if (! $dryRun) {
             $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
@@ -259,7 +261,11 @@ class ServerTransferImporter
             ];
         }
 
-        $result = DB::transaction(function () use ($bundle, $teamId, $preserveUuids, $adoptMode, $warnings, &$created) {
+        $result = DB::transaction(function () use ($bundle, $teamId, $preserveUuids, $adoptMode, $warnings, $archive, &$created) {
+            // Removed in the same transaction as the import, so a failed import keeps the archive.
+            if ($archive) {
+                app(ServerTransferClaimer::class)->deleteArchive($archive);
+            }
             Team::ensureServerCapacity($teamId);
 
             $this->privateKeyMap = [];
@@ -463,18 +469,19 @@ class ServerTransferImporter
     public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): array
     {
         $team = Team::find($teamId);
-        $limitReached = ! $team || Team::serverLimitReached($team);
+        $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
+        // The archive is replaced, so the import does not add a server.
+        $limitReached = ! $team || ($archive === null && Team::serverLimitReached($team));
 
-        $existingServer = $preserveUuids ? Server::withTrashed()->where('uuid', $serverUuid)->first() : null;
-        // A server that comes back keeps an archived copy of itself here from the first transfer.
+        $existingServer = $preserveUuids && $archive === null ? Server::withTrashed()->where('uuid', $serverUuid)->first() : null;
         $uuidMessage = match (true) {
             $existingServer === null => null,
             $existingServer->trashed() => "The server with UUID {$serverUuid} is still being deleted on this instance. Wait a minute, then transfer again.",
-            $existingServer->isTransferredAway() => "This instance still has the archived copy of server {$existingServer->name} from an earlier transfer. Delete that server on this instance first (this deletes only its records here, nothing on the server), then transfer again.",
+            $existingServer->isTransferredAway() => "Another team of this instance has the archived copy of server {$existingServer->name}. Transfer the server into that team, or delete the archive there first.",
             default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
         };
 
-        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->exists();
+        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
 
         return [
             [
@@ -485,7 +492,7 @@ class ServerTransferImporter
             ],
             [
                 'field' => 'server.uuid',
-                'label' => 'no server with the same UUID exists',
+                'label' => $archive ? 'the archived copy of this server on this instance is replaced' : 'no server with the same UUID exists',
                 'ok' => $uuidMessage === null,
                 'message' => $uuidMessage,
             ],
@@ -496,6 +503,17 @@ class ServerTransferImporter
                 'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
             ],
         ];
+    }
+
+    /**
+     * The archive that this instance kept when it transferred the server away. A transfer back into the same team
+     * replaces it.
+     */
+    private function replaceableArchive(string $serverUuid, int $teamId): ?Server
+    {
+        $server = Server::query()->where('uuid', $serverUuid)->where('team_id', $teamId)->first();
+
+        return $server?->isTransferredAway() ? $server : null;
     }
 
     /**

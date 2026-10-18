@@ -21,6 +21,13 @@ class Transfer extends Component
 
     public ?string $exportId = null;
 
+    /** Transfer back fields, shown for an archive */
+    public string $managerUrl = '';
+
+    public string $managerToken = '';
+
+    public string $thisInstanceUrl = '';
+
     /** @var list<string> */
     public array $lastWarnings = [];
 
@@ -31,6 +38,8 @@ class Transfer extends Component
             // The transfer exports every credential of the server, so only admins and owners may open it.
             $this->authorize('update', $this->server);
             $this->exportId = data_get($this->server->server_metadata, 'transfer.export_id');
+            $this->managerUrl = (string) data_get($this->server->server_metadata, 'transfer.target_instance_url', '');
+            $this->thisInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
         } catch (Throwable $e) {
             handleError($e, $this);
             $this->redirect(route('server.index'), navigate: true);
@@ -101,6 +110,26 @@ class Transfer extends Component
         } catch (Throwable $e) {
             // A failed check is saved in the transfer log, so show it.
             $this->server->refresh();
+            handleError($e, $this);
+        }
+    }
+
+    public function transferBack(ServerTransferMigrator $migrator): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $migrator->requestTransferBack($this->server, auth()->user(), $this->managerUrl, $this->managerToken, $this->thisInstanceUrl);
+
+            auditLog('ui.server.transfer_back', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'from' => $this->managerUrl,
+            ]);
+
+            $this->server->refresh();
+            $this->managerToken = '';
+            $this->dispatch('success', 'The other instance started the transfer back.');
+        } catch (Throwable $e) {
             handleError($e, $this);
         }
     }

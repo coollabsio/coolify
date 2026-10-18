@@ -189,9 +189,10 @@
                             <x-callout type="danger" title="Transferred to another instance" class="mb-4">
                                 This server was transferred to
                                 <strong>{{ data_get($server->server_metadata, 'transfer.target_instance_url') ?: 'another Coolify instance' }}</strong>,
-                                which manages it now. Use that instance. To move the server back, delete this archived
-                                server here (this deletes only its records on this instance), then transfer the server from
-                                that instance to this one.
+                                which manages it now. Use that instance. To undo the transfer, use
+                                <a href="{{ route('server.transfer', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                                    class="underline">Transfer back</a>. Keep this archive until you are sure: it is the copy
+                                that an undo uses.
                             </x-callout>
                         @endif
 

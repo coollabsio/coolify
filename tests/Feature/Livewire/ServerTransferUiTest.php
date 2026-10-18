@@ -286,3 +286,31 @@ test('transfer page hides the post-transfer checklist', function (string $status
     'finished transfer without steps' => ['succeeded', []],
     'failed transfer' => ['failed', ['Set the webhook URL of GitHub App deploy-bot.']],
 ]);
+
+test('the transfer page of an archive offers a transfer back instead of a transfer', function () {
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://8.8.8.8');
+    Http::fake(['https://8.8.8.8/api/v1/servers/*/migrate' => Http::response(['migration' => ['status' => 'running']], 202)]);
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSet('managerUrl', 'https://8.8.8.8')
+        ->assertDontSee('Transfer to another instance')
+        ->set('managerToken', 'token-of-b')
+        ->call('transferBack')
+        ->assertDispatched('success')
+        ->assertSee('Transfer back started');
+
+    Http::assertSentCount(1);
+});
+
+test('team members cannot start a transfer back', function () {
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://8.8.8.8');
+    Http::fake();
+    $component = Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid]);
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+
+    $component->set('managerToken', 'token-of-b')->call('transferBack');
+
+    Http::assertNothingSent();
+});

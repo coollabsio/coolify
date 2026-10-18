@@ -3,6 +3,7 @@
 namespace App\Services\ServerTransfer;
 
 use App\Enums\GithubRunnerStatus;
+use App\Jobs\DeleteResourceJob;
 use App\Models\GithubRunnerExecution;
 use App\Models\ManagedDnsRecord;
 use App\Models\Server;
@@ -162,6 +163,23 @@ class ServerTransferClaimer
     public function forgetDnsRecords(Server $server): void
     {
         app(ManagedDnsRecordCleanup::class)->forgetResources($this->dnsResources($server));
+    }
+
+    /**
+     * Delete the archive of a transferred server with its resources, records only: another instance manages the
+     * host, so nothing runs on the server and nothing changes at a provider.
+     */
+    public function deleteArchive(Server $server): void
+    {
+        if (! $server->isTransferredAway()) {
+            throw new RuntimeException('Only the archive of a transferred server can be deleted this way.');
+        }
+
+        $this->forgetDnsRecords($server);
+        foreach ($server->definedResources() as $resource) {
+            (new DeleteResourceJob($resource, deleteFromCoolifyOnly: true))->handle();
+        }
+        $server->forceDelete();
     }
 
     /**

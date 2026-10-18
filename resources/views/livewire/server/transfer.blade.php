@@ -34,6 +34,51 @@
                     </x-slot:actions>
 
                     <div class="flex flex-col gap-4">
+                        @if ($server->isTransferredAway())
+                            <div>
+                                <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">Transfer back</h3>
+                                <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                    Undo the transfer. The instance that manages the server now transfers it back here,
+                                    with all changes made there. This archive is replaced only when the import here
+                                    succeeds. If the other instance is lost, use Enable management on the server page.
+                                </p>
+                            </div>
+                            <div class="flex flex-col gap-3 md:max-w-xl">
+                                <x-forms.input id="managerUrl" label="Instance that manages the server now" required
+                                    placeholder="https://coolify.example.com"
+                                    helper="The Coolify instance that this server was transferred to." />
+                                <x-forms.input id="managerToken" type="password" label="API token of that instance" required
+                                    placeholder="Paste token from that instance" autocomplete="off"
+                                    helper="A token with root, or with read:sensitive and write, from an admin or owner of that instance." />
+                                <x-forms.input id="thisInstanceUrl" label="URL of this instance" required
+                                    helper="The URL at which the other instance reaches this instance. This instance gives it a token that expires in 3 hours." />
+                            </div>
+                            <div>
+                                <x-modal-confirmation title="Transfer this server back?" submitAction="transferBack"
+                                    :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Transfer back"
+                                    :actions="[
+                                        'The other instance checks the server, this instance, and the tokens. If a check fails, nothing changes.',
+                                        'The other instance transfers the server, its resources, and its credentials back here.',
+                                        'This archive is replaced by the transferred server, and the other instance keeps an archive.',
+                                    ]">
+                                    <x-slot:trigger>
+                                        <x-forms.button canGate="update" :canResource="$server" wire:loading.attr="disabled"
+                                            wire:target="transferBack">
+                                            <span wire:loading.remove wire:target="transferBack">Transfer back</span>
+                                            <span wire:loading wire:target="transferBack">Running checks…</span>
+                                        </x-forms.button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
+                            </div>
+                            @if ($transferBackAt = data_get($server->server_metadata, 'transfer.transfer_back.requested_at'))
+                                <x-callout type="info" title="Transfer back started">
+                                    {{ data_get($server->server_metadata, 'transfer.transfer_back.from') }} started the transfer back at
+                                    {{ \Illuminate\Support\Carbon::parse($transferBackAt)->format('H:i') }}. Reload this page in a minute.
+                                    When the transfer finishes, this instance manages the server again. If it does not, read
+                                    the transfer log of the server on the other instance.
+                                </x-callout>
+                            @endif
+                        @else
                         <div>
                             <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">Transfer to another instance
                             </h3>
@@ -68,6 +113,7 @@
                                 </x-slot:trigger>
                             </x-modal-confirmation>
                         </div>
+                        @endif
                         @php $migration = $this->migration; @endphp
                         @if (data_get($migration, 'status') === 'running')
                             <div wire:poll.5s="refreshMigration">

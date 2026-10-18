@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Models\User;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
@@ -640,4 +641,36 @@ test('migrate saves the export ID before it sends the bundle', function () {
     $result = app(ServerTransferMigrator::class)->migrate($this->server, 'https://8.8.8.8', 'token');
 
     expect($savedExportId)->toBe($result['export_id']);
+});
+
+test('transfer back asks the managing instance to transfer the archive here with a short-lived token of its team', function () {
+    $user = User::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => 'owner']);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://8.8.8.8');
+    Http::fake(['https://8.8.8.8/api/v1/servers/*/migrate' => Http::response(['migration' => ['status' => 'running']], 202)]);
+
+    app(ServerTransferMigrator::class)->requestTransferBack($this->server->fresh(), $user, 'https://8.8.8.8', 'token-of-b', 'https://coolify-a.test');
+
+    $token = $user->tokens()->sole();
+    expect((int) $token->team_id)->toBe($this->team->id)
+        ->and($token->abilities)->toBe(['read', 'write'])
+        ->and($token->expires_at->isFuture())->toBeTrue()
+        ->and(data_get($this->server->fresh()->server_metadata, 'transfer.transfer_back.from'))->toBe('https://8.8.8.8');
+    Http::assertSent(fn ($request) => $request->url() === "https://8.8.8.8/api/v1/servers/{$this->server->uuid}/migrate"
+        && $request->hasHeader('Authorization', 'Bearer token-of-b')
+        && $request['target_url'] === 'https://coolify-a.test'
+        && str_starts_with((string) $request['target_token'], $token->id.'|'));
+});
+
+test('a refused transfer back deletes the token and shows the reason of the other instance', function () {
+    $user = User::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => 'owner']);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://8.8.8.8');
+    Http::fake(['*' => Http::response(['message' => '1 of 13 checks failed: no server with the same IP exists.'], 422)]);
+
+    expect(fn () => app(ServerTransferMigrator::class)->requestTransferBack($this->server->fresh(), $user, 'https://8.8.8.8', 'token-of-b', 'https://coolify-a.test'))
+        ->toThrow(RuntimeException::class, 'no server with the same IP exists');
+
+    expect($user->tokens()->count())->toBe(0)
+        ->and(data_get($this->server->fresh()->server_metadata, 'transfer.transfer_back'))->toBeNull();
 });
