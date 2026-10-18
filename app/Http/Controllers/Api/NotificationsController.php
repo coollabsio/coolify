@@ -45,6 +45,7 @@ class NotificationsController extends Controller
                     'use_instance_email_settings' => 'sometimes|boolean',
                     'deployment_success_email_notifications' => 'sometimes|boolean',
                     'deployment_failure_email_notifications' => 'sometimes|boolean',
+                    'deployment_commit_details_email_notifications' => 'sometimes|boolean',
                     'status_change_email_notifications' => 'sometimes|boolean',
                     'restart_limit_reached_email_notifications' => 'sometimes|boolean',
                     'backup_success_email_notifications' => 'sometimes|boolean',
