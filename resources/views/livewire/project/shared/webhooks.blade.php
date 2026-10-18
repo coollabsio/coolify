@@ -50,7 +50,8 @@
 
             @if ($githubManualWebhook && $gitlabManualWebhook)
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col">
-                    <x-unsaved-bar action="submit" />
+                    <x-unsaved-bar action="submit"
+                        dirty="Object.entries($wire.savedSecrets).some(([property, saved]) => ($wire[property] ?? '') !== (saved ?? ''))" />
                     <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
                         helper="Configure these endpoints when the repository is not connected through an official Git App." flush>
                         <x-slot:actions>
@@ -84,7 +85,7 @@
                                                     helper="Must exactly match the secret configured in {{ $provider['name'] }}. New secrets need at least 16 characters. Leave empty to disable this webhook."
                                                     autocomplete="new-password" copyable />
                                                 <x-forms.button type="button"
-                                                    x-on:click="$wire.generateSecret('{{ $provider['key'] }}').then((secret) => { if (typeof secret === 'string') { $wire.set('{{ $provider['secret'] }}', secret, false); } })"
+                                                    wire:click="generateSecret('{{ $provider['key'] }}')"
                                                     aria-label="Generate {{ $provider['name'] }} webhook secret">
                                                     Generate
                                                 </x-forms.button>
