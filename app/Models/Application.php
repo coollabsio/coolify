@@ -547,20 +547,24 @@ class Application extends BaseModel
     }
 
     /**
-     * Removes the volumes by the names that Coolify stored.
+     * Removes the volumes by the names that Coolify stored. Compose parser versions 1 and 2 store no
+     * volumes, so for a Compose application also remove the volumes that Docker labels with its
+     * project name (the application UUID).
      */
     public function deleteVolumes()
     {
-        $persistentStorages = $this->persistentStorages()->get();
-        if ($persistentStorages->isEmpty()) {
-            return;
-        }
         $server = data_get($this, 'destination.server');
-        foreach ($persistentStorages as $storage) {
-            if ($storage->isSharedWithAnotherResource()) {
-                continue;
-            }
-            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
+        $persistentStorages = $this->persistentStorages()->get();
+        $sharedVolumeNames = $persistentStorages->filter->isSharedWithAnotherResource()->pluck('name');
+        $volumeNames = $persistentStorages->pluck('name');
+        if ($this->build_pack === 'dockercompose') {
+            $projectVolumes = instant_remote_process([
+                'docker volume ls -q --filter '.escapeshellarg("label=com.docker.compose.project={$this->uuid}"),
+            ], $server, false);
+            $volumeNames = $volumeNames->merge(str($projectVolumes)->explode("\n")->map(fn (string $name): string => trim($name))->filter());
+        }
+        foreach ($volumeNames->unique()->diff($sharedVolumeNames) as $volumeName) {
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server, false);
         }
     }
 
