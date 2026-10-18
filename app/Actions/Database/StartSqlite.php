@@ -69,7 +69,7 @@ class StartSqlite
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
         if (count($persistent_storages) > 0) {
             $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
