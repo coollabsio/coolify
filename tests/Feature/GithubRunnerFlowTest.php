@@ -705,6 +705,42 @@ describe('provisioning', function () {
         Queue::assertPushed(CleanupGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
     });
 
+    it('stops provisioning without touching GitHub or the host when the server is transferred meanwhile', function (bool $cancelled) {
+        Queue::fake();
+        Process::fake(['*' => Process::result(output: '29.8.0')]);
+        $server = runnerTestServer($this->team);
+        runnerTestConfig($server, $this->githubApp);
+        $execution = runnerTestExecution($this->githubApp);
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
+            'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
+            'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($server, $execution, $cancelled) {
+                // The transfer commits while GitHub registers the runner. Without the cancel, it commits right
+                // after the job read the execution, so only the server shows the transfer.
+                $server->settings()->update(['force_disabled' => true]);
+                $server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+                if ($cancelled) {
+                    $execution->finish(GithubRunnerStatus::Cancelled);
+                }
+
+                return Http::response(['runner' => ['id' => 42], 'encoded_jit_config' => 'SECRET-JIT-CONFIG'], 201);
+            },
+        ]);
+
+        (new ProvisionGithubRunnerJob($execution->id))->handle();
+
+        expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Cancelled)
+            ->and($execution->fresh()->ready_at)->toBeNull();
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, '/home/runner/run.sh'));
+        Queue::assertPushed(CleanupGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
+
+        (new CleanupGithubRunnerJob($execution->id))->handle();
+
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'docker rm'));
+        Http::assertNotSent(fn ($request) => $request->method() === 'DELETE');
+    })->with(['the transfer cancelled the execution' => true, 'the transfer commits after the last check' => false]);
+
     it('cleans up cancellation during remote provisioning without marking the runner ready', function (bool $duringStart) {
         Queue::fake();
         runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
@@ -889,6 +925,19 @@ describe('server deletion', function () {
 
         $this->githubApp->delete();
         expect(GithubApp::find($this->githubApp->id))->toBeNull();
+    });
+
+    it('keeps the GitHub runners of a transferred server registered when it deletes the archive', function () {
+        Queue::fake();
+        $running = runnerTestExecution($this->githubApp, ['status' => GithubRunnerStatus::Running, 'server_id' => $this->server->id, 'github_runner_config_id' => $this->config->id, 'runner_id' => 42]);
+        $this->server->update(['server_metadata' => ['transfer' => ['status' => 'transferred']]]);
+
+        $this->server->delete();
+        DeleteServer::run($this->server->id);
+
+        expect(Server::withTrashed()->find($this->server->id))->toBeNull()
+            ->and(GithubRunnerExecution::whereKey($running->id)->exists())->toBeFalse();
+        Queue::assertNotPushed(DeregisterGithubRunnerJob::class);
     });
 
     it('removes the runner from GitHub and ignores GitHub errors', function (int $status) {

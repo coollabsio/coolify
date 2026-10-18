@@ -260,6 +260,23 @@ it('pins docker config while running railpack buildx commands', function () {
         ->toContain('DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack');
 });
 
+it('stops the railpack builder after the build when no other build uses it', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'uuid' => 'application-uuid',
+    ]);
+
+    $command = invokeRailpackMethod($job, $reflection, 'railpack_build_command', ['coollabsio/coolify:test', collect([])]);
+
+    $sharedLock = strpos($command, 'flock -s 9');
+    $build = strpos($command, 'docker buildx build --builder coolify-railpack');
+    $stop = strpos($command, 'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack');
+
+    expect($sharedLock)->not->toBeFalse()
+        ->and($build)->toBeGreaterThan($sharedLock)
+        ->and($stop)->toBeGreaterThan($build)
+        ->and($command)->toEndWith('exit $status');
+});
+
 it('filters reserved docker client variables from railpack build secrets', function () {
     [$job, $reflection] = makeRailpackDeploymentJob([
         'uuid' => 'application-uuid',
@@ -439,7 +456,7 @@ it('creates an empty build-time env file for railpack when there are no generate
     foreach ([
         'application_deployment_queue' => new class extends ApplicationDeploymentQueue
         {
-            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false): void {}
+            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false, ?string $command = null, int $batch = 1): void {}
         },
         'build_pack' => 'railpack',
         'pull_request_id' => 0,

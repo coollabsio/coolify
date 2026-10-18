@@ -9,57 +9,33 @@
     @auth
         <div x-data="{
             open: false,
-            hasSidebarPreference: localStorage.getItem('sidebarCollapsed') !== null,
-            userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-            autoCollapse: localStorage.getItem('sidebarAutoCollapse') !== 'false',
-            hasSecondBar: false,
-            collapsed: false,
-            pageWidth: localStorage.getItem('pageWidth') || 'full',
+            // New users start expanded.
+            collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            pageWidth: localStorage.getItem('pageWidth') || 'centered',
             sidebarReady: false,
             init() {
-                this.applyCollapsed(false);
                 this.$nextTick(() => {
                     requestAnimationFrame(() => {
                         this.sidebarReady = true;
                     });
                 });
             },
-            targetCollapsed() {
-                this.hasSecondBar = !!document.querySelector('.application-settings-navigation');
-                return this.hasSidebarPreference ? this.userCollapsed : (this.autoCollapse && this.hasSecondBar);
-            },
-            applyCollapsed(animate) {
-                const target = this.targetCollapsed();
-                if (target === this.collapsed) return;
-                if (animate) {
-                    // Let the new page paint at the current width, then animate the
-                    // slide a frame later so the auto-collapse reads as a motion.
-                    this.sidebarReady = true;
-                    requestAnimationFrame(() => requestAnimationFrame(() => { this.collapsed = target; }));
-                } else {
-                    this.collapsed = target;
-                }
-            },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
-                this.hasSidebarPreference = true;
-                this.userCollapsed = this.collapsed;
-                localStorage.setItem('sidebarCollapsed', this.userCollapsed);
-            },
-            toggleAutoCollapse() {
-                this.autoCollapse = !this.autoCollapse;
-                localStorage.setItem('sidebarAutoCollapse', this.autoCollapse);
-                this.applyCollapsed(true);
+                localStorage.setItem('sidebarCollapsed', this.collapsed);
             }
-        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-on:livewire:navigated.window="applyCollapsed(true)"
+        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail"
             :style="{ '--sidebar-w': collapsed ? '4rem' : '14rem' }" x-cloak
-            class="dark:text-inherit text-black">
+            @class(['app-shell dark:text-inherit text-black', 'flex h-dvh flex-col' => $fullBleed ?? false])>
             {{-- ============ DESKTOP TOP BAR ============ --}}
             <header
                 x-data="{ resourceActionsOpen: false }"
+                {{-- Floating style: the resource actions are a separate panel at the top right.
+                     Publish its width so the top bar panel stops before it. --}}
+                x-init="new ResizeObserver(([entry]) => $el.style.setProperty('--resource-actions-w', entry.borderBoxSize[0].inlineSize + 'px')).observe($refs.resourceActions)"
                 @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
                 :class="{ 'z-[1000]': resourceActionsOpen }"
-                class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
+                class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
                 {{-- Brand (width tracks sidebar) --}}
                 <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"
                     :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
@@ -87,12 +63,15 @@
                     <div class="relative flex min-w-0 flex-1 items-center">
                         <x-top-breadcrumb />
                         <div id="server-topbar-context" class="min-w-0"></div>
+                        {{-- Dev Server-Timing HUD docks here, after the breadcrumb (local only; empty in production) --}}
+                        <div id="server-timing-hud-slot" data-server-timing-hud-slot class="ml-2 hidden shrink-0 items-center"></div>
                     </div>
-                    {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
-                    <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
+                    {{-- Page toolbars (the canvases) dock here on desktop. --}}
+                    <div id="page-toolbar-slot" class="flex shrink-0 items-center empty:hidden"></div>
                     <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
+                    <livewire:deployments-indicator variant="topbar" />
                     {{-- Resource actions dock here on desktop. --}}
-                    <div id="resource-action-hud-slot" class="hidden shrink-0 items-center xl:flex"></div>
+                    <div id="resource-action-hud-slot" x-ref="resourceActions" class="hidden shrink-0 items-center xl:flex"></div>
                 </div>
             </header>
 
@@ -140,10 +119,10 @@
             </div>
 
             {{-- ============ DESKTOP SIDEBAR (below top bar) ============ --}}
-            <div class="hidden lg:fixed lg:top-12 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col min-w-0"
+            <div class="app-sidebar hidden lg:fixed lg:top-12 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col min-w-0"
                 :class="[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']">
-                <div class="flex grow min-w-0 flex-col overflow-visible">
-                    <x-navbar deployments-indicator />
+                <div class="flex min-h-0 grow min-w-0 flex-col overflow-visible">
+                    <x-navbar desktop />
                 </div>
             </div>
 
@@ -181,13 +160,23 @@
             </div>
 
             {{-- ============ MAIN ============ --}}
-            <main
-                class="min-h-screen bg-neutral-50 dark:bg-app px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
-                :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
-                <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
-                    {{ $slot }}
-                </div>
-            </main>
+            @if ($fullBleed ?? false)
+                {{-- Full-bleed pages (canvases) fill the space between the top bar and the sidebar. --}}
+                <main class="app-main app-main-full relative min-h-0 flex-1 bg-neutral-50 dark:bg-app lg:pt-12"
+                    :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
+                    <div class="relative h-full">
+                        {{ $slot }}
+                    </div>
+                </main>
+            @else
+                <main
+                    class="app-main min-h-screen bg-neutral-50 dark:bg-app px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
+                    :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '', pageWidth === 'centered' ? '' : 'app-main-wide']">
+                    <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
+                        {{ $slot }}
+                    </div>
+                </main>
+            @endif
         </div>
     @endauth
 @endsection

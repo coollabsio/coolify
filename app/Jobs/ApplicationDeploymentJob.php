@@ -633,6 +633,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
         }
 
+        // Domains can change with a deployment, so the maintenance routes follow them.
+        if ($this->pull_request_id === 0 && $this->application->is_maintenance_enabled) {
+            try {
+                $this->application->syncMaintenancePage();
+            } catch (Exception $e) {
+                \Log::warning('Maintenance page update failed for '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+        }
+
     }
 
     private function deploy_simple_dockerfile()
@@ -3483,11 +3492,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $variables;
     }
 
+    /**
+     * Without the `...` entry, the list replaces the packages that Railpack generates
+     * (for example libatomic1, which Node.js 25+ needs at runtime).
+     */
     private function merge_railpack_deploy_apt_packages(Collection $variables): Collection
     {
         $packages = collect(preg_split('/\s+/', trim((string) $variables->get('RAILPACK_DEPLOY_APT_PACKAGES', ''))) ?: [])
             ->filter()
             ->values();
+
+        if (! $packages->contains('...')) {
+            $packages->prepend('...');
+        }
 
         foreach (['curl', 'wget'] as $package) {
             if (! $packages->contains($package)) {
@@ -3574,7 +3591,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." {$this->workdir}";
 
         return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
+            ."\n".railpackBuilderLockedScript('('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
     }
 
     private function decode_railpack_config(string $config, string $source): array
@@ -6010,7 +6027,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->failDeployment();
 
-        // Log comprehensive error information
+        // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
+        // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written
+        // because their truncated arguments can hold partial secrets that redaction cannot match.
         $errorMessage = $exception->getMessage() ?: 'Unknown error occurred';
         $errorCode = $exception->getCode();
         $errorClass = get_class($exception);
@@ -6037,14 +6056,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $previousClass = get_class($previous);
             $this->application_deployment_queue->addLogEntry("  {$previousClass}: {$previousMessage}", 'stderr', hidden: true);
             $this->application_deployment_queue->addLogEntry("  at {$previous->getFile()}:{$previous->getLine()}", 'stderr', hidden: true);
-        }
-
-        // Log first few lines of stack trace for debugging
-        $trace = $exception->getTraceAsString();
-        $traceLines = explode("\n", $trace);
-        $this->application_deployment_queue->addLogEntry('Stack trace (first 5 lines):', 'stderr', hidden: true);
-        foreach (array_slice($traceLines, 0, 5) as $traceLine) {
-            $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr', hidden: true);
         }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
 

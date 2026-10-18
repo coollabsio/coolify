@@ -86,7 +86,6 @@ it('enables and disables S3 backups from the S3 title action', function () {
     $component = Livewire::test(BackupEdit::class, [
         'backup' => $backup->fresh(),
         'availableS3Storages' => $this->team->s3s,
-        'section' => 's3',
     ])
         ->assertSee('Enable S3')
         ->call('toggleS3')
@@ -117,7 +116,6 @@ it('shows and saves S3 retention while S3 backups are disabled', function () {
     Livewire::test(BackupEdit::class, [
         'backup' => $backup->fresh(),
         'availableS3Storages' => $this->team->s3s,
-        'section' => 'retention',
     ])
         ->assertSee('S3 backups')
         ->set('databaseBackupRetentionAmountS3', 12)
@@ -147,34 +145,18 @@ it('splits standalone database backup settings and executions across dedicated u
     $this->get($generalUrl)
         ->assertOk()
         ->assertSee('General')
-        ->assertSee('S3 storage')
-        ->assertSee('Retention')
         ->assertSee('Executions')
         ->assertSee('Danger Zone')
         ->assertSee('Frequency')
-        ->assertDontSee('Enable S3')
-        ->assertDontSee('Disable S3')
-        ->assertDontSee('Backups to keep')
-        ->assertDontSee('Clean failed backups')
-        ->assertDontSee('Delete schedule');
-
-    $this->get($generalUrl.'/s3')
-        ->assertOk()
         ->assertSeeText('No validated S3 storage')
-        ->assertDontSee('Local copy')
-        ->assertDontSee('Enable S3')
-        ->assertDontSee('Disable S3')
-        ->assertDontSee('Backups to keep')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Clean failed backups');
-
-    $this->get($generalUrl.'/retention')
-        ->assertOk()
         ->assertSee('Local backups')
         ->assertSee('S3 backups')
         ->assertSee('Backups to keep')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Clean failed backups');
+        ->assertDontSee('Clean failed backups')
+        ->assertDontSee('Delete schedule');
+
+    $this->get($generalUrl.'/s3')->assertRedirect($generalUrl);
+    $this->get($generalUrl.'/retention')->assertRedirect($generalUrl);
 
     $this->get($generalUrl.'/executions')
         ->assertOk()
@@ -424,7 +406,7 @@ it('defaults to the first available storage when multiple storages are available
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
-        ->assertSet('s3StorageId', $firstS3->id)
+        ->assertSet('s3StorageIds', [$firstS3->id])
         ->set('saveS3', true)
         ->call('instantSave')
         ->assertDispatched('success');
@@ -461,7 +443,7 @@ it('accepts a root team S3 storage for the instance database backup', function (
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => collect([$s3])])
         ->set('saveS3', true)
-        ->set('s3StorageId', $s3->id)
+        ->set('s3StorageIds', [$s3->id])
         ->call('instantSave')
         ->assertDispatched('success');
 
@@ -478,22 +460,21 @@ it('shows available S3 storages even when S3 backup is disabled', function () {
         's3_storage_id' => null,
     ]);
 
-    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->assertSee('First S3')
         ->assertSee('Second S3');
 });
 
-it('shows only an empty S3 state when no storages are available', function () {
+it('shows an empty S3 state when no storages are available', function () {
     $backup = createBackupForEditValidationTest($this->team, [
         'save_s3' => false,
         's3_storage_id' => null,
     ]);
 
-    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->assertSeeText('No validated S3 storage')
         ->assertSeeHtml('href="'.route('storage.index').'"')
         ->assertSeeText('Open S3 storage')
-        ->assertDontSee('Save')
         ->assertDontSee('Enable S3')
         ->assertDontSee('Disable S3')
         ->assertDontSee('S3 Storage')
@@ -510,7 +491,6 @@ it('allows S3 backups to be disabled when no usable storage remains', function (
     $component = Livewire::test(BackupEdit::class, [
         'backup' => $backup->fresh(),
         'availableS3Storages' => collect(),
-        'section' => 's3',
     ])
         ->assertSet('saveS3', true)
         ->assertSeeText('No validated S3 storage')
@@ -532,7 +512,7 @@ it('shows when S3 backups are currently disabled', function () {
         's3_storage_id' => null,
     ]);
 
-    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         // Disabled S3 backups are indicated by the "Enable S3" title action
         ->assertSee('S3 storage')
         ->assertSee('Enable S3')
@@ -548,7 +528,7 @@ it('saves selected S3 storage immediately when it changes', function () {
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
-        ->set('s3StorageId', $secondS3->id)
+        ->set('s3StorageIds', [$secondS3->id])
         ->assertDispatched('success');
 
     $backup->refresh();
@@ -616,4 +596,85 @@ it('disables Back up now after refresh when the database stops', function () {
         ->assertSee('Back up now');
 
     expect($component->html())->toMatch('/<button\s+disabled[^>]*wire:click="backupNow"/s');
+});
+
+it('shows the backup actions in the header bar on every database backup page', function () {
+    config(['cache.default' => 'array', 'app.maintenance.driver' => 'file']);
+    $backup = createBackupForEditValidationTest($this->team);
+    $database = $backup->database;
+    $database->update(['status' => 'running:healthy']);
+    $generalUrl = route('project.database.backup.execution', [
+        'project_uuid' => $database->project()->uuid,
+        'environment_uuid' => $database->environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    foreach (['', '/executions', '/danger'] as $suffix) {
+        expect($this->get($generalUrl.$suffix)->assertOk()->getContent())
+            ->toMatch('/x-teleport="#resource-action-hud-slot".*?wire:click="toggleEnabled".*?Disable backup.*?wire:click="backupNow"/s');
+    }
+});
+
+it('hides the header Back up now button from team members', function () {
+    config(['cache.default' => 'array', 'app.maintenance.driver' => 'file']);
+    $backup = createBackupForEditValidationTest($this->team);
+    $database = $backup->database;
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+
+    $this->get(route('project.database.backup.executions', [
+        'project_uuid' => $database->project()->uuid,
+        'environment_uuid' => $database->environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]))
+        ->assertOk()
+        ->assertDontSee('wire:click="backupNow"', false);
+});
+
+it('denies Back up now for team members', function () {
+    Queue::fake();
+    $backup = createBackupForEditValidationTest($this->team);
+    $backup->database->update(['status' => 'running:healthy']);
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+
+    Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+    ])
+        ->call('backupNow')
+        ->assertNoRedirect();
+
+    Queue::assertNotPushed(DatabaseBackupJob::class);
+});
+
+it('syncs the backup form when the header toggles the schedule', function () {
+    $backup = createBackupForEditValidationTest($this->team, ['enabled' => true]);
+
+    $component = Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+    ])->assertSet('backupEnabled', true);
+
+    $backup->update(['enabled' => false]);
+
+    $component->dispatch('backupEnabledChanged')
+        ->assertSet('backupEnabled', false)
+        ->call('submit');
+
+    expect((bool) $backup->fresh()->enabled)->toBeFalse();
+});
+
+it('toggles the schedule from the form and notifies the page header', function () {
+    $backup = createBackupForEditValidationTest($this->team, ['enabled' => true]);
+
+    Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+    ])
+        ->call('toggleEnabled')
+        ->assertSet('backupEnabled', false)
+        ->assertDispatched('backupEnabledChanged');
+
+    expect((bool) $backup->fresh()->enabled)->toBeFalse();
 });

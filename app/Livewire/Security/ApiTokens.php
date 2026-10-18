@@ -37,6 +37,8 @@ class ApiTokens extends Component
 
     public $isApiEnabled;
 
+    public $isMcpEnabled;
+
     #[Locked]
     public bool $canUseRootPermissions = false;
 
@@ -56,7 +58,9 @@ class ApiTokens extends Component
 
     public function mount()
     {
-        $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
+        $settings = InstanceSettings::get();
+        $this->isApiEnabled = $settings->is_api_enabled;
+        $this->isMcpEnabled = $settings->is_mcp_server_enabled;
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);

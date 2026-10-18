@@ -249,11 +249,6 @@
     @apply px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none;
 }
 
-/* Collapsible group header (accordion) for the resource settings sidebar. */
-@utility nav-section-toggle {
-    @apply w-full items-center justify-between gap-2 px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none rounded-md transition-colors cursor-pointer hover:text-nav-active;
-}
-
 /* Indented child rows in a collapsible nav group */
 @utility menu-subitem {
     /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
@@ -433,6 +428,16 @@
         justify-content: flex-start;
         padding-left: 0.625rem;
         padding-right: 0.625rem;
+    }
+
+    /* Flat rows show their own fill, so make it a 2rem square (same as the h-8
+       height) with the icon centered, in line with the footer controls. */
+    html[data-nav-items="flat"] .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        width: 2rem;
+        margin-left: 0.1875rem;
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
     }
 
     .sidebar-collapsed .sidebar-collapsed-label {

@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Services\SharedVariableCanvas;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
@@ -402,6 +403,15 @@ class Show extends Component
             $resource->docker_compose_raw ?? $resource->docker_compose,
             $storedEnvironmentVariable->key
         );
+    }
+
+    /**
+     * Shared variables only: the connect envs canvas with this variable selected.
+     */
+    #[Computed]
+    public function connectLink(): ?string
+    {
+        return $this->isSharedVariable ? app(SharedVariableCanvas::class)->connectLink($this->env) : null;
     }
 
     #[Computed]

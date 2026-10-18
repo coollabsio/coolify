@@ -59,15 +59,34 @@
                     </x-application.settings-section>
                 </form>
 
-                <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage"
-                    helper="Percentage of available CPU capacity used by this server.">
-                    <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                {{-- CPU is the primary signal, so it spans full width; the other four
+                     charts fall into a 2x2 below (mirrors the fleet /metrics layout). --}}
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage" class="lg:col-span-2"
+                        helper="Percentage of available CPU capacity used by this server.">
+                        <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
 
-                <x-application.settings-section id="server-memory-metrics-section" title="Memory usage"
-                    helper="Percentage of physical memory currently used by this server.">
-                    <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                    <x-application.settings-section id="server-memory-metrics-section" title="Memory usage"
+                        helper="Percentage of physical memory currently used by this server.">
+                        <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-network-metrics-section" title="Network throughput"
+                        helper="Receive and transmit rate across the server's network interfaces.">
+                        <div wire:ignore id="{!! $chartId !!}-network" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-load-metrics-section" title="Load average"
+                        helper="One minute load average reported by the server.">
+                        <div wire:ignore id="{!! $chartId !!}-load" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-disk-metrics-section" title="Disk usage"
+                        helper="Percentage of the root filesystem used by this server.">
+                        <div wire:ignore id="{!! $chartId !!}-disk" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+                </div>
 
                 @script
                     <script>
@@ -81,6 +100,16 @@
                                 return `${Number(number.toFixed(precision))}%`;
                             };
 
+                            const formatNumber = value => Number(Number(value).toFixed(2)).toLocaleString();
+                            const formatBytes = value => {
+                                const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                                let amount = Number(value) || 0;
+                                let unit = 0;
+                                while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit++; }
+                                return `${Number(amount.toFixed(unit === 0 ? 0 : 2))} ${units[unit]}`;
+                            };
+                            const formatRate = value => `${formatBytes(value)}/s`;
+
                             const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
                                 hour12: false,
                                 timeZoneName: 'short',
@@ -91,7 +120,7 @@
                                 timeZoneName: 'short',
                             });
 
-                            const chartOptions = (name, color, loadingText) => ({
+                            const chartOptions = (name, color, loadingText, formatter = formatPercent) => ({
                                 chart: {
                                     height: 240,
                                     type: 'area',
@@ -151,7 +180,7 @@
                                         style: {
                                             colors: textColor,
                                         },
-                                        formatter: formatPercent,
+                                        formatter,
                                     },
                                 },
                                 noData: {
@@ -180,7 +209,7 @@
                                         const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
 
                                         return `<div class="apexcharts-tooltip-custom">
-                                            <div class="apexcharts-tooltip-custom-value">${name}: <span class="apexcharts-tooltip-value-bold">${formatPercent(value)}</span></div>
+                                            <div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames?.[seriesIndex] ?? name}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>
                                             <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
                                             <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
                                         </div>`;
@@ -197,8 +226,32 @@
                                 chartOptions('Memory', ramColor, 'Loading memory metrics…'),
                             );
 
-                            cpuChart.render();
-                            memoryChart.render();
+                            const diskChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-disk'),
+                                chartOptions('Disk', '#ef4444', 'Loading disk metrics…', formatPercent),
+                            );
+                            const networkChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-network'),
+                                {
+                                    ...chartOptions('Network', '#10b981', 'Loading network metrics…', formatRate),
+                                    colors: ['#10b981', '#f59e0b'],
+                                    legend: { show: true, labels: { colors: textColor } },
+                                },
+                            );
+                            const loadChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-load'),
+                                chartOptions('Load', '#14b8a6', 'Loading load metrics…', formatNumber),
+                            );
+
+                            // Defer to the next frame so the 2x2 grid cells are laid out
+                            // before ApexCharts measures them (a zero-width cell renders blank).
+                            requestAnimationFrame(() => {
+                                cpuChart.render();
+                                memoryChart.render();
+                                diskChart.render();
+                                networkChart.render();
+                                loadChart.render();
+                            });
 
                             Livewire.on('refreshChartData-{!! $chartId !!}-metrics', chartData => {
                                 checkTheme();
@@ -272,6 +325,12 @@
                                         },
                                     },
                                 });
+                                diskChart.updateSeries([{ name: 'Disk', data: data.diskSeries || [] }]);
+                                networkChart.updateSeries([
+                                    { name: 'RX', data: data.networkRxSeries || [] },
+                                    { name: 'TX', data: data.networkTxSeries || [] },
+                                ]);
+                                loadChart.updateSeries([{ name: 'Load', data: data.loadSeries || [] }]);
                             });
                         })();
                     </script>

@@ -28,6 +28,9 @@
                     <x-reicon name="refresh" class="size-3.5" />
                     Refresh
                 </x-forms.button>
+                <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]"
+                    :list-url="route('server.resources', ['server_uuid' => $server->uuid])"
+                    :canvas-url="route('server.canvas', ['server_uuid' => $server->uuid])" />
             </x-slot:actions>
 
             <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
@@ -63,8 +66,12 @@
                             @php($resourceStatus = (string) data_get($resource, 'status', 'unknown'))
                             <div wire:key="managed-{{ $resource->type() }}-{{ $resource->uuid }}"
                                 class="data-table-row server-resources-managed-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
-                                <div class="min-w-0">
-                                    <a class="block max-w-full truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
+                                <div class="flex min-w-0 items-center gap-2">
+                                    <span
+                                        class="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded text-neutral-500 dark:text-fg-dim">
+                                        <x-resource-logo :resource="$resource" icon-class="size-3.5" />
+                                    </span>
+                                    <a class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
                                         {{ wireNavigate() }} href="{{ $resource->link() }}">
                                         {{ $resource->name }}
                                     </a>

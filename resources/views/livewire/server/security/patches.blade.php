@@ -16,7 +16,7 @@
 
     <div
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        <x-server.sidebar :server="$server" activeMenu="security" />
+        <x-server.sidebar :server="$server" activeMenu="security" activeSubMenu="patches" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
             <x-application.settings-section id="server-patching-overview-section" title="Server patching"

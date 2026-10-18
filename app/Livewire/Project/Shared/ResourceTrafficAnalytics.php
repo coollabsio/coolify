@@ -65,7 +65,7 @@ abstract class ResourceTrafficAnalytics extends Component
     public array $series = [];
 
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = ['country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
 
     /**
      * Name of the public model property and lazy-load parameter ('application' / 'service').

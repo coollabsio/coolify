@@ -71,7 +71,7 @@
                 matches(values) { const query = this.search.trim().toLowerCase(); return !query || values.some(value => String(value || '').toLowerCase().includes(query)); },
                 setViewMode(mode) { this.viewMode = mode; localStorage.setItem('coolify-sources-view', mode); }
             }">
-            @include('livewire.shared.list-search-controls', ['placeholder' => 'Search sources', 'singular' => 'source', 'plural' => 'sources'])
+            @include('livewire.shared.list-search-controls', ['placeholder' => 'Search sources'])
             <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($sources as $source)
                     @if ($source->getMorphClass() === 'App\Models\GithubApp')
