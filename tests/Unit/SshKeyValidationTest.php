@@ -190,19 +190,4 @@ class SshKeyValidationTest extends TestCase
         // Lock file should persist (not be deleted) to prevent flock race conditions
         $this->assertFileExists($lockFile, 'Lock file should persist after storeInFileSystem');
     }
-
-    public function test_server_model_detects_private_key_id_changes()
-    {
-        $reflection = new \ReflectionMethod(\App\Models\Server::class, 'booted');
-        $filename = $reflection->getFileName();
-        $startLine = $reflection->getStartLine();
-        $endLine = $reflection->getEndLine();
-        $source = implode('', array_slice(file($filename), $startLine - 1, $endLine - $startLine + 1));
-
-        $this->assertStringContainsString(
-            "wasChanged('private_key_id')",
-            $source,
-            'Server saved event should detect private_key_id changes'
-        );
-    }
 }

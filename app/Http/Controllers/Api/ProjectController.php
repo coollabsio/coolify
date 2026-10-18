@@ -167,10 +167,12 @@ class ProjectController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
-        $environment = $environment->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
+        // Redis connection URLs read REDIS_PASSWORD and REDIS_USERNAME; load the variables once, not per database.
+        $environment = $environment->load(['applications', 'postgresqls', 'redis.runtime_environment_variables', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
         collect(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'])
             ->flatMap(fn (string $relation) => $environment->{$relation})
             ->each(fn ($resource) => exposeSensitiveFields($resource));
+        $environment->redis->each(fn ($redis) => $redis->makeHidden('runtime_environment_variables'));
 
         return response()->json(serializeApiResponse($environment));
     }

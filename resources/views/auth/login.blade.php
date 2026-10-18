@@ -99,6 +99,8 @@
             @if ($is_registration_enabled)
                 <span>New to Coolify?</span>
                 <a href="/register" class="auth-text-link">{{ __('auth.register_now') }}</a>
+            @elseif ($can_register_with_oauth)
+                <span>{{ __('auth.register_with_oauth') }}</span>
             @else
                 <span>{{ __('auth.registration_disabled') }}</span>
             @endif

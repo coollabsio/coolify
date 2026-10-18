@@ -39,7 +39,7 @@ class Show extends Component
                 'is_literal' => $data['is_literal'],
                 'comment' => $data['comment'] ?? null,
                 'type' => 'server',
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->server->team_id,
             ]);
             $this->server->refresh();
             $this->getDevView();
@@ -75,7 +75,12 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
+        $canViewValues = auth()->user()?->isAdminOfTeam($this->server->team_id) ?? false;
+
+        return $variables->map(function ($item) use ($canViewValues) {
+            if (! $canViewValues) {
+                return "$item->key=(Hidden, only admins can view)";
+            }
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }
@@ -168,7 +173,7 @@ class Show extends Component
                     'is_multiline' => false,
                     'is_literal' => false,
                     'type' => 'server',
-                    'team_id' => currentTeam()->id,
+                    'team_id' => $this->server->team_id,
                 ]);
                 $count++;
             }

@@ -189,37 +189,45 @@ describe('Boarding Flow Integration', function () {
         expect((bool) $this->team->fresh()->show_boarding)->toBeTrue();
     });
 
-    test('uses the shared dropdown UI for advanced Hetzner options', function () {
+    test('renders advanced Hetzner options in their own settings section', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
-            ->assertSee('Advanced Hetzner options')
-            ->assertSeeHtml('dropdownOpen')
-            ->assertSeeHtml('x-ref="panel"')
-            ->assertSeeHtml('dark:bg-coolgray-100')
-            ->assertSeeHtml('dark:bg-transparent')
-            ->assertSeeHtml('@click.outside="if (! true) close()"');
+            ->assertSee('Advanced options')
+            ->assertSee('Provider SSH keys, networking, backups, and cloud-init.');
     });
 
-    test('renders advanced Hetzner option controls inside the dropdown menu', function () {
+    test('renders advanced Hetzner option controls in the advanced section', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
-            ->assertSee('Extra SSH Keys')
+            ->assertSee('Extra SSH keys')
             ->assertSee('Firewalls')
-            ->assertSee('Private Networks')
-            ->assertSee('Enable Hetzner Backups')
+            ->assertSee('Private networks')
+            ->assertSee('Enable Hetzner backups')
             ->assertSee('Add cloud-init script')
-            ->assertSee('additional 20% of the server monthly fee');
+            ->assertSee('Adds 20% to the provider server price.');
     });
 
-    test('shows the cloud init script name only when saving the script', function () {
+    test('lists account SSH keys and firewalls as listbox options and shows the selection', function () {
+        Livewire::test(ByHetzner::class)
+            ->set('current_step', 2)
+            ->set('hetznerSshKeys', [['id' => 11, 'name' => 'deploy-key']])
+            ->set('hetznerFirewalls', [['id' => 38, 'name' => 'web-firewall'], ['id' => 39, 'name' => 'db-firewall']])
+            ->set('selectedHetznerFirewallIds', [38])
+            ->assertSee('deploy-key')
+            ->assertSee('db-firewall')
+            ->assertSeeHtml('x-text="current">web-firewall</span>')
+            ->assertSeeHtml('x-text="current">Select SSH keys</span>');
+    });
+
+        test('shows the cloud init script name only when saving the script', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
             ->set('show_cloud_init_script', true)
-            ->assertSee('Cloud-Init Script')
-            ->assertSee('Save this script for later use')
-            ->assertDontSee('Script name...')
+            ->assertSee('Cloud-init script')
+            ->assertSee('Save this script for later')
+            ->assertDontSee('Saved script name')
             ->set('save_cloud_init_script', true)
-            ->assertSee('Script name...');
+            ->assertSee('Saved script name');
     });
 });
 

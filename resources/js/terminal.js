@@ -9,9 +9,9 @@ import {
 import {
     TERMINAL_CONNECT_TIMEOUT_MS,
     TERMINAL_CONNECTION_ERRORS,
-    TERMINAL_SESSION_START_TIMEOUT_MS,
     classifyTerminalServerMessage,
     resolveTerminalCloseOutcome,
+    terminalSessionStartMethods,
 } from './terminal-connection.js';
 import { FitAddon } from '@xterm/addon-fit';
 
@@ -226,8 +226,15 @@ export function initializeTerminalComponent() {
                 ? localStorage.getItem('coolify-console-theme')
                 : 'system',
 
+            ...terminalSessionStartMethods,
+
             init() {
                 this.starting = this.$el.dataset.autoStart === 'true';
+                // Auto-start requests a token without a user action. If no token or error
+                // arrives, the session-start timeout ends "connecting…" with an error.
+                if (this.starting) {
+                    this.armTerminalSessionStartTimeout();
+                }
                 this.updateKeyboardInset = () => {
                     const viewport = window.visualViewport;
                     const viewportWidth = viewport?.width ?? window.innerWidth;
@@ -307,6 +314,16 @@ export function initializeTerminalComponent() {
                     }
                     this.beginTerminalSessionStart();
                     this.sendCommandWhenReady({ terminalToken: token });
+                });
+
+                // Coolify did not issue a token (container stopped, no shell, access denied).
+                this.$wire.on('terminal-session-failed', ({ message }) => {
+                    this.failTerminalSessionStart(message);
+                });
+
+                // The page shows a container picker; nothing starts until the user chooses.
+                this.$wire.on('terminal-auto-start-cancelled', () => {
+                    this.cancelTerminalAutoStart();
                 });
 
                 this.$wire.on('terminal-should-focus', () => {
@@ -767,52 +784,6 @@ export function initializeTerminalComponent() {
                 this.scheduleReconnect();
             },
 
-            /** A session was requested and the UI shows "connecting…" until `pty-ready`. */
-            isTerminalSessionPending() {
-                return this.starting && !this.terminalActive;
-            },
-
-            /**
-             * Leave the "connecting" state and show why. The first reason wins unless
-             * `override` is set (auth rejections replace generic connection errors).
-             */
-            failTerminalConnection(message, { override = false } = {}) {
-                this.starting = false;
-                this.clearSessionStartTimeout();
-
-                if (this.connectionError === message || (this.connectionError && !override)) {
-                    return;
-                }
-
-                this.connectionError = message;
-                this.$wire.dispatch('error', message);
-            },
-
-            /** Called whenever a new terminal session is requested (target chosen or token issued). */
-            beginTerminalSessionStart() {
-                this.starting = true;
-                this.connectionError = null;
-                this.authRejected = false;
-                this.clearSessionStartTimeout();
-                this.sessionStartTimeoutId = setTimeout(() => {
-                    this.sessionStartTimeoutId = null;
-                    if (this.isTerminalSessionPending()) {
-                        logTerminal('error', `[Terminal] Session did not start within ${TERMINAL_SESSION_START_TIMEOUT_MS}ms`);
-                        // Single-use tokens must not be sent after the user was told to retry.
-                        this.pendingCommand = null;
-                        this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout);
-                    }
-                }, TERMINAL_SESSION_START_TIMEOUT_MS);
-                this.ensureWebSocketConnection();
-            },
-
-            clearSessionStartTimeout() {
-                if (this.sessionStartTimeoutId) {
-                    clearTimeout(this.sessionStartTimeoutId);
-                    this.sessionStartTimeoutId = null;
-                }
-            },
-
             /** Reconnect immediately for a user-requested session if the socket is closed. */
             ensureWebSocketConnection() {
                 if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
@@ -894,9 +865,7 @@ export function initializeTerminalComponent() {
                 }
 
                 if (event.data === 'pty-ready') {
-                    this.starting = false;
-                    this.connectionError = null;
-                    this.clearSessionStartTimeout();
+                    this.completeTerminalSessionStart();
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
@@ -1029,6 +998,7 @@ export function initializeTerminalComponent() {
             },
 
             destroy() {
+                this.clearSessionStartTimeout();
                 this.themeObserver?.disconnect();
                 window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset);
                 window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset);

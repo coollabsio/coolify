@@ -1,10 +1,12 @@
 <?php
 
 use App\Jobs\CheckMissingDatabaseBackupsJob;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Team;
 use App\Notifications\Database\BackupMissing;
+use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -49,7 +51,7 @@ it('notifies the team when an enabled backup has no executions for the configure
     (new CheckMissingDatabaseBackupsJob)->handle();
 
     Notification::assertSentTo($team, BackupMissing::class, fn (BackupMissing $notification) => $notification->backup->is($backup));
-    expect($backup->fresh()->missing_backup_notification_sent_at)->not->toBeNull();
+    expect(NotificationThrottle::wasSent($backup, BackupMissing::class))->toBeTrue();
 });
 
 it('does not notify for recent disabled or unconfigured backup schedules', function () {
@@ -114,7 +116,7 @@ it('waits to mark an incident sent until a notification channel is enabled', fun
     $backup = missingBackupSchedule($team);
 
     (new CheckMissingDatabaseBackupsJob)->handle();
-    expect($backup->fresh()->missing_backup_notification_sent_at)->toBeNull();
+    expect(NotificationThrottle::wasSent($backup, BackupMissing::class))->toBeFalse();
 
     $team->emailNotificationSettings->update([
         'smtp_enabled' => true,
@@ -123,4 +125,13 @@ it('waits to mark an incident sent until a notification channel is enabled', fun
     (new CheckMissingDatabaseBackupsJob)->handle();
 
     Notification::assertSentTo($team, BackupMissing::class);
+});
+
+it('releases the missing backup claim when sending the notification throws', function () {
+    $team = teamWithBackupFailureNotifications();
+    $backup = missingBackupSchedule($team);
+    $this->mock(Dispatcher::class, fn ($mock) => $mock->shouldReceive('send')->once()->andThrow(new RuntimeException('SMTP is down')));
+
+    expect(fn () => (new CheckMissingDatabaseBackupsJob)->handle())->toThrow(RuntimeException::class, 'SMTP is down')
+        ->and(NotificationThrottle::wasSent($backup, BackupMissing::class))->toBeFalse();
 });

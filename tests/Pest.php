@@ -15,7 +15,7 @@ use Tests\TestCase;
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
+uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
 
 /*
 |--------------------------------------------------------------------------
@@ -27,6 +27,7 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
 */
 
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
+require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -69,19 +70,23 @@ function loadLazy(Testable $component): Testable
 | Test Hooks
 |--------------------------------------------------------------------------
 |
-| Global hooks that run before/after each test.
+| Global hooks that run before/after each test. A bare beforeEach() in this file
+| only applies to tests in this file, so register them with uses()->in().
 |
 */
-beforeEach(function () {
+uses()->beforeEach(function () {
     // Flush the Once memoization cache to ensure tests get fresh data
     Once::flush();
 
     // Flush the Server identity map cache to ensure tests get fresh data
     Server::flushIdentityMap();
 
+})->in('Feature', 'Unit', 'v4');
+
+uses()->beforeEach(function () {
     // Browser Livewire actions often dispatch events; disable broadcasting for host-side runs.
     config(['broadcasting.default' => 'null']);
-});
+})->in('v4/Browser');
 
 function loginAndSkipBoarding(string $email = 'test@example.com', string $password = 'password'): mixed
 {

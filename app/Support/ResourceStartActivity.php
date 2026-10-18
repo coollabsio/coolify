@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\ProcessStatus;
 use App\Models\Service;
+use App\Support\DatabaseImport\DatabaseImportCleanup;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 
@@ -53,6 +54,16 @@ class ResourceStartActivity
     public const INTERRUPTED_MESSAGE = 'Interrupted by a Coolify restart.';
 
     public const STALE_MESSAGE = 'Marked as failed: no progress was recorded for too long.';
+
+    /**
+     * Added to the reason when Coolify queued the stop of the remote restore and the cleanup.
+     */
+    public const IMPORT_STOPPED_MESSAGE = 'The import was stopped. The database may be partly restored.';
+
+    /**
+     * Added to the reason for an import without stored cleanup data (started before Coolify stored it).
+     */
+    public const IMPORT_PARTLY_RESTORED_MESSAGE = 'The database may be partly restored.';
 
     public const SUPERSEDED_MESSAGE = 'Skipped: a newer start of this database was requested.';
 
@@ -141,17 +152,20 @@ class ResourceStartActivity
     {
         [$stale, $live] = $activities->partition(fn (Activity $activity): bool => self::isStale($activity));
 
-        $stale->each(fn (Activity $activity) => self::markFailed($activity, self::STALE_MESSAGE));
+        $stale->each(fn (Activity $activity) => self::fail($activity, self::STALE_MESSAGE));
 
         return $live->values();
     }
 
     /**
      * Mark an activity as failed, append the reason to its log and stop log polling.
+     *
+     * @param  array<string, mixed>  $extraProperties
      */
-    public static function markFailed(Activity $activity, string $message): void
+    public static function markFailed(Activity $activity, string $message, array $extraProperties = []): void
     {
         $properties = [
+            ...$extraProperties,
             'status' => ProcessStatus::ERROR->value,
             'error' => $message,
             'failed_at' => now()->toIso8601String(),
@@ -186,9 +200,36 @@ class ResourceStartActivity
                 || $serviceUuids->contains(data_get($activity, 'properties.type_uuid'))
         );
 
-        $interrupted->each(fn (Activity $activity) => self::markFailed($activity, self::INTERRUPTED_MESSAGE));
+        $interrupted->each(fn (Activity $activity) => self::fail($activity, self::INTERRUPTED_MESSAGE));
 
         return $interrupted->count();
+    }
+
+    /**
+     * Fail an interrupted or stale activity. For a database import, also queue the stop of the
+     * restore that can still run in the database container, and the removal of its helper
+     * container and temporary files. The stop is queued: this also runs during boot.
+     */
+    private static function fail(Activity $activity, string $reason): void
+    {
+        if (data_get($activity, 'properties.operation') !== self::DATABASE_IMPORT_OPERATION) {
+            self::markFailed($activity, $reason);
+
+            return;
+        }
+
+        $cleanup = DatabaseImportCleanup::stored($activity);
+        if ($cleanup === null) {
+            self::markFailed($activity, $reason.' '.self::IMPORT_PARTLY_RESTORED_MESSAGE);
+
+            return;
+        }
+
+        // Save the stop flag before the stop is queued, so a retried CoolifyTask sees it.
+        self::markFailed($activity, $reason.' '.self::IMPORT_STOPPED_MESSAGE, [
+            DatabaseImportCleanup::STOP_REQUESTED_PROPERTY => now()->toIso8601String(),
+        ]);
+        DatabaseImportCleanup::queueStop($cleanup);
     }
 
     /**

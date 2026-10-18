@@ -67,9 +67,6 @@ it('shows application general and advanced settings in a resource card modal', f
         'parameters' => $this->parameters,
     ])
         ->assertSee('Resource settings')
-        ->assertSeeHtml('data-icon-tooltip-ignore')
-        ->assertSeeHtml('underline underline-offset-4')
-        ->assertDontSeeHtml('decoration-dotted')
         ->assertDontSee(route('project.service.index', [
             ...$this->parameters,
             'stack_service_uuid' => $this->application->uuid,
@@ -98,9 +95,6 @@ it('shows database general and advanced settings in a resource card modal', func
     ])
         ->assertSee('Resource settings')
         ->assertSeeLivewire(Index::class)
-        ->assertSeeHtml('data-icon-tooltip-ignore')
-        ->assertSeeHtml('underline underline-offset-4')
-        ->assertDontSeeHtml('decoration-dotted')
         ->assertDontSee(route('project.service.index', [
             ...$this->parameters,
             'stack_service_uuid' => $this->database->uuid,

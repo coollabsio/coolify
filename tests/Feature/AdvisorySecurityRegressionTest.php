@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\ServiceApplicationsController;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Middleware\ApiAllowed;
+use App\Http\Middleware\ApiIpAllowed;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Service;
@@ -49,7 +50,7 @@ it('does not require email verification for protected web routes', function () {
     $this->actingAs($user)->get('/analytics')->assertOk();
 });
 
-it('does not apply the REST API allowlist to MCP and MCP switch routes', function () {
+it('applies only the IP allow-list, not the REST API switch, to MCP and MCP switch routes', function () {
     $mcp = Route::getRoutes()->match(Request::create('/mcp', 'POST'));
     $enable = Route::getRoutes()->match(Request::create('/api/v1/mcp/enable', 'POST'));
     $disable = Route::getRoutes()->match(Request::create('/api/v1/mcp/disable', 'POST'));
@@ -57,7 +58,10 @@ it('does not apply the REST API allowlist to MCP and MCP switch routes', functio
     expect($mcp)->not->toBeNull()
         ->and($mcp->gatherMiddleware())->not->toContain(ApiAllowed::class)
         ->and($enable->gatherMiddleware())->not->toContain(ApiAllowed::class)
-        ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class);
+        ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class)
+        ->and($mcp->gatherMiddleware())->toContain(ApiIpAllowed::class)
+        ->and($enable->gatherMiddleware())->toContain(ApiIpAllowed::class)
+        ->and($disable->gatherMiddleware())->toContain(ApiIpAllowed::class);
 });
 
 it('throttles only failed authentication on manual webhook routes', function (string $provider) {
@@ -74,7 +78,7 @@ it('throttles only failed authentication on manual webhook routes', function (st
 
         public function reply(array $payloads, string $failureKey): int
         {
-            return $this->manualWebhookResponse(collect($payloads), $failureKey)->getStatusCode();
+            return $this->manualWebhookResponse(collect($payloads), $failureKey, $this->manualWebhookTokenAttempt('wrong-token'))->getStatusCode();
         }
     };
     $failureKey = $helper->key($request, $provider);
@@ -85,7 +89,7 @@ it('throttles only failed authentication on manual webhook routes', function (st
     $helper->reply([['status' => 'success', 'message' => 'queued']], $failureKey);
     expect(RateLimiter::attempts($failureKey))->toBe(0);
 
-    $helper->reply([['status' => 'failed', 'message' => 'Invalid signature.']], $failureKey);
+    $helper->reply([['status' => 'failed', 'message' => 'No matching application or invalid signature.']], $failureKey);
     expect(RateLimiter::attempts($failureKey))->toBe(1);
 })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
@@ -96,14 +100,14 @@ it('does not reveal how many applications share a manual webhook repository', fu
 
         public function reply(array $payloads): string
         {
-            return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test')->getContent();
+            return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test', $this->manualWebhookTokenAttempt('wrong-token'))->getContent();
         }
     };
-    $failure = ['status' => 'failed', 'message' => 'Invalid signature.'];
+    $failure = ['status' => 'failed', 'message' => 'No matching application or invalid signature.'];
 
     expect($helper->reply([$failure, $failure]))->toBe($helper->reply([$failure]));
     expect($helper->reply([$failure, ['status' => 'success', 'message' => 'queued']]))
-        ->not->toContain('Invalid signature.');
+        ->not->toContain('No matching application or invalid signature.');
 });
 
 it('never exposes a shown-once database variable even with sensitive read access', function () {

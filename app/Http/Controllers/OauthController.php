@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\OauthLoginException;
 use App\Models\OauthSetting;
 use App\Services\Auth\OauthLoginService;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,11 @@ class OauthController extends Controller
         } catch (\Exception $e) {
             $this->logCallbackFailure($provider, $e);
 
-            $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
+            $errorCode = match (true) {
+                $e instanceof OauthLoginException => $e->userMessageKey,
+                $e instanceof HttpException => 'auth.failed.oauth',
+                default => 'auth.failed.callback',
+            };
 
             return redirect()->route('login')->withErrors([__($errorCode)]);
         }

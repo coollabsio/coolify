@@ -79,3 +79,85 @@ export function resolveTerminalCloseOutcome({ code, sessionPending, reconnectAtt
         error: sessionPending || !reconnect ? TERMINAL_CONNECTION_ERRORS.connectionFailed : null,
     };
 }
+
+/**
+ * Session-start state for the terminal Alpine component (`terminalData()` spreads it in).
+ *
+ * The host provides `starting`, `terminalActive`, `connectionError`, `authRejected`,
+ * `pendingCommand`, `sessionStartTimeoutId`, `$wire`, and `ensureWebSocketConnection()`.
+ * Only one session-start timer exists at a time: every start clears the previous timer.
+ */
+export const terminalSessionStartMethods = {
+    /** A session was requested and the UI shows "connecting…" until `pty-ready`. */
+    isTerminalSessionPending() {
+        return this.starting && !this.terminalActive;
+    },
+
+    /**
+     * Leave the "connecting" state and show why. The first reason wins unless
+     * `override` is set (auth rejections replace generic connection errors).
+     */
+    failTerminalConnection(message, { override = false } = {}) {
+        this.starting = false;
+        this.clearSessionStartTimeout();
+
+        if (this.connectionError === message || (this.connectionError && !override)) {
+            return;
+        }
+
+        this.connectionError = message;
+        this.$wire.dispatch('error', message);
+    },
+
+    /** Called whenever a new terminal session is requested (target chosen or token issued). */
+    beginTerminalSessionStart() {
+        this.starting = true;
+        this.connectionError = null;
+        this.authRejected = false;
+        this.armTerminalSessionStartTimeout();
+        this.ensureWebSocketConnection();
+    },
+
+    /** Show the timeout error if no session is ready in time. Replaces an earlier timer. */
+    armTerminalSessionStartTimeout() {
+        this.clearSessionStartTimeout();
+        this.sessionStartTimeoutId = setTimeout(() => {
+            this.sessionStartTimeoutId = null;
+            if (this.isTerminalSessionPending()) {
+                // Single-use tokens must not be sent after the user was told to retry.
+                this.pendingCommand = null;
+                this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout);
+            }
+        }, TERMINAL_SESSION_START_TIMEOUT_MS);
+    },
+
+    clearSessionStartTimeout() {
+        if (this.sessionStartTimeoutId) {
+            clearTimeout(this.sessionStartTimeoutId);
+            this.sessionStartTimeoutId = null;
+        }
+    },
+
+    /** The server reported `pty-ready`. */
+    completeTerminalSessionStart() {
+        this.starting = false;
+        this.connectionError = null;
+        this.clearSessionStartTimeout();
+    },
+
+    /** Coolify refused to issue a terminal token (`terminal-session-failed`). */
+    failTerminalSessionStart(message) {
+        this.pendingCommand = null;
+        this.failTerminalConnection(message || TERMINAL_CONNECTION_ERRORS.connectionFailed, { override: true });
+    },
+
+    /** No container was auto-selected (`terminal-auto-start-cancelled`); wait for the user. */
+    cancelTerminalAutoStart() {
+        if (this.terminalActive || this.pendingCommand) {
+            return;
+        }
+
+        this.starting = false;
+        this.clearSessionStartTimeout();
+    },
+};

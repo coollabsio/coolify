@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\AuditEvent;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 if (! function_exists('auditLog')) {
     /**
@@ -13,6 +16,10 @@ if (! function_exists('auditLog')) {
      */
     function auditLog(string $event, array $context = [], string $level = 'info'): void
     {
+        if (! shouldRecordAuditEvent($event, $context)) {
+            return;
+        }
+
         $level = AuditEvent::normalizeLevel($level);
 
         try {
@@ -38,6 +45,73 @@ if (! function_exists('auditLog')) {
         }
 
         AuditEvent::record($event, $context, $level);
+    }
+}
+
+if (! function_exists('auditChangedFields')) {
+    /**
+     * Names of the attributes that the next save() will really change, without timestamps.
+     * Call it before save(). Loosely equal values, such as `false` and `0` in an uncast
+     * boolean column, do not count as changes.
+     *
+     * @return array<int, string>
+     */
+    function auditChangedFields(Model $model): array
+    {
+        return collect(array_keys($model->getDirty()))
+            ->reject(fn (string $field): bool => in_array($field, ['created_at', 'updated_at'], true)
+                || $model->getOriginal($field) == $model->getAttribute($field))
+            ->values()
+            ->all();
+    }
+}
+
+if (! function_exists('auditFailureDeduplicationWindow')) {
+    /**
+     * Seconds during which repeated unauthenticated failures from one source are recorded once.
+     *
+     * Failed logins use a short window so an ongoing brute force attempt stays visible
+     * (one row per email and source IP each minute, on top of the login rate limit).
+     */
+    function auditFailureDeduplicationWindow(string $event): ?int
+    {
+        return match (true) {
+            $event === 'auth.user.login_failed' => 60,
+            $event === 'api.auth.unauthenticated',
+            preg_match('/^webhook\.[a-z0-9_-]+\.signature_failed$/i', $event) === 1 => 300,
+            default => null,
+        };
+    }
+}
+
+if (! function_exists('shouldRecordAuditEvent')) {
+    /**
+     * Keep only the first unauthenticated failure per event, source IP, reason, server and
+     * attempted email in each deduplication window. All other events are always recorded.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    function shouldRecordAuditEvent(string $event, array $context): bool
+    {
+        $window = auditFailureDeduplicationWindow($event);
+        if ($window === null) {
+            return true;
+        }
+
+        try {
+            $request = app()->bound('request') ? request() : null;
+            $fingerprint = hash('sha256', json_encode([
+                $event,
+                $request?->ip(),
+                data_get($context, 'reason'),
+                data_get($context, 'server_uuid'),
+                Str::lower(trim((string) data_get($context, 'attempted_email'))),
+            ]));
+
+            return Cache::add("audit-failure-dedup:{$fingerprint}", true, $window);
+        } catch (Throwable) {
+            return true;
+        }
     }
 }
 

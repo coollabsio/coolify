@@ -44,6 +44,9 @@
                 helper="Uses the backup server timezone, or the instance timezone when none is configured." required />
             <x-forms.input id="timeout" type="number" min="60" max="36000" label="Timeout"
                 helper="Maximum backup runtime in seconds." required />
+            <x-forms.input label="Missing backup alert after" id="missingBackupNotificationDays" type="number"
+                min="0" max="365" suffix="days"
+                helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
         </div>
     </x-application.settings-section>
 </form>

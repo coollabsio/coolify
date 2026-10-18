@@ -4,7 +4,6 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use App\Services\ServerTransfer\ServerTransferBundle;
-use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -22,18 +21,9 @@ class Transfer extends Component
 
     public string $targetToken = '';
 
-    public bool $writeRemote = false;
-
-    /** Advanced */
-    public bool $showAdvanced = false;
-
-    public string $passphrase = '';
-
-    public bool $encryptBundle = false;
-
-    public bool $writeRemoteOnClaim = false;
-
-    public bool $rebindSentinelOnClaim = true;
+    /** Manual transfer */
+    /** Encrypts the downloaded file when filled; empty or whitespace means no encryption. */
+    public ?string $passphrase = null;
 
     public ?string $exportId = null;
 
@@ -56,11 +46,6 @@ class Transfer extends Component
         }
     }
 
-    public function getTransferStatusProperty(): ?string
-    {
-        return data_get($this->server->fresh()->server_metadata, 'transfer.status');
-    }
-
     public function getIsLocalhostProperty(): bool
     {
         return (int) $this->server->id === 0;
@@ -80,7 +65,6 @@ class Transfer extends Component
                 server: $this->server,
                 targetUrl: $this->targetUrl,
                 targetToken: $this->targetToken,
-                writeRemote: $this->writeRemote,
             );
 
             $this->server->refresh();
@@ -114,10 +98,7 @@ class Transfer extends Component
 
             $payload = $bundle;
             $fileName = 'server-transfer-'.$this->server->uuid.'.json';
-            if ($this->encryptBundle) {
-                if (blank($this->passphrase)) {
-                    throw new \RuntimeException('Passphrase is required to encrypt the bundle.');
-                }
+            if (filled($this->passphrase)) {
                 $payload = ServerTransferBundle::encryptWithPassphrase($bundle, $this->passphrase);
                 $fileName = 'server-transfer-'.$this->server->uuid.'.encrypted.json';
             }
@@ -136,53 +117,6 @@ class Transfer extends Component
             ]);
         } catch (Throwable $e) {
             return handleError($e, $this);
-        }
-    }
-
-    public function completeTransfer(ServerTransferClaimer $claimer): void
-    {
-        $this->ensureDevelopmentAvailability();
-
-        try {
-            $this->authorize('update', $this->server);
-            if ($this->isLocalhost) {
-                throw new \RuntimeException('The Coolify host cannot be marked as transferred.');
-            }
-
-            $result = $claimer->markTransferred(
-                $this->server,
-                exportId: $this->exportId ?: data_get($this->server->server_metadata, 'transfer.export_id'),
-                targetInstanceUrl: filled($this->targetUrl) ? rtrim($this->targetUrl, '/') : null,
-            );
-            $this->server->refresh();
-            $this->lastResultJson = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            $this->dispatch('success', $result['message'] ?? 'Server marked as transferred.');
-        } catch (Throwable $e) {
-            handleError($e, $this);
-        }
-    }
-
-    public function claimServer(ServerTransferClaimer $claimer): void
-    {
-        $this->ensureDevelopmentAvailability();
-
-        try {
-            $this->authorize('update', $this->server);
-            if ($this->isLocalhost) {
-                throw new \RuntimeException('The Coolify host cannot be claimed.');
-            }
-
-            $result = $claimer->claim(
-                $this->server,
-                writeRemote: $this->writeRemoteOnClaim,
-                rebindSentinel: $this->rebindSentinelOnClaim,
-            );
-            $this->server->refresh();
-            $this->lastResultJson = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            $this->lastWarnings = [];
-            $this->dispatch('success', $result['message'] ?? 'Server claimed.');
-        } catch (Throwable $e) {
-            handleError($e, $this);
         }
     }
 

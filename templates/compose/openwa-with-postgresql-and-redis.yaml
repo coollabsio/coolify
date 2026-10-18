@@ -1,0 +1,113 @@
+# documentation: https://github.com/rmyndharis/OpenWA
+# slogan: Production OpenWA with PostgreSQL, Redis, and bundled dashboard.
+# category: messaging
+# tags: whatsapp,api,gateway,messaging,automation,webhooks,postgresql,redis
+# logo: svgs/openwa.png
+# port: 2785
+# Production stack with PostgreSQL + Redis. Coolify/Traefik handle routing; no docker-proxy needed.
+
+services:
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:0.23.1
+    restart: unless-stopped
+    stop_grace_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: ${OPENWA_PIDS_LIMIT:-2048}
+    mem_limit: ${OPENWA_MEM_LIMIT:-2g}
+    environment:
+      - SERVICE_URL_OPENWA_2785
+      - NODE_ENV=production
+      - HOME=/tmp
+      - XDG_CONFIG_HOME=/tmp/.config
+      - XDG_CACHE_HOME=/tmp/.cache
+      - PORT=2785
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - BASE_URL=${SERVICE_URL_OPENWA}
+      - DASHBOARD_URL=${SERVICE_URL_OPENWA}
+      - API_MASTER_KEY=${SERVICE_PASSWORD_OPENWA}
+      - DATABASE_TYPE=postgres
+      - DATABASE_HOST=postgresql
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=$SERVICE_USER_POSTGRES
+      - DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - DATABASE_NAME=${POSTGRES_DB:-openwa}
+      - DATABASE_SYNCHRONIZE=false
+      - POSTGRES_SCHEMA=public
+      - ENGINE_TYPE=${ENGINE_TYPE:-whatsapp-web.js}
+      - SESSION_DATA_PATH=./data/sessions
+      - PUPPETEER_HEADLESS=true
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+      - PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/puppeteer-chrome
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=./data/media
+      - REDIS_ENABLED=true
+      - REDIS_HOST=openwa-redis
+      - REDIS_PORT=6379
+      - QUEUE_ENABLED=true
+      - CACHE_ENABLED=true
+      - AUTO_START_SESSIONS=${AUTO_START_SESSIONS:-false}
+    volumes:
+      - openwa-data:/app/data
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      openwa-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://localhost:2785/api/health/ready', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  postgresql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-openwa}
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  openwa-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  openwa-data:
+  postgresql-data:
+  redis-data:

@@ -84,7 +84,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public function mount()
     {
         if (isDev()) {
-            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/v4.x';
+            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/main';
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
@@ -223,6 +223,15 @@ class GithubPrivateRepositoryDeployKey extends Component
 
         if (($scp = parseScpStyleGitUrl($this->repository_url)) !== null) {
             $this->git_host = $scp['host'];
+            $this->git_repository = $this->repository_url;
+            $this->git_source = 'other';
+
+            return;
+        }
+
+        // Keep ssh:// URLs as-is so a custom SSH port is preserved for deployments.
+        if (str_starts_with($this->repository_url, 'ssh://')) {
+            $this->git_host = parse_url($this->repository_url, PHP_URL_HOST);
             $this->git_repository = $this->repository_url;
             $this->git_source = 'other';
 

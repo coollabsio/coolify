@@ -117,7 +117,7 @@ it('renders frontend-only database backup search data for database names and fre
         ->assertSee('Archive-Bucket')
         ->assertSee('archive-bucket', false)
         ->assertSee('backup.s3_storage.includes(query)', false)
-        ->assertSee('Search backup schedules')
+        ->assertSee('placeholder="Search backups"', false)
         ->assertSee('x-model="search"', false)
         ->assertSee('x-show=', false)
         ->assertSee('No matching backup schedules');

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -68,6 +69,7 @@ class StartMongodb
 
             $server = $this->database->destination->server;
             $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
             if (! $this->ssl_certificate) {
@@ -88,6 +90,7 @@ class StartMongodb
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mongo_conf();
@@ -104,11 +107,7 @@ class StartMongodb
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD',
-                        'echo',
-                        'ok',
-                    ]),
+                    'healthcheck' => $this->database->healthCheckConfiguration($this->generate_health_check_command()),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -249,7 +248,7 @@ class StartMongodb
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
@@ -314,21 +313,54 @@ class StartMongodb
             }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_ROOT_USERNAME')) {
             $environment_variables->push("MONGO_INITDB_ROOT_USERNAME={$this->database->mongo_initdb_root_username}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_ROOT_PASSWORD')) {
             $environment_variables->push("MONGO_INITDB_ROOT_PASSWORD={$this->database->mongo_initdb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_DATABASE')) {
             $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
+    }
+
+    /**
+     * The shell is chosen when the check runs: images before MongoDB 5 (and some custom images) have only the legacy mongo shell.
+     * The check uses ping, which needs no authentication and passes on members that are not the writable primary (e.g. an uninitiated replica set).
+     */
+    private function generate_health_check_command(): array
+    {
+        $mongosh = $this->health_check_shell_command(legacy: false);
+        $mongo = $this->health_check_shell_command(legacy: true);
+
+        return ['CMD-SHELL', "if command -v mongosh >/dev/null 2>&1; then {$mongosh}; else {$mongo}; fi"];
+    }
+
+    private function health_check_shell_command(bool $legacy): string
+    {
+        $command = [$legacy ? 'mongo' : 'mongosh', '--quiet', '--host', $this->database->uuid];
+
+        if ($this->database->enable_ssl) {
+            $command = [...$command, $legacy ? '--ssl' : '--tls', $legacy ? '--sslCAFile' : '--tlsCAFile', '/etc/mongo/certs/ca.pem'];
+
+            if ($this->database->ssl_mode === 'verify-full') {
+                $command = [...$command, $legacy ? '--sslPEMKeyFile' : '--tlsCertificateKeyFile', '/etc/mongo/certs/server.pem'];
+            }
+        }
+
+        $command = [
+            ...$command,
+            '--eval',
+            'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
+        ];
+
+        return implode(' ', array_map('escapeshellarg', $command));
     }
 
     private function add_custom_mongo_conf()
@@ -340,6 +372,8 @@ class StartMongodb
         $content = $this->database->mongo_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
     }
 
     private function add_default_database()

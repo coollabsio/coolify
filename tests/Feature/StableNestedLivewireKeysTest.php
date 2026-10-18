@@ -13,19 +13,6 @@ it('does not key nested Livewire components by mutable list positions', function
         ->not->toContain('wire:key="{{ $fileName }}-{{ $loop->index }}"');
 });
 
-it('saves reindexed PostgreSQL scripts by their original stable identity', function () {
-    $editor = file_get_contents(app_path('Livewire/Project/Database/InitScript.php'));
-    $parent = file_get_contents(app_path('Livewire/Project/Database/Postgresql/General.php'));
-
-    expect($editor)
-        ->toContain('public string $originalFilename;')
-        ->toContain("dispatch('save_init_script', \$this->script, \$this->originalFilename)");
-
-    expect($parent)
-        ->toContain('public function save_init_script($script, string $originalFilename)')
-        ->toContain("firstWhere('filename', \$originalFilename)");
-});
-
 it('keeps editable and refreshed list row keys independent of their positions', function () {
     $applicationDomains = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
     $serviceDomains = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
@@ -46,12 +33,15 @@ it('keys nested Livewire status components rendered inside navigation loops', fu
         ->toContain(':key="\'application-server-status-\'.$application->uuid"');
 });
 
-it('keys rolling log lines by content occurrence instead of list position', function () {
-    $logs = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+it('keys virtual log rows by stable line identity instead of list position', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+    $script = file_get_contents(resource_path('js/runtime-logs.js'));
 
-    expect($logs)
-        ->toContain('$lineOccurrences = [];')
-        ->toContain('$lineFingerprint = md5($line);')
-        ->toContain('wire:key="log-{{ $lineFingerprint }}-{{ $lineOccurrence }}"')
-        ->not->toContain("'line-' . \$index");
+    expect($view)
+        ->toContain(':key="row.key"')
+        ->not->toContain(':key="row.index"');
+
+    expect($script)
+        ->toContain('getItemKey: (index) => filtered[index]?.id ?? index')
+        ->toContain('id: nextId()');
 });

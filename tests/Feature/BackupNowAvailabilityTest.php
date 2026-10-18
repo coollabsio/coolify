@@ -2,7 +2,6 @@
 
 use App\Jobs\DatabaseBackupJob;
 use App\Livewire\Project\Database\BackupEdit;
-use App\Livewire\Project\Database\BackupNow;
 use App\Livewire\Project\Service\VolumeBackup\Index;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -63,8 +62,6 @@ beforeEach(function () {
 dataset('database backup controls', [
     'standalone settings' => [BackupEdit::class, 'standalone'],
     'service settings' => [BackupEdit::class, 'service'],
-    'standalone button' => [BackupNow::class, 'standalone'],
-    'service button' => [BackupNow::class, 'service'],
     'service list' => [Index::class, 'service'],
 ]);
 

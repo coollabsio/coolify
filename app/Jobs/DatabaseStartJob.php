@@ -10,9 +10,11 @@ use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
+use App\Actions\Database\StartSqlite;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
 use App\Exceptions\DatabaseStartException;
+use App\Exceptions\RemoteSecretException;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -21,6 +23,8 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+use App\Services\ResourceStatusRefresher;
 use App\Support\ResourceStartActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -30,6 +34,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Spatie\Activitylog\Models\Activity;
 use Throwable;
 
@@ -120,10 +125,18 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
             StandaloneKeydb::class => StartKeydb::run($database, $activity),
             StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
             StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
+            StandaloneSqlite::class => StartSqlite::run($database, $activity),
         };
 
         if (! $result instanceof Activity || data_get($result, 'properties.status') !== ProcessStatus::FINISHED->value) {
             throw DatabaseStartException::startCommandsDidNotRun();
+        }
+
+        // Store the new status now; the regular status check can wait behind other jobs.
+        try {
+            app(ResourceStatusRefresher::class)->refreshDatabase($database);
+        } catch (Throwable $e) {
+            Log::warning('Could not refresh the status of a started database.', ['database' => $database->uuid, 'error' => $e->getMessage()]);
         }
 
         event(new DatabaseStatusChanged($this->userId));
@@ -139,7 +152,9 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
 
             ResourceStartActivity::markFailed(
                 $activity,
-                $exception instanceof DatabaseStartException ? $exception->getMessage() : 'Database start failed.',
+                $exception instanceof DatabaseStartException || $exception instanceof RemoteSecretException
+                    ? $exception->getMessage()
+                    : 'Database start failed.',
             );
         } finally {
             event(new DatabaseStatusChanged($this->userId));

@@ -89,7 +89,7 @@ class PublicGitRepository extends Component
     public function mount()
     {
         if (isDev()) {
-            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/v4.x';
+            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/main';
             $this->port = 3000;
         }
         $this->parameters = get_route_parameters();
@@ -137,7 +137,7 @@ class PublicGitRepository extends Component
                 throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
             }
 
-            $httpsRepositoryUrl = scpStyleGitUrlToHttps($this->repository_url);
+            $httpsRepositoryUrl = sshGitUrlToHttps($this->repository_url);
             if (is_string($httpsRepositoryUrl)) {
                 $this->repository_url = $httpsRepositoryUrl;
             }

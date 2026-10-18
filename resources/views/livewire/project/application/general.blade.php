@@ -109,7 +109,7 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="buildPack" label="Build strategy" live :options="[
                             ['value' => 'railpack', 'label' => 'Railpack'],
-                            ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                            ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Compose'],
@@ -121,6 +121,9 @@
                             ]" x-bind:disabled="!canUpdate" />
                         @endif
                     </div>
+                    @if ($buildPack === 'nixpacks')
+                        <x-nixpacks-deprecated-callout class="mt-4" />
+                    @endif
                 </div>
             @endif
             @if ($application->could_set_build_commands() || ($isStatic && $buildPack !== 'static'))
@@ -207,7 +210,7 @@
                                 @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                     <div class="pt-4">
                                         <x-forms.textarea
-                                            helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
+                                            helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
                                             placeholder="services/api/**" id="watchPaths" label="Watch paths"
                                             x-bind:disabled="shouldDisable()" />
                                     </div>
@@ -263,7 +266,7 @@
                             @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                 <div class="pb-4">
                                     <x-forms.textarea
-                                        helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
+                                        helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
                                         placeholder="src/pages/**" id="watchPaths" label="Watch paths"
                                         x-bind:disabled="!canUpdate" />
                                 </div>
@@ -280,7 +283,7 @@
                             @endif
                             @if ($buildPack !== 'dockercompose')
                                 @php
-                                    $hasBuildServers = \App\Models\Server::buildServers(currentTeam()->id)->exists();
+                                    $hasBuildServers = \App\Models\Server::buildServers($application->team()?->id)->exists();
                                     $buildServerOptions = [
                                         ['value' => false, 'label' => 'Deployment server'],
                                         $hasBuildServers
@@ -328,33 +331,40 @@
             @endif
             @if ($buildPack === 'dockercompose')
                 <div x-data="{ showRaw: true }" class="mt-5">
-                    <div class="mb-2 flex items-center justify-between gap-4">
-                        <h3>Docker Compose</h3>
-                        <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
-                            @click.prevent="showRaw = !showRaw"
-                            x-text="showRaw ? 'Show deployable compose' : 'Show raw compose'"></x-forms.button>
-                    </div>
-                    @if ($application->settings->is_raw_compose_deployment_enabled)
-                        <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
-                            label="Docker compose content (applicationId: {{ $application->id }})"
-                            helper="You need to modify the docker compose file in the git repository."
-                            monacoEditorLanguage="yaml" useMonacoEditor />
-                    @else
-                        @if ((int) $application->compose_parsing_version >= 3)
-                            <div x-show="showRaw">
-                                <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
-                                    label="Docker compose content (raw)"
+                    @can('update', $application)
+                        <div class="mb-2 flex items-center justify-between gap-4">
+                            <h3>Docker Compose</h3>
+                            <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
+                                @click.prevent="showRaw = !showRaw"
+                                x-text="showRaw ? 'Show deployable compose' : 'Show raw compose'"></x-forms.button>
+                        </div>
+                        @if ($application->settings->is_raw_compose_deployment_enabled)
+                            <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
+                                label="Docker compose content (applicationId: {{ $application->id }})"
+                                helper="You need to modify the docker compose file in the git repository."
+                                monacoEditorLanguage="yaml" useMonacoEditor />
+                        @else
+                            @if ((int) $application->compose_parsing_version >= 3)
+                                <div x-show="showRaw">
+                                    <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
+                                        label="Docker compose content (raw)"
+                                        helper="You need to modify the docker compose file in the git repository."
+                                        monacoEditorLanguage="yaml" useMonacoEditor />
+                                </div>
+                            @endif
+                            <div x-show="showRaw === false">
+                                <x-forms.textarea rows="10" readonly id="dockerCompose"
+                                    label="Docker compose content"
                                     helper="You need to modify the docker compose file in the git repository."
                                     monacoEditorLanguage="yaml" useMonacoEditor />
                             </div>
                         @endif
-                        <div x-show="showRaw === false">
-                            <x-forms.textarea rows="10" readonly id="dockerCompose"
-                                label="Docker compose content"
-                                helper="You need to modify the docker compose file in the git repository."
-                                monacoEditorLanguage="yaml" useMonacoEditor />
-                        </div>
-                    @endif
+                    @else
+                        <h3 class="mb-2">Docker Compose</h3>
+                        <x-callout type="info" title="Hidden (only admins can view)" class="mb-4">
+                            The Docker Compose file can contain secrets.
+                        </x-callout>
+                    @endcan
                     <div class="w-full sm:w-96">
                         <x-forms.checkbox label="Escape special characters in labels?"
                             helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."

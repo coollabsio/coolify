@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Security;
 
-use App\Models\InstanceSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -15,7 +14,13 @@ class ApiTokens extends Component
 
     public ?string $description = null;
 
-    public ?int $expiresInDays = 30;
+    /**
+     * Untyped on purpose: Livewire skips hydrating null into typed properties, which
+     * would silently revert a "Never" (null) choice back to the default on the next request.
+     *
+     * @var int|string|null
+     */
+    public $expiresInDays = 30;
 
     public $tokens = [];
 
@@ -28,8 +33,6 @@ class ApiTokens extends Component
         90 => '90 days',
         365 => '1 year',
     ];
-
-    public $isApiEnabled;
 
     #[Locked]
     public bool $canUseRootPermissions = false;
@@ -50,7 +53,6 @@ class ApiTokens extends Component
 
     public function mount()
     {
-        $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
@@ -143,7 +145,7 @@ class ApiTokens extends Component
                 throw new \Exception('You do not have permission to create tokens with read:sensitive permissions.');
             }
 
-            $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
+            $expiresAt = filled($validated['expiresInDays'] ?? null) ? now()->addDays((int) $validated['expiresInDays']) : null;
             $token = auth()->user()->createToken($this->description, $permissions, $expiresAt);
             auditLog('ui.api_token.created', [
                 'team_id' => currentTeam()->id,

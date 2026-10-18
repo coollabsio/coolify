@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Tag;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -28,7 +29,7 @@ class Tags extends Component
 
     public function loadTags()
     {
-        $this->tags = Tag::ownedByCurrentTeam()->get();
+        $this->tags = $this->resourceTags()->get();
         $this->filteredTags = $this->tags->filter(function ($tag) {
             return ! $this->resource->tags->contains($tag);
         });
@@ -52,13 +53,11 @@ class Tags extends Component
 
                     continue;
                 }
-                $found = Tag::ownedByCurrentTeam()->where(['name' => $tag])->exists();
-                if (! $found) {
-                    $found = Tag::create([
+                $found = $this->resourceTags()->where('name', $tag)->first()
+                    ?? Tag::create([
                         'name' => $tag,
-                        'team_id' => currentTeam()->id,
+                        'team_id' => $this->resource->team()->id,
                     ]);
-                }
                 $this->resource->tags()->attach($found->id);
             }
             $this->refresh();
@@ -71,7 +70,7 @@ class Tags extends Component
     {
         try {
             $this->authorize('update', $this->resource);
-            $tag = Tag::ownedByCurrentTeam()->findOrFail($id);
+            $tag = $this->resourceTags()->findOrFail($id);
             if ($this->resource->tags()->whereKey($tag->id)->exists()) {
                 $this->dispatch('error', 'Duplicate tags.', 'Tag <span class=\'dark:text-warning\'>'.e($tag->name).'</span> already added.');
 
@@ -90,13 +89,18 @@ class Tags extends Component
         try {
             $this->authorize('update', $this->resource);
             $this->resource->tags()->detach($id);
-            $found_more_tags = Tag::ownedByCurrentTeam()->find($id);
+            $found_more_tags = $this->resourceTags()->find($id);
             $found_more_tags?->deleteIfOrphaned();
             $this->refresh();
             $this->dispatch('success', 'Tag deleted.');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function resourceTags(): Builder
+    {
+        return Tag::query()->where('team_id', $this->resource->team()?->id)->orderBy('name');
     }
 
     public function refresh()

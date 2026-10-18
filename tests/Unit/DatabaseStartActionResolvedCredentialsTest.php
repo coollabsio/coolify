@@ -54,6 +54,7 @@ it('runs database start commands without persisting them through remote process'
     'StartMysql',
     'StartPostgresql',
     'StartRedis',
+    'StartSqlite',
 ]);
 
 it('queues database starts with identifiers instead of generated commands', function () {
@@ -74,10 +75,10 @@ it('keeps raw secret values separate from compose environment formatting', funct
         ->toContain('$environment_variables->push($env->key.\'=\'.$resolvedValue);')
         ->toContain(...$rawAssignments);
 })->with([
-    'clickhouse' => ['StartClickhouse', ['$this->resolvedClickhouseUser = $rawValue;', '$this->resolvedClickhousePassword = $rawValue;']],
-    'dragonfly' => ['StartDragonfly', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->resolvedRedisPassword)']],
-    'keydb' => ['StartKeydb', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->resolvedRedisPassword)']],
+    'clickhouse' => ['StartClickhouse', ['$this->resolvedClickhouseUser = $composeFileValue;', '$this->resolvedClickhousePassword = $composeFileValue;']],
+    'dragonfly' => ['StartDragonfly', ['$this->resolvedRedisPassword = $this->database->formatComposeFileValue($env, $rawValue);', '$this->requirePassArgument()']],
+    'keydb' => ['StartKeydb', ['$this->resolvedRedisPassword = $this->database->formatComposeFileValue($env, $rawValue);', '$this->requirePassArgument()']],
     'mongodb' => ['StartMongodb', ['$this->resolvedMongoUsername = $rawValue;', '$this->resolvedMongoPassword = $rawValue;', '$this->resolvedMongoDatabase = $rawValue;', 'json_encode($this->resolvedMongoPassword']],
-    'mysql' => ['StartMysql', ['$this->resolvedMysqlRootPassword = $rawValue;']],
-    'postgresql' => ['StartPostgresql', ['$this->resolvedPostgresUser = $rawValue;', '$this->resolvedPostgresDatabase = $rawValue;']],
+    'mysql' => ['StartMysql', ['$this->resolvedMysqlRootPassword = $composeFileValue;']],
+    'postgresql' => ['StartPostgresql', ['$this->resolvedPostgresUser = $composeFileValue;', '$this->resolvedPostgresDatabase = $composeFileValue;']],
 ]);

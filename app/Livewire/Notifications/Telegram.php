@@ -257,7 +257,7 @@ class Telegram extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->telegramEnabled = false;
+            $this->telegramEnabled = (bool) $this->settings->refresh()->telegram_enabled;
 
             return handleError($e, $this);
         } finally {

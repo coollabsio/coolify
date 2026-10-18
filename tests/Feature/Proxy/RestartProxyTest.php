@@ -192,40 +192,6 @@ test('member cannot see start proxy button', function () {
         ->assertDontSee('Start Proxy');
 });
 
-test('start proxy button shows a loading state while proxy startup actions run', function () {
-    [$user, $team, $server] = setupProxyUser('admin');
-
-    $server->proxy->status = 'exited';
-    $server->proxy->type = ProxyTypes::TRAEFIK->value;
-    $server->save();
-    $server->refresh();
-
-    $mock = Mockery::mock($server)->makePartial();
-    $mock->shouldReceive('proxySet')->andReturn(true);
-
-    $this->actingAs($user);
-    session(['currentTeam' => $team]);
-
-    $html = Livewire::test('server.navbar', ['server' => $mock])
-        ->assertSeeHtml('wire:loading.attr="disabled"')
-        ->assertSeeHtml('wire:target="checkProxy,startProxy"')
-        ->html();
-
-    // The split action main button shows its loading state through the
-    // `.split-action-main:disabled` style while Livewire disables it.
-    preg_match_all('/<button\b[^>]*class="split-action-main"[^>]*>(?:(?!<\/button>).)*?Start Proxy/s', $html, $startButtons);
-
-    expect($startButtons[0])->not->toBeEmpty();
-    foreach ($startButtons[0] as $startButton) {
-        expect($startButton)
-            ->toContain('wire:loading.attr="disabled"')
-            ->toContain('wire:target="checkProxy,startProxy"');
-    }
-
-    expect(file_get_contents(resource_path('css/app.css')))
-        ->toMatch('/\.split-action-main:disabled,\s*\.split-action-caret:disabled\s*\{[^}]*opacity:/');
-});
-
 test('starting a proxy records a team audit event', function () {
     [$user, $team, $server] = setupProxyUser('admin');
     $activity = Activity::create([

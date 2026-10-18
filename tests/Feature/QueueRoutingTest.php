@@ -1,11 +1,17 @@
 <?php
 
+use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Proxy\StartProxy;
+use App\Actions\Service\RestartService;
+use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StartService;
 use App\Jobs\DatabaseBackupJob;
+use App\Jobs\RestartProxyJob;
 use App\Jobs\ScheduledJobManager;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\Server;
 
 describe('deployment_queue helper', function () {
     test('uses the high queue on self-hosted', function () {
@@ -42,8 +48,12 @@ describe('start action job routing', function () {
         expect($actionClass::makeJob()->queue)->toBe('deployments');
     })->with([
         StartDatabase::class,
+        RestartDatabase::class,
         StartDatabaseProxy::class,
         StartService::class,
+        RestartService::class,
+        RestartServiceApplication::class,
+        StartProxy::class,
     ]);
 
     test('routes to the high queue on self-hosted', function (string $actionClass) {
@@ -52,9 +62,27 @@ describe('start action job routing', function () {
         expect($actionClass::makeJob()->queue)->toBe('high');
     })->with([
         StartDatabase::class,
+        RestartDatabase::class,
         StartDatabaseProxy::class,
         StartService::class,
+        RestartService::class,
+        RestartServiceApplication::class,
+        StartProxy::class,
     ]);
+});
+
+describe('proxy restart job routing', function () {
+    test('routes to the deployments queue on cloud', function () {
+        config(['constants.coolify.self_hosted' => false]);
+
+        expect((new RestartProxyJob(new Server))->queue)->toBe('deployments');
+    });
+
+    test('routes to the high queue on self-hosted', function () {
+        config(['constants.coolify.self_hosted' => true]);
+
+        expect((new RestartProxyJob(new Server))->queue)->toBe('high');
+    });
 });
 
 describe('scheduled job routing', function () {

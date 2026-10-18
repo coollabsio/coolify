@@ -2,8 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ServerManagerJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledJobDelivery;
+use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\Team;
@@ -15,10 +18,10 @@ use Illuminate\Support\Facades\Cache;
 class ScheduledJobDiagnostics extends Command
 {
     protected $signature = 'scheduled:diagnostics
-        {--type=all : Type to inspect: docker-cleanup, backups, tasks, server-jobs, all}
+        {--type=all : Type to inspect: docker-cleanup, backups, tasks, server-jobs, deliveries, all}
         {--server= : Filter by server ID}';
 
-    protected $description = 'Inspect dedup cache state and scheduling decisions for all scheduled jobs';
+    protected $description = 'Inspect scheduled job state, due schedules, and open deliveries without changing anything';
 
     public function handle(): int
     {
@@ -41,6 +44,10 @@ class ScheduledJobDiagnostics extends Command
 
         if (in_array($type, ['all', 'server-jobs'])) {
             $this->inspectServerJobs($serverFilter);
+        }
+
+        if (in_array($type, ['all', 'deliveries'])) {
+            $this->inspectDeliveries();
         }
 
         return self::SUCCESS;
@@ -72,14 +79,14 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKey = "docker-cleanup:{$server->id}";
-            $cacheValue = Cache::get($dedupKey);
+            $cacheValue = ScheduledJobState::query()->where('schedule_key', $dedupKey)->value('last_scheduled_for')?->toIso8601String();
             $timezone = data_get($server->settings, 'server_timezone', config('app.timezone'));
 
             if (validate_timezone($timezone) === false) {
                 $timezone = config('app.timezone');
             }
 
-            $wouldFire = shouldRunCronNow($frequency, $timezone, $dedupKey);
+            $wouldFire = shouldRunCronNow($frequency, $timezone);
 
             $lastExecution = DockerCleanupExecution::where('server_id', $server->id)
                 ->latest()
@@ -91,14 +98,14 @@ class ScheduledJobDiagnostics extends Command
                 $timezone,
                 $frequency,
                 $dedupKey,
-                $cacheValue ?? '<missing>',
+                $cacheValue ?? 'never',
                 $wouldFire ? 'YES' : 'no',
                 $lastExecution ? $lastExecution->status.' @ '.$lastExecution->created_at : 'never',
             ];
         }
 
         $this->table(
-            ['ID', 'Server', 'TZ', 'Frequency', 'Dedup Key', 'Cache Value', 'Would Fire', 'Last Execution'],
+            ['ID', 'Server', 'TZ', 'Frequency', 'Schedule Key', 'Last Scheduled For', 'Due Now', 'Last Execution'],
             $rows
         );
         $this->newLine();
@@ -121,27 +128,27 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKey = "scheduled-backup:{$backup->id}";
-            $cacheValue = Cache::get($dedupKey);
+            $cacheValue = ScheduledJobState::query()->where('schedule_key', $dedupKey)->value('last_scheduled_for')?->toIso8601String();
             $timezone = $server ? data_get($server->settings, 'server_timezone', config('app.timezone')) : config('app.timezone');
 
             if (validate_timezone($timezone) === false) {
                 $timezone = config('app.timezone');
             }
 
-            $wouldFire = shouldRunCronNow($frequency, $timezone, $dedupKey);
+            $wouldFire = shouldRunCronNow($frequency, $timezone);
 
             $rows[] = [
                 $backup->id,
                 $backup->database_type ?? 'unknown',
                 $server?->name ?? 'N/A',
                 $frequency,
-                $cacheValue ?? '<missing>',
+                $cacheValue ?? 'never',
                 $wouldFire ? 'YES' : 'no',
             ];
         }
 
         $this->table(
-            ['Backup ID', 'DB Type', 'Server', 'Frequency', 'Cache Value', 'Would Fire'],
+            ['Backup ID', 'DB Type', 'Server', 'Frequency', 'Last Scheduled For', 'Due Now'],
             $rows
         );
         $this->newLine();
@@ -164,27 +171,27 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKey = "scheduled-task:{$task->id}";
-            $cacheValue = Cache::get($dedupKey);
+            $cacheValue = ScheduledJobState::query()->where('schedule_key', $dedupKey)->value('last_scheduled_for')?->toIso8601String();
             $timezone = $server ? data_get($server->settings, 'server_timezone', config('app.timezone')) : config('app.timezone');
 
             if (validate_timezone($timezone) === false) {
                 $timezone = config('app.timezone');
             }
 
-            $wouldFire = shouldRunCronNow($frequency, $timezone, $dedupKey);
+            $wouldFire = shouldRunCronNow($frequency, $timezone);
 
             $rows[] = [
                 $task->id,
                 $task->name,
                 $server?->name ?? 'N/A',
                 $frequency,
-                $cacheValue ?? '<missing>',
+                $cacheValue ?? 'never',
                 $wouldFire ? 'YES' : 'no',
             ];
         }
 
         $this->table(
-            ['Task ID', 'Name', 'Server', 'Frequency', 'Cache Value', 'Would Fire'],
+            ['Task ID', 'Name', 'Server', 'Frequency', 'Last Scheduled For', 'Due Now'],
             $rows
         );
         $this->newLine();
@@ -204,7 +211,8 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKeys = [
-                "server-patch-check:{$server->id}" => '0 0 * * 0',
+                "server-patch-check-v2:{$server->id}" => ServerManagerJob::patchCheckCron($server),
+                "sentinel-version-check-v2:{$server->id}" => ServerManagerJob::sentinelVersionCheckCron($server),
                 "server-check:{$server->id}" => isCloud() ? '*/5 * * * *' : '* * * * *',
                 "server-storage-check:{$server->id}" => data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *'),
             ];
@@ -215,7 +223,7 @@ class ScheduledJobDiagnostics extends Command
                 }
 
                 $cacheValue = Cache::get($dedupKey);
-                $wouldFire = shouldRunCronNow($frequency, $timezone, $dedupKey);
+                $wouldFire = shouldRunCronNow($frequency, $timezone);
 
                 $rows[] = [
                     $server->id,
@@ -229,8 +237,27 @@ class ScheduledJobDiagnostics extends Command
         }
 
         $this->table(
-            ['Server ID', 'Server', 'Dedup Key', 'Frequency', 'Cache Value', 'Would Fire'],
+            ['Server ID', 'Server', 'Dedup Key', 'Frequency', 'Cache Value', 'Due Now'],
             $rows
+        );
+        $this->newLine();
+    }
+
+    /**
+     * Occurrences that are not finished. An old "enqueued" row usually means its queued job was lost.
+     */
+    private function inspectDeliveries(): void
+    {
+        $this->info('=== Open and failed deliveries (failed ones are kept for 30 days) ===');
+
+        $this->table(
+            ['Job Type', 'Status', 'Count', 'Oldest Due (UTC)'],
+            ScheduledJobDelivery::query()
+                ->whereIn('status', ['pending', 'enqueued', 'claimed', 'failed'])
+                ->selectRaw('job_type, status, count(*) as total, min(scheduled_for) as oldest')
+                ->groupBy('job_type', 'status')
+                ->get()
+                ->map(fn ($row) => [$row->job_type, $row->status, $row->total, $row->oldest])
         );
         $this->newLine();
     }

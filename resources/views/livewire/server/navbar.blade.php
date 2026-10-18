@@ -85,7 +85,9 @@
             $activeServerMenuItem['route'],
             $serverRouteParameters,
         );
-        $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
+        $showSentinelStatus = $server->isFunctional()
+            && $server->isSentinelEnabled()
+            && auth()->user()?->can('viewSentinel', $server);
         $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
     @endphp
 
@@ -140,7 +142,7 @@
                                 :class="option.functional ? 'bg-success' : 'bg-error'"></span>
                             <span class="min-w-0 flex-1 truncate" x-text="option.name"></span>
                             <x-reicon name="check-circle"
-                                class="size-3.5 shrink-0 text-coollabs dark:text-warning"
+                                class="size-3.5 shrink-0 text-black dark:text-fg"
                                 x-show="option.uuid === '{{ $server->uuid }}'" />
                         </a>
                     </template>
@@ -164,7 +166,7 @@
                     <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
                         :show-sentinel-status="$showSentinelStatus" />
                     @if ($traefikDashboardAvailable)
-                        <a target="_blank" href="http://{{ $serverIp }}:8080" title="Open Traefik dashboard"
+                        <a target="_blank" href="http://{{ formatHostForUrl((string) $serverIp) }}:8080" title="Open Traefik dashboard"
                             class="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white">
                             <x-reicon name="external-link" class="size-3" />
                             Traefik
@@ -280,7 +282,7 @@
                         @if ($traefikDashboardAvailable)
                             <div class="resource-heading-menus shrink-0">
                                 <a class="app-tab shrink-0 gap-1" target="_blank" title="Open Traefik dashboard"
-                                    href="http://{{ $serverIp }}:8080">
+                                    href="http://{{ formatHostForUrl((string) $serverIp) }}:8080">
                                     <x-reicon name="external-link" class="size-3.5 shrink-0 opacity-70" />
                                     Traefik Dashboard
                                 </a>

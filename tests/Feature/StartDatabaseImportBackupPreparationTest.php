@@ -11,7 +11,9 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\RemoteProcessCommand;
 use App\Support\ResourceStartActivity;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Filesystem\FilesystemManager;
@@ -72,7 +74,7 @@ function importServerBackup(object $test, string $path, string $magicHex): strin
         $test->team->id,
     );
 
-    return (string) $activity->getExtraProperty('command');
+    return (string) RemoteProcessCommand::read($activity);
 }
 
 test('plain and gzip server backups are copied into the database container unchanged', function (string $path, string $magicHex) {
@@ -85,6 +87,56 @@ test('plain and gzip server backups are copied into the database container uncha
     'plain SQL' => ['/srv/backups/app.sql', '2d2d20506f73'],
     'gzip' => ['/srv/backups/app.sql.gz', '1f8b08000000'],
     'custom archive' => ['/srv/backups/app.dmp', '5047444d5001'],
+]);
+
+test('server backups without a known backup extension can be restored', function (string $path, string $magicHex) {
+    $command = importServerBackup($this, $path, $magicHex);
+
+    expect($command)->toContain("docker cp '{$path}' '{$this->database->uuid}:/tmp/restore_");
+})->with([
+    'no extension' => ['/srv/backups/pgdump', '5047444d5001'],
+    'date suffix' => ['/srv/backups/app.sql.2026-10-01', '2d2d20506f73'],
+    'sqlite' => ['/srv/backups/app.sqlite', '53514c697465'],
+]);
+
+test('server backup paths with shell characters are still rejected', function (string $path) {
+    expect(fn () => importServerBackup($this, $path, '2d2d20506f73'))
+        ->toThrow(DatabaseImportException::class, 'The server path is invalid.');
+})->with([
+    'relative' => ['srv/backups/pgdump'],
+    'traversal' => ['/srv/backups/../../etc/shadow'],
+    'command substitution' => ['/srv/backups/$(id)'],
+    'semicolon' => ['/srv/backups/a;id'],
+    'quote' => ["/srv/backups/a'b"],
+]);
+
+test('s3 backups still need a known backup extension', function (string $path, bool $allowed) {
+    $storage = S3Storage::create([
+        'name' => 'Import S3',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://8.8.8.8',
+        'is_usable' => true,
+        'team_id' => $this->team->id,
+    ]);
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('exists')->andReturn(false);
+    $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
+    $filesystem->shouldReceive('build')->andReturn($disk);
+    Storage::swap($filesystem);
+    Process::fake();
+
+    expect(fn () => app(StartDatabaseImport::class)->handle(
+        $this->database,
+        new DatabaseImportSource('s3', path: $path, s3StorageUuid: $storage->uuid),
+        $this->team->id,
+    ))->toThrow(DatabaseImportException::class, $allowed ? 'The S3 backup was not found' : 'The S3 path is invalid.');
+})->with([
+    'no extension' => ['backups/pgdump', false],
+    'sqlite' => ['backups/app.sqlite', true],
+    'gzip sqlite3' => ['backups/app.sqlite3.gz', true],
 ]);
 
 test('bz2, xz, and zip server backups are prepared in the helper image', function (string $path, string $magicHex) {
@@ -115,7 +167,7 @@ test('uploaded backups use the same preparation as server backups', function (st
         new DatabaseImportSource('upload'),
         $this->team->id,
     );
-    $command = (string) $activity->getExtraProperty('command');
+    $command = (string) RemoteProcessCommand::read($activity);
 
     expect(str_contains($command, "'backup-decompress-"))->toBe($usesHelper)
         ->and(str_contains($command, "docker cp '/tmp/database-import-"))->toBeTrue();
@@ -149,7 +201,7 @@ test('s3 backups are prepared in the s3 helper and streamed into the database co
         new DatabaseImportSource('s3', path: 'backups/restore.sql.xz', s3StorageUuid: $storage->uuid),
         $this->team->id,
     );
-    $command = (string) $activity->getExtraProperty('command');
+    $command = (string) RemoteProcessCommand::read($activity);
 
     expect($command)
         ->toContain('unxz -c')

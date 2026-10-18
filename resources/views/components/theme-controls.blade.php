@@ -21,7 +21,7 @@
                                 :style="`background: ${themeColor}`"></span>
                             Custom
                         </span>
-                        <svg x-show="theme === 'custom'" class="size-3.5 text-coollabs dark:text-warning"
+                        <svg x-show="theme === 'custom'" class="size-3.5 text-black dark:text-fg"
                             viewBox="0 0 12 12" fill="none" aria-hidden="true">
                             <path d="{{ $checkPath }}" stroke="currentColor" stroke-width="1.4"
                                 stroke-linecap="round" stroke-linejoin="round" />
@@ -34,7 +34,7 @@
                     class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
                     <span>{{ $option['label'] }}</span>
                     <svg x-show="theme === '{{ $option['value'] }}'"
-                        class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
+                        class="size-3.5 text-black dark:text-fg" viewBox="0 0 12 12" fill="none"
                         aria-hidden="true">
                         <path d="{{ $checkPath }}" stroke="currentColor" stroke-width="1.4"
                             stroke-linecap="round" stroke-linejoin="round" />
@@ -54,7 +54,7 @@
                 class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
                 <span>{{ $option['label'] }}</span>
                 <svg x-show="pageWidth === '{{ $option['value'] }}'"
-                    class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
+                    class="size-3.5 text-black dark:text-fg" viewBox="0 0 12 12" fill="none"
                     aria-hidden="true">
                     <path d="{{ $checkPath }}" stroke="currentColor" stroke-width="1.4"
                         stroke-linecap="round" stroke-linejoin="round" />
@@ -99,7 +99,7 @@
                                 <div class="p-3">
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
-                                        <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-warning"
+                                        <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
                                             x-show="theme === 'custom'" x-cloak />
                                     </div>
                                     <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
@@ -129,7 +129,7 @@
                                     <span class="text-sm font-semibold text-black dark:text-fg">
                                         {{ $option['label'] }}
                                     </span>
-                                    <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-warning"
+                                    <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
                                         x-show="theme === '{{ $option['value'] }}'" x-cloak />
                                 </div>
                                 <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
@@ -172,7 +172,7 @@
                         <div class="p-3">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
-                                <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-warning"
+                                <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
                                     x-show="pageWidth === '{{ $option['value'] }}'" x-cloak />
                             </div>
                             <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>

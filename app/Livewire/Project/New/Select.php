@@ -118,6 +118,7 @@ class Select extends Component
                 'name' => str($serviceKey)->headline(),
                 'docsSlug' => str($serviceKey)->lower()->value(),
                 'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
+                'website' => $this->serviceWebsiteUrl(data_get($service, 'documentation')),
             ] + service_logo_urls(data_get($service, 'logo')) + (array) $service;
         })->all();
 
@@ -255,6 +256,13 @@ class Select extends Component
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
                 'logo' => asset('svgs/resources/clickhouse.svg'),
             ],
+            [
+                'id' => 'sqlite',
+                'name' => 'SQLite',
+                'description' => 'A lightweight relational database stored in a single file.',
+                'logo' => asset('svgs/resources/sqlite.svg'),
+                'experimental' => true,
+            ],
 
         ];
 
@@ -279,6 +287,29 @@ class Select extends Component
                 $this->servers = $this->allServers;
             }
         }
+    }
+
+    /**
+     * Derive a website link from the documentation URL. Shared hosts keep the
+     * path that identifies the project, so the link does not open the host root.
+     */
+    private function serviceWebsiteUrl(?string $documentation): ?string
+    {
+        $url = parse_url((string) $documentation);
+        if (! in_array($url['scheme'] ?? null, ['http', 'https'], true) || blank($url['host'] ?? null)) {
+            return null;
+        }
+
+        $projectPathSegments = [
+            'github.com' => 2,
+            'gitlab.com' => 2,
+            'codeberg.org' => 2,
+            'hub.docker.com' => 3,
+        ][str($url['host'])->lower()->chopStart('www.')->value()] ?? 0;
+
+        $projectPath = str($url['path'] ?? '')->explode('/')->filter()->take($projectPathSegments)->implode('/');
+
+        return rtrim("{$url['scheme']}://{$url['host']}/{$projectPath}", '/');
     }
 
     private function serviceTemplatesLastUpdated(): ?string
@@ -369,6 +400,7 @@ class Select extends Component
             case 'dragonfly':
             case 'clickhouse':
             case 'mongodb':
+            case 'sqlite':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {

@@ -130,6 +130,11 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
     }
 
+    public function sqlites()
+    {
+        return $this->hasManyThrough(StandaloneSqlite::class, Environment::class);
+    }
+
     public function mongodbs()
     {
         return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
@@ -156,6 +161,7 @@ class Project extends BaseModel
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
+            $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0;
     }
 
@@ -168,7 +174,8 @@ class Project extends BaseModel
             ->concat($this->mariadbs()->with($with)->get())
             ->concat($this->keydbs()->with($with)->get())
             ->concat($this->dragonflies()->with($with)->get())
-            ->concat($this->clickhouses()->with($with)->get());
+            ->concat($this->clickhouses()->with($with)->get())
+            ->concat($this->sqlites()->with($with)->get());
     }
 
     public function navigateTo()

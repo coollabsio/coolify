@@ -47,17 +47,6 @@ beforeEach(function () {
     Once::flush();
 });
 
-it('renders settings email enable actions instead of enabled checkboxes', function () {
-    $view = file_get_contents(resource_path('views/livewire/settings-email.blade.php'));
-
-    expect($view)->toContain('Enable SMTP Server')
-        ->and($view)->toContain('Disable SMTP Server')
-        ->and($view)->toContain('Enable Resend')
-        ->and($view)->toContain('Disable Resend')
-        ->and($view)->not->toContain('id="smtpEnabled" label="Enabled"')
-        ->and($view)->not->toContain('id="resendEnabled" label="Enabled"');
-});
-
 it('keeps transactional smtp disabled when enable validation fails', function () {
     actingAsEnableActionInstanceAdmin();
 
@@ -87,19 +76,6 @@ it('enables transactional smtp only after required fields validate', function ()
         ->and(instanceSettings()->fresh()->resend_enabled)->toBeFalse();
 });
 
-it('renders notification provider enable actions instead of enabled checkboxes', function (string $view, string $enableLabel, string $checkboxSnippet) {
-    $contents = file_get_contents(resource_path("views/livewire/notifications/{$view}.blade.php"));
-
-    expect($contents)->toContain($enableLabel)
-        ->and($contents)->not->toContain($checkboxSnippet);
-})->with([
-    'discord' => ['discord', 'Enable Discord', 'id="discordEnabled" label="Enabled"'],
-    'slack' => ['slack', 'Enable Slack', 'id="slackEnabled" label="Enabled"'],
-    'telegram' => ['telegram', 'Enable Telegram', 'id="telegramEnabled" label="Enabled"'],
-    'pushover' => ['pushover', 'Enable Pushover', 'id="pushoverEnabled" label="Enabled"'],
-    'webhook' => ['webhook', 'Enable Webhook', 'id="webhookEnabled" label="Enabled"'],
-]);
-
 it('shows notification provider save buttons while disabled', function (string $component) {
     actingAsEnableActionOwner();
 
@@ -117,12 +93,15 @@ it('shows notification provider save buttons while disabled', function (string $
 it('hides notification provider test buttons while disabled and shows them when enabled', function (string $component, string $enabledProperty) {
     actingAsEnableActionOwner();
 
-    Livewire::test($component)
-        ->assertDontSee('Send Test Notification');
+    // The channel actions always render "Send test"; it stays disabled until the channel is enabled.
+    $sendTestButton = '/<button\s+(disabled\s+)?class="button"[^>]*\$wire\.\$call\(testMethod\)[^>]*>/';
 
-    Livewire::test($component)
-        ->set($enabledProperty, true)
-        ->assertSee('Send Test Notification');
+    preg_match($sendTestButton, Livewire::test($component)->html(), $disabledMatch);
+    expect($disabledMatch[1] ?? null)->not->toBeEmpty();
+
+    preg_match($sendTestButton, Livewire::test($component)->set($enabledProperty, true)->html(), $enabledMatch);
+    expect($enabledMatch)->not->toBeEmpty()
+        ->and($enabledMatch[1] ?? '')->toBe('');
 })->with([
     'discord' => [Discord::class, 'discordEnabled'],
     'slack' => [Slack::class, 'slackEnabled'],
@@ -155,20 +134,6 @@ it('keeps notification providers disabled when enable validation fails', functio
     'webhook' => [Webhook::class, 'toggleWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
-it('renders notification email and log drain enable actions instead of enabled checkboxes', function () {
-    $notificationEmail = file_get_contents(resource_path('views/livewire/notifications/email.blade.php'));
-    $logDrains = file_get_contents(resource_path('views/livewire/server/log-drains.blade.php'));
-
-    expect($notificationEmail)->toContain('Enable SMTP Server')
-        ->and($notificationEmail)->toContain('Enable Resend')
-        ->and($notificationEmail)->not->toContain('id="smtpEnabled"')
-        ->and($notificationEmail)->not->toContain('id="resendEnabled"')
-        ->and($logDrains)->toContain('Enable New Relic')
-        ->and($logDrains)->toContain('Enable Axiom')
-        ->and($logDrains)->toContain('Enable Custom FluentBit')
-        ->and($logDrains)->not->toContain('label="Enabled"');
-});
-
 it('keeps notification email smtp disabled when enable validation fails', function () {
     actingAsEnableActionOwner();
 
@@ -176,4 +141,71 @@ it('keeps notification email smtp disabled when enable validation fails', functi
         ->call('toggleSmtp')
         ->assertDispatched('error')
         ->assertSet('smtpEnabled', false);
+});
+
+it('reverts a notification provider toggle to the saved value when enabling fails', function (string $component, string $method, string $enabledProperty, string $settingsRelation, string $settingsColumn) {
+    [, $team] = actingAsEnableActionOwner();
+
+    Livewire::test($component)
+        ->set($enabledProperty, true)
+        ->call($method)
+        ->assertDispatched('error')
+        ->assertSet($enabledProperty, false);
+
+    expect($team->{$settingsRelation}->fresh()->{$settingsColumn})->toBeFalse();
+})->with([
+    'discord' => [Discord::class, 'instantSaveDiscordEnabled', 'discordEnabled', 'discordNotificationSettings', 'discord_enabled'],
+    'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackNotificationSettings', 'slack_enabled'],
+    'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramNotificationSettings', 'telegram_enabled'],
+    'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookNotificationSettings', 'webhook_enabled'],
+]);
+
+it('reverts a notification provider toggle to the saved value when disabling fails', function (string $component, string $method, string $enabledProperty, string $requiredProperty, string $settingsRelation, array $savedSettings) {
+    [, $team] = actingAsEnableActionOwner();
+    $team->{$settingsRelation}->update($savedSettings);
+
+    Livewire::test($component)
+        ->assertSet($enabledProperty, true)
+        ->set($requiredProperty, '')
+        ->set($enabledProperty, false)
+        ->call($method)
+        ->assertDispatched('error')
+        ->assertSet($enabledProperty, true);
+
+    expect($team->{$settingsRelation}->fresh()->{array_key_first($savedSettings)})->toBeTrue();
+})->with([
+    'discord' => [Discord::class, 'instantSaveDiscordEnabled', 'discordEnabled', 'discordWebhookUrl', 'discordNotificationSettings', ['discord_enabled' => true, 'discord_webhook_url' => 'https://discord.com/api/webhooks/1/abc']],
+    'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C']],
+    'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42']],
+    'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token']],
+    'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify']],
+]);
+
+it('reverts a notification event toggle to the saved value when saving fails', function (string $component, string $urlProperty, string $eventProperty, string $settingsRelation, string $eventColumn) {
+    [, $team] = actingAsEnableActionOwner();
+    $saved = (bool) $team->{$settingsRelation}->{$eventColumn};
+
+    Livewire::test($component)
+        ->set($urlProperty, 'not-a-url')
+        ->call('toggleEvent', $eventProperty)
+        ->assertSet($eventProperty, $saved);
+
+    expect((bool) $team->{$settingsRelation}->fresh()->{$eventColumn})->toBe($saved);
+})->with([
+    'discord' => [Discord::class, 'discordWebhookUrl', 'deploymentSuccessDiscordNotifications', 'discordNotificationSettings', 'deployment_success_discord_notifications'],
+    'slack' => [Slack::class, 'slackWebhookUrl', 'deploymentSuccessSlackNotifications', 'slackNotificationSettings', 'deployment_success_slack_notifications'],
+]);
+
+it('reverts the discord mention setting to the saved value when saving fails', function () {
+    [, $team] = actingAsEnableActionOwner();
+    $team->discordNotificationSettings->update(['discord_ping_enabled' => true]);
+
+    Livewire::test(Discord::class)
+        ->set('discordWebhookUrl', 'not-a-url')
+        ->set('discordPingEnabled', false)
+        ->call('instantSaveDiscordPingEnabled')
+        ->assertSet('discordPingEnabled', true);
+
+    expect($team->discordNotificationSettings->fresh()->discord_ping_enabled)->toBeTrue();
 });

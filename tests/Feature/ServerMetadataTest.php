@@ -2,20 +2,24 @@
 
 use App\Livewire\Server\Show;
 use App\Livewire\Server\ValidateAndInstall;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+
     $user = User::factory()->create();
     $this->team = Team::factory()->create();
-    $user->teams()->attach($this->team);
+    $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
     session(['currentTeam' => $this->team]);
 
@@ -160,14 +164,19 @@ it('can overwrite server_metadata with new values', function () {
 });
 
 it('calls gatherServerMetadata during ValidateAndInstall when docker version is valid', function () {
+    Queue::fake();
+
     $serverMock = Mockery::mock($this->server)->makePartial();
     $serverMock->shouldReceive('isSwarm')->andReturn(false);
     $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn('24.0.0');
     $serverMock->shouldReceive('gatherServerMetadata')->once();
     $serverMock->shouldReceive('isBuildServer')->andReturn(false);
 
+    // Call the action on the mounted instance: a Livewire request round trip
+    // would rehydrate the server from the database and drop the mock.
     Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->call('validateDockerVersion');
+        ->instance()
+        ->validateDockerVersion();
 });
 
 it('does not call gatherServerMetadata when docker version validation fails', function () {
@@ -176,6 +185,9 @@ it('does not call gatherServerMetadata when docker version validation fails', fu
     $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn(false);
     $serverMock->shouldNotReceive('gatherServerMetadata');
 
+    // Call the action on the mounted instance: a Livewire request round trip
+    // would rehydrate the server from the database and drop the mock.
     Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->call('validateDockerVersion');
+        ->instance()
+        ->validateDockerVersion();
 });

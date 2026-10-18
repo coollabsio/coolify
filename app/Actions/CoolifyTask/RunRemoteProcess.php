@@ -7,7 +7,11 @@ use App\Enums\ProcessStatus;
 use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
-use Illuminate\Process\ProcessResult;
+use App\Support\DatabaseImport\DatabaseImportCleanup;
+use App\Support\RemoteProcessCommand;
+use App\Support\ResourceStartActivity;
+use App\Traits\BroadcastsToTeam;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -80,11 +84,37 @@ class RunRemoteProcess
         $status = ProcessStatus::IN_PROGRESS;
         $timeout = config('constants.ssh.command_timeout');
         $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
-        $this->activity->properties = $this->activity->properties->merge([
+        // Start from the stored properties and save now, so later output writes only change the log and
+        // never write back an old copy over a status that Coolify set meanwhile (for example a stopped import).
+        $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties ?? $this->activity->properties;
+        $this->activity->properties = $stored->merge([
             'process_id' => $process->id(),
         ]);
+        $this->activity->save();
 
         $processResult = $process->wait();
+
+        // A database import whose SSH command ended without the restore result keeps blocking the
+        // database until its restore is stopped. The stop event also cleans up, so the normal
+        // finish event must not run first.
+        if (array_key_exists($processResult->exitCode(), DatabaseImportCleanup::TRANSPORT_FAILURE_REASONS)
+            && $this->activity->properties->get('operation') === ResourceStartActivity::DATABASE_IMPORT_OPERATION
+            && blank(Activity::query()->whereKey($this->activity->getKey())->first()?->properties?->get(DatabaseImportCleanup::STOP_REQUESTED_PROPERTY))
+            && DatabaseImportCleanup::stopAfterTransportFailure($this->activity, $processResult->exitCode())) {
+            $this->activity->properties = $this->activity->properties->merge([
+                'exitCode' => $processResult->exitCode(),
+                'stdout' => $processResult->output(),
+                'stderr' => $processResult->errorOutput(),
+            ]);
+            $this->activity->save();
+
+            if (! $this->ignore_errors) {
+                throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
+            }
+
+            return $processResult;
+        }
+
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {
@@ -95,21 +125,29 @@ class RunRemoteProcess
             }
         }
 
-        $this->activity->properties = $this->activity->properties->merge([
+        $properties = [
             'exitCode' => $processResult->exitCode(),
             'stdout' => $processResult->output(),
             'stderr' => $processResult->errorOutput(),
             'status' => $status->value,
-        ]);
+        ];
+
+        // Coolify can stop a database import while this job runs (restart or stale import). Keep the
+        // stop status and message, because this job only has its own older copy of the properties.
+        $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties;
+        if ($stored !== null && filled($stored->get(DatabaseImportCleanup::STOP_REQUESTED_PROPERTY))) {
+            $properties = [
+                ...$properties,
+                ...$stored->only([DatabaseImportCleanup::STOP_REQUESTED_PROPERTY, 'error'])->all(),
+                'status' => ProcessStatus::ERROR->value,
+            ];
+        }
+
+        $this->activity->properties = $this->activity->properties->merge($properties);
         $this->activity->save();
         if ($this->call_event_on_finish) {
             try {
-                $eventClass = "App\\Events\\$this->call_event_on_finish";
-                if (! is_null($this->call_event_data)) {
-                    event(new $eventClass($this->call_event_data));
-                } else {
-                    event(new $eventClass($this->activity->causer_id));
-                }
+                self::dispatchFinishEvent($this->activity, $this->call_event_on_finish, $this->call_event_data);
             } catch (\Throwable $e) {
                 Log::error('Error calling event: '.$e->getMessage());
             }
@@ -121,10 +159,29 @@ class RunRemoteProcess
         return $processResult;
     }
 
+    /**
+     * Dispatches the event that a remote process asked for when it finishes.
+     *
+     * Without explicit event data, a team event goes to the team of the server that ran the
+     * process. The causer is a user, so its id is only used for events on a user channel.
+     */
+    public static function dispatchFinishEvent(Activity $activity, string $eventName, mixed $eventData = null): void
+    {
+        $eventClass = "App\\Events\\{$eventName}";
+
+        if (is_null($eventData)) {
+            $eventData = in_array(BroadcastsToTeam::class, class_uses_recursive($eventClass), true)
+                ? $activity->getExtraProperty('team_id')
+                : $activity->causer_id;
+        }
+
+        event(new $eventClass($eventData));
+    }
+
     protected function getCommand(): string
     {
         $server_uuid = $this->activity->getExtraProperty('server_uuid');
-        $command = $this->activity->getExtraProperty('command');
+        $command = RemoteProcessCommand::read($this->activity) ?? throw new \RuntimeException('The command of this task was already removed.');
         $server = Server::whereUuid($server_uuid)->firstOrFail();
 
         return SshMultiplexingHelper::generateSshCommand($server, $command);

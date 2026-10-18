@@ -134,7 +134,7 @@
                     <div class="flex items-end gap-2">
                         <x-forms.input id="email" label="Email" readonly />
                         <x-forms.button @click="openEmailModal()" type="button"
-                            :disabled="$uses_sso" x-bind:disabled="emailModalOpen || @js($uses_sso)">
+                            :disabled="$uses_sso" x-bind:disabled="emailModalOpen || {{ $uses_sso ? 'true' : 'false' }}">
                             Change
                         </x-forms.button>
                     </div>
@@ -260,8 +260,8 @@
                             <div x-data="{ showCode: false }">
                                 <div x-cloak x-show="showCode" class="space-y-2 pb-3">
                                     <x-forms.copy-input
-                                        text="{{ decrypt(request()->user()->two_factor_secret) }}" />
-                                    <x-forms.copy-input text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
+                                        :text="decrypt(request()->user()->two_factor_secret)" />
+                                    <x-forms.copy-input :text="request()->user()->twoFactorQrCodeUrl()" />
                                 </div>
                                 <x-forms.button type="button" x-on:click="showCode = !showCode">
                                     <span x-text="showCode ? 'Hide manual setup' : 'Show manual setup'"></span>
@@ -297,6 +297,51 @@
                         description="Configure an authenticator app to add another sign-in check."
                         icon-name="keys" />
                 @endif
+            </div>
+        </section>
+
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Danger zone</h2>
+                    <p>Destructive actions for your account cannot be undone.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body">
+                <x-danger-zone title="Delete account">
+                    @if ($accountDeletionBlockers === [])
+                        <p>
+                            Permanently delete your account from Coolify. This action cannot be undone.
+                        </p>
+                        <ul class="space-y-1 text-xs">
+                            <li>• Teams where you are the only member are deleted.</li>
+                            <li>• You are removed from all other teams.</li>
+                            <li>• Your API tokens and sessions are revoked.</li>
+                        </ul>
+                    @else
+                        <p>Before you can delete your account:</p>
+                        <ul class="space-y-1">
+                            @foreach ($accountDeletionBlockers as $blocker)
+                                <li>• {{ $blocker }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <x-slot:action>
+                        @if ($accountDeletionBlockers === [])
+                            <x-modal-confirmation title="Confirm Account Deletion?" buttonTitle="Delete account"
+                                isErrorButton submitAction="deleteAccount"
+                                :actions="$accountDeletionActions"
+                                confirmationText="{{ $email }}"
+                                confirmationLabel="Enter your email address to confirm permanent deletion"
+                                shortConfirmationLabel="Email" step3ButtonText="Permanently Delete" />
+                        @else
+                            <x-forms.button isError disabled
+                                tooltip="Resolve the requirements shown before deleting your account.">
+                                Delete account
+                            </x-forms.button>
+                        @endif
+                    </x-slot:action>
+                </x-danger-zone>
             </div>
         </section>
 

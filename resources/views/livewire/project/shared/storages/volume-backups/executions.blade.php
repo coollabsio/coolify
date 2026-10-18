@@ -3,6 +3,7 @@
         $executionCount = method_exists($executions, 'total') ? $executions->total() : $executions->count();
         $currentPage = method_exists($executions, 'currentPage') ? $executions->currentPage() : 1;
         $lastPage = method_exists($executions, 'lastPage') ? $executions->lastPage() : 1;
+        $server = $backup->server();
     @endphp
 
     <div wire:poll.5000ms="$refresh">
@@ -62,6 +63,14 @@
                             if (empty($deleteActions)) {
                                 $deleteActions[] = 'This backup execution record will be deleted.';
                             }
+                            $recoveryPending = $execution->status !== 'running' && $execution->hasPendingRecovery();
+                            $recoveryErrorLabel = match ($execution->recovery_error) {
+                                's3_auth' => 'S3 credentials',
+                                's3_bucket' => 'S3 bucket missing',
+                                'server_unreachable' => 'server unreachable',
+                                'remote_command' => 'remote command failed',
+                                default => 'unknown error',
+                            };
                         @endphp
 
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
@@ -74,12 +83,13 @@
                                 <x-forms.copy-input :text="$execution->filename ?? 'No archive name'" />
                             </span>
 
-                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint"
+                                title="Started: {{ formatDateInServerTimezone($execution->created_at, $server) }}@if ($execution->status !== 'running')&#10;Ended: {{ formatDateInServerTimezone($finishedAt, $server) }}@endif">
                                 @if ($execution->status === 'running')
                                     Running for {{ calculateDuration($execution->created_at, now()) }}
                                 @else
-                                    {{ $finishedAt->diffForHumans() }}<br>
-                                    {{ calculateDuration($execution->created_at, $finishedAt) }}
+                                    <span class="block text-black dark:text-fg">{{ formatDateInServerTimezone($finishedAt, $server) }}</span>
+                                    {{ $finishedAt->diffForHumans() }} · {{ calculateDuration($execution->created_at, $finishedAt) }}
                                 @endif
                             </span>
 
@@ -99,6 +109,14 @@
                                             ? 'neutral'
                                             : ($execution->s3_uploaded ? 'success' : 'error')" />
                                 @endif
+                                @if ($recoveryPending)
+                                    @if ($execution->recovery_needs_attention)
+                                        <x-status-badge :status="'Needs attention ('.$recoveryErrorLabel.')'" type="error" />
+                                    @else
+                                        <x-status-badge status="Recovery pending" type="warning"
+                                            :title="$execution->recovery_error ? 'Last attempt: '.$recoveryErrorLabel : null" />
+                                    @endif
+                                @endif
                             </span>
 
                             <span class="flex items-center justify-end gap-1">
@@ -107,6 +125,14 @@
                                         x-on:click="download_volume_backup_file('{{ $execution->id }}')"
                                         title="Download backup" aria-label="Download backup">
                                         <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                    </button>
+                                @endif
+                                @if ($recoveryPending)
+                                    <button type="button" class="icon-button shrink-0"
+                                        wire:click="retryRecovery({{ $execution->id }})"
+                                        wire:loading.attr="disabled" wire:target="retryRecovery({{ $execution->id }})"
+                                        title="Retry recovery" aria-label="Retry recovery">
+                                        <x-reicon name="refresh" class="size-3.5" />
                                     </button>
                                 @endif
                                 @if ($execution->status !== 'running')

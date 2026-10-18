@@ -272,4 +272,5 @@ test('all other database create variants reject write-only instant deployment', 
     '/api/v1/databases/clickhouse',
     '/api/v1/databases/dragonfly',
     '/api/v1/databases/keydb',
+    '/api/v1/databases/sqlite',
 ]);

@@ -47,8 +47,8 @@
         </span>
     </x-status-badge>
 
-    <div x-cloak x-show="open" x-transition.origin.top.right
-        class="listbox-panel top-8! right-0! left-auto! z-[90]! w-64! min-w-64!" role="menu">
+    <div x-cloak x-show="open" x-transition.origin.top.left
+        class="listbox-panel top-8! right-auto! left-0! z-[90]! w-64! min-w-64!" role="menu">
         <div class="flex items-center gap-1 px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">
             <span>System status</span>
             @if ($server->proxySet())

@@ -42,7 +42,6 @@ test('fix mode fully ends a locally active subscription with an invalid Stripe s
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'unreachable_count' => 0,
-        'unreachable_notification_sent' => false,
     ]);
 
     $stripe = Mockery::mock(StripeClient::class);

@@ -35,7 +35,7 @@
                                         :aria-selected="resourceType === option.value"
                                         @click="resourceType = option.value; close()">
                                         <span x-text="option.label"></span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check-circle" class="size-3.5 text-black dark:text-fg"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
@@ -71,7 +71,7 @@
                                         :aria-selected="selectedCategory === ''"
                                         @click="selectedCategory = ''; categorySearch = ''; categoryOpen = false">
                                         <span>All categories</span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check-circle" class="size-3.5 text-black dark:text-fg"
                                             x-show="selectedCategory === ''" />
                                     </button>
                                     <template
@@ -81,7 +81,7 @@
                                             :aria-selected="selectedCategory === category"
                                             @click="selectedCategory = category; categorySearch = ''; categoryOpen = false">
                                             <span class="truncate" x-text="category"></span>
-                                            <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                            <x-reicon name="check-circle" class="size-3.5 text-black dark:text-fg"
                                                 x-show="selectedCategory === category" />
                                         </button>
                                     </template>
@@ -92,8 +92,8 @@
                 </div>
             </x-application.settings-section>
 
-            <div x-show="loading" class="flex items-center justify-center py-8">
-                <x-loading text="Loading resources..." />
+            <div x-show="loading" class="mt-6">
+                <x-skeleton.cards :count="6" label="Loading resources" />
             </div>
             <div x-show="!loading" class="mt-6 flex flex-col gap-6">
                 <section
@@ -227,9 +227,12 @@
                                             </span>
                                         </template>
                                     </div>
-                                    <div class="min-w-0 flex-1">
+                                    <div class="flex min-w-0 flex-1 items-center gap-2">
                                         <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
                                             x-text="database.name"></h3>
+                                        <template x-if="database.experimental">
+                                            <x-status-badge status="Experimental" type="warning" class="shrink-0" />
+                                        </template>
                                     </div>
                                 </div>
 
@@ -314,7 +317,7 @@
                                             class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
                                             Docs
                                         </a>
-                                        <a x-show="serviceWebsiteUrl(service)" :href="serviceWebsiteUrl(service)"
+                                        <a x-show="service.website" :href="service.website"
                                             target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
@@ -415,6 +418,10 @@
                             clickhouse: {
                                 docs: 'https://clickhouse.com/docs',
                                 website: 'https://clickhouse.com/'
+                            },
+                            sqlite: {
+                                docs: 'https://sqlite.org/docs.html',
+                                website: 'https://sqlite.org/'
                             }
                         },
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }
@@ -463,16 +470,6 @@
                         },
                         databaseWebsiteUrl(database) {
                             return this.databaseLinks[database.id]?.website;
-                        },
-                        serviceWebsiteUrl(service) {
-                            const source = service.website || service.homepage || service.documentation;
-                            if (!source) return null;
-
-                            try {
-                                return new URL(source).origin;
-                            } catch (error) {
-                                return null;
-                            }
                         },
                         async checkUrlExists(url) {
                             if (!url) return false;

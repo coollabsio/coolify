@@ -74,5 +74,6 @@ test('danger page is reachable for host.docker.internal non-coolify-host servers
     $this->get(route('server.delete', ['server_uuid' => $server->uuid]))
         ->assertSuccessful()
         ->assertSee('Delete server')
-        ->assertSee('Delete '.$server->name);
+        ->assertSee('Confirm Server Deletion?')
+        ->assertSee('Please confirm by entering the Server Name below');
 });

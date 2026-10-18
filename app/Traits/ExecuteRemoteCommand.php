@@ -52,10 +52,7 @@ trait ExecuteRemoteCommand
             }
 
             if (isset($this->remote_secrets_cache)) {
-                $lockedVars = $lockedVars->merge(array_values(array_filter(
-                    $this->remote_secrets_cache,
-                    static fn (mixed $value): bool => is_string($value) && $value !== ''
-                )));
+                $lockedVars = $lockedVars->merge(EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache));
             }
 
             foreach ($lockedVars as $key => $value) {
@@ -84,6 +81,9 @@ trait ExecuteRemoteCommand
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
+        if (isset($this->application_deployment_queue, $this->remote_secrets_cache)) {
+            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
+        }
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {
@@ -95,6 +95,7 @@ trait ExecuteRemoteCommand
             $append = data_get($single_command, 'append', true);
             $command_hidden = data_get($single_command, 'command_hidden', false);
             $skip_command_log = data_get($single_command, 'skip_command_log', false);
+            $input = data_get($single_command, 'input');
             $this->save = data_get($single_command, 'save');
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
@@ -119,13 +120,13 @@ trait ExecuteRemoteCommand
 
             while ($attempt < $maxRetries && ! $commandExecuted) {
                 try {
-                    $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log);
+                    $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log, $input);
                     $commandExecuted = true;
                 } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
-                    if ($this->isRetryableSshError($errorMessage) && $attempt < $maxRetries - 1) {
+                    if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
@@ -167,16 +168,20 @@ trait ExecuteRemoteCommand
     }
 
     /**
-     * Execute the actual command with process handling
+     * Execute the actual command with process handling. With $input, the content goes to the command over
+     * SSH stdin, because Linux limits one exec argument to 128 KiB and generateSshCommand() puts the whole
+     * script into one argument.
      */
-    private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false, $skip_command_log = false)
+    private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false, $skip_command_log = false, ?string $input = null)
     {
         if ($command_hidden && ! $skip_command_log && isset($this->application_deployment_queue)) {
             $this->application_deployment_queue->addLogEntry('[CMD]: '.$this->redact_sensitive_info($command), hidden: true);
         }
 
-        $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
+        $remote_command = $input === null
+            ? SshMultiplexingHelper::generateSshCommand($this->server, $command)
+            : SshMultiplexingHelper::generateSshStdinCommand($this->server, $command);
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
             // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
             $sanitized_output = sanitize_utf8_text($output);
             $log_output = str($sanitized_output)->trim();
@@ -243,7 +248,7 @@ trait ExecuteRemoteCommand
                 if (empty($error)) {
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
-                throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log));
+                throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
             }
         }
     }
@@ -263,7 +268,22 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}";
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error);
+    }
+
+    /**
+     * Docker Engine 27.0 to 28.0.0 reports an IPv6 network gateway with its prefix length (fd00::1/64) until the
+     * daemon restarts, and newer Docker CLI and Compose versions fail to parse it.
+     *
+     * @see https://github.com/moby/moby/pull/49520
+     */
+    private function dockerNetworkGatewayHint(string $error): string
+    {
+        if (! preg_match('~ParseAddr\("[0-9A-Fa-f:.]+/\d+"\)~', $error)) {
+            return '';
+        }
+
+        return "\nDocker Engine on this server reports a Docker network gateway with a prefix length, which is a Docker Engine bug fixed in 28.0.1. Run 'systemctl restart docker' on the server (this restarts all containers) or upgrade Docker Engine, then deploy again.";
     }
 
     /**
