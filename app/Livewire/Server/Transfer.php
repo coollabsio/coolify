@@ -86,7 +86,7 @@ class Transfer extends Component
         $this->ensureDevelopmentAvailability();
 
         try {
-            $this->authorize('view', $this->server);
+            $this->authorize('update', $this->server);
             if ($this->isLocalhost) {
                 throw new \RuntimeException('The Coolify host (localhost) cannot be transferred.');
             }
