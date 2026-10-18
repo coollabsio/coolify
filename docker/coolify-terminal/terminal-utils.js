@@ -138,6 +138,12 @@ export function extractTimeout(commandString) {
     return timeoutMatch ? parseInt(timeoutMatch[1], 10) : null;
 }
 
+// A `docker attach` session shares the container's main process. On disconnect we
+// must detach from it instead of killing it, otherwise we stop the running app.
+export function isAttachCommand(commandString) {
+    return /(?:^|\s)docker\s+attach(?:\s|$)/.test(commandString || '');
+}
+
 function normalizeShellArgument(argument) {
     if (!argument) {
         return argument;
@@ -392,4 +398,54 @@ export function sanitizeSshArgs(sshArgs) {
     }
 
     return sanitizedArgs;
+}
+
+// Wait for this PTY to exit, not for mutable session state to change.
+export function detachPtyProcess(session) {
+    const ptyProcess = session.ptyProcess;
+    if (!ptyProcess || !session.isActive) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+        let timer;
+        let attempts = 0;
+        let settled = false;
+        const finish = (exited) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            exitListener.dispose();
+            if (exited && session.ptyProcess === ptyProcess) {
+                session.isActive = false;
+                session.ptyProcess = null;
+                clearTimeout(session.terminalSessionTimer);
+                session.terminalSessionTimer = null;
+            }
+            resolve(exited);
+        };
+        const exitListener = ptyProcess.onExit(() => finish(true));
+        const attemptDetach = () => {
+            attempts++;
+            try {
+                ptyProcess.write('\x10\x11');
+            } catch (_) {
+                // An exit event is still required to confirm teardown.
+            }
+            if (settled) return;
+            timer = setTimeout(() => {
+                if (attempts < 3) {
+                    attemptDetach();
+                    return;
+                }
+                // --sig-proxy=false prevents forwarding signals to the container.
+                // Refuse a replacement if killing the local SSH client does not exit.
+                timer = setTimeout(() => finish(false), 1000);
+                try {
+                    ptyProcess.kill();
+                } catch (_) {
+                    // The bounded exit wait fails closed.
+                }
+            }, 500);
+        };
+        attemptDetach();
+    });
 }

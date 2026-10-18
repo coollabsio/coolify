@@ -87,6 +87,10 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->is_gzip_enabled = filter_var($payload['is_gzip_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('traefik_certificate_resolver', $payload)) {
+            $serviceApplication->traefik_certificate_resolver = filled($payload['traefik_certificate_resolver']) ? $payload['traefik_certificate_resolver'] : null;
+        }
+
         if (array_key_exists('is_stripprefix_enabled', $payload)) {
             $serviceApplication->is_stripprefix_enabled = filter_var($payload['is_stripprefix_enabled'], FILTER_VALIDATE_BOOLEAN);
         }

@@ -8,7 +8,7 @@
             <div class="grid min-h-0 min-w-0 flex-1 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
                 <x-application.configuration-sidebar :application="$application"
                     current-route="project.application.deployment.show" />
-                <div class="flex min-h-0 min-w-0 flex-col gap-4 xl:h-full xl:pt-px">
+                <div class="flex min-h-0 min-w-0 flex-col gap-4 xl:h-full xl:pt-px 2xl:grid 2xl:grid-cols-[24rem_minmax(0,1fr)] 2xl:items-start">
                     <livewire:project.application.deployment.index :embedded="true"
                         :selected-deployment-uuid="$deployment_uuid"
                         wire:key="embedded-deployment-history-{{ $deployment_uuid }}" />
@@ -273,7 +273,7 @@
                 this.deploymentFinishedCleanup = null;
             }
         }
-    }" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none">
+    }" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full min-w-0 flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none 2xl:sticky 2xl:top-4 2xl:h-[calc(100dvh-10rem)] 2xl:min-h-[32rem]">
             <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-0'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"

@@ -325,7 +325,7 @@ class Change extends Component
                 $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
             }
             if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+                $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
             }
             if ($this->github_app->installation_id && session('from')) {
                 $source_id = data_get(session('from'), 'source_id');
@@ -416,10 +416,18 @@ class Change extends Component
         }
     }
 
+    private function authorizeSystemWideChange(): void
+    {
+        if ($this->isSystemWide && ! $this->github_app->is_system_wide) {
+            $this->authorize('makeSystemWide', GithubApp::class);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->github_app);
+            $this->authorizeSystemWideChange();
 
             $this->organization = normalizeGithubOrganization($this->organization);
             $this->apiUrl = filled($this->apiUrl)
@@ -455,6 +463,7 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->github_app);
+            $this->authorizeSystemWideChange();
 
             $this->validateOnly('privateKeyId');
 

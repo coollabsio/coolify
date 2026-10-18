@@ -86,9 +86,9 @@
                                 "properties": {
                                     "pull_request_id": {
                                         "type": "integer",
+                                        "example": 42,
                                         "maximum": 2147483647,
-                                        "minimum": 1,
-                                        "example": 42
+                                        "minimum": 1
                                     },
                                     "pull_request_html_url": {
                                         "type": [
@@ -886,6 +886,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -910,6 +914,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -979,6 +988,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -1477,6 +1516,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -1501,6 +1544,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -1570,6 +1618,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -2068,6 +2146,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -2092,6 +2174,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2161,6 +2248,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -2554,6 +2671,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -2578,6 +2699,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2647,6 +2773,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -3020,6 +3176,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -3044,6 +3204,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -3113,6 +3278,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -3703,6 +3898,32 @@
                                         "type": "boolean",
                                         "description": "Use Docker Build Secrets for build-time environment variables."
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "is_git_submodules_enabled": {
                                         "type": "boolean",
                                         "description": "Clone Git submodules."
@@ -3731,6 +3952,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -3755,6 +3980,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -6142,7 +6372,8 @@
                                                 "enum": [
                                                     "hetzner",
                                                     "digitalocean",
-                                                    "vultr"
+                                                    "vultr",
+                                                    "hostinger"
                                                 ]
                                             },
                                             "team_id": {
@@ -6201,7 +6432,8 @@
                                         "enum": [
                                             "hetzner",
                                             "digitalocean",
-                                            "vultr"
+                                            "vultr",
+                                            "hostinger"
                                         ],
                                         "example": "hetzner",
                                         "description": "The cloud provider."
@@ -6679,7 +6911,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Get all backups for a database",
+                        "description": "Get all backups for a database. Each backup includes s3_storage_uuid (primary S3 destination) and s3_storage_uuids (every S3 destination, primary first).",
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -6749,7 +6981,14 @@
                                     },
                                     "s3_storage_uuid": {
                                         "type": "string",
-                                        "description": "S3 storage UUID (required if save_s3 is true)"
+                                        "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true."
+                                    },
+                                    "s3_storage_uuids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination."
                                     },
                                     "databases_to_backup": {
                                         "type": "string",
@@ -7203,6 +7442,10 @@
                                         "description": "Healthcheck start period in seconds.",
                                         "minimum": 0,
                                         "default": 5
+                                    },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions."
                                     }
                                 },
                                 "type": "object"
@@ -7352,7 +7595,14 @@
                                     },
                                     "s3_storage_uuid": {
                                         "type": "string",
-                                        "description": "S3 storage UUID"
+                                        "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay."
+                                    },
+                                    "s3_storage_uuids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination."
                                     },
                                     "backup_now": {
                                         "type": "boolean",
@@ -8890,7 +9140,7 @@
                     "Databases"
                 ],
                 "summary": "List backup executions",
-                "description": "Get all executions for a specific backup configuration.",
+                "description": "Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.",
                 "operationId": "list-backup-executions",
                 "parameters": [
                     {
@@ -8936,7 +9186,11 @@
                                                         "type": "string"
                                                     },
                                                     "message": {
-                                                        "type": "string"
+                                                        "description": "Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.",
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
                                                     },
                                                     "status": {
                                                         "type": "string"
@@ -10700,8 +10954,8 @@
                                     },
                                     "network": {
                                         "type": "string",
-                                        "maxLength": 255,
-                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                                        "maxLength": 255
                                     },
                                     "type": {
                                         "type": "string",
@@ -12697,6 +12951,189 @@
                 ]
             }
         },
+        "\/hostinger\/data-centers": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS data centers",
+                "operationId": "get-hostinger-data-centers",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS data centers."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/catalog": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS plans and prices",
+                "operationId": "get-hostinger-catalog",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS plans and prices."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/templates": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS operating system templates",
+                "operationId": "get-hostinger-templates",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS templates."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/ssh-keys": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger account SSH keys",
+                "operationId": "get-hostinger-ssh-keys",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger account SSH keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/post-install-scripts": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger post-install scripts",
+                "operationId": "get-hostinger-post-install-scripts",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger post-install scripts."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/hostinger": {
+            "post": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Purchase a Hostinger VPS and create a linked server",
+                "operationId": "create-hostinger-server",
+                "responses": {
+                    "201": {
+                        "description": "Hostinger VPS purchased and linked to a Coolify server."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/settings\/email": {
             "get": {
                 "tags": [
@@ -13163,58 +13600,6 @@
                                     "type": "string"
                                 },
                                 "example": "v4.0.0"
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/enable": {
-            "post": {
-                "summary": "Enable API",
-                "description": "Enable API (only with root permissions).",
-                "operationId": "enable-api",
-                "responses": {
-                    "200": {
-                        "description": "Enable API.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "API enabled."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "You are not allowed to enable the API.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "You are not allowed to enable the API."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
                             }
                         }
                     },
@@ -15547,9 +15932,6 @@
                     "content": {
                         "application\/json": {
                             "schema": {
-                                "required": [
-                                    "private_key"
-                                ],
                                 "properties": {
                                     "name": {
                                         "type": "string"
@@ -16670,6 +17052,14 @@
                                             "type": "boolean",
                                             "example": false
                                         },
+                                        "traefik_certificate_resolver": {
+                                            "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "example": "letsencrypt"
+                                        },
                                         "configuration": {
                                             "description": "Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.",
                                             "type": [
@@ -16704,7 +17094,7 @@
                     "Servers"
                 ],
                 "summary": "Update server proxy",
-                "description": "Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.",
+                "description": "Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.",
                 "operationId": "update-server-proxy",
                 "parameters": [
                     {
@@ -16735,6 +17125,13 @@
                                     },
                                     "generate_exact_labels": {
                                         "type": "boolean"
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
                                     },
                                     "proxy_type": {
                                         "description": "Proxy type (case-insensitive).",
@@ -16782,6 +17179,12 @@
                                         },
                                         "generate_exact_labels": {
                                             "type": "boolean"
+                                        },
+                                        "traefik_certificate_resolver": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
                                         },
                                         "configuration": {
                                             "type": [
@@ -18017,6 +18420,13 @@
                                             "null"
                                         ]
                                     },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for this service application. Null uses the server setting, \"none\" uses no resolver.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
                                     "is_stripprefix_enabled": {
                                         "type": [
                                             "boolean",
@@ -19224,6 +19634,11 @@
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "tags": {
                                         "type": "array",
                                         "items": {
@@ -19551,6 +19966,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     }
                                 },
                                 "type": "object"
@@ -23180,8 +23600,8 @@
                 "properties": {
                     "frequency": {
                         "type": "string",
-                        "maxLength": 255,
-                        "example": "0 2 * * *"
+                        "example": "0 2 * * *",
+                        "maxLength": 255
                     },
                     "enabled": {
                         "type": "boolean",
@@ -23200,10 +23620,18 @@
                         "default": false
                     },
                     "s3_storage_uuid": {
+                        "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.",
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "s3_storage_uuids": {
+                        "description": "UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "retention_amount_locally": {
                         "type": "integer",
@@ -23313,10 +23741,18 @@
                         "type": "boolean"
                     },
                     "s3_storage_uuid": {
+                        "description": "Primary S3 destination.",
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "s3_storage_uuids": {
+                        "description": "Every S3 destination, primary first.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "retention_amount_locally": {
                         "type": "integer"
@@ -23753,6 +24189,32 @@
                         "nullable": true,
                         "description": "Password for HTTP Basic Authentication"
                     },
+                    "http_basic_auth_hash_algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "bcrypt",
+                            "argon2id"
+                        ],
+                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                    },
+                    "http_basic_auth_bcrypt_cost": {
+                        "type": "integer",
+                        "minimum": 4,
+                        "maximum": 14,
+                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                    },
+                    "http_basic_auth_argon2id_memory_cost": {
+                        "type": "integer",
+                        "minimum": 8192,
+                        "maximum": 262144,
+                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                    },
+                    "http_basic_auth_argon2id_time_cost": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 12,
+                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                    },
                     "settings": {
                         "$ref": "#\/components\/schemas\/ApplicationSetting"
                     }
@@ -23918,6 +24380,11 @@
                     "is_gzip_enabled": {
                         "type": "boolean"
                     },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver override. Null uses the server setting, \"none\" uses no resolver."
+                    },
                     "is_stripprefix_enabled": {
                         "type": "boolean"
                     },
@@ -23958,6 +24425,10 @@
                     },
                     "use_build_secrets": {
                         "type": "boolean"
+                    },
+                    "redact_all_env_values_in_logs": {
+                        "type": "boolean",
+                        "description": "Hide every environment variable value in logs. When false, only locked values are hidden."
                     },
                     "inject_build_args_to_dockerfile": {
                         "type": "boolean"
@@ -24387,6 +24858,11 @@
                             "off"
                         ]
                     },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates."
+                    },
                     "is_reachable": {
                         "type": "boolean"
                     },
@@ -24538,6 +25014,10 @@
                     "is_container_label_escape_enabled": {
                         "type": "boolean",
                         "description": "The flag to enable the container label escape."
+                    },
+                    "redact_all_env_values_in_logs": {
+                        "type": "boolean",
+                        "description": "Hide every environment variable value in logs. When false, only locked values are hidden."
                     },
                     "is_container_label_readonly_enabled": {
                         "type": "boolean",
@@ -24874,6 +25354,10 @@
         {
             "name": "Hetzner",
             "description": "Hetzner"
+        },
+        {
+            "name": "Hostinger",
+            "description": "Hostinger"
         },
         {
             "name": "Settings",

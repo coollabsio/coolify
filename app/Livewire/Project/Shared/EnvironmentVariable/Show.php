@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Services\SharedVariableCanvas;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
@@ -24,6 +25,9 @@ use Livewire\Component;
 class Show extends Component
 {
     public bool $showEnvironmentType = true;
+
+    /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    public ?array $composeInfo = null;
 
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
 
@@ -91,6 +95,11 @@ class Show extends Component
     public bool $editorOpen = false;
 
     public array $problematicVariables = [];
+
+    /**
+     * The variable was saved before exact escaping, and the container gets a different value.
+     */
+    public bool $legacyEscapingChangesValue = false;
 
     protected $listeners = [
         'refresh',
@@ -168,6 +177,10 @@ class Show extends Component
         }
 
         $this->hydrateValueFields();
+        $this->legacyEscapingChangesValue = $this->env instanceof ModelsEnvironmentVariable
+            && is_object($this->env->resourceable)
+            && method_exists($this->env->resourceable, 'legacyEscapingChangesValue')
+            && $this->env->resourceable->legacyEscapingChangesValue($this->env);
         $this->valuesLoaded = true;
     }
 
@@ -312,11 +325,36 @@ class Show extends Component
         $this->submit();
     }
 
+    public function useComposeDefault(): void
+    {
+        $this->authorize('update', $this->env);
+        $this->loadValues();
+        $composeInfo = $this->serverComposeInfo();
+        if ($this->env->is_shown_once || $composeInfo === null || $composeInfo['default'] === null || $composeInfo['required']) {
+            return;
+        }
+
+        $this->env->preserve_compose_null = false;
+        $this->value = null;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->env);
             $this->loadValues();
+
+            $composeInfo = $this->serverComposeInfo();
+            if ($composeInfo !== null) {
+                $storedKey = $this->env->fresh()?->key;
+                if ($storedKey === null || $this->key !== $storedKey) {
+                    $this->key = $storedKey ?? $this->key;
+                    $this->dispatch('error', 'Compose-linked environment variable names cannot be changed.');
+
+                    return;
+                }
+            }
 
             if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
@@ -342,6 +380,38 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    private function serverComposeInfo(): ?array
+    {
+        if ($this->isSharedVariable) {
+            return null;
+        }
+
+        $storedEnvironmentVariable = $this->env->fresh();
+        if ($storedEnvironmentVariable === null) {
+            return null;
+        }
+
+        $resource = $storedEnvironmentVariable->resourceable;
+        if (! $resource instanceof Application && ! $resource instanceof Service) {
+            return null;
+        }
+
+        return dockerComposeEnvironmentVariableInfo(
+            $resource->docker_compose_raw ?? $resource->docker_compose,
+            $storedEnvironmentVariable->key
+        );
+    }
+
+    /**
+     * Shared variables only: the connect envs canvas with this variable selected.
+     */
+    #[Computed]
+    public function connectLink(): ?string
+    {
+        return $this->isSharedVariable ? app(SharedVariableCanvas::class)->connectLink($this->env) : null;
     }
 
     #[Computed]

@@ -27,8 +27,8 @@
                                 </x-forms.button>
                             </x-slot:headerActions>
 
-                            <div class="flex min-h-48 items-center justify-center" wire:loading wire:target="load_prs">
-                                <x-loading text="Loading pull requests…" />
+                            <div class="-m-4" wire:loading wire:target="load_prs">
+                                <x-skeleton.list :rows="3" label="Loading pull requests" />
                             </div>
 
                             <div class="-m-4" wire:loading.remove wire:target="load_prs">

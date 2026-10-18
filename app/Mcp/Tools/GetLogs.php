@@ -3,9 +3,11 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ChecksTokenAbilities;
 use App\Mcp\Concerns\ResolvesResource;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -13,7 +15,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetLogs extends Tool
 {
     protected string $name = 'get_logs';
@@ -21,8 +25,14 @@ class GetLogs extends Tool
     protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires read:sensitive ability. Output is best-effort redacted (not a guarantee). Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
 
     use BuildsResponse;
+    use ChecksTokenAbilities;
     use ResolvesResource;
     use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return $this->currentTokenCan('read:sensitive');
+    }
 
     public function handle(Request $request): Response
     {
@@ -65,14 +75,17 @@ class GetLogs extends Tool
             return $this->mcpSuccess($request, $this->respond($failure), ['resource_uuid' => $uuid, 'outcome' => 'unavailable']);
         }
 
+        $secrets = $this->logRedactionSecrets($resource);
+
         try {
             $logs = $this->redactLogText(
-                $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps)
+                $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps),
+                $secrets,
             );
         } catch (MultipleContainersException $e) {
             $payload = $this->failurePayload(
                 reason: 'multiple_containers',
-                message: $e->getMessage(),
+                message: $this->redactLogText($e->getMessage(), $secrets),
                 resourceType: $resourceType,
                 uuid: $uuid,
                 status: $resource->status ?? null,
@@ -85,7 +98,7 @@ class GetLogs extends Tool
             return $this->mcpSuccess($request, $this->respond(
                 $this->failurePayload(
                     reason: 'log_fetch_failed',
-                    message: $e->getMessage(),
+                    message: $this->redactLogText($e->getMessage(), $secrets),
                     resourceType: $resourceType,
                     uuid: $uuid,
                     status: $resource->status ?? null,
@@ -102,6 +115,20 @@ class GetLogs extends Tool
             'logs' => $logs,
             'redacted' => true,
         ]), ['resource_uuid' => $uuid]);
+    }
+
+    /**
+     * Environment values and database credentials of the resource that owns the log output.
+     *
+     * @return array{known: array<int, string>, locked: array<int, string>}
+     */
+    private function logRedactionSecrets(mixed $resource): array
+    {
+        if ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
+            $resource = $resource->service;
+        }
+
+        return EnvironmentVariable::logRedactionSecretsFor($resource);
     }
 
     /**

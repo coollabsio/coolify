@@ -5,6 +5,7 @@ namespace App\Livewire\Server\DockerRegistries;
 use App\Models\Server;
 use App\Services\DockerRegistryLogins;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\View\View;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -104,13 +105,9 @@ class ServerRegistries extends Component
         $this->loadRegistries();
     }
 
-    public function placeholder(): string
+    public function placeholder(): View
     {
-        return <<<'HTML'
-        <div class="rounded-xl border border-neutral-200 bg-white p-4 text-[12px] text-neutral-500 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-            Loading registries...
-        </div>
-        HTML;
+        return view('livewire.server.docker-registries.server-registries-placeholder');
     }
 
     public function render()

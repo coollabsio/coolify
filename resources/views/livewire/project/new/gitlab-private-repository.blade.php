@@ -109,7 +109,7 @@
                                 ])->values()->all()" />
                             <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
                                 ['value' => 'railpack', 'label' => 'Railpack'],
-                                ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                                ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                                 ['value' => 'static', 'label' => 'Static'],
                                 ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                                 ['value' => 'dockercompose', 'label' => 'Docker Compose'],
@@ -130,29 +130,14 @@
                             @endif
                         </div>
 
+                        @if ($build_pack === 'nixpacks')
+                            <x-nixpacks-deprecated-callout />
+                        @endif
+
                         @if ($build_pack === 'dockercompose')
-                            <div x-data="{
-                                baseDir: @js($base_directory),
-                                composeLocation: @js($docker_compose_location),
-                                normalize(path) {
-                                    if (!path || path.trim() === '') return '/';
-                                    const normalized = path.trim().replace(/\/+$/, '');
-                                    return normalized.startsWith('/') ? normalized : '/' + normalized;
-                                },
-                            }" class="grid gap-4 sm:grid-cols-2">
-                                <x-forms.input placeholder="/" wire:model.defer="base_directory"
-                                    label="Base directory" helper="Repository directory used as the build root."
-                                    x-model="baseDir" @blur="baseDir = normalize(baseDir)" />
-                                <x-forms.input placeholder="/docker-compose.yaml"
-                                    wire:model.defer="docker_compose_location" label="Compose file"
-                                    helper="Path relative to the base directory." x-model="composeLocation"
-                                    @blur="composeLocation = normalize(composeLocation)" />
-                                <p class="sm:col-span-2 text-xs text-neutral-500 dark:text-fg-dim">
-                                    Resolved file:
-                                    <code class="font-mono text-coollabs dark:text-warning"
-                                        x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></code>
-                                </p>
-                            </div>
+                            <x-forms.repository-paths class="sm:grid-cols-2" base="base_directory"
+                                file="docker_compose_location" fileLabel="Compose file"
+                                defaultFile="/docker-compose.yaml" />
                         @else
                             <x-forms.input wire:model="base_directory" label="Base directory"
                                 helper="Repository directory used as the build root." />

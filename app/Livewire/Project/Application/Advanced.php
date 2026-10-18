@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
+use App\Models\ServerSetting;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -83,6 +86,11 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isStripprefixEnabled = true;
 
+    /** One of "server" (use the server setting), "none" (no resolver), or "custom". */
+    public string $certificateResolverMode = 'server';
+
+    public ?string $certificateResolverName = null;
+
     #[Validate(['boolean'])]
     public bool $isRawComposeDeploymentEnabled = false;
 
@@ -135,6 +143,7 @@ class Advanced extends Component
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
             $this->isGzipEnabled = $this->application->isGzipEnabled();
             $this->isStripprefixEnabled = $this->application->isStripprefixEnabled();
+            $this->syncCertificateResolverFromModel();
             $this->isLogDrainEnabled = $this->application->isLogDrainEnabled();
 
             $this->isGitSubmodulesEnabled = $this->application->settings->is_git_submodules_enabled;
@@ -161,6 +170,18 @@ class Advanced extends Component
         // Load stop_grace_period separately since it has its own save handler
         // Convert null to empty string to prevent dirty detection issues
         $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
+    }
+
+    private function syncCertificateResolverFromModel(): void
+    {
+        $resolver = $this->application->settings->traefik_certificate_resolver;
+
+        $this->certificateResolverMode = match (true) {
+            blank($resolver) => 'server',
+            $resolver === ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE => 'none',
+            default => 'custom',
+        };
+        $this->certificateResolverName = $this->certificateResolverMode === 'custom' ? $resolver : null;
     }
 
     /**
@@ -314,6 +335,65 @@ class Advanced extends Component
         }
     }
 
+    /**
+     * Listbox change: "custom" waits for a resolver name before it saves.
+     */
+    public function saveCertificateResolverMode()
+    {
+        if ($this->certificateResolverMode === 'custom' && blank($this->certificateResolverName)) {
+            $this->resetErrorBag('certificateResolverName');
+
+            return;
+        }
+
+        return $this->saveCertificateResolver();
+    }
+
+    public function saveCertificateResolver()
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            $this->validate([
+                'certificateResolverMode' => ['required', Rule::in(['server', 'none', 'custom'])],
+                'certificateResolverName' => [
+                    'exclude_unless:certificateResolverMode,custom',
+                    'required',
+                    'string',
+                    'max:255',
+                    'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN,
+                    Rule::notIn([ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE]),
+                ],
+            ], [
+                'certificateResolverName.regex' => 'The resolver name may only contain letters, numbers, hyphens, and underscores.',
+                'certificateResolverName.not_in' => 'Choose "None" instead of a custom resolver named "none".',
+            ], [
+                'certificateResolverName' => 'resolver name',
+            ]);
+
+            $this->application->settings->traefik_certificate_resolver = match ($this->certificateResolverMode) {
+                'none' => ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+                'custom' => $this->certificateResolverName,
+                default => null,
+            };
+            $changedFields = array_keys($this->application->settings->getDirty());
+            $this->application->settings->save();
+            $this->auditSettingsUpdate($changedFields);
+            $this->syncCertificateResolverFromModel();
+
+            if (in_array('traefik_certificate_resolver', $changedFields, true)) {
+                $this->resetDefaultLabels();
+            }
+
+            $this->dispatch('success', 'Certificate resolver saved.');
+            $this->dispatch('configurationChanged');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function saveStopGracePeriod()
     {
         try {
@@ -359,7 +439,12 @@ class Advanced extends Component
 
     public function render()
     {
-        return view('livewire.project.application.advanced');
+        $server = data_get($this->application, 'destination.server');
+
+        return view('livewire.project.application.advanced', [
+            'isTraefikProxy' => $server?->proxyType() === ProxyTypes::TRAEFIK->value,
+            'serverCertificateResolver' => $server?->traefikCertificateResolver() ?? ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+        ]);
     }
 
     /** @param array<int, string> $changedFields */

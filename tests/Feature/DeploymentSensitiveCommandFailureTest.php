@@ -505,7 +505,7 @@ it('keeps a literal vault reference as text when the application has no secret m
     $buildtime = invokeSensitiveFailureJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
     invokeSensitiveFailureJobMethod($job, $reflection, 'generate_env_variables');
 
-    expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe("LITERAL_REF='{{vault.FOO}}'")
+    expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe('LITERAL_REF='.escapeComposeEnvFileValue('{{vault.FOO}}'))
         ->and($buildtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe("LITERAL_REF='{{vault.FOO}}'")
         ->and(readSensitiveFailureJobProperty($job, $reflection, 'env_args')->get('LITERAL_REF'))->toBe("'{{vault.FOO}}'")
         ->and(invokeSensitiveFailureJobMethod($job, $reflection, 'has_remote_buildtime_secret_references'))->toBeFalse();
@@ -531,5 +531,5 @@ it('resolves a literal vault reference when the application has a secret manager
 
     $runtime = invokeSensitiveFailureJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
-    expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe("LITERAL_REF='resolved-remote-value'");
+    expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe('LITERAL_REF='.escapeComposeEnvFileValue('resolved-remote-value'));
 });

@@ -158,28 +158,6 @@ it('denies team member to deploy their own team application', function () {
     expect($policy->deploy($user, $application))->toBeFalse();
 });
 
-it('allows team admin to manage deployments', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
-
-    $application = Mockery::mock(Application::class)->makePartial();
-    $application->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
-    $policy = new ApplicationPolicy;
-    expect($policy->manageDeployments($user, $application))->toBeTrue();
-});
-
-it('denies team member to manage deployments', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
-
-    $application = Mockery::mock(Application::class)->makePartial();
-    $application->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
-    $policy = new ApplicationPolicy;
-    expect($policy->manageDeployments($user, $application))->toBeFalse();
-});
-
 it('allows team admin to manage environment variables', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
@@ -200,22 +178,6 @@ it('denies team member to manage environment variables', function () {
 
     $policy = new ApplicationPolicy;
     expect($policy->manageEnvironment($user, $application))->toBeFalse();
-});
-
-it('allows admin to cleanup deployment queue', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(true);
-
-    $policy = new ApplicationPolicy;
-    expect($policy->cleanupDeploymentQueue($user))->toBeTrue();
-});
-
-it('denies member to cleanup deployment queue', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(false);
-
-    $policy = new ApplicationPolicy;
-    expect($policy->cleanupDeploymentQueue($user))->toBeFalse();
 });
 
 it('denies restore for any user', function () {

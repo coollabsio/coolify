@@ -48,15 +48,19 @@
                                 'failed' => 'error',
                                 default => 'neutral',
                             };
+                            $s3Replicas = $execution->s3Replicas;
+                            $hasLiveS3Copies = $s3Replicas->isNotEmpty()
+                                ? $s3Replicas->contains(fn ($replica) => $replica->s3_uploaded === true && ! $replica->s3_storage_deleted)
+                                : $execution->s3_uploaded === true && ! $execution->s3_storage_deleted;
                             $executionCheckboxes = [];
                             $deleteActions = [];
                             if (! $execution->local_storage_deleted) {
                                 $deleteActions[] = 'This backup will be permanently deleted from local storage.';
                             }
-                            if ($execution->s3_uploaded === true && ! $execution->s3_storage_deleted) {
+                            if ($hasLiveS3Copies) {
                                 $executionCheckboxes[] = [
                                     'id' => 'delete_backup_s3',
-                                    'label' => 'Delete the selected backup permanently from S3 Storage',
+                                    'label' => 'Delete the selected backup permanently from every S3 storage',
                                 ];
                             }
                             if (empty($deleteActions)) {
@@ -75,7 +79,7 @@
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
                             class="data-table-row volume-backup-executions-grid min-h-16 items-center gap-x-3 border-b border-neutral-200 text-[12px] last:border-b-0 dark:border-white/[0.07]">
                             <span>
-                                <x-status-badge :status="$statusLabel" :type="$statusType" />
+                                <x-status-badge :status="$statusLabel" :type="$statusType" :pulse="$execution->status === 'running'" />
                             </span>
 
                             <span class="min-w-0">
@@ -98,7 +102,22 @@
                             <span class="flex flex-wrap gap-1">
                                 <x-status-badge :status="$execution->local_storage_deleted ? 'Local deleted' : 'Local'"
                                     :type="$execution->local_storage_deleted ? 'neutral' : 'success'" />
-                                @if ($execution->s3_uploaded !== null)
+                                @foreach ($s3Replicas as $replica)
+                                    <x-status-badge wire:key="volume-backup-replica-{{ $replica->id }}"
+                                        :label="$replica->s3?->name ?? 'Removed S3 storage'"
+                                        :status="$replica->s3_storage_deleted
+                                            ? 'deleted'
+                                            : match ($replica->s3_uploaded) {
+                                                true => null,
+                                                false => 'failed',
+                                                default => $execution->status === 'running' ? 'pending' : 'not uploaded',
+                                            }"
+                                        :type="$replica->s3_storage_deleted || $replica->s3_uploaded === null
+                                            ? 'neutral'
+                                            : ($replica->s3_uploaded ? 'success' : 'error')"
+                                        :title="$replica->message" />
+                                @endforeach
+                                @if ($s3Replicas->isEmpty() && $execution->s3_uploaded !== null)
                                     <x-status-badge
                                         :status="$execution->s3_storage_deleted
                                             ? 'S3 deleted'

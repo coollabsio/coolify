@@ -21,7 +21,7 @@ it('shows the settings of the open resource in the command palette and switches 
     $page = visit(applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application));
     $page->assertSee('Palette App')
         ->assertMissing('[aria-label="Filter settings"]')
-        ->assertVisible('button:visible:has-text("Search page & global")');
+        ->assertVisible('button:visible[title^="Search this page"]');
 
     $page->script("window.dispatchEvent(new Event('open-global-search'))");
 
@@ -49,7 +49,7 @@ it('does not show the scope switch on pages without a settings sidebar', functio
     loginAndSkipBoarding();
 
     $page = visit('/dashboard');
-    $page->assertDontSee('page & global');
+    $page->assertMissing('button[title^="Search this page"]');
     $page->script("window.dispatchEvent(new Event('open-global-search'))");
 
     $page->assertVisible('.command-palette-input')
@@ -65,7 +65,7 @@ it('focuses the search input when the palette is opened from the mobile menu', f
 
     $page->assertSee('Palette App')
         ->click('button:visible:has-text("Open sidebar")')
-        ->assertSee('Search page & global')
+        ->assertVisible('button:visible[title^="Search this page"]')
         ->screenshot(filename: 'command-palette-mobile-menu')
         ->click('button:visible:has-text("Search")')
         ->assertVisible('.command-palette-input')
@@ -112,7 +112,7 @@ it('searches the sidebar pages of other settings pages', function (string $pageT
     loginAndSkipBoarding();
 
     $page = visit($url);
-    $page->assertVisible('button:visible:has-text("Search page & global")');
+    $page->assertVisible('button:visible[title^="Search this page"]');
     $page->script("window.dispatchEvent(new Event('open-global-search'))");
 
     $page->assertVisible('.command-palette-scope')
@@ -135,7 +135,7 @@ it('searches the sections of a page without a settings sidebar and scrolls to th
     loginAndSkipBoarding();
 
     $page = visit('/profile');
-    $page->assertVisible('button:visible:has-text("Search page & global")');
+    $page->assertVisible('button:visible[title^="Search this page"]');
     $page->script("window.dispatchEvent(new Event('open-global-search'))");
 
     $page->assertVisible('.command-palette-scope')

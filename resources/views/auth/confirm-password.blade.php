@@ -28,6 +28,11 @@
                     {{ __('auth.confirm_password') }}
                 </x-forms.button>
             </form>
+
+            @if ($can_confirm_with_passkey)
+                <x-auth.passkey-verify options-route="passkey.confirm-options" submit-route="passkey.confirm"
+                    label="Confirm with a passkey" />
+            @endif
         </div>
     </x-auth.shell>
 </x-layout-simple>

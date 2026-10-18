@@ -33,17 +33,7 @@
                             </button>
                         </x-slot:content>
 
-                        <form class="space-y-4" wire:submit="submit">
-                            <x-forms.input placeholder="staging" id="name" label="Name" required />
-
-                            <footer
-                                class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="submit"
-                                    defaultClass="button button-highlighted">
-                                    Create environment
-                                </x-forms.button>
-                            </footer>
-                        </form>
+                        @include('livewire.project.partials.new-environment-form')
                     </x-modal-input>
                 </div>
             @endcan
@@ -95,27 +85,9 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle
+                        :list-url="route('project.show', ['project_uuid' => $project->uuid])"
+                        :canvas-url="route('project.canvas', ['project_uuid' => $project->uuid])" />
                 </div>
             </div>
 
@@ -239,7 +211,7 @@
             search: '',
             sortBy: 'name-asc',
             sortOpen: false,
-            viewMode: localStorage.getItem('project-environments-view') || 'grid',
+            viewMode: @js($this->listView('project', 'grid')),
             page: 1,
             pageSize: 12,
             environments: @js($environmentsJs),
@@ -299,7 +271,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 this.page = 1;
-                localStorage.setItem('project-environments-view', mode);
+                this.$wire.saveListView('project', mode);
             },
             previousPage() {
                 this.page = Math.max(1, this.page - 1);

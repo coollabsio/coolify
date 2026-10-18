@@ -5,9 +5,9 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.4.3',
-        'helper_version' => '1.0.17',
-        'railpack_version' => '0.23.0',
+        'version' => env('COOLIFY_VERSION') ?: '4.4.6',
+        'helper_version' => '1.0.18',
+        'railpack_version' => '0.40.1',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -15,6 +15,8 @@ return [
         // devHostDockerPath() uses them only for that server. The defaults are the legacy docker-compose.dev.yml names.
         'dev_data_volume' => env('DEV_COOLIFY_DATA_VOLUME', 'coolify_dev_coolify_data'),
         'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
+        // Development only: IP for the seeded sslip.io wildcard domain and application domains (for example a Tailscale IP).
+        'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
@@ -43,6 +45,12 @@ return [
         'host' => env('TERMINAL_HOST'),
         'port' => env('TERMINAL_PORT'),
         'command_timeout' => 0,
+        // Docker's default detach escape for `docker attach`. Pressing this
+        // sequence (Ctrl-P, Ctrl-Q) leaves the container's main process running.
+        'detach_keys' => 'ctrl-p,ctrl-q',
+        // Recent log lines shown when a console (attach) session opens, so the
+        // screen is not blank until the next line of live output arrives.
+        'console_history_lines' => 200,
     ],
 
     'pusher' => [

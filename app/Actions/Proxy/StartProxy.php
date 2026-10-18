@@ -56,10 +56,11 @@ class StartProxy
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            $caddyfile = 'import /dynamic/*.caddy';
+            // The base Caddyfile also holds the maintenance blocks (see Server::caddyBaseCaddyfile()).
+            $caddyfile = base64_encode($server->caddyBaseCaddyfile());
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
+                "echo '$caddyfile' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
                 "docker compose -f $compose_file pull",

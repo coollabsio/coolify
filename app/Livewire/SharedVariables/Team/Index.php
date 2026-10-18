@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SharedVariables\Team;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Team;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,7 @@ use Livewire\Component;
 class Index extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Team $team;
 
@@ -46,6 +48,9 @@ class Index extends Component
 
     public function mount()
     {
+        if ($this->prefersCanvasView('team_variables')) {
+            return $this->redirectRoute('shared-variables.team.canvas', navigate: true);
+        }
         $this->team = currentTeam();
         $this->getDevView();
     }
