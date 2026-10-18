@@ -63,7 +63,7 @@
                         </div>
                     </x-application.settings-section>
                     <x-application.settings-section id="server-cloudwatch-drain-section" title="Amazon CloudWatch Logs"
-                        helper="Send container logs directly to CloudWatch Logs using the Docker awslogs logging driver.">
+                        helper="Send container logs directly to CloudWatch Logs using the Docker awslogs logging driver.<br><br>AWS credentials are read by the Docker daemon on this server, not by Coolify. Attach an IAM instance role, or configure <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> for the Docker service or in <code>/root/.aws/credentials</code>.<br><br>The credentials need <code>logs:CreateLogStream</code> and <code>logs:PutLogEvents</code>, plus <code>logs:CreateLogGroup</code> if the log group does not exist yet.<br><br>Delivery errors do not stop containers; they appear in the Docker daemon logs (<code>journalctl -u docker</code>). Redeploy or restart resources to apply the logging driver.">
                         <div class="mb-4 max-w-sm">
                             <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCloudwatchEnabled" label="Status"
                                 onChange="instantSave" :options="[
@@ -72,15 +72,6 @@
                                 ]"
                                 :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
                         </div>
-                        <p class="mb-4 text-sm leading-6 text-neutral-600 dark:text-fg-dim">
-                            AWS credentials are read by the Docker daemon on this server, not by Coolify. Attach an IAM
-                            instance role, or configure <code>AWS_ACCESS_KEY_ID</code>/<code>AWS_SECRET_ACCESS_KEY</code>
-                            for the Docker service or in <code>/root/.aws/credentials</code>. The credentials need
-                            <code>logs:CreateLogStream</code> and <code>logs:PutLogEvents</code>, plus
-                            <code>logs:CreateLogGroup</code> if the log group does not exist yet. Delivery errors do not
-                            stop containers; they appear in the Docker daemon logs (<code>journalctl -u docker</code>). Redeploy or
-                            restart resources to apply the logging driver.
-                        </p>
                         <div class="grid gap-4 lg:grid-cols-3">
                             <x-forms.input canGate="update" :canResource="$server" required
                                 id="logDrainCloudwatchGroup" label="Log group" placeholder="/coolify/production"
