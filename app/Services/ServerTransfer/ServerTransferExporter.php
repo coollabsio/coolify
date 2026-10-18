@@ -505,6 +505,25 @@ class ServerTransferExporter
      * @param  Collection<int, Application>  $applications
      * @return list<string>
      */
+    /**
+     * The manual steps that a transfer of this server needs, with {target_url} for the instance that manages it next.
+     *
+     * @return list<string>
+     */
+    public function postTransferChecklistFor(Server $server): array
+    {
+        $applications = $server->applications()->unique('id')->values();
+        $databases = collect($server->databases())->unique(fn ($db) => $db::class.':'.$db->id)->values();
+        $services = $server->services()->get()->unique('id')->values();
+        $runnerConfig = $server->githubRunnerConfig()->with('githubApp')->first();
+
+        return $this->postTransferChecklist(
+            $this->collectDependencies($server, $applications, $databases, $services, $runnerConfig),
+            $runnerConfig,
+            $applications,
+        );
+    }
+
     private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
     {
         $steps = [];
@@ -528,8 +547,8 @@ class ServerTransferExporter
             $steps[] = "In GitLab, open Settings > Webhooks of every project that uses GitLab App {$gitlabApp->name}, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.";
         }
         if ($runnerConfig) {
-            $steps[] = 'After the GitHub App sends webhooks to the target, open the server on the target, check the runner requirements, and enable GitHub runners. '
-                .'Enabling them stops runners that the source started on this server.';
+            $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
+                .'Enabling them stops runners that another Coolify instance started on this server.';
         }
 
         return $steps;

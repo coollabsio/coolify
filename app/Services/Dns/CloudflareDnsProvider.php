@@ -353,6 +353,38 @@ class CloudflareDnsProvider
         }
     }
 
+    /**
+     * Takes a record back after a take back, when another Coolify instance may have adopted it meanwhile. The
+     * provider comment must be an ownership comment for this record uuid, from this or any other instance.
+     * Never throws; returns false when the record was not taken back.
+     */
+    public function reclaimRecord(ManagedDnsRecord $record): bool
+    {
+        try {
+            $record->loadMissing(['zone', 'integrationToken']);
+            if ($record->zone === null || $record->integrationToken?->provider !== 'cloudflare') {
+                return false;
+            }
+
+            return $this->hostnameLock->run(
+                (int) $record->integrationToken->team_id,
+                $record->name,
+                function () use ($record): bool {
+                    $url = "https://api.cloudflare.com/client/v4/zones/{$record->zone->provider_zone_id}/dns_records/{$record->provider_record_id}";
+                    $comment = $this->client($record->integrationToken)->get($url)->json('result.comment');
+                    $pattern = '/^'.preg_quote(ManagedDnsRecord::OWNERSHIP_COMMENT_PREFIX, '/').' \\S+\\/'.preg_quote($record->uuid, '/').'$/';
+                    if (! is_string($comment) || preg_match($pattern, $comment) !== 1) {
+                        return false;
+                    }
+
+                    return $comment === $record->ownershipComment() || $this->adoptRecordLocked($record, $comment);
+                },
+            );
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     private function adoptRecordLocked(ManagedDnsRecord $record, string $previousComment): bool
     {
         $url = "https://api.cloudflare.com/client/v4/zones/{$record->zone->provider_zone_id}/dns_records/{$record->provider_record_id}";

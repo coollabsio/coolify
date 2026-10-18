@@ -396,6 +396,19 @@ class Show extends Component
     }
 
     /**
+     * Hide the manual steps after a take back, when the user did them.
+     */
+    public function dismissTakeBackChecklist(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $metadata = $this->server->server_metadata ?? [];
+        unset($metadata['transfer']['checklist']);
+        $this->server->server_metadata = $metadata;
+        $this->server->save();
+    }
+
+    /**
      * Take back a server that was transferred to another instance.
      */
     public function enableManagement(ServerTransferClaimer $claimer): void
@@ -420,6 +433,7 @@ class Show extends Component
             return;
         }
 
+        $claimer->restoreAfterTakeBack($this->server->refresh());
         $this->server->refresh();
         // Sentinel must report here. While it reports to the other instance, that instance does not run
         // the connection check that reads the owner marker and makes it stop managing the server.

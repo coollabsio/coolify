@@ -158,6 +158,8 @@
                             @if ($server->isTransferredAway() && ! $server->isLocalhost())
                                 @php
                                     $transferTarget = data_get($server->server_metadata, 'transfer.target_instance_url') ?: 'another Coolify instance';
+                                    $transferredAt = data_get($server->server_metadata, 'transfer.transferred_at');
+                                    $transferredAt = $transferredAt ? \Illuminate\Support\Carbon::parse($transferredAt)->toDayDateTimeString().' UTC' : 'the transfer';
                                 @endphp
                                 <x-modal-confirmation title="Take back a transferred server?"
                                     submitAction="enableManagement" :confirmWithPassword="false"
@@ -166,11 +168,12 @@
                                     :confirmationText="$server->name"
                                     confirmationLabel="Enter the server name to take the server back."
                                     shortConfirmationLabel="Server name"
-                                    :warningMessage="'<strong>This server was transferred to '.e($transferTarget).'.</strong> To move it back, delete this archived server here, then transfer the server from '.e($transferTarget).' to this instance. That keeps all changes made there. Take the server back here only when '.e($transferTarget).' is lost or cannot transfer it. This instance uses its old copy of the settings and resources, and changes made on the other instance are lost.'"
+                                    :warningMessage="'<strong>Changes made on '.e($transferTarget).' after '.e($transferredAt).' are lost.</strong> This instance uses its copy of the settings and resources from the time of the transfer. Use this only when '.e($transferTarget).' is lost or cannot transfer the server back. Otherwise use Transfer back, which keeps those changes.'"
                                     :actions="[
                                         'This instance starts to run deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server again.',
                                         'The server records that this instance owns it. The next time the other instance connects to the server, it stops managing it automatically.',
                                         'Sentinel on the server is reconfigured to send its data to this instance.',
+                                        'This instance takes back its DNS records and lists the steps that are left: webhook URLs and GitHub runners.',
                                     ]">
                                     <x-slot:trigger>
                                         <x-forms.button type="button" isError canGate="update" :canResource="$server">
@@ -189,6 +192,19 @@
                                 which manages it now. Use that instance. To move the server back, delete this archived
                                 server here (this deletes only its records on this instance), then transfer the server from
                                 that instance to this one.
+                            </x-callout>
+                        @endif
+
+                        @if (! $server->isTransferredAway() && count((array) data_get($server->server_metadata, 'transfer.checklist', [])) > 0)
+                            <x-callout type="warning" title="After taking the server back" class="mb-4">
+                                Do these steps to finish the take back. Coolify cannot do them for you.
+                                <ul class="mt-2 list-disc space-y-1 pl-5">
+                                    @foreach ((array) data_get($server->server_metadata, 'transfer.checklist', []) as $step)
+                                        <li wire:key="take-back-step-{{ hash('xxh128', (string) $step) }}">{{ $step }}</li>
+                                    @endforeach
+                                </ul>
+                                <x-forms.button class="mt-3" wire:click="dismissTakeBackChecklist" canGate="update"
+                                    :canResource="$server">Done</x-forms.button>
                             </x-callout>
                         @endif
 

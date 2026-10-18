@@ -149,7 +149,7 @@ test('a server that this instance never claimed ignores the owner marker', funct
         ->and($this->server->fresh()->isTransferredAway())->toBeFalse();
 });
 
-test('markTransferred stops tracking the DNS records of the server resources without deleting them at the provider', function () {
+test('markTransferred keeps the DNS records of the server resources as not owned, without provider calls', function () {
     Http::fake();
     $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
     $application = Application::factory()->create(['destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()]);
@@ -165,9 +165,46 @@ test('markTransferred stops tracking the DNS records of the server resources wit
     app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
 
     Http::assertNothingSent();
-    expect(ManagedDnsRecord::find($onlyThisServer->id))->toBeNull()
+    expect($onlyThisServer->fresh()->owned)->toBeFalse()
+        ->and($onlyThisServer->fresh()->references()->pluck('resource_id')->all())->toBe([$application->id])
+        ->and(data_get($this->server->fresh()->server_metadata, 'transfer.parked_dns_record_ids'))->toBe([$onlyThisServer->id])
+        ->and($shared->fresh()->owned)->toBeTrue()
         ->and($shared->fresh()->references()->pluck('resource_id')->all())->toBe([$otherApplication->id]);
 });
+
+test('take back owns the parked DNS records again and lists the steps that are left', function (string $remoteComment, bool $reclaimed) {
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create(['destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare']);
+    $zone = DnsProviderZone::factory()->create(['integration_token_id' => $token->id]);
+    $record = ManagedDnsRecord::factory()->owned()->create(['dns_provider_zone_id' => $zone->id, 'name' => 'app.example.test', 'type' => 'A', 'content' => '10.0.0.1']);
+    $record->addReference($application);
+    $claimer = app(ServerTransferClaimer::class);
+    $claimer->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    $claimer->claim($this->server->fresh());
+    $remote = ['type' => 'A', 'name' => 'app.example.test', 'content' => '10.0.0.1', 'comment' => str_replace('{uuid}', $record->uuid, $remoteComment)];
+    Http::fake([
+        'api.cloudflare.com/*' => fn ($request) => $request->method() === 'GET'
+            ? Http::response(['success' => true, 'result' => $remote])
+            : Http::response(['success' => true, 'result' => [...$remote, 'comment' => $record->ownershipComment()]]),
+    ]);
+
+    $steps = $claimer->restoreAfterTakeBack($this->server->fresh());
+
+    expect($record->fresh()->owned)->toBe($reclaimed)
+        ->and(data_get($this->server->fresh()->server_metadata, 'transfer.checklist'))->toBe($steps)
+        ->and(data_get($this->server->fresh()->server_metadata, 'transfer.parked_dns_record_ids'))->toBeNull()
+        ->and(implode("\n", $steps))->toContain('https://coolify-a.test/webhooks/source/github/events/manual');
+    if ($reclaimed) {
+        Http::assertSent(fn ($request) => $request->method() === 'PATCH' && $request['comment'] === $record->ownershipComment());
+    } else {
+        Http::assertNotSent(fn ($request) => $request->method() === 'PATCH');
+        expect(implode("\n", $steps))->toContain('Check DNS record app.example.test');
+    }
+})->with([
+    'the other instance adopted the record' => ['managed-by: coolify other-instance/{uuid}', true],
+    'someone changed the record at the provider' => ['set by hand', false],
+]);
 
 function transferRunnerSetup(Server $server): array
 {

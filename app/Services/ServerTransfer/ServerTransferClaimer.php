@@ -4,9 +4,13 @@ namespace App\Services\ServerTransfer;
 
 use App\Enums\GithubRunnerStatus;
 use App\Models\GithubRunnerExecution;
+use App\Models\ManagedDnsRecord;
 use App\Models\Server;
 use App\Notifications\Internal\GeneralNotification;
+use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -124,12 +128,16 @@ class ServerTransferClaimer
                 'target_instance_url' => $targetInstanceUrl,
                 'transferred_at' => now()->toIso8601String(),
             ]);
+            unset($metadata['transfer']['checklist'], $metadata['transfer']['taken_back_at']);
             $server->server_metadata = $metadata;
             $server->save();
 
             $this->releaseGithubRunners($server);
 
-            $this->forgetDnsRecords($server);
+            // Kept for a take back. Not owned, so this instance never changes or deletes them at the provider.
+            $metadata['transfer']['parked_dns_record_ids'] = app(ManagedDnsRecordCleanup::class)->parkResources($this->dnsResources($server));
+            $server->server_metadata = $metadata;
+            $server->save();
 
             return [
                 'server_uuid' => $server->uuid,
@@ -153,10 +161,57 @@ class ServerTransferClaimer
      */
     public function forgetDnsRecords(Server $server): void
     {
-        app(ManagedDnsRecordCleanup::class)->forgetResources(
-            $server->applications()
-                ->concat($server->services()->with('applications')->get()->flatMap->applications)
-        );
+        app(ManagedDnsRecordCleanup::class)->forgetResources($this->dnsResources($server));
+    }
+
+    /**
+     * @return Collection<int, Model>
+     */
+    private function dnsResources(Server $server): Collection
+    {
+        return $server->applications()
+            ->concat($server->services()->with('applications')->get()->flatMap->applications);
+    }
+
+    /**
+     * After a take back: own the DNS records of the server again, and save the manual steps that move webhooks and
+     * runners back to this instance. Provider calls run here, after the claim committed; a failure only adds a step.
+     *
+     * @return list<string> the manual steps
+     */
+    public function restoreAfterTakeBack(Server $server): array
+    {
+        $steps = [];
+        $dns = app(CloudflareDnsProvider::class);
+        $parkedIds = (array) data_get($server->server_metadata, 'transfer.parked_dns_record_ids', []);
+        foreach (ManagedDnsRecord::query()->whereIn('id', $parkedIds)->get() as $record) {
+            if ($dns->reclaimRecord($record)) {
+                $record->update(['owned' => true]);
+            } else {
+                $steps[] = "Check DNS record {$record->name} at the DNS provider. This instance could not take it back, so it does not change or delete it.";
+            }
+        }
+
+        $instanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
+        try {
+            $exportSteps = app(ServerTransferExporter::class)->postTransferChecklistFor($server);
+        } catch (Throwable $e) {
+            $exportSteps = [];
+            Log::warning('Could not build the take back checklist', ['server_uuid' => $server->uuid, 'error' => $e->getMessage()]);
+        }
+        $steps = [...array_map(fn (string $step) => str_replace('{target_url}', $instanceUrl, $step), $exportSteps), ...$steps];
+
+        DB::transaction(function () use ($server, $steps) {
+            $locked = Server::query()->lockForUpdate()->findOrFail($server->id);
+            $metadata = $locked->server_metadata ?? [];
+            unset($metadata['transfer']['parked_dns_record_ids']);
+            $metadata['transfer']['taken_back_at'] = now()->toIso8601String();
+            $metadata['transfer']['checklist'] = $steps;
+            $locked->server_metadata = $metadata;
+            $locked->save();
+        });
+
+        return $steps;
     }
 
     private function releaseGithubRunners(Server $server): void

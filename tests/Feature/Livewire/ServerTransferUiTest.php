@@ -71,7 +71,7 @@ test('taking back a transferred server needs a typed confirmation', function () 
     $this->get('/server/'.$this->server->uuid)
         ->assertOk()
         ->assertSee('Take back a transferred server?')
-        ->assertSee('This server was transferred to https://target.example.com.', escape: false);
+        ->assertSee('Changes made on https://target.example.com after', escape: false);
 });
 
 test('team members cannot open the transfer page', function () {

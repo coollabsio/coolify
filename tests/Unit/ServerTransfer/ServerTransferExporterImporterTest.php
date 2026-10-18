@@ -1662,7 +1662,7 @@ test('the GitHub runner config moves disabled with its GitHub App and the bundle
         ->and($bundle['post_transfer_checklist'])->toBe([
             'On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to {target_url}/webhooks/source/github/events, the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.',
             'In GitLab, open Settings > Webhooks of every project that uses GitLab App Team GitLab, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.',
-            'After the GitHub App sends webhooks to the target, open the server on the target, check the runner requirements, and enable GitHub runners. Enabling them stops runners that the source started on this server.',
+            'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. Enabling them stops runners that another Coolify instance started on this server.',
         ])
         ->and(implode(' ', $bundle['warnings']))->not->toContain('webhook URL')
         ->and(implode(' ', $bundle['warnings']))->not->toContain('runner');

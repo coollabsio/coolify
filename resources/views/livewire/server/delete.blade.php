@@ -38,6 +38,11 @@
                                 ? ['This server and the records of its resources will be permanently deleted from this Coolify instance. Nothing on the server changes.']
                                 : ['This server will be permanently deleted from Coolify.'];
                             $deleteWarningMessage = null;
+                            if ($server->isTransferredAway()) {
+                                $deleteWarningMessage = '<strong>This removes the option to undo the transfer.</strong><br>'
+                                    .'This archive is the copy that "Transfer back" and "Take back" use. '
+                                    .'Delete it only when the transfer works and you do not need to undo it.';
+                            }
                             if ($server->hostinger_virtual_machine_id && ! $server->isTransferredAway()) {
                                 $deleteWarningMessage = '<strong>Hostinger deletes a VPS only at the end of its paid period.</strong><br>'
                                     .'If you select to delete the VPS from Hostinger, Coolify turns off its auto-renewal. '

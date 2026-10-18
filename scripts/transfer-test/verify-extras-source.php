@@ -19,7 +19,8 @@ $check('transfer succeeded', ($migration['status'] ?? null) === 'succeeded', (st
 $check('precheck NOTE about resources on the other server', $messages->contains(fn ($m) => str_starts_with($m, "NOTE: project 'Second Server' also has 2 resources on other servers")));
 $check('runner config disabled on the source', GithubRunnerConfig::where('server_id', $server?->id)->value('is_enabled') === false);
 $check('runner execution cancelled on the source', GithubRunnerExecution::where('runner_name', 'coolify-runner-fake')->value('status')?->value === 'cancelled');
-$check('source no longer tracks the DNS record', ! ManagedDnsRecord::where('name', 'whoami2.example.test')->exists());
+$record = ManagedDnsRecord::where('name', 'whoami2.example.test')->first();
+$check('source keeps the DNS record for a take back, not owned', $record !== null && $record->owned === false);
 $checklist = implode("\n", (array) ($migration['checklist'] ?? []));
 $check('checklist: GitHub App URLs', str_contains($checklist, 'GitHub App fake-gh-app'));
 $check('checklist: enable GitHub runners', str_contains($checklist, 'enable GitHub runners'));

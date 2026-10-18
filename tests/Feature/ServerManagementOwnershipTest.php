@@ -1,9 +1,11 @@
 <?php
 
 use App\Livewire\Server\Show;
+use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ServerTransfer\ServerTransferClaimer;
@@ -182,4 +184,21 @@ test('taking back a transferred server fails without changes when the host canno
 
     expect($this->server->isTransferredAway())->toBeTrue()
         ->and((bool) $this->server->settings->force_disabled)->toBeTrue();
+});
+
+test('after a take back the server page lists the steps that are left until the user dismisses them', function () {
+    markServerTransferredAway($this->server);
+    Application::factory()->create([
+        'destination_id' => $this->server->standaloneDockers()->first()->id,
+        'destination_type' => StandaloneDocker::class,
+        'git_repository' => 'https://github.com/coollabsio/coolify',
+    ]);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('enableManagement')
+        ->assertSee('After taking the server back')
+        ->assertSee('https://coolify-a.test/webhooks/source/github/events/manual');
+
+    $component->call('dismissTakeBackChecklist')->assertDontSee('After taking the server back');
+    expect(data_get($this->server->fresh()->server_metadata, 'transfer.checklist'))->toBeNull();
 });
