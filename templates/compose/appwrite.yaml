@@ -3,19 +3,20 @@
 # category: backend
 # tags: backend, backend-as-a-service, platform
 # logo: svgs/appwrite.svg
-# port: 3003
+# port: 80
 
 services:
   appwrite:
-    image: appwrite/appwrite:2.0.0
+    image: appwrite/appwrite:2.5.0
     environment:
       - SERVICE_URL_APPWRITE=/v1
+      - _APP_DNS_EXTERNAL=${_APP_DNS_EXTERNAL}
+      - _APP_ALLOWED_INTERNAL_ADDRESSES=${_APP_ALLOWED_INTERNAL_ADDRESSES}
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_USAGE_PASS=$SERVICE_PASSWORD_CLICKHOUSE
       - _APP_CONNECTIONS_DB_USAGE=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_USAGE=${_APP_POOL_SIZE_USAGE:-2}
-      - _APP_EXECUTIONS_DUAL_WRITE=${_APP_EXECUTIONS_DUAL_WRITE:-enabled}
       - _APP_CONNECTIONS_DB_EXECUTIONS=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_EXECUTIONS=${_APP_POOL_SIZE_EXECUTIONS:-2}
       - _APP_MAINTENANCE_RETENTION_USAGE_TTL=${_APP_MAINTENANCE_RETENTION_USAGE_TTL:-180}
@@ -24,7 +25,6 @@ services:
       - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL:-3600}
       - _APP_EDITION=${_APP_EDITION:-self-hosted}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_POOL_ADAPTER=${_APP_POOL_ADAPTER:-stack}
       - _APP_LOCALE=${_APP_LOCALE:-en}
       - _APP_COMPRESSION_ENABLED=${_APP_COMPRESSION_ENABLED:-enabled}
       - _APP_COMPRESSION_MIN_SIZE_BYTES=${_APP_COMPRESSION_MIN_SIZE_BYTES}
@@ -51,14 +51,14 @@ services:
       - _APP_OPTIONS_ABUSE=${_APP_OPTIONS_ABUSE:-enabled}
       - _APP_OPTIONS_ABUSE_INCREASED_LIMIT_PROJECTS=${_APP_OPTIONS_ABUSE_INCREASED_LIMIT_PROJECTS}
       - _APP_OPTIONS_ROUTER_PROTECTION=${_APP_OPTIONS_ROUTER_PROTECTION:-disabled}
-      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-enabled}
+      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_OPTIONS_ROUTER_FORCE_HTTPS=${_APP_OPTIONS_ROUTER_FORCE_HTTPS:-disabled}
       - _APP_ROUTER_AUTO_CERTIFICATES=${_APP_ROUTER_AUTO_CERTIFICATES:-disabled}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_NOTIFICATIONS_TRACKING_SECRET=$SERVICE_PASSWORD_64_NOTIFICATIONS
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_CONSOLE_DOMAIN=${_APP_CONSOLE_DOMAIN}
-      - _APP_CONSOLE_URL_SCHEME=root
+      - _APP_CONSOLE_URL=${_APP_CONSOLE_URL}
       - _APP_CONSOLE_TRUSTED_PROJECTS=${_APP_CONSOLE_TRUSTED_PROJECTS}
       - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
       - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
@@ -97,6 +97,7 @@ services:
       - _APP_SMTP_PASSWORD=${_APP_SMTP_PASSWORD}
       - _APP_STORAGE_LIMIT=${_APP_STORAGE_LIMIT:-30000000}
       - _APP_STORAGE_PREVIEW_LIMIT=${_APP_STORAGE_PREVIEW_LIMIT:-20000000}
+      - _APP_AUTOGRAVITY_HOST=${_APP_AUTOGRAVITY_HOST}
       - _APP_STORAGE_ANTIVIRUS=${_APP_STORAGE_ANTIVIRUS:-disabled}
       - _APP_STORAGE_ANTIVIRUS_HOST=${_APP_STORAGE_ANTIVIRUS_HOST}
       - _APP_STORAGE_ANTIVIRUS_PORT=${_APP_STORAGE_ANTIVIRUS_PORT:-3310}
@@ -123,6 +124,7 @@ services:
       - _APP_STORAGE_WASABI_REGION=${_APP_STORAGE_WASABI_REGION:-eu-central-1}
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
       - _APP_COMPUTE_SIZE_LIMIT=${_APP_COMPUTE_SIZE_LIMIT:-30000000}
+      - _APP_COMPUTE_BUILD_SIZE_LIMIT=${_APP_COMPUTE_BUILD_SIZE_LIMIT:-2000000000}
       - _APP_FUNCTIONS_TIMEOUT=${_APP_FUNCTIONS_TIMEOUT:-900}
       - _APP_SITES_TIMEOUT=${_APP_SITES_TIMEOUT:-900}
       - _APP_COMPUTE_BUILD_TIMEOUT=${_APP_COMPUTE_BUILD_TIMEOUT:-2700}
@@ -146,7 +148,6 @@ services:
       - _APP_MAINTENANCE_RETENTION_ABUSE=${_APP_MAINTENANCE_RETENTION_ABUSE:-86400}
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
       - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE}
-      - _APP_MAINTENANCE_RETENTION_USAGE_HOURLY=${_APP_MAINTENANCE_RETENTION_USAGE_HOURLY:-8640000}
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
       - _APP_SMS_PROVIDER=${_APP_SMS_PROVIDER}
       - _APP_SMS_FROM=${_APP_SMS_FROM}
@@ -177,18 +178,17 @@ services:
       - _APP_VCS_WEBHOOK_URL=${_APP_VCS_WEBHOOK_URL}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_ID=${_APP_MIGRATIONS_FIREBASE_CLIENT_ID}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET=${_APP_MIGRATIONS_FIREBASE_CLIENT_SECRET}
-      - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
       - _APP_CONSOLE_COUNTRIES_DENYLIST=${_APP_CONSOLE_COUNTRIES_DENYLIST}
-      - _APP_EXPERIMENT_LOGGING_PROVIDER=${_APP_EXPERIMENT_LOGGING_PROVIDER}
-      - _APP_EXPERIMENT_LOGGING_CONFIG=${_APP_EXPERIMENT_LOGGING_CONFIG}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_DATABASE_SHARED_NAMESPACE=${_APP_DATABASE_SHARED_NAMESPACE}
       - _APP_FUNCTIONS_CREATION_ABUSE_LIMIT=${_APP_FUNCTIONS_CREATION_ABUSE_LIMIT}
       - _APP_CUSTOM_DOMAIN_DENY_LIST=${_APP_CUSTOM_DOMAIN_DENY_LIST:-example.com,test.com,app.example.com}
       - _APP_TRUSTED_HEADERS=${_APP_TRUSTED_HEADERS:-x-forwarded-for}
+      - _APP_TRUSTED_PROXIES=${_APP_TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16}
       - _APP_MIGRATION_HOST=${_APP_MIGRATION_HOST:-appwrite}
       - _APP_GEO_SECRET=$SERVICE_PASSWORD_64_GEO
       - _APP_GEO_ENDPOINT=${_APP_GEO_ENDPOINT:-http://appwrite-geo/v1}
+      - _APP_PWNED_PASSWORDS_DSN=${_APP_PWNED_PASSWORDS_DSN:-none://localhost}
       - _APP_LIMIT_DATABASE_BATCH=${_APP_LIMIT_DATABASE_BATCH:-100}
       - _APP_DOCUMENTSDB=${_APP_DOCUMENTSDB:-disabled}
       - _APP_VECTORSDB=${_APP_VECTORSDB:-disabled}
@@ -219,12 +219,12 @@ services:
       start_period: 120s
 
   appwrite-console:
-    image: appwrite/new:1.1.16
+    image: appwrite/new:1.2.74-self-hosted
     environment:
       - SERVICE_URL_APPWRITE_3000=/
       - VITE_CONSOLE_PROFILE=self-hosted
+      - VITE_APPWRITE_VERSION=2.5.0
       - APPWRITE_ENDPOINT_SAME_ORIGIN=true
-      - VITE_GROWTH_ENDPOINT=${VITE_GROWTH_ENDPOINT:-https://growth.appwrite.io/v1}
     depends_on:
       appwrite:
         condition: service_healthy
@@ -235,7 +235,7 @@ services:
       retries: 3
 
   appwrite-realtime:
-    image: appwrite/appwrite:2.0.0
+    image: appwrite/appwrite:2.5.0
     entrypoint: realtime
     environment:
       - SERVICE_URL_APPWRITE=/v1/realtime
@@ -248,6 +248,8 @@ services:
       - _APP_CONSOLE_HOSTNAMES=${_APP_CONSOLE_HOSTNAMES}
       - _APP_REALTIME_TAIL_RATE=${_APP_REALTIME_TAIL_RATE:-50}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_TRUSTED_HEADERS=${_APP_TRUSTED_HEADERS:-x-forwarded-for}
+      - _APP_TRUSTED_PROXIES=${_APP_TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -274,13 +276,11 @@ services:
       - _APP_CONNECTIONS_DATABASE_VECTORSDB=${_APP_CONNECTIONS_DATABASE_VECTORSDB}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
-      - _APP_LOGGING_CONFIG_REALTIME=${_APP_LOGGING_CONFIG_REALTIME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_LIMIT_DATABASE_BATCH=${_APP_LIMIT_DATABASE_BATCH:-100}
       - _APP_DOCUMENTSDB=${_APP_DOCUMENTSDB:-disabled}
       - _APP_VECTORSDB=${_APP_VECTORSDB:-disabled}
       - _APP_EMBEDDING=${_APP_EMBEDDING:-disabled}
-      - _APP_POOL_ADAPTER=swoole
     depends_on:
       appwrite-postgresql:
         condition: service_healthy
@@ -293,15 +293,16 @@ services:
       retries: 3
 
   appwrite-worker:
-    image: appwrite/appwrite:2.0.0
+    image: appwrite/appwrite:2.5.0
     entrypoint: worker
     environment:
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_DNS_EXTERNAL=${_APP_DNS_EXTERNAL}
+      - _APP_ALLOWED_INTERNAL_ADDRESSES=${_APP_ALLOWED_INTERNAL_ADDRESSES}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_USAGE_PASS=$SERVICE_PASSWORD_CLICKHOUSE
       - _APP_CONNECTIONS_DB_USAGE=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_USAGE=${_APP_POOL_SIZE_USAGE:-2}
-      - _APP_EXECUTIONS_DUAL_WRITE=${_APP_EXECUTIONS_DUAL_WRITE:-enabled}
       - _APP_CONNECTIONS_DB_EXECUTIONS=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_EXECUTIONS=${_APP_POOL_SIZE_EXECUTIONS:-2}
       - _APP_MAINTENANCE_RETENTION_USAGE_TTL=${_APP_MAINTENANCE_RETENTION_USAGE_TTL:-180}
@@ -311,7 +312,6 @@ services:
       - _APP_WORKERS_NUM=1
       - _APP_WORKER_MAX_COROUTINES=78
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_POOL_ADAPTER=${_APP_POOL_ADAPTER:-stack}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-security@appwrite.io}
       - _APP_EMAIL_CERTIFICATES=${_APP_EMAIL_CERTIFICATES}
@@ -341,10 +341,9 @@ services:
       - _APP_REDIS_PASS=${_APP_REDIS_PASS}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_QUEUE_NAME=${_APP_QUEUE_NAME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
-      - _APP_CONSOLE_URL_SCHEME=root
+      - _APP_CONSOLE_URL=${_APP_CONSOLE_URL}
       - _APP_CONSOLE_DOMAIN=${_APP_CONSOLE_DOMAIN}
       - _APP_CONSOLE_TRUSTED_PROJECTS=${_APP_CONSOLE_TRUSTED_PROJECTS}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
@@ -355,7 +354,7 @@ services:
       - _APP_DNS=${_APP_DNS}
       - _APP_DOMAIN_FUNCTIONS=${_APP_DOMAIN_FUNCTIONS:-functions.$SERVICE_FQDN_APPWRITE}
       - _APP_DOMAIN_SITES=${_APP_DOMAIN_SITES:-sites.$SERVICE_FQDN_APPWRITE}
-      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-enabled}
+      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_OPTIONS_ROUTER_FORCE_HTTPS=${_APP_OPTIONS_ROUTER_FORCE_HTTPS:-disabled}
       - _APP_WEBHOOK_MAX_FAILED_ATTEMPTS=${_APP_WEBHOOK_MAX_FAILED_ATTEMPTS:-10}
       - _APP_STORAGE_DEVICE=${_APP_STORAGE_DEVICE:-local}
@@ -391,6 +390,7 @@ services:
       - _APP_COMPUTE_MEMORY=${_APP_COMPUTE_MEMORY:-0}
       - _APP_OPEN_RUNTIMES_NFT=${_APP_OPEN_RUNTIMES_NFT:-enabled}
       - _APP_COMPUTE_SIZE_LIMIT=${_APP_COMPUTE_SIZE_LIMIT:-30000000}
+      - _APP_COMPUTE_BUILD_SIZE_LIMIT=${_APP_COMPUTE_BUILD_SIZE_LIMIT:-2000000000}
       - _APP_VCS_GITHUB_APP_NAME=${_APP_VCS_GITHUB_APP_NAME}
       - _APP_VCS_GITHUB_PRIVATE_KEY=${_APP_VCS_GITHUB_PRIVATE_KEY}
       - _APP_VCS_GITHUB_APP_ID=${_APP_VCS_GITHUB_APP_ID}
@@ -462,7 +462,7 @@ services:
       retries: 3
 
   appwrite-task-scheduler:
-    image: appwrite/appwrite:2.0.0
+    image: appwrite/appwrite:2.5.0
     entrypoint: schedule
     environment:
       - _APP_ENV=${_APP_ENV:-production}
@@ -470,7 +470,6 @@ services:
       - _APP_USAGE_PASS=$SERVICE_PASSWORD_CLICKHOUSE
       - _APP_CONNECTIONS_DB_USAGE=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_USAGE=${_APP_POOL_SIZE_USAGE:-2}
-      - _APP_EXECUTIONS_DUAL_WRITE=${_APP_EXECUTIONS_DUAL_WRITE:-enabled}
       - _APP_CONNECTIONS_DB_EXECUTIONS=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_EXECUTIONS=${_APP_POOL_SIZE_EXECUTIONS:-2}
       - _APP_MAINTENANCE_RETENTION_USAGE_TTL=${_APP_MAINTENANCE_RETENTION_USAGE_TTL:-180}
@@ -480,9 +479,8 @@ services:
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
       - _APP_WORKER_MAX_COROUTINES=8
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_POOL_ADAPTER=${_APP_POOL_ADAPTER:-stack}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
-      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-enabled}
+      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_CONSOLE_DOMAIN=${_APP_CONSOLE_DOMAIN}
       - _APP_CONSOLE_SCHEMA=${_APP_CONSOLE_SCHEMA:-appwriteio}
@@ -513,13 +511,12 @@ services:
       retries: 3
 
   appwrite-task-maintenance:
-    image: appwrite/appwrite:2.0.0
+    image: appwrite/appwrite:2.5.0
     entrypoint: maintenance
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_POOL_ADAPTER=${_APP_POOL_ADAPTER:-stack}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
       - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
@@ -546,7 +543,6 @@ services:
       - _APP_MAINTENANCE_RETENTION_ABUSE=${_APP_MAINTENANCE_RETENTION_ABUSE:-86400}
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
       - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE}
-      - _APP_MAINTENANCE_RETENTION_USAGE_HOURLY=${_APP_MAINTENANCE_RETENTION_USAGE_HOURLY:-8640000}
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
       - _APP_MAINTENANCE_START_TIME=${_APP_MAINTENANCE_START_TIME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
@@ -562,13 +558,12 @@ services:
       retries: 3
 
   appwrite-task-interval:
-    image: appwrite/appwrite:2.0.0
+    image: appwrite/appwrite:2.5.0
     entrypoint: interval
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_POOL_ADAPTER=${_APP_POOL_ADAPTER:-stack}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
       - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
@@ -603,7 +598,7 @@ services:
       retries: 3
 
   appwrite-geo:
-    image: appwrite/geo:0.3.1
+    image: appwrite/geo:0.3.2
     environment:
       - GEO_SECRET=$SERVICE_PASSWORD_64_GEO
     healthcheck:
@@ -613,18 +608,17 @@ services:
       retries: 3
       start_period: 10s
 
-  appwrite-assistant:
-    image: appwrite/assistant:0.8.4
-    environment:
-      - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
-    exclude_from_hc: true
-
   appwrite-browser:
-    image: appwrite/browser:0.3.4
+    image: appwrite/browser:0.3.6
+    environment:
+      - ALLOWED_HOSTS=appwrite
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     exclude_from_hc: true
 
   openruntimes-executor:
-    image: openruntimes/executor:0.29.0
+    image: openruntimes/executor:1.1.2
     hostname: openruntimes-executor
     stop_signal: SIGINT
     environment:
@@ -656,7 +650,7 @@ services:
       start_period: 10s
 
   orchestrator:
-    image: ghcr.io/open-runtimes/orchestrator/orchestrator:2.0.1
+    image: ghcr.io/open-runtimes/orchestrator/orchestrator:2.2.2
     hostname: orchestrator
     user: root
     environment:
@@ -710,8 +704,91 @@ services:
       - CLICKHOUSE_USER=appwrite
       - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS=1
     volumes:
       - appwrite-clickhouse:/var/lib/clickhouse:rw
+      - type: bind
+        source: ./clickhouse-config.xml
+        target: /etc/clickhouse-server/config.d/appwrite.xml
+        read_only: true
+        content: |
+          <?xml version="1.0"?>
+          <!--
+              Retention for ClickHouse's own system log tables.
+
+              Every <ttl> in the image's config.xml sits inside an XML comment, so these
+              tables keep every row forever, and the metric ones add a row per second
+              whether or not the instance serves traffic. Left alone they outgrow the
+              usage data they sit next to and fill the volume.
+
+              When a window here changes, ClickHouse replaces the table on the next
+              restart and keeps the old one, rows and all, as <log>_<N>.
+              clickhouse-init.sh gives those old tables the same window.
+          -->
+          <clickhouse>
+              <!-- The metric, trace and profile logs sample the server every second whether
+                   or not Appwrite serves traffic, and nothing reads them back, so their
+                   writes and the merges behind them are pure overhead. -->
+              <asynchronous_metric_log remove="1"/>
+              <metric_log remove="1"/>
+              <histogram_metric_log remove="1"/>
+              <query_metric_log remove="1"/>
+              <processors_profile_log remove="1"/>
+              <trace_log remove="1"/>
+              <!-- text_log repeats the server log the container already writes. -->
+              <text_log remove="1"/>
+
+              <!-- Kept for debugging, capped so they cannot fill the volume. -->
+              <asynchronous_insert_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></asynchronous_insert_log>
+              <query_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_log>
+              <query_views_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_views_log>
+              <query_thread_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_thread_log>
+              <part_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></part_log>
+              <background_schedule_pool_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></background_schedule_pool_log>
+
+              <!-- Longer, so it still covers a report that reaches us late. crash_log is
+                   deliberately left alone: it is tiny and worth keeping. -->
+              <error_log><ttl>event_date + INTERVAL 14 DAY DELETE</ttl></error_log>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse-init.sh
+        target: /docker-entrypoint-initdb.d/clickhouse-init.sh
+        read_only: true
+        content: |
+          #!/bin/bash
+          # The ClickHouse entrypoint sources this file, so a subshell keeps these options out of it.
+          (
+            set -euo pipefail
+
+            client() {
+              clickhouse-client --host 127.0.0.1 --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" "$@"
+            }
+
+            # Flushing replaces log tables whose definition changed, keeping each old table as <log>_<N>.
+            client --query 'SYSTEM FLUSH LOGS'
+
+            # Tables left behind never expire on their own: take the TTL of the log that
+            # replaced this one, or a week when the log is no longer written at all.
+            # The named logs must match the ones clickhouse-config.xml removes: a log that
+            # is still written gets replaced on the next restart if its TTL is altered here.
+            client --format TSVRaw <<'SQL' | client --multiquery
+          SELECT concat('ALTER TABLE system.', stale.name, ' MODIFY TTL ', if(active.name = '', 'event_date + INTERVAL 7 DAY DELETE', splitByString(' SETTINGS ', splitByString(' TTL ', active.engine_full)[2])[1]), ';')
+          FROM (
+            SELECT name, splitByChar('_', name)[-1] AS suffix, arrayStringConcat(arrayPopBack(splitByChar('_', name)), '_') AS log
+            FROM system.tables
+            WHERE database = 'system'
+              AND position(engine_full, ' TTL ') = 0
+              AND endsWith(engine, 'MergeTree')
+              AND name IN (SELECT table FROM system.columns WHERE database = 'system' AND name = 'event_date' AND type = 'Date')
+          ) AS stale
+          LEFT JOIN system.tables AS active
+            ON active.database = 'system'
+            AND active.name = stale.log
+            AND position(active.engine_full, ' TTL ') > 0
+          WHERE (endsWith(stale.log, '_log') AND toUInt64OrNull(stale.suffix) IS NOT NULL)
+            OR stale.name IN ('asynchronous_metric_log', 'metric_log', 'histogram_metric_log', 'query_metric_log', 'processors_profile_log', 'trace_log', 'text_log')
+          SQL
+          )
     ulimits:
       nofile:
         soft: 262144

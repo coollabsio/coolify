@@ -291,7 +291,7 @@ class StartPostgresql
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -342,5 +342,7 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $config_file_path";
     }
 }

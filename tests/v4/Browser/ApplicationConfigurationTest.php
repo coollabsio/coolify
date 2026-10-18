@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
@@ -133,6 +134,42 @@ it('saves application name description and ports from the general form', functio
         ->assertValue('description', 'Updated via browser test')
         ->assertValue('portsExposes', '8080')
         ->screenshot(filename: 'application-general-reloaded');
+});
+
+it('shows the unsaved bar for a Compose location edit and saves it with the name', function () {
+    Process::fake(fn ($process) => match (true) {
+        str_contains($process->command, 'git --version') => Process::result('git version 2.43.0'),
+        str_contains($process->command, 'head -c') => Process::result("services:\n  web:\n    image: nginx\n"),
+        default => Process::result(''),
+    });
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_location' => '/docker-compose.yaml',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+    ]);
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    // The Compose location input is bound through @entangle, not wire:model.
+    $page->assertSee('Docker compose location')
+        ->type('input[placeholder="/docker-compose.yaml"]', '/compose.prod.yaml')
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('.is-dirty')].some((bar) => bar.textContent.includes('Save changes'))
+            JS)
+        ->type('name', 'Renamed Compose App')
+        ->click('button:visible:has-text("Save changes")')
+        ->wait(2)
+        ->screenshot(filename: 'application-compose-location-saved');
+
+    expect($this->application->refresh()->only(['name', 'docker_compose_location']))->toBe([
+        'name' => 'Renamed Compose App',
+        'docker_compose_location' => '/compose.prod.yaml',
+    ]);
 });
 
 it('saves custom docker run options from the UI', function () {

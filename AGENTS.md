@@ -66,6 +66,22 @@ npm run dev                     # vite dev server
 npm run build                   # production build
 ```
 
+## Testing the Service Parser
+
+`tests/Feature/ServiceParserReferenceTest.php` is a golden test for both compose parsers (`serviceParser` with `updateCompose`, and `applicationParser`) and the proxy label and magic-variable helpers. It parses `tests/Fixtures/parser/service-reference.yaml` and `application-reference.yaml` (one service per parser feature, with setting variations and error fixtures) and every template in `templates/compose`, then compares the output with `tests/Fixtures/parser/expected/`. Only the reference expected files are committed. Template expected files are gitignored, so CI checks only that each template parses.
+
+```bash
+./scripts/parser-snapshot-diff save       # before a parser change: save the output of all cases (~90 s)
+./scripts/parser-snapshot-diff baseline   # after the change: one line per changed case, full diff in storage/framework/testing/parser-snapshot-diff.diff
+php artisan test --compact tests/Feature/ServiceParserReferenceTest.php    # before you commit
+UPDATE_PARSER_SNAPSHOTS=1 php artisan test --compact tests/Feature/ServiceParserReferenceTest.php   # accept an intended change, then review git diff tests/Fixtures/parser/
+```
+
+- A refactor must give "No differences". For an intended change, check every changed line in the diff file.
+- When you add a parser feature, add a small service that uses it to `service-reference.yaml` or `application-reference.yaml` and regenerate the expected files.
+- `./scripts/parser-snapshot-diff <git-ref>` compares with a commit instead of a saved baseline.
+- It covers only the latest compose parsing version. Older parsing versions are not covered.
+
 ## Browser Tests (Pest Browser Plugin)
 
 Uses `pestphp/pest-plugin-browser` (Playwright). Browser tests go in `tests/v4/Browser/`.

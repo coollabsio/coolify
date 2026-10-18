@@ -542,7 +542,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -958,7 +958,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1374,7 +1374,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -2369,15 +2369,6 @@ paths:
           application/json:
             schema:
               properties:
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name.'
                 github_app_uuid:
                   type: string
                   description: 'The Github App UUID.'
@@ -2390,9 +2381,6 @@ paths:
                 ports_exposes:
                   type: string
                   description: 'The ports to expose.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, railpack, static, dockerfile, dockercompose]
@@ -2572,7 +2560,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -4715,6 +4703,9 @@ paths:
                 limits_cpu_shares:
                   type: integer
                   description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Restart the database after the update. Requires the deploy ability.'
                 postgres_user:
                   type: string
                   description: 'PostgreSQL user'
@@ -12614,6 +12605,10 @@ paths:
                 docker_compose_raw:
                   type: string
                   description: 'The base64 encoded Docker Compose content.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'Connect the service to the predefined docker network.'
                 urls:
                   type: array
                   description: 'Array of URLs to be applied to containers of a service.'

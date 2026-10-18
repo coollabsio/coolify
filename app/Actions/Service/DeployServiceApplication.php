@@ -47,23 +47,29 @@ class DeployServiceApplication
             $commands->push("docker network inspect {$safeProjectName} >/dev/null 2>&1 || docker network create --attachable {$safeProjectName}");
         }
 
+        $connectToPredefinedNetwork = (bool) data_get($service, 'connect_to_docker_network');
         $upCommand = "docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} up -d --no-deps";
         if ($forceRebuild) {
             $upCommand .= ' --build';
+        }
+        if ($connectToPredefinedNetwork) {
+            $upCommand .= ' --no-start';
         }
         // No stdin for Compose prompts: they would read the next script lines (see StartService).
         $upCommand .= " {$safeComposeServiceName} < /dev/null";
         $commands->push('echo Starting service container.');
         $commands->push($upCommand);
 
-        $commands->push("docker network connect {$safeProjectName} coolify-proxy >/dev/null 2>&1 || true");
-
-        if (data_get($service, 'connect_to_docker_network')) {
-            $network = escapeshellarg($service->destination->network);
-            $containerName = escapeshellarg("{$composeServiceName}-{$service->uuid}");
-            $networkAlias = escapeshellarg("{$composeServiceName}-{$service->uuid}");
-            $commands->push("docker network connect --alias {$networkAlias} {$network} {$containerName} >/dev/null 2>&1 || true");
+        if ($connectToPredefinedNetwork) {
+            // Connect to the predefined network before the container starts (see StartService).
+            $serviceConfig = data_get(parseDockerComposeYaml($service->docker_compose ?? ''), "services.{$composeServiceName}");
+            if ($command = StartService::predefinedNetworkConnectCommand($service, $composeServiceName, $serviceConfig)) {
+                $commands->push($command);
+            }
+            $commands->push('docker start '.escapeshellarg("{$composeServiceName}-{$service->uuid}").' >/dev/null');
         }
+
+        $commands->push("docker network connect {$safeProjectName} coolify-proxy >/dev/null 2>&1 || true");
 
         return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
     }

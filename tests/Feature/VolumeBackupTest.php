@@ -40,6 +40,7 @@ use Illuminate\Routing\Redirector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
@@ -49,6 +50,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 uses(RefreshDatabase::class);
 
@@ -732,16 +734,21 @@ it('renders volume backup executions like database backup executions', function 
         'team_id' => $team->id,
         'frequency' => 'daily',
     ]);
+    $this->travelTo(Carbon::parse('2026-10-16 14:00:00', 'UTC'));
     ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         'status' => 'success',
         'filename' => '/data/coolify/backups/volumes/test/archive.tar.gz',
         'size' => 1024,
-        'finished_at' => now(),
+        'finished_at' => Carbon::parse('2026-10-16 14:30:05', 'UTC'),
     ]);
+    $this->travelTo(Carbon::parse('2026-10-16 18:00:00', 'UTC'));
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application, 'section' => 'executions'])
         ->assertSet('timezone', 'Europe/Budapest')
+        ->assertSee('2026-10-16 16:30:05 CEST')
+        ->assertSee('Started: 2026-10-16 16:00:00 CEST', false)
+        ->assertSee('3 hours ago')
         ->assertSeeInOrder([
             'Executions',
             'Status',
@@ -2001,8 +2008,10 @@ it('streams S3-only volume backups without creating or copying a local archive',
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
+        && ! str_contains($process->command, '--quiet')
         && str_contains($process->command, '>/dev/null && (compressor=')
-        && str_contains($process->command, '>/dev/null) && mc stat')
+        && str_contains($process->command, '>/dev/null 2>/tmp/mc-pipe.log || {')
+        && str_contains($process->command, '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
         && str_contains($process->command, 'temporary/bucket/')
         && str_contains($process->command, $expectedFilename)
         && substr_count($process->command, '--resolve') === 3
@@ -2349,8 +2358,67 @@ it('stops and restarts containers that use the volume when requested', function 
         && str_contains($process->command, 'state_file='));
     Process::assertRan(fn ($process) => str_contains($process->command, '{{println .Source}}{{println .Name}}')
         && str_contains($process->command, "grep -Fqx -- 'app-data'")
-        && str_contains($process->command, '{{.State.Paused}}')
+        && str_contains($process->command, '{{if not .State.Paused}}')
         && str_contains($process->command, 'continue'));
+});
+
+/**
+ * Runs the recorded container scan script in a local shell with a fake `docker` binary.
+ *
+ * @return array{exit_code: int, output: string}
+ */
+function runVolumeContainerScan(string $fakeDocker): array
+{
+    $scan = '';
+    Process::assertRan(function ($process) use (&$scan): bool {
+        if (! str_contains($process->command, 'docker ps -q')) {
+            return false;
+        }
+        $scan = $process->command;
+
+        return true;
+    });
+    $script = implode("\n", array_slice(explode("\n", $scan), 1, -1));
+
+    $bin = sys_get_temp_dir().'/volume-scan-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/docker", "#!/bin/sh\n{$fakeDocker}");
+    chmod("{$bin}/docker", 0755);
+
+    $result = new SymfonyProcess(['sh', '-c', $script], env: ['PATH' => $bin.':'.getenv('PATH')]);
+    $result->run();
+    File::deleteDirectory($bin);
+
+    return ['exit_code' => $result->getExitCode(), 'output' => trim($result->getOutput())];
+}
+
+it('skips containers that are removed while scanning for volume users', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'stop_during_backup' => true,
+    ]);
+
+    Process::fake(['*du -b*' => '128', '*' => '']);
+    (new VolumeBackupJob($backup))->handle();
+
+    $docker = <<<'SH'
+case "$*" in
+  "ps -q") printf 'aaa111\nbbb222\nccc333\n' ;;
+  "ps -aq --filter id=aaa111") ;;
+  "ps -aq --filter id=ccc333") echo ccc333 ;;
+  *aaa111*) echo 'error: no such object: aaa111' >&2; exit 1 ;;
+  *bbb222*) printf '/var/lib/docker/volumes/app-data/_data\napp-data\n' ;;
+  *ccc333*) [ "$CCC_BROKEN" = 1 ] && { echo 'daemon error' >&2; exit 1; }; printf 'other\n' ;;
+esac
+SH;
+
+    expect(runVolumeContainerScan($docker))->toBe(['exit_code' => 0, 'output' => 'bbb222'])
+        ->and(runVolumeContainerScan("CCC_BROKEN=1\n".$docker)['exit_code'])->not->toBe(0);
 });
 
 it('finds containers using a bind mounted host path before stopping', function () {
@@ -2899,6 +2967,25 @@ it('records a missed volume backup that is too old to run late as a failed execu
     Notification::assertSentToTimes($team, BackupFailed::class, 1);
     Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
 });
+
+it('fails the volume archive only on fatal tar errors', function (int $tarExitCode, int $expectedExitCode) {
+    $bin = sys_get_temp_dir().'/volume-backup-tar-'.uniqid();
+    mkdir($bin);
+    file_put_contents($bin.'/tar', "#!/bin/sh\nexit {$tarExitCode}\n");
+    chmod($bin.'/tar', 0755);
+
+    $result = Process::env(['PATH' => $bin.':/usr/bin:/bin'])
+        ->run(['sh', '-c', VolumeBackupJob::archiveScript(50)]);
+
+    unlink($bin.'/tar');
+    rmdir($bin);
+
+    expect($result->exitCode())->toBe($expectedExitCode);
+})->with([
+    'success' => [0, 0],
+    'file changed as we read it' => [1, 0],
+    'fatal error' => [2, 2],
+]);
 
 it('shows the backup actions in the header bar on every application backup page', function () {
     config(['cache.default' => 'array', 'app.maintenance.driver' => 'file']);

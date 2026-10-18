@@ -222,3 +222,13 @@ it('guides issue authors to the correct contribution branch', function () {
         ->toContain('Feature code should branch from `next` and target `next`')
         ->toContain('Small fixes should target `main`; larger changes should target `next`');
 });
+
+it('ships versions.json in the production image so version checks work right after an upgrade', function () {
+    $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
+    $dockerignore = file_get_contents(dirname(__DIR__, 2).'/.dockerignore');
+
+    expect($dockerfile)
+        ->toContain('COPY --chown=www-data:www-data versions.json ./versions.json')
+        ->and($dockerignore)
+        ->not->toMatch('/^\/?versions\.json$/m');
+});

@@ -260,6 +260,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $source = data_get($this->application, 'source');
         if ($source) {
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
+            // Share one source instance so the job reuses its in-memory GitHub installation token.
+            $this->application->setRelation('source', $this->source);
         }
         $this->server = Server::find($this->application_deployment_queue->server_id);
         $this->timeout = $this->server->settings->dynamic_timeout;
@@ -975,24 +977,61 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $composeFile;
     }
 
+    /**
+     * Pulls the registry images of the Compose services before the current deployment stops. Images that
+     * this deployment builds are not pulled: a pull fails for an image that is only local, and a pull of
+     * an image that is also in a registry replaces the new build with the old registry image.
+     */
     private function pull_docker_compose_images(): void
     {
+        if ($this->docker_compose_custom_build_command && ! $this->use_build_server) {
+            $this->application_deployment_queue->addLogEntry('Skipping the image pull before stopping the current deployment, because the custom build command can build images outside of Docker Compose.');
+
+            return;
+        }
+
+        $services = $this->registry_image_compose_services();
+        if ($services->isEmpty()) {
+            return;
+        }
+
         $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
 
+        $services = $services->map(fn (string $service) => escapeshellarg($service))->implode(' ');
         if ($this->use_build_server) {
             $this->write_deployment_configurations();
             $this->server = $this->mainServer;
             $workdir = $this->application->workdir();
-            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
+            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
         } else {
             $workdir = $this->workdir;
-            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}");
         }
 
         $this->execute_remote_command([
             $command,
             'hidden' => true,
         ]);
+    }
+
+    /**
+     * Returns the names of the Compose services that get their image from a registry. A service with a
+     * `build` section, or a service that uses the image of such a service, gets its image from the build.
+     *
+     * @return Collection<int, string>
+     */
+    private function registry_image_compose_services(): Collection
+    {
+        $services = collect(data_get(Yaml::parse($this->generated_docker_compose), 'services', []));
+        $builtImages = $services->filter(fn ($service) => filled(data_get($service, 'build')))->pluck('image')->filter();
+
+        return $services
+            ->filter(fn ($service) => filled(data_get($service, 'image'))
+                && blank(data_get($service, 'build'))
+                && ! $builtImages->contains(data_get($service, 'image')))
+            ->keys()
+            ->map(fn ($service) => (string) $service)
+            ->values();
     }
 
     /**
@@ -1711,7 +1750,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $ports = $this->application->main_port();
         $coolify_envs = $this->generate_coolify_env_variables();
         $coolify_envs->each(function ($item, $key) use ($envs) {
-            $envs->push($key.'='.$item);
+            $envs->push($key.'='.escapeComposeEnvFileValue($item));
         });
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
@@ -3189,13 +3228,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function clone_repository()
     {
-        $importCommands = $this->generate_git_import_commands();
         $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
         $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->commit}) to {$this->basedir}.");
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        $this->execute_remote_command(...$this->gitCommandDefinitions($importCommands));
+        $this->import_repository();
         $this->create_workdir();
         $this->execute_remote_command(
             [
@@ -3210,6 +3248,37 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
             );
+        }
+    }
+
+    /**
+     * SSH exits with 255 when the connection drops, which can happen during a long clone. Git exits with
+     * 128 for its own errors, so only 255 is retried. The interrupted clone can still run in the helper
+     * container, so stop it and remove the partial checkout before cloning again.
+     */
+    private function import_repository(): void
+    {
+        $maxAttempts = config('constants.ssh.max_retries');
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $this->execute_remote_command(...$this->gitCommandDefinitions($this->generate_git_import_commands()));
+
+                return;
+            } catch (DeploymentException $e) {
+                if ($e->getCode() !== 255 || $attempt >= $maxAttempts) {
+                    throw $e;
+                }
+
+                $delay = $this->calculateRetryDelay($attempt - 1);
+                $this->application_deployment_queue->addLogEntry('Lost the SSH connection while importing the repository. Retrying in '.$delay.'s (attempt '.($attempt + 1)."/{$maxAttempts}).", 'stderr');
+                Sleep::for($delay)->seconds();
+                $this->execute_remote_command([
+                    executeInDocker($this->deployment_uuid, 'pkill git; rm -rf '.escapeshellarg($this->basedir)),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ]);
+            }
         }
     }
 
@@ -3910,7 +3979,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables_preview);
+            // Runtime only, so a project or server change does not break the Docker build cache
+            if (! $forBuildTime) {
+                $coolify_envs = $coolify_envs->merge(coolifyDefaultEnvironmentVariables($this->application, $this->application->environment_variables_preview->pluck('key'), $this->mainServer));
+            }
 
         } else {
             // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
@@ -3954,7 +4026,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables);
+            // Runtime only, so a project or server change does not break the Docker build cache
+            if (! $forBuildTime) {
+                $coolify_envs = $coolify_envs->merge(coolifyDefaultEnvironmentVariables($this->application, $this->application->environment_variables->pluck('key'), $this->mainServer));
+            }
 
         }
 

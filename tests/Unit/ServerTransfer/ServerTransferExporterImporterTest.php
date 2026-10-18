@@ -1245,9 +1245,11 @@ test('export refuses credentials of another team', function () {
         ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });
 
-test('transfer keeps maintenance mode, the server error page and swarm cluster, and environment variable flags', function () {
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, and the Coolify default variables switch', function () {
     $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
-    $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>'])->saveQuietly();
+    $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
+    $this->application->settings->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
+    $this->database->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
     $this->server->forceFill(['proxy_error_page' => '<h1>Proxy error</h1>', 'swarm_cluster' => 7])->saveQuietly();
     EnvironmentVariable::withoutEvents(function () {
         $env = new EnvironmentVariable;
@@ -1264,6 +1266,8 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
     });
     $appUuid = $this->application->uuid;
     $serviceUuid = $this->service->uuid;
+    $databaseClass = $this->database::class;
+    $databaseUuid = $this->database->uuid;
 
     $bundle = $this->exporter->export($this->server->fresh());
 
@@ -1286,7 +1290,10 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ->and((int) $server->swarm_cluster)->toBe(7)
         ->and($variable->preserve_compose_null)->toBeTrue()
         ->and($variable->value)->toBeNull()
-        ->and($variable->version)->toBe('4.0.0-beta.400');
+        ->and($variable->version)->toBe('4.0.0-beta.400')
+        ->and($application->settings->include_coolify_default_variables)->toBeFalse()
+        ->and($service->include_coolify_default_variables)->toBeFalse()
+        ->and($databaseClass::where('uuid', $databaseUuid)->sole()->include_coolify_default_variables)->toBeFalse();
 });
 
 test('transfer keeps preview, backup, GitHub App runner fields and canvas positions when uuids change', function () {

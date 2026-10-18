@@ -957,6 +957,11 @@ class ServerTransferExporter
             }
         }
 
+        // Not fillable
+        if (in_array('include_coolify_default_variables', $columns, true)) {
+            $attrs['include_coolify_default_variables'] = $database->include_coolify_default_variables;
+        }
+
         $destinationKey = $database->destination_type.':'.$database->destination_id;
 
         return [
@@ -1014,8 +1019,8 @@ class ServerTransferExporter
             $attrs[$field] = $service->{$field};
         }
 
-        // Hidden compose fields and maintenance mode (not fillable)
-        foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page'] as $hidden) {
+        // Hidden compose fields, maintenance mode and the Coolify default variables switch (not fillable)
+        foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $service->{$hidden};
             }

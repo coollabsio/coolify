@@ -14,13 +14,9 @@ class ApiIpAllowed
             return $next($request);
         }
 
-        $allowedIps = instanceSettings()->allowed_ips;
-        if (! $allowedIps) {
-            return $next($request);
-        }
-
-        // Check for special case: 0.0.0.0 means allow all
-        if (trim($allowedIps) === '0.0.0.0') {
+        $allowedIps = trim((string) instanceSettings()->allowed_ips);
+        // Empty or 0.0.0.0 means allow all
+        if ($allowedIps === '' || $allowedIps === '0.0.0.0') {
             return $next($request);
         }
 

@@ -93,7 +93,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | Limits | memory, swap, swappiness, reservation, CPUs, cpuset, CPU shares |
 | ➕ | Advanced | custom labels, custom docker run options, pre/post deployment command + container, manual webhook secrets |
 | ✅ | Maintenance | maintenance mode on + custom maintenance page |
-| ➕ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Traefik certificate resolver |
+| ➕ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, Traefik certificate resolver |
 | ➕ | Environment variables | normal, multiline, literal, shown once, build time only, runtime only, required, with comment, preview-only, and references to `{{team.*}}`, `{{project.*}}`, `{{environment.*}}`, `{{server.*}}` |
 | ✅/➕ | Persistent volume | the seed has one; add a host-path bind mount and preview suffix on |
 | ➕ | File mount + directory mount | content, chown, chmod |
@@ -116,7 +116,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | KeyDB, Dragonfly, ClickHouse | defaults are enough, plus the common settings below |
 | ➕ | SQLite | database files list, volume link |
 
-Common settings on at least one database: custom image, public port + public on + public port timeout, limits, custom docker run options, health check values, log drain, include timestamps, redact env values, environment variables, persistent volume + volume backup, tags, secret manager link (if the type supports it).
+Common settings on at least one database: custom image, public port + public on + public port timeout, limits, custom docker run options, health check values, log drain, include timestamps, redact env values, Coolify default variables off, environment variables, persistent volume + volume backup, tags, secret manager link (if the type supports it).
 
 Database backups (✅ one exists): add S3 on, dump all, databases list, local and S3 retention (amount, days, max storage), timeout, disable local backup, missing-backup days.
 
@@ -128,7 +128,7 @@ Database backups (✅ one exists): add S3 on, dump all, databases list, local an
 | ➕ | Custom compose service with an app and a database part | |
 | ➕ | Service app settings | domain, gzip off, strip prefix off, force HTTPS, exclude from status, redirect, port overrides, log drain, custom image, Traefik resolver |
 | ➕ | Service database settings | public port + public on, custom type |
-| ➕ | Service level | connect to network, label escape off, redact env values, maintenance mode + page, environment variables, scheduled task, tags, volume backup on a service volume |
+| ➕ | Service level | connect to network, label escape off, redact env values, Coolify default variables off, maintenance mode + page, environment variables, scheduled task, tags, volume backup on a service volume |
 
 ## 9. After the transfer, check
 

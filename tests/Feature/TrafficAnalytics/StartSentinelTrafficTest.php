@@ -180,6 +180,12 @@ it('starts sentinel with a restart policy so Docker restarts it after a crash or
     expect($script)->toContain('--name coolify-sentinel --restart unless-stopped ');
 });
 
+it('starts sentinel in the host user namespace so --pid host works on a userns-remap daemon', function () {
+    $script = runStartSentinelAndCaptureScript(sentinelTrafficServer($this, 'TRAEFIK', analyticsEnabled: false));
+
+    expect($script)->toContain('--userns host --pid host ');
+});
+
 it('does not touch the access log when traffic analytics cannot run', function (?string $proxyType, bool $analyticsEnabled) {
     $server = sentinelTrafficServer($this, $proxyType, $analyticsEnabled);
 

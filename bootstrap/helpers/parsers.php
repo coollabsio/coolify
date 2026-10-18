@@ -2031,7 +2031,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
@@ -2547,6 +2549,10 @@ function serviceParser(Service $resource): Collection
                 $port = $parsed['port'];
                 $fqdnFor = $parsed['service_name'];
 
+                if (isCopiedServiceUrlDeclaration($resource, $services, $savedService, $key->value())) {
+                    continue;
+                }
+
                 // Only ServiceApplication has fqdn column, ServiceDatabase does not
                 $isServiceApplication = $savedService instanceof ServiceApplication;
 
@@ -2667,8 +2673,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_FQDN_UMAMI_3000)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $fqdnFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -2712,8 +2718,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_URL_DASHBOARD_6791)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $urlFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -3333,7 +3339,9 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');

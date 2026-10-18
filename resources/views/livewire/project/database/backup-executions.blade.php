@@ -45,6 +45,9 @@
                             <span>Availability</span>
                             <span class="text-right">Actions</span>
                         </div>
+                        @php
+                            $server = $this->server();
+                        @endphp
                         @foreach ($executions as $execution)
                             @php
                                 $executionStatus = data_get($execution, 'status');
@@ -92,12 +95,15 @@
                                     <div class="min-w-0">
                                         <x-forms.copy-input :text="data_get($execution, 'filename') ?? 'No archive name'" />
                                     </div>
-                                    <div class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <div class="text-[11px] text-neutral-500 dark:text-fg-faint"
+                                        title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $server) }}@if ($executionStatus !== 'running')&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}@endif">
                                         @if ($executionStatus === 'running')
                                             Running for {{ calculateDuration(data_get($execution, 'created_at'), now()) }}
                                         @else
-                                            {{ $finishedAt->diffForHumans() }}<br>
-                                            {{ calculateDuration(data_get($execution, 'created_at'), $finishedAt) }}
+                                            <div class="text-black dark:text-fg">
+                                                {{ formatDateInServerTimezone($finishedAt, $server) }}
+                                            </div>
+                                            <div>{{ $finishedAt->diffForHumans() }} · {{ calculateDuration(data_get($execution, 'created_at'), $finishedAt) }}</div>
                                         @endif
                                     </div>
                                     <div class="tabular-nums text-neutral-500 dark:text-fg-dim">

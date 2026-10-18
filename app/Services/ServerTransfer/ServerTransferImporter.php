@@ -1384,8 +1384,8 @@ class ServerTransferImporter
         $attributes['destination_type'] = $destination->getMorphClass();
 
         $service = new Service($attributes);
-        // Maintenance mode is not fillable.
-        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page'])->all());
+        // Maintenance mode and the Coolify default variables switch are not fillable.
+        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'])->all());
         $service->save();
 
         $this->importEnvVars(data_get($payload, 'environment_variables', []), $service, false);

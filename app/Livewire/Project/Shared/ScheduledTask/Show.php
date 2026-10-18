@@ -147,6 +147,9 @@ class Show extends Component
             auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());
             $this->dispatch('success', 'Scheduled task deleted.');
             $this->dispatch('scheduledTaskDeleted')->to(All::class);
+
+            // Without true, the confirmation modal refreshes this deleted task.
+            return true;
         } catch (\Exception $e) {
             return handleError($e);
         }

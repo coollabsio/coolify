@@ -1,10 +1,16 @@
 <?php
 
+use App\Jobs\CheckForUpdatesJob;
+use App\Jobs\CheckHelperImageJob;
+use App\Jobs\PullChangelog;
+use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -49,6 +55,22 @@ it('schedules every production job with onOneServer', function () {
             "Scheduled job [{$event->description}] is missing ->onOneServer()"
         );
     });
+});
+
+it('dispatches CDN fetching jobs with a random delay so instances do not hit the CDN at the same second', function () {
+    InstanceSettings::query()->whereKey(0)->update(['is_auto_update_enabled' => true]);
+    Queue::fake();
+
+    $jobs = [CheckHelperImageJob::class, CheckForUpdatesJob::class, PullTemplatesFromCDN::class, PullChangelog::class, UpdateCoolifyJob::class];
+    $schedule = app(Schedule::class);
+
+    foreach ($jobs as $job) {
+        $event = collect($schedule->events())->first(fn ($e) => $e->description === $job);
+        expect($event)->not->toBeNull("[{$job}] is not scheduled");
+        $event->run(app());
+
+        Queue::assertPushed($job, fn ($pushed) => is_int($pushed->delay) && $pushed->delay >= 0 && $pushed->delay <= 600);
+    }
 });
 
 it('does not schedule Stripe subscription reconciliation automatically', function () {

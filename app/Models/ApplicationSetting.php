@@ -36,6 +36,7 @@ use OpenApi\Attributes as OA;
         'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true],
         'is_container_label_escape_enabled' => ['type' => 'boolean'],
         'is_env_sorting_enabled' => ['type' => 'boolean'],
+        'include_coolify_default_variables' => ['type' => 'boolean'],
         'is_container_label_readonly_enabled' => ['type' => 'boolean'],
         'is_preserve_repository_enabled' => ['type' => 'boolean'],
         'disable_build_cache' => ['type' => 'boolean'],
@@ -88,6 +89,7 @@ class ApplicationSetting extends Model
         'is_stripprefix_enabled' => 'boolean',
         'connect_to_docker_network' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
+        'include_coolify_default_variables' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'disable_build_cache' => 'boolean',
     ];
@@ -120,6 +122,7 @@ class ApplicationSetting extends Model
         'custom_container_name_prefix',
         'is_container_label_escape_enabled',
         'is_env_sorting_enabled',
+        'include_coolify_default_variables',
         'is_container_label_readonly_enabled',
         'is_preserve_repository_enabled',
         'disable_build_cache',

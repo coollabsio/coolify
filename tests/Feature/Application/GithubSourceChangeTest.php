@@ -62,6 +62,30 @@ describe('GitHub Source Change Component', function () {
         expect($missingAuthorization)->toBeEmpty();
     });
 
+    test('deletes an incomplete github app and redirects without a render error', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'organization' => 'coollabsio',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSee('Incomplete GitHub App')
+            ->call('delete')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('source.all'))
+            ->assertSet('github_app', null)
+            ->call('$refresh');
+
+        expect(GithubApp::find($githubApp->id))->toBeNull();
+    });
+
     test('can mount with newly created github app with null app_id', function () {
         // Create a GitHub app without app_id (simulating a newly created source)
         $githubApp = GithubApp::create([
