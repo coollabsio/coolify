@@ -202,7 +202,7 @@ Route::group([
     Route::get('/servers/{uuid}/proxy', [ServerProxyController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/proxy', [ServerProxyController::class, 'update'])->middleware(['api.ability:write']);
     Route::put('/servers/{uuid}/proxy/configuration', [ServerProxyController::class, 'saveConfiguration'])->middleware(['api.ability:write']);
-    Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:deploy']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::post('/servers/import', [ServerTransferController::class, 'import'])->middleware(['api.ability:write']);
