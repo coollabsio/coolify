@@ -2671,8 +2671,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_FQDN_UMAMI_3000)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $fqdnFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -2716,8 +2716,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_URL_DASHBOARD_6791)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $urlFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');

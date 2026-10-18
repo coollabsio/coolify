@@ -154,3 +154,25 @@ it('fixes SERVICE_URL_TWENTY for installs where worker already has a generated d
     expect($this->service->environment_variables()->where('key', 'SERVICE_URL_TWENTY')->value('value'))->toBe('https://crm.example.com')
         ->and($this->service->applications()->where('name', 'worker')->value('fqdn'))->toBe('http://twenty-stale.10.0.1.1.sslip.io');
 });
+
+it('treats SERVICE_FQDN_ with the same name, port and value as a copy of SERVICE_URL_', function () {
+    $this->service->update(['docker_compose_raw' => <<<'YAML'
+services:
+  twenty:
+    image: twentycrm/twenty:v1.15
+    environment:
+      - SERVICE_URL_TWENTY_3000
+  worker:
+    image: twentycrm/twenty:v1.15
+    environment:
+      - SERVICE_FQDN_TWENTY_3000
+YAML]);
+
+    $this->service->parse();
+    $this->service->applications()->where('name', 'twenty')->first()->update(['fqdn' => 'https://crm.example.com']);
+    $this->service->fresh()->parse();
+
+    expect($this->service->environment_variables()->where('key', 'SERVICE_URL_TWENTY')->value('value'))->toBe('https://crm.example.com')
+        ->and($this->service->environment_variables()->where('key', 'SERVICE_FQDN_TWENTY_3000')->value('value'))->toBe('crm.example.com:3000')
+        ->and($this->service->applications()->where('name', 'worker')->value('fqdn'))->toBeNull();
+});
