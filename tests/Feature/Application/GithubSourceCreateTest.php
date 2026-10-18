@@ -40,7 +40,9 @@ describe('GitHub Source Create Component', function () {
         expect($githubApp->team_id)->toBe($this->team->id);
     });
 
-    test('creates github app with system wide enabled', function () {
+    test('instance admin creates github app with system wide enabled', function () {
+        Team::factory()->create(['id' => 0])->members()->attach($this->user->id, ['role' => 'owner']);
+
         Livewire::test(Create::class)
             ->assertSuccessful()
             ->set('name', 'system-wide-app')
@@ -119,6 +121,10 @@ describe('GitHub Source Create Component', function () {
 
         $githubApp = GithubApp::where('name', 'redirect-test')->first();
 
-        $component->assertRedirect(route('source.github.show', ['github_app_uuid' => $githubApp->uuid]));
+        $component->assertRedirect(route('source.github.show', [
+            'github_app_uuid' => $githubApp->uuid,
+            'previews' => 1,
+            'runners' => 0,
+        ]));
     });
 });

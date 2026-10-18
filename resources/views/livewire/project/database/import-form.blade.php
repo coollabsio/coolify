@@ -36,7 +36,9 @@
                 });
                 this.on('complete', function (file) {
                     $wire.filename = file.name;
-                    $wire.selectSqliteDatabaseFor(file.name);
+                    if (file.status === Dropzone.SUCCESS) {
+                        $wire.selectUploadedFile(file.name);
+                    }
                     $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
                     $wire.isUploading = false;
                 });

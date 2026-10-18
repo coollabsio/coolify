@@ -27,6 +27,11 @@ class ShowHardcoded extends Component
     #[Locked]
     public bool $isPreview = false;
 
+    public string $composeType = 'literal';
+
+    /** @var list<string> */
+    public array $references = [];
+
     #[Locked]
     public ?string $resourceableType = null;
 
@@ -40,6 +45,8 @@ class ShowHardcoded extends Component
         $this->isValueHidden = $this->env['is_value_hidden'] ?? true;
         $this->comment = $this->env['comment'] ?? null;
         $this->serviceName = $this->env['service_name'] ?? null;
+        $this->composeType = $this->env['compose_type'] ?? 'literal';
+        $this->references = $this->env['references'] ?? [];
     }
 
     public function copyValue(): ?string

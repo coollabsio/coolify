@@ -7,10 +7,15 @@
     ])>
     <div>
         <div class="flex items-center gap-2">
-            <div
-                class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-[11px] font-semibold text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
-                {{ Str::upper(Str::substr($member->name ?: $member->email, 0, 1)) }}
-            </div>
+            @if ($member->avatar_path)
+                <img src="{{ profile_avatar_url($member) }}" alt="{{ $member->name }}"
+                    class="size-7 shrink-0 rounded-lg object-cover">
+            @else
+                <div
+                    class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-[11px] font-semibold text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                    {{ Str::upper(Str::substr($member->name ?: $member->email, 0, 1)) }}
+                </div>
+            @endif
             <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $member->name }}</span>
             @if ($member->id === Auth::id())
                 <span

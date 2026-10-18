@@ -32,6 +32,12 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private string $checkFrequency = '* * * * *';
 
     /**
+     * Provider state seldom changes, and each check is one API call per server.
+     * Hetzner allows 3600 requests per hour for each token.
+     */
+    private const CLOUD_PROVIDER_STATUS_CHECK_CRON = '*/5 * * * *';
+
+    /**
      * Create a new job instance.
      */
     public function __construct()
@@ -86,14 +92,15 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function dispatchCloudProviderStatusChecks(Collection $servers): void
     {
-        if (! shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
+        if (! shouldRunCronNow(self::CLOUD_PROVIDER_STATUS_CHECK_CRON, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
             return;
         }
 
         $servers->each(function (Server $server) {
             $hasCloudResource = $server->hetzner_server_id
                 || $server->vultr_instance_id
-                || $server->digitalocean_droplet_id;
+                || $server->digitalocean_droplet_id
+                || $server->hostinger_virtual_machine_id;
 
             if ($hasCloudResource && $server->cloudProviderToken) {
                 ServerCloudProviderStatusCheckJob::dispatch($server);
@@ -161,7 +168,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $waitTime = $server->waitBeforeDoingSshCheck();
         $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->copy()->subSeconds($waitTime));
 
-        if ($sentinelOutOfSync) {
+        // Build servers and Swarm workers have no containers to sync, and ServerConnectionCheckJob
+        // already checks their connection.
+        $hasContainersToSync = ! $server->isBuildServer() && ! $server->isSwarmWorker();
+
+        if ($sentinelOutOfSync && $hasContainersToSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
             if (shouldRunCronNow($this->checkFrequency, $serverTimezone, "server-check:{$server->id}", $this->executionTime)) {
                 if (! $this->shouldSkipDueToBackoff($server)) {
@@ -171,9 +182,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Sentinel versions that report their version on push are updated by SentinelController.
+        // Unreachable servers are skipped: the SSH check would only fail. The connection check recovers them.
         if ($server->isSentinelEnabled()
             && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
-            && shouldRunCronNow('0 * * * *', $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
+            && shouldRunCronNow(self::sentinelVersionCheckCron($server), $serverTimezone, "sentinel-version-check-v2:{$server->id}", $this->executionTime)
+            && $server->isFunctional()
         ) {
             CheckAndStartSentinelJob::dispatch($server);
         }
@@ -192,14 +205,39 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Dispatch ServerPatchCheckJob if due (weekly)
-        $shouldRunPatchCheck = shouldRunCronNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
+        // Dispatch ServerPatchCheckJob if due (weekly, staggered per server on Sunday).
+        // The "-v2" keys start fresh: v4.3.23 stored its old run times under the unversioned keys, which
+        // would make every server run these checks at once on the first run after the upgrade.
+        $shouldRunPatchCheck = shouldRunCronNow(self::patchCheckCron($server), $serverTimezone, "server-patch-check-v2:{$server->id}", $this->executionTime);
 
-        if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
+        if ($shouldRunPatchCheck) {
             ServerPatchCheckJob::dispatch($server);
         }
 
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
+    }
+
+    /**
+     * Hourly Sentinel version check at a stable per-server minute, so servers do not all SSH at minute 0.
+     *
+     * ServerManagerJob evaluates this every minute and shouldRunCronNow() catches up a missed minute
+     * on the next run, so every minute of the hour is a safe slot.
+     */
+    public static function sentinelVersionCheckCron(Server $server): string
+    {
+        return sprintf('%d * * * *', $server->id % 60);
+    }
+
+    /**
+     * Weekly patch check at a stable per-server time on Sunday between 04:00 and 23:59.
+     *
+     * The early hours are skipped because most daylight saving transitions happen there.
+     */
+    public static function patchCheckCron(Server $server): string
+    {
+        $slot = $server->id % (20 * 60);
+
+        return sprintf('%d %d * * 0', $slot % 60, 4 + intdiv($slot, 60));
     }
 
     /**

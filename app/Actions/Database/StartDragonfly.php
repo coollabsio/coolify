@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -87,6 +88,7 @@ class StartDragonfly
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $startCommand = $this->buildStartCommand();
@@ -250,19 +252,20 @@ class StartDragonfly
     {
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->dragonfly_password;
+        $passwordVariable = $this->database->serverPasswordEnvironmentVariable();
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
-            // Credentials below are placed directly in the compose file (healthcheck, command).
-            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
-            if ($env->key === 'REDIS_PASSWORD') {
-                $this->resolvedRedisPassword = $composeFileValue;
+            // A REDIS_PASSWORD variable overrides the stored password, which stays unchanged.
+            if ($passwordVariable?->is($env) && $rawValue !== '') {
+                // Credentials below are placed directly in the compose file (healthcheck, command).
+                $this->resolvedRedisPassword = $this->database->formatComposeFileValue($env, $rawValue);
                 $this->redisPasswordFromSecretManager = $this->database->environmentVariableUsesSecretManager($env);
             }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'REDIS_PASSWORD')) {
             $environment_variables->push("REDIS_PASSWORD={$this->database->dragonfly_password}");
         }
 
@@ -272,14 +275,14 @@ class StartDragonfly
     /**
      * The password argument of the start command. Docker Compose splits the command like a shell, so the
      * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
-     * quoting would change the password the server receives (backslashes and quotes), so their server
-     * password stays the same.
+     * quoting would change it (quotes, backslashes, whitespace, ; & | < >): Compose splits or cuts the old
+     * command there, so quoting now would change the password or options and can lose data.
      */
     private function requirePassArgument(): string
     {
         $keepsUnquotedPassword = $this->database->legacy_password_quoting
             && ! $this->redisPasswordFromSecretManager
-            && strpbrk($this->resolvedRedisPassword, '\\\'"') !== false;
+            && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
 
         return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }

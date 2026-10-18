@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Github extends Controller
@@ -95,10 +96,6 @@ class Github extends Controller
                 default => $base_branch,
             };
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'github', $full_name, $matched_branch);
-            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
-                return $this->tooManyManualWebhookFailuresResponse($failure_key);
-            }
-
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
             $applications = Application::query();
@@ -265,6 +262,14 @@ class Github extends Controller
     }
 
     /**
+     * Cuts a webhook string to the varchar(255) column of the runner tables.
+     */
+    private function limitRunnerColumn(mixed $value): ?string
+    {
+        return is_scalar($value) ? mb_substr((string) $value, 0, 255) : null;
+    }
+
+    /**
      * Handles GitHub Actions runner demand. Every lookup is scoped to the App whose signature was verified.
      * GitHub can give a job to any idle runner with matching labels, so progress is matched by runner name.
      */
@@ -276,13 +281,20 @@ class Github extends Controller
         if ($jobId <= 0) {
             return response('Nothing to do. No workflow job found.');
         }
+        // A public App can be installed by other accounts; only its own installation may use the runners.
+        $installationId = data_get($payload, 'installation.id');
+        if (blank($githubApp->installation_id) || ! is_numeric($installationId) || (int) $installationId !== (int) $githubApp->installation_id) {
+            return response('Nothing to do. The job belongs to another installation of the GitHub App.');
+        }
 
+        // The columns are varchar(255). A cut URL would be a broken link, so a longer one is not stored.
+        $htmlUrl = data_get($payload, 'workflow_job.html_url');
         $jobDetails = array_filter([
             'workflow_job_id' => $jobId,
-            'workflow_job_html_url' => data_get($payload, 'workflow_job.html_url'),
-            'workflow_name' => data_get($payload, 'workflow_job.workflow_name'),
-            'job_name' => data_get($payload, 'workflow_job.name'),
-            'repository_full_name' => data_get($payload, 'repository.full_name'),
+            'workflow_job_html_url' => is_string($htmlUrl) && mb_strlen($htmlUrl) <= 255 ? $htmlUrl : null,
+            'workflow_name' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.workflow_name')),
+            'job_name' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.name')),
+            'repository_full_name' => $this->limitRunnerColumn(data_get($payload, 'repository.full_name')),
         ], fn ($value) => filled($value));
 
         if ($action === 'queued') {
@@ -294,13 +306,15 @@ class Github extends Controller
             if ($matchingConfigs->isEmpty()) {
                 return response('Nothing to do. No runner configuration matches the job labels.');
             }
-            if (! $matchingConfigs->contains('allow_pull_requests', true) && $this->isPullRequestWorkflowJob($githubApp, $payload)) {
+            $isPullRequest = $matchingConfigs->contains(fn (GithubRunnerConfig $config) => ! $config->allow_pull_requests)
+                && $this->isPullRequestWorkflowJob($githubApp, $payload);
+            if ($isPullRequest && ! $matchingConfigs->contains('allow_pull_requests', true)) {
                 return response('Nothing to do. The runner configuration does not allow pull request jobs.');
             }
 
             $execution = GithubRunnerExecution::createOrFirst(
                 ['github_app_id' => $githubApp->id, 'trigger_workflow_job_id' => $jobId],
-                [...$jobDetails, 'labels' => $labels, 'status' => GithubRunnerStatus::Queued, 'queued_at' => now()],
+                [...$jobDetails, 'labels' => $labels, 'is_pull_request' => $isPullRequest, 'status' => GithubRunnerStatus::Queued, 'queued_at' => now()],
             );
             if ($execution->wasRecentlyCreated) {
                 ProvisionGithubRunnerJob::dispatch($execution->id);
@@ -313,15 +327,20 @@ class Github extends Controller
             ? GithubRunnerExecution::query()->where('github_app_id', $githubApp->id)->where('runner_name', $runnerName)->first()
             : null;
 
-        if ($action === 'in_progress' && $execution && in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
-            $execution->update([...$jobDetails, 'status' => GithubRunnerStatus::Running, 'started_at' => now()]);
-
-            return response('Runner marked running.');
+        // The completed hook can arrive before the in_progress hook.
+        if (in_array($action, ['in_progress', 'completed'], true) && $execution && in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
+            $replacement = $execution->assignJob($jobId, $jobDetails);
+            if ($replacement) {
+                ProvisionGithubRunnerJob::dispatch($replacement->id);
+            }
+            if ($action === 'in_progress') {
+                return response('Runner marked running.');
+            }
         }
 
         if ($action === 'completed') {
             if ($execution) {
-                $execution->update([...$jobDetails, 'conclusion' => data_get($payload, 'workflow_job.conclusion')]);
+                $execution->update([...$jobDetails, 'conclusion' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.conclusion'))]);
                 if ($execution->isActive() || $execution->status === GithubRunnerStatus::Failed) {
                     $execution->finish(GithubRunnerStatus::Completed);
                     CleanupGithubRunnerJob::dispatch($execution->id);
@@ -729,11 +748,21 @@ class Github extends Controller
             action: 'install',
         );
 
-        abort_unless(
-            $this->githubInstallationBelongsToApp($github_app, $installation_id),
-            403,
-            'GitHub App installation could not be verified.'
-        );
+        $verification_error = $this->githubInstallationVerificationError($github_app, $installation_id);
+        if ($verification_error) {
+            Log::warning('GitHub App installation could not be verified.', [
+                'github_app_id' => $github_app->id,
+                'installation_id' => $installation_id,
+                'reason' => $verification_error,
+            ]);
+
+            $message = "GitHub App installation could not be verified: {$verification_error}";
+            abort_if($request->expectsJson(), 403, $message);
+
+            return redirect()
+                ->route('source.github.show', ['github_app_uuid' => $github_app->uuid])
+                ->with('error', $message);
+        }
 
         $github_app->installation_id = $installation_id;
         $github_app->save();
@@ -760,11 +789,13 @@ class Github extends Controller
      * The installation id arrives as an untrusted query parameter on an
      * unauthenticated-reachable GET callback, so it must be confirmed against
      * the GitHub API using the App's own credentials before it is persisted.
+     *
+     * @return string|null The reason the verification failed, or null when it passed.
      */
-    private function githubInstallationBelongsToApp(GithubApp $github_app, string $installation_id): bool
+    private function githubInstallationVerificationError(GithubApp $github_app, string $installation_id): ?string
     {
-        if (blank($github_app->app_id) || blank($github_app->privateKey?->private_key)) {
-            return false;
+        if (blank($github_app->app_id) || blank(githubAppPrivateKey($github_app)?->private_key)) {
+            return 'The GitHub App ID or private key is missing.';
         }
 
         try {
@@ -776,12 +807,19 @@ class Github extends Controller
                 ->timeout(10)
                 ->connectTimeout(5)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
-
-            return $response->successful()
-                && (string) data_get($response->json(), 'app_id') === (string) $github_app->app_id;
-        } catch (\Throwable) {
-            return false;
+        } catch (\Throwable $e) {
+            return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
         }
+
+        if (! $response->successful()) {
+            return "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found');
+        }
+
+        if ((string) data_get($response->json(), 'app_id') !== (string) $github_app->app_id) {
+            return 'The installation belongs to a different GitHub App.';
+        }
+
+        return null;
     }
 
     private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp
@@ -795,12 +833,20 @@ class Github extends Controller
             $this->rejectInvalidGithubAppSetupState($request);
         }
 
-        $team_id = $request->user()?->currentTeam()?->id;
-        abort_unless(! is_null($team_id) && (int) data_get($payload, 'team_id') === $team_id, 403);
+        // The state is bound to the team that started the setup. The user may have switched
+        // teams while on GitHub, so check membership of that team, not the session team.
+        $team_id = (int) data_get($payload, 'team_id');
+        abort_unless((bool) $request->user()?->teams->contains('id', $team_id), 403);
 
-        return GithubApp::whereKey(data_get($payload, 'github_app_id'))
-            ->where('team_id', data_get($payload, 'team_id'))
+        $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
+            ->where('team_id', $team_id)
             ->firstOrFail();
+
+        if ($request->user()->currentTeam()?->id !== $team_id) {
+            refreshSession($github_app->team);
+        }
+
+        return $github_app;
     }
 
     private function rejectInvalidGithubAppSetupState(Request $request): never

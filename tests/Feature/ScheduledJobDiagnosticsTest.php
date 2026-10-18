@@ -27,8 +27,8 @@ it('does not consume the dedup keys of the server manager checks', function () {
     $this->artisan('scheduled:diagnostics', ['--type' => 'server-jobs'])->assertSuccessful();
 
     expect(Cache::get("server-check:{$server->id}"))->toBeNull()
-        ->and(Cache::get("server-patch-check:{$server->id}"))->toBeNull()
-        ->and(shouldRunCronNow('0 0 * * 0', 'UTC', "server-patch-check:{$server->id}"))->toBeTrue();
+        ->and(Cache::get("server-patch-check-v2:{$server->id}"))->toBeNull()
+        ->and(shouldRunCronNow('0 0 * * 0', 'UTC', "server-patch-check-v2:{$server->id}"))->toBeTrue();
 });
 
 it('shows the occurrence state that the scheduled job manager records', function () {

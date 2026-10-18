@@ -47,7 +47,7 @@ class StartDatabaseImport
     public static function jobTimeoutSeconds(): int
     {
         $timeout = (int) config('constants.ssh.command_timeout') + self::JOB_TIMEOUT_MARGIN_SECONDS;
-        $workerTimeout = (int) config('horizon.defaults.s6.timeout');
+        $workerTimeout = (int) config('horizon.worker_timeout');
 
         return $workerTimeout > 0 ? min($timeout, $workerTimeout - self::JOB_TIMEOUT_MARGIN_SECONDS) : $timeout;
     }
@@ -219,9 +219,12 @@ class StartDatabaseImport
         return $file;
     }
 
+    /**
+     * Server backups can have any file name; the restore script checks the format.
+     */
     private function assertServerPath(?string $path): void
     {
-        if (! $path || ! str_starts_with($path, '/') || preg_match('/\.\.|[$()`|;&><\r\n\0\'"\\\\]/', $path) || ! DatabaseBackupFileValidator::hasAllowedExtension(basename($path))) {
+        if (! $path || ! str_starts_with($path, '/') || preg_match('/\.\.|[$()`|;&><\r\n\0\'"\\\\]/', $path)) {
             throw new DatabaseImportException('The server path is invalid.');
         }
     }

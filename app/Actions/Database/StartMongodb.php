@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -89,6 +90,7 @@ class StartMongodb
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mongo_conf();
@@ -311,15 +313,15 @@ class StartMongodb
             }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_ROOT_USERNAME')) {
             $environment_variables->push("MONGO_INITDB_ROOT_USERNAME={$this->database->mongo_initdb_root_username}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_ROOT_PASSWORD')) {
             $environment_variables->push("MONGO_INITDB_ROOT_PASSWORD={$this->database->mongo_initdb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_DATABASE')) {
             $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
 

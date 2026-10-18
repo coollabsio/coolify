@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profile;
 
+use App\Actions\User\DeleteUserAccount;
 use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -347,6 +348,28 @@ class Index extends Component
         }
     }
 
+    public function deleteAccount(string $password, array $selectedActions = []): mixed
+    {
+        try {
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            app(DeleteUserAccount::class)->handle(Auth::user());
+            auditLog('ui.user.account_deleted', ['resource' => 'user']);
+
+            Auth::guard('web')->logout();
+            session()->invalidate();
+            session()->regenerateToken();
+
+            $this->redirect(route('login'));
+
+            return true;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     private function providerLabel(string $provider): string
     {
         return match ($provider) {
@@ -368,6 +391,9 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.profile.index');
+        return view('livewire.profile.index', [
+            'accountDeletionBlockers' => app(DeleteUserAccount::class)->blockers(Auth::user()),
+            'accountDeletionActions' => app(DeleteUserAccount::class)->confirmationActions(Auth::user()),
+        ]);
     }
 }

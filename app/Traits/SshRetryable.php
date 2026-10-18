@@ -54,6 +54,23 @@ trait SshRetryable
     }
 
     /**
+     * Check if a failure came from the SSH connection and not from the remote command.
+     *
+     * SSH exits with 255 for its own errors. Any other non-zero exit code comes from the
+     * remote command, whose output can contain words such as "Connection refused" (for
+     * example a failed S3 upload). Retrying would replay commands that already ran.
+     */
+    protected function isRetryableSshFailure(\Throwable $exception): bool
+    {
+        $exitCode = $exception->getCode();
+        if (is_int($exitCode) && $exitCode > 0 && $exitCode !== 255) {
+            return false;
+        }
+
+        return $this->isRetryableSshError($exception->getMessage());
+    }
+
+    /**
      * Calculate delay for exponential backoff
      */
     protected function calculateRetryDelay(int $attempt): int
@@ -92,7 +109,7 @@ trait SshRetryable
                 $lastErrorMessage = $e->getMessage();
 
                 // Check if it's retryable and not the last attempt
-                if ($this->isRetryableSshError($lastErrorMessage) && $attempt < $maxRetries - 1) {
+                if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
                     $delay = $this->calculateRetryDelay($attempt);
 
                     // Add deployment log if available (for ExecuteRemoteCommand trait)

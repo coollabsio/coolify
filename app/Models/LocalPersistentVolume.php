@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 
 class LocalPersistentVolume extends BaseModel
 {
@@ -191,7 +190,7 @@ class LocalPersistentVolume extends BaseModel
                 return true;
             }
 
-            $compose = Yaml::parse($composeContent);
+            $compose = parseDockerComposeYaml($composeContent);
             $services = data_get($compose, 'services', []);
             $topLevelVolumes = collect(data_get($compose, 'volumes') ?? []);
 
@@ -227,8 +226,9 @@ class LocalPersistentVolume extends BaseModel
     /**
      * The external Compose volume that this storage entry still replaces, or null. Before Coolify
      * used external volumes as written, the parsers gave them a generated name, for example
-     * "{uuid}_{volume}" or "{uuid}_{volume}-pr-{id}". While this storage entry exists, the parsers
-     * keep that name so that the resource keeps its data (see useComposeExternalVolumeAsWritten()).
+     * "{uuid}_{volume}". While this storage entry exists, the parsers keep that name so that the
+     * resource keeps its data (see useComposeExternalVolumeAsWritten()). A preview volume
+     * ("{uuid}_{volume}-pr-{id}") replaces nothing: a preview never uses the external volume.
      */
     public function replacedExternalComposeVolume(): ?string
     {
@@ -245,7 +245,7 @@ class LocalPersistentVolume extends BaseModel
                 return null;
             }
 
-            foreach (data_get(Yaml::parse($composeContent), 'volumes') ?? [] as $key => $declaration) {
+            foreach (data_get(parseDockerComposeYaml($composeContent), 'volumes') ?? [] as $key => $declaration) {
                 $key = (string) $key;
                 if (! isComposeExternalVolume($declaration)) {
                     continue;
@@ -256,8 +256,7 @@ class LocalPersistentVolume extends BaseModel
                     $resource instanceof Application => $resource->uuid.'_'.Str::slug($key, '-'),
                     default => data_get($resource, 'service.uuid').'_'.Str::slug($key, '-'),
                 };
-                $isLegacyName = $legacyName !== $key && $this->name === $legacyName;
-                if ($isLegacyName || preg_match('/^'.preg_quote($legacyName, '/').'-pr-\d+$/', $this->name) === 1) {
+                if ($legacyName !== $key && $this->name === $legacyName) {
                     return $key;
                 }
             }
@@ -293,7 +292,7 @@ class LocalPersistentVolume extends BaseModel
             }
 
             $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
-            foreach (data_get(Yaml::parse($composeContent), 'volumes') ?? [] as $key => $declaration) {
+            foreach (data_get(parseDockerComposeYaml($composeContent), 'volumes') ?? [] as $key => $declaration) {
                 if (! is_array($declaration) || isComposeExternalVolume($declaration)) {
                     continue;
                 }
@@ -334,7 +333,7 @@ class LocalPersistentVolume extends BaseModel
             }
 
             // Parse the docker-compose content
-            $compose = Yaml::parse($actualService->docker_compose_raw);
+            $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
             if (! isset($compose['services'])) {
                 return false;
             }

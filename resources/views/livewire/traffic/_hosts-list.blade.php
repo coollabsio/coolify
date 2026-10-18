@@ -16,6 +16,12 @@
         icon-name="unordered-list" />
 @else
     <div x-data="{ page: 0, per: 10, total: {{ count($hosts) }} }">
+        <div class="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.07] dark:text-fg-dim">
+            <span class="min-w-0 flex-1">Host</span>
+            <span class="hidden w-16 shrink-0 text-right sm:inline" title="Request volume relative to the busiest row in this list">Volume</span>
+            <span class="w-16 shrink-0 text-right">Requests</span>
+            <span class="hidden w-16 shrink-0 text-right sm:inline" title="Total response data sent">Bandwidth</span>
+        </div>
         @foreach ($hosts as $row)
             @php
                 $host = (string) ($row['host'] ?? '');
@@ -35,7 +41,7 @@
                 <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
                     <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
                 </div>
-                <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                <span class="w-16 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
                     title="{{ number_format($requests) }} requests">{{ compactNumber($requests) }}</span>
                 <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes((int) ($row['bandwidth'] ?? 0)) }}</span>
             </div>

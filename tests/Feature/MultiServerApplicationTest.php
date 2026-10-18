@@ -112,6 +112,13 @@ describe('registry image guard', function () {
         callMultiServerDeploymentJob($job, 'ensureRegistryImageForMultipleServers');
     })->throwsNoExceptions();
 
+    test('allows docker compose applications, which build on each server', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        $job = makeMultiServerDeploymentJob(['application' => $this->application->fresh()]);
+
+        callMultiServerDeploymentJob($job, 'ensureRegistryImageForMultipleServers');
+    })->throwsNoExceptions();
+
     test('allows preview deployments, which run only on the main server', function () {
         $job = makeMultiServerDeploymentJob(['application' => $this->application, 'pull_request_id' => 7]);
 
@@ -311,6 +318,25 @@ describe('combined deployment notification', function () {
         $job->handle();
 
         Notification::assertNothingSent();
+    });
+
+    test('takes commit details for the summary from the main deployment', function () {
+        $parent = ApplicationDeploymentQueue::create([
+            'application_id' => $this->application->id,
+            'deployment_uuid' => new_public_id(),
+            'server_id' => $this->mainServer->id,
+            'status' => ApplicationDeploymentStatus::FINISHED->value,
+            'commit' => 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+            'commit_message' => 'Add checkout page',
+        ]);
+        Cache::put("multi-server-deployment-queued:{$parent->deployment_uuid}", true);
+        $child = createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::FINISHED->value, $parent->deployment_uuid);
+        $job = makeMultiServerDeploymentJob(['application' => $this->application, 'application_deployment_queue' => $child]);
+
+        callMultiServerDeploymentJob($job, 'sendMultiServerDeploymentNotification', $parent->deployment_uuid);
+
+        Notification::assertSentTo($this->team, DeploymentSuccess::class, fn (DeploymentSuccess $notification) => $notification->commit_sha === $parent->commit
+            && $notification->commit_message === 'Add checkout page');
     });
 
     test('sends a failed notification that links to the failed server deployment', function () {

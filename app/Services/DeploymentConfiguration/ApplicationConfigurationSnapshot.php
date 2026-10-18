@@ -205,9 +205,14 @@ class ApplicationConfigurationSnapshot
             $this->item('is_force_https_enabled', 'Force HTTPS', data_get($this->application, 'settings.is_force_https_enabled'), 'redeploy'),
             $this->item('is_gzip_enabled', 'Gzip', data_get($this->application, 'settings.is_gzip_enabled'), 'redeploy'),
             $this->item('is_stripprefix_enabled', 'Strip prefix', data_get($this->application, 'settings.is_stripprefix_enabled'), 'redeploy'),
+            $this->item('traefik_certificate_resolver', 'Certificate resolver', data_get($this->application, 'settings.traefik_certificate_resolver'), 'redeploy'),
             $this->item('is_http_basic_auth_enabled', 'HTTP basic auth', $this->application->is_http_basic_auth_enabled, 'redeploy'),
             $this->item('http_basic_auth_username', 'HTTP basic auth username', $this->application->http_basic_auth_username, 'redeploy'),
             $this->item('http_basic_auth_password', 'HTTP basic auth password', $this->application->http_basic_auth_password, 'redeploy', sensitive: true),
+            $this->item('http_basic_auth_hash_algorithm', 'HTTP basic auth hash algorithm', $this->application->http_basic_auth_hash_algorithm?->value, 'redeploy'),
+            $this->item('http_basic_auth_bcrypt_cost', 'HTTP basic auth bcrypt cost factor', $this->application->http_basic_auth_bcrypt_cost, 'redeploy'),
+            $this->item('http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', $this->application->http_basic_auth_argon2id_memory_cost, 'redeploy'),
+            $this->item('http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', $this->application->http_basic_auth_argon2id_time_cost, 'redeploy'),
         ];
     }
 

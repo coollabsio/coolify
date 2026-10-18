@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ApplicationPreviewsController;
 use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\ApplicationSecretManagerController;
 use App\Http\Controllers\Api\AuditEventsController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\HostingerController;
 use App\Http\Controllers\Api\InstanceEmailSettingsController;
 use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
@@ -52,12 +54,10 @@ Route::post('/feedback', [OtherController::class, 'feedback'])
     ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.token.team', 'api.ability:write'],
+    'middleware' => ['api.ip.allowed', 'auth:sanctum', 'api.token.team', 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
-    Route::get('/enable', [OtherController::class, 'post_required']);
     Route::get('/disable', [OtherController::class, 'post_required']);
-    Route::post('/enable', [OtherController::class, 'enable_api']);
     Route::post('/disable', [OtherController::class, 'disable_api']);
     Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
     Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
@@ -231,6 +231,13 @@ Route::group([
     Route::get('/digitalocean/ssh-keys', [DigitalOceanController::class, 'sshKeys'])->middleware(['api.ability:read']);
     Route::post('/servers/digitalocean', [DigitalOceanController::class, 'createServer'])->middleware(['api.ability:write']);
 
+    Route::get('/hostinger/data-centers', [HostingerController::class, 'dataCenters'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/catalog', [HostingerController::class, 'catalog'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/templates', [HostingerController::class, 'templates'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/ssh-keys', [HostingerController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/post-install-scripts', [HostingerController::class, 'postInstallScripts'])->middleware(['api.ability:read']);
+    Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
+
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
 
     Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
@@ -290,6 +297,9 @@ Route::group([
     Route::post('/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::post('/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
+    Route::get('/applications/{uuid}/previews', [ApplicationPreviewsController::class, 'index'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/previews', [ApplicationPreviewsController::class, 'store'])->middleware(['api.ability:deploy']);
+    Route::get('/applications/{uuid}/previews/{pull_request_id}', [ApplicationPreviewsController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'update_preview_by_pull_request_id'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write']);
 

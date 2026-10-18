@@ -60,6 +60,7 @@ class SentinelController extends Controller
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,
             ]);
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the subscription of this team is not active.');
 
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -69,6 +70,7 @@ class SentinelController extends Controller
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,
             ]);
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the server is marked unreachable, not usable, or disabled. Validate the server connection.');
 
             return response()->json(['message' => 'Server is not functional'], 401);
         }
@@ -78,6 +80,7 @@ class SentinelController extends Controller
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,
             ]);
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the Sentinel token does not match. Sync Sentinel to apply the current token.');
 
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -86,6 +89,8 @@ class SentinelController extends Controller
         ]);
 
         if ($validator->fails()) {
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the payload is not valid.');
+
             return response()->json(serializeApiResponse([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
@@ -101,6 +106,7 @@ class SentinelController extends Controller
         $server->sentinelHeartbeat();
 
         if (! $wasSentinelLive) {
+            $server->rememberSentinelPushProblem(null);
             SentinelSynchronized::dispatch($server);
         }
 
@@ -173,14 +179,14 @@ class SentinelController extends Controller
     /**
      * Build a stable hash of container state.
      *
-     * Covers [name, state, restart_count] only — metrics, filesystem_usage_root, and
-     * health_status are excluded on purpose. Disk % churns constantly, and
-     * health checks can flap between starting/healthy/unhealthy while the
-     * container lifecycle state remains unchanged. Both would otherwise defeat
-     * the hash and dispatch DB-heavy PushServerUpdateJob instances too often.
-     * The snapshot completeness flag is included so a complete snapshot always
-     * dispatches after a partial snapshot. Sorted by name so container ordering
-     * from Sentinel does not affect the hash.
+     * Covers [name, state, health_status, restart_count] only — metrics and
+     * filesystem_usage_root are excluded on purpose because disk % churns
+     * constantly and would dispatch PushServerUpdateJob on every push. Health is
+     * included so a healthy/unhealthy change reaches the UI on the next push
+     * instead of after the force window. The snapshot completeness flag is
+     * included so a complete snapshot always dispatches after a partial
+     * snapshot. Sorted by name so container ordering from Sentinel does not
+     * affect the hash.
      */
     private function containerStateHash(array $data): string
     {
@@ -188,6 +194,7 @@ class SentinelController extends Controller
             ->map(fn ($c) => [
                 'name' => data_get($c, 'name'),
                 'state' => data_get($c, 'state'),
+                'health_status' => data_get($c, 'health_status'),
                 'restart_count' => data_get($c, 'restart_count'),
             ])
             ->sortBy('name')

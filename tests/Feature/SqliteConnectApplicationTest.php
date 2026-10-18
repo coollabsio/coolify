@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -215,6 +216,28 @@ it('forbids team members from mounting the volume into an application', function
         ->set('applicationUuid', $this->application->uuid)
         ->call('connect')
         ->assertForbidden();
+
+    expect($this->application->persistentStorages()->count())->toBe(0);
+});
+
+it('rejects a client-supplied volume name so the mount cannot become a host bind mount', function (string $volumeName) {
+    expect(fn () => Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
+        ->set('applicationUuid', $this->application->uuid)
+        ->set('volumeName', $volumeName)
+        ->call('connect'))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+
+    expect($this->application->persistentStorages()->count())->toBe(0);
+})->with(['/', '../x', '/etc']);
+
+it('does not mount a stored data volume whose name is not a docker volume name', function () {
+    $this->sqlite->persistentStorages()->update(['name' => '/etc']);
+
+    Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
+        ->set('applicationUuid', $this->application->uuid)
+        ->call('connect')
+        ->assertHasErrors('volumeName')
+        ->assertNoRedirect();
 
     expect($this->application->persistentStorages()->count())->toBe(0);
 });

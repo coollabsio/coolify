@@ -19,7 +19,7 @@ use Illuminate\Support\Sleep;
 use RuntimeException;
 
 /**
- * Starts one ephemeral runner for a queued execution on the least busy matching build server.
+ * Starts one ephemeral runner for a queued execution on the least busy matching server.
  * When no server has free capacity, the execution stays queued and is retried by
  * CleanupGithubRunnerJob or ReconcileGithubRunnersJob. A runner that fails to start is removed and
  * started again, possibly on another server, up to MAX_ATTEMPTS times.
@@ -120,7 +120,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->where('status', GithubRunnerStatus::Provisioning)
                 ->update([
                     'status' => GithubRunnerStatus::Failed,
-                    'error_message' => "Could not start a runner after {$attempt} attempts: {$e->getMessage()}",
+                    'error_message' => remove_iip("Could not start a runner after {$attempt} attempts: {$e->getMessage()}"),
                     'completed_at' => now(),
                 ]);
             CleanupGithubRunnerJob::dispatch($execution->id);
@@ -140,7 +140,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 'runner_name' => null,
                 'runner_id' => null,
                 'ready_at' => null,
-                'error_message' => "Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}",
+                'error_message' => remove_iip("Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}"),
             ]);
         if (! $retried) {
             return;
@@ -150,6 +150,15 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function stopIfFinished(GithubRunnerExecution $execution): bool
     {
+        // The execution is deleted together with its server.
+        if (! GithubRunnerExecution::query()->whereKey($execution->id)->exists()) {
+            if ($execution->runner_id) {
+                DeregisterGithubRunnerJob::dispatch($execution->github_app_id, $execution->runner_id);
+            }
+
+            return true;
+        }
+
         $execution->refresh();
         if ($execution->isActive()) {
             return false;
@@ -181,7 +190,8 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->get()
                 ->filter(fn (GithubRunnerConfig $config) => $config->server !== null
                     && $config->matchesLabels($execution->labels ?? [])
-                    && $config->server->isBuildServer()
+                    && ($config->allow_pull_requests || ! $execution->is_pull_request)
+                    && $config->server->canBuildApplications()
                     && ! $config->server->isLocalhost()
                     && $config->server->isFunctional())
                 ->map(fn (GithubRunnerConfig $config) => ['config' => $config, 'occupied' => $config->occupiedRunnerCount()])

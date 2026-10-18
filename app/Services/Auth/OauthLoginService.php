@@ -147,6 +147,7 @@ class OauthLoginService
                     throw new OauthLoginException('OAuth identity cannot be linked to this account', 'auth.failed.oauth_already_linked');
                 }
 
+                $linksExistingUser = $user !== null;
                 if (! $user) {
                     if (! $oauthSetting->allowsUserCreation()) {
                         throw new OauthLoginException('Registration is disabled', 'auth.registration_disabled');
@@ -164,6 +165,9 @@ class OauthLoginService
                     'raw_claims' => $rawClaims,
                     'last_login_at' => now(),
                 ]);
+                if ($linksExistingUser) {
+                    $this->auditIdentityLinked($user, $provider, $issuer);
+                }
 
                 if ($user->created_before_oauth_identities) {
                     $user->forceFill(['created_before_oauth_identities' => false])->save();
@@ -266,6 +270,7 @@ class OauthLoginService
                     throw new OauthLoginException('OAuth identity cannot be linked to this account', 'auth.failed.oauth_already_linked');
                 }
 
+                $linksExistingUser = $user !== null;
                 if (! $user) {
                     if (! $oauthSetting->allowsUserCreation()) {
                         throw new OauthLoginException('Registration is disabled', 'auth.registration_disabled');
@@ -283,6 +288,9 @@ class OauthLoginService
                     'raw_claims' => $rawClaims,
                     'last_login_at' => now(),
                 ]);
+                if ($linksExistingUser) {
+                    $this->auditIdentityLinked($user, 'oidc', $issuer);
+                }
 
                 return $user;
             });
@@ -292,6 +300,45 @@ class OauthLoginService
     }
 
     private function createUser(string $name, string $email, OauthSetting $oauthSetting): User
+    {
+        $user = $this->provisionUser($name, $email, $oauthSetting);
+
+        auditLog('auth.user.registered', [
+            ...$this->userAuditContext($user, $user->teams()->first()?->id),
+            'provider' => $oauthSetting->provider,
+            'via' => 'oauth',
+        ]);
+
+        return $user;
+    }
+
+    private function auditIdentityLinked(User $user, string $provider, string $issuer): void
+    {
+        auditLog('auth.user.oauth_identity_linked', [
+            ...$this->userAuditContext($user, $user->resolveStoredTeam()?->id ?? $user->teams()->first()?->id),
+            'provider' => $provider,
+            'issuer' => $issuer,
+        ]);
+    }
+
+    /**
+     * Context for events recorded before the user is logged in, so the actor is set explicitly.
+     *
+     * @return array<string, mixed>
+     */
+    private function userAuditContext(User $user, ?int $teamId): array
+    {
+        return [
+            'team_id' => $teamId,
+            'resource' => 'user',
+            'user_name' => $user->name,
+            'actor_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_email' => $user->email,
+        ];
+    }
+
+    private function provisionUser(string $name, string $email, OauthSetting $oauthSetting): User
     {
         if (User::count() === 0) {
             $user = (new User)->forceFill([

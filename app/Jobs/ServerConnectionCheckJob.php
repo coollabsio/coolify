@@ -5,7 +5,6 @@ namespace App\Jobs;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
-use App\Services\ConfigurationRepository;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -55,12 +54,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         return [(new WithoutOverlapping('server-connection-check-'.$this->server->uuid))->expireAfter($this->timeout + 30)->dontRelease()];
     }
 
-    private function disableSshMux(): void
-    {
-        $configRepository = app(ConfigurationRepository::class);
-        $configRepository->disableSshMux();
-    }
-
     public function handle(): void
     {
         if ($this->server->hasPlaceholderIp()) {
@@ -85,11 +78,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, 'force_disabled');
 
                 return;
-            }
-
-            // Temporarily disable mux if requested
-            if ($this->disableMux) {
-                $this->disableSshMux();
             }
 
             // Check basic connectivity first
@@ -291,7 +279,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     private function runDockerCommand(string $command): ?string
     {
         try {
-            $process = Process::timeout(self::DOCKER_TIMEOUT_SECONDS)->run($this->sshCommand($command));
+            $process = Process::timeout(self::DOCKER_TIMEOUT_SECONDS)->run($this->sshCommand($command, disableMultiplexing: $this->disableMux));
         } catch (\Throwable $e) {
             Log::debug('ServerConnectionCheck: Docker command failed', [
                 'server_id' => $this->server->id,

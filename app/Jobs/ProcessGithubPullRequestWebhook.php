@@ -41,7 +41,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public string $fullName,
         public bool $isForkPullRequest = false,
     ) {
-        $this->onQueue('high');
+        $this->onQueue(webhooks_queue());
     }
 
     public function handle(): void

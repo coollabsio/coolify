@@ -5,9 +5,9 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.4.0',
-        'helper_version' => '1.0.17',
-        'railpack_version' => '0.23.0',
+        'version' => env('COOLIFY_VERSION') ?: '4.4.6',
+        'helper_version' => '1.0.18',
+        'railpack_version' => '0.40.1',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -15,13 +15,17 @@ return [
         // devHostDockerPath() uses them only for that server. The defaults are the legacy docker-compose.dev.yml names.
         'dev_data_volume' => env('DEV_COOLIFY_DATA_VOLUME', 'coolify_dev_coolify_data'),
         'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
-        'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
-        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
+        // Development only: IP for the seeded sslip.io wildcard domain and application domains (for example a Tailscale IP).
+        'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
+        'registry_url' => env('REGISTRY_URL', 'docker.io'),
+        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
         'releases_url' => env('RELEASES_URL', 'https://cdn.coollabs.io/coolify/releases.json'),
+        // "sequential" or "concurrent". Empty uses sequential on self-hosted and concurrent on Coolify Cloud.
+        'scheduled_jobs_dispatch_mode' => env('SCHEDULED_JOBS_DISPATCH_MODE'),
     ],
 
     'urls' => [
@@ -41,6 +45,12 @@ return [
         'host' => env('TERMINAL_HOST'),
         'port' => env('TERMINAL_PORT'),
         'command_timeout' => 0,
+        // Docker's default detach escape for `docker attach`. Pressing this
+        // sequence (Ctrl-P, Ctrl-Q) leaves the container's main process running.
+        'detach_keys' => 'ctrl-p,ctrl-q',
+        // Recent log lines shown when a console (attach) session opens, so the
+        // screen is not blank until the next line of live output arrives.
+        'console_history_lines' => 200,
     ],
 
     'pusher' => [
@@ -107,14 +117,6 @@ return [
         // every push.
         'push_force_interval_seconds' => env('SENTINEL_PUSH_FORCE_INTERVAL_SECONDS', 300),
 
-    ],
-
-    'proxy' => [
-        // How often (seconds) PushServerUpdateJob periodically re-connects the
-        // proxy to Docker networks as a safety net. Real network-layout changes
-        // already connect the proxy on-demand; this only covers gaps (Swarm
-        // networks added via UI, proxy crash recovery).
-        'connect_networks_interval_seconds' => env('PROXY_CONNECT_NETWORKS_INTERVAL_SECONDS', 3600),
     ],
 
     'github_runner' => [

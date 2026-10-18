@@ -33,6 +33,5 @@ docker/coolify-terminal/node_modules
 /storage/app/debugbar
 /storage/logs
 /storage/pail
-
-
-
+/storage/framework/**
+!/storage/framework/**/.gitignore

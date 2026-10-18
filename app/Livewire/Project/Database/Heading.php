@@ -158,6 +158,7 @@ class Heading extends Component
                 return;
             }
             $this->auditDatabaseAction('ui.database.restarted');
+            $this->dispatch('info', 'Restarting database.');
             $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);

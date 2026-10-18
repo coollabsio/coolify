@@ -30,6 +30,12 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
 
     public $timeout = 600; // 10 minutes max
 
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), instead of after the queue
+     * retry_after, so the next daily run is not blocked.
+     */
+    public int $uniqueFor = 600;
+
     public function __construct() {}
 
     public function middleware(): array

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\BackupCreated;
 use App\Events\DockerCleanupDone;
 use App\Events\ScheduledTaskDone;
 use App\Jobs\DatabaseBackupJob;
@@ -11,15 +12,19 @@ use App\Jobs\VolumeBackupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Team;
+use App\Notifications\Database\BackupFailed;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\Server\DockerCleanupFailed;
+use App\Notifications\VolumeBackup\BackupFailed as VolumeBackupFailed;
 use Closure;
 use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +44,18 @@ class ScheduledJobDeliveryService
      */
     public const ENQUEUED_STALE_AFTER_MINUTES = 60;
 
+    /**
+     * At most this many open occurrences are published again or recovered per scheduler run, so a
+     * large backlog after an outage is worked off in steps instead of in one long scheduler tick.
+     */
+    public const RECOVERY_BATCH_SIZE = 500;
+
+    /**
+     * A claimed occurrence that started longer ago than the worker timeout plus this margin has no
+     * live worker: Horizon kills every job at the worker timeout.
+     */
+    public const INTERRUPTED_CLAIM_MARGIN_MINUTES = 15;
+
     public const MISSED_OCCURRENCE_NOTIFICATION = 'scheduled-occurrence-missed';
 
     public const MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES = 60;
@@ -48,6 +65,12 @@ class ScheduledJobDeliveryService
      * recorded as a failed execution and the team is notified.
      */
     private const LATE_RUN_JOB_TYPES = ['database-backup', 'volume-backup'];
+
+    /**
+     * A lost backup occurrence runs late only while it is younger than this. Older work is not
+     * replayed, for example after a long Redis or worker outage.
+     */
+    public const LATE_RUN_MAX_AGE_HOURS = 24;
 
     public function recordAndPublish(
         string $scheduleKey,
@@ -66,7 +89,7 @@ class ScheduledJobDeliveryService
             return false;
         }
 
-        $delivery = DB::transaction(function () use ($scheduleKey, $scheduledFor, $jobType, $resourceId, $payload): ?ScheduledJobDelivery {
+        $delivery = DB::transaction(function () use ($scheduleKey, $scheduledFor, $cron, $timezone, $jobType, $resourceId, $payload): ?ScheduledJobDelivery {
             ScheduledJobState::query()->insertOrIgnore([
                 'uuid' => new_public_id(),
                 'schedule_key' => $scheduleKey,
@@ -79,7 +102,7 @@ class ScheduledJobDeliveryService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($state->last_scheduled_for?->gte($scheduledFor)) {
+            if ($this->isDuplicateOccurrence($state, $scheduledFor, $cron, $timezone)) {
                 return null;
             }
 
@@ -116,7 +139,7 @@ class ScheduledJobDeliveryService
             return false;
         }
 
-        return DB::transaction(function () use ($scheduleKey, $scheduledFor): bool {
+        return DB::transaction(function () use ($scheduleKey, $scheduledFor, $cron, $timezone): bool {
             ScheduledJobState::query()->insertOrIgnore([
                 'uuid' => new_public_id(),
                 'schedule_key' => $scheduleKey,
@@ -129,7 +152,7 @@ class ScheduledJobDeliveryService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($state->last_scheduled_for?->gte($scheduledFor)) {
+            if ($this->isDuplicateOccurrence($state, $scheduledFor, $cron, $timezone)) {
                 return false;
             }
 
@@ -140,28 +163,64 @@ class ScheduledJobDeliveryService
     }
 
     /**
+     * The same schedule can have the same local time twice when daylight saving time ends. A
+     * schedule with fixed hours (for example `30 2 * * *`) then runs once, like cron does. Interval
+     * schedules (`*` or `/` in the hour field) still run in both hours.
+     */
+    private function isDuplicateOccurrence(ScheduledJobState $state, Carbon $scheduledFor, CronExpression $cron, string $timezone): bool
+    {
+        $last = $state->last_scheduled_for;
+        if ($last === null) {
+            return false;
+        }
+
+        if ($last->gte($scheduledFor)) {
+            return true;
+        }
+
+        if (preg_match('/^[\d,\-]+$/', (string) $cron->getExpression(CronExpression::HOUR)) !== 1) {
+            return false;
+        }
+
+        $format = 'Y-m-d H:i';
+
+        return $last->copy()->setTimezone($timezone)->format($format) === $scheduledFor->copy()->setTimezone($timezone)->format($format);
+    }
+
+    /**
+     * Publish occurrences again whose publication did not finish, for example because Redis
+     * rejected the job. An occurrence that stays pending longer than the stale limit follows the
+     * same late-run policy as a lost queued job (see recoverStaleEnqueued()).
+     *
      * @param  array<int, string>|null  $jobTypes  Only these job types, or all when null.
      */
     public function publishPending(?array $jobTypes = null): void
     {
-        ScheduledJobDelivery::query()
+        $occurrences = ScheduledJobDelivery::query()
             ->where('status', 'pending')
             ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
             ->orderBy('id')
-            ->chunkById(100, function ($occurrences): void {
-                foreach ($occurrences as $occurrence) {
-                    try {
-                        $this->logOccurrence($occurrence, 'Scheduled occurrence publishing again', 'warning');
-                        $this->publish($occurrence);
-                    } catch (\Throwable $e) {
-                        Log::channel('scheduled-errors')->error('Failed to publish pending scheduled occurrence', [
-                            'occurrence_uuid' => $occurrence->uuid,
-                            'schedule_key' => $occurrence->schedule_key,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
+            ->limit(self::RECOVERY_BATCH_SIZE)
+            ->get();
+
+        foreach ($occurrences as $occurrence) {
+            try {
+                if ($occurrence->created_at->lt(now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))) {
+                    $this->recoverUnstartedOccurrence($occurrence);
+
+                    continue;
                 }
-            });
+
+                $this->logOccurrence($occurrence, 'Scheduled occurrence publishing again', 'warning');
+                $this->publish($occurrence);
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error('Failed to publish pending scheduled occurrence', [
+                    'occurrence_uuid' => $occurrence->uuid,
+                    'schedule_key' => $occurrence->schedule_key,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
@@ -191,27 +250,70 @@ class ScheduledJobDeliveryService
      */
     public function recoverStaleEnqueued(?array $jobTypes = null): void
     {
-        ScheduledJobDelivery::query()
+        $occurrences = ScheduledJobDelivery::query()
             ->where('status', 'enqueued')
             ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
             ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
-            ->chunkById(100, function ($occurrences): void {
-                foreach ($occurrences as $occurrence) {
-                    try {
-                        $this->recoverStaleEnqueuedOccurrence($occurrence);
-                    } catch (\Throwable $e) {
-                        Log::channel('scheduled-errors')->error('Failed to recover enqueued scheduled occurrence', [
-                            'occurrence_uuid' => $occurrence->uuid,
-                            'schedule_key' => $occurrence->schedule_key,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
-            });
+            ->orderBy('id')
+            ->limit(self::RECOVERY_BATCH_SIZE)
+            ->get();
+
+        foreach ($occurrences as $occurrence) {
+            try {
+                $this->recoverUnstartedOccurrence($occurrence);
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error('Failed to recover enqueued scheduled occurrence', [
+                    'occurrence_uuid' => $occurrence->uuid,
+                    'schedule_key' => $occurrence->schedule_key,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
-    private function recoverStaleEnqueuedOccurrence(ScheduledJobDelivery $occurrence): void
+    /**
+     * Mark claimed occurrences as failed when no worker can still run them. Horizon kills a job at
+     * the worker timeout, so a claim older than that lost its worker (for example a killed
+     * container). The job is not run again: it can have done part of its remote work already.
+     *
+     * @param  array<int, string>|null  $jobTypes  Only these job types, or all when null.
+     */
+    public function failInterruptedClaims(?array $jobTypes = null): void
     {
+        $startedBefore = now()
+            ->subSeconds((int) config('horizon.worker_timeout'))
+            ->subMinutes(self::INTERRUPTED_CLAIM_MARGIN_MINUTES);
+
+        $occurrences = ScheduledJobDelivery::query()
+            ->where('status', 'claimed')
+            ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
+            ->where('started_at', '<', $startedBefore)
+            ->orderBy('id')
+            ->limit(self::RECOVERY_BATCH_SIZE)
+            ->get(['id', 'uuid', 'claim_token']);
+
+        foreach ($occurrences as $occurrence) {
+            $failed = ScheduledJobDelivery::query()
+                ->whereKey($occurrence->id)
+                ->where('status', 'claimed')
+                ->where('claim_token', $occurrence->claim_token)
+                ->update(['status' => 'failed', 'updated_at' => now()]) === 1;
+
+            if ($failed) {
+                $this->logOccurrence($occurrence->uuid, 'Scheduled occurrence interrupted: its worker stopped after it claimed the occurrence', 'warning');
+            }
+        }
+    }
+
+    /**
+     * Decide what happens to an occurrence that never started: a pending row whose publication kept
+     * failing, or an enqueued row whose queued job was lost. Backups run once late unless a newer
+     * occurrence exists; tasks and Docker cleanups are reported as missed.
+     */
+    private function recoverUnstartedOccurrence(ScheduledJobDelivery $occurrence): void
+    {
+        $staleBefore = now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES);
+
         // complete() deletes the row of a finished occurrence, so the schedule state also counts.
         $hasNewerOccurrence = ScheduledJobState::query()
             ->where('schedule_key', $occurrence->schedule_key)
@@ -221,13 +323,18 @@ class ScheduledJobDeliveryService
                 ->where('schedule_key', $occurrence->schedule_key)
                 ->where('scheduled_for', '>', $occurrence->scheduled_for)
                 ->exists();
-        $runLate = in_array($occurrence->job_type, self::LATE_RUN_JOB_TYPES, true) && ! $hasNewerOccurrence;
+        $tooOld = $occurrence->scheduled_for->lt(now()->subHours(self::LATE_RUN_MAX_AGE_HOURS));
+        $runLate = in_array($occurrence->job_type, self::LATE_RUN_JOB_TYPES, true) && ! $hasNewerOccurrence && ! $tooOld;
 
         // Only one scheduler node can move each occurrence.
         $moved = ScheduledJobDelivery::query()
             ->whereKey($occurrence->id)
-            ->where('status', 'enqueued')
-            ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
+            ->where('status', $occurrence->status)
+            ->when(
+                $occurrence->status === 'enqueued',
+                fn ($query) => $query->where('enqueued_at', '<', $staleBefore),
+                fn ($query) => $query->where('created_at', '<', $staleBefore),
+            )
             ->update(['status' => $runLate ? 'pending' : 'failed', 'updated_at' => now()]) === 1;
 
         if (! $moved) {
@@ -235,9 +342,11 @@ class ScheduledJobDeliveryService
         }
 
         if (! $runLate) {
-            $this->logOccurrence($occurrence->uuid, $hasNewerOccurrence
-                ? 'Scheduled occurrence skipped: its queued job was not started and a newer occurrence exists'
-                : 'Scheduled occurrence missed: its queued job was not started', 'warning');
+            $this->logOccurrence($occurrence->uuid, match (true) {
+                $hasNewerOccurrence => 'Scheduled occurrence skipped: its queued job was not started and a newer occurrence exists',
+                $tooOld && in_array($occurrence->job_type, self::LATE_RUN_JOB_TYPES, true) => 'Scheduled occurrence missed: its queued job was not started and it is too old to run late',
+                default => 'Scheduled occurrence missed: its queued job was not started',
+            }, 'warning', ['previous_status' => $occurrence->status]);
             $this->reportMissedOccurrence($occurrence);
 
             return;
@@ -249,7 +358,7 @@ class ScheduledJobDeliveryService
     }
 
     /**
-     * Show a missed task or Docker cleanup as a failed execution and send the failure notification.
+     * Show a missed task, Docker cleanup, or backup as a failed execution and send the failure notification.
      * The caller moved the occurrence out of `enqueued` atomically, so this runs once per occurrence,
      * and claim() rejects the late job if it starts afterwards.
      */
@@ -287,6 +396,38 @@ class ScheduledJobDeliveryService
                 ]);
                 event(new DockerCleanupDone($execution));
                 $this->notifyMissedOccurrence($server, fn () => $server->team?->notify(new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}")));
+            } elseif ($occurrence->job_type === 'database-backup') {
+                $backup = ScheduledDatabaseBackup::with(['team', 'database'])->find($occurrence->resource_id);
+                if (! $backup?->database) {
+                    return;
+                }
+
+                $databaseName = $backup->dump_all ? 'all' : $backup->databases_to_backup;
+                ScheduledDatabaseBackupExecution::create([
+                    'uuid' => new_public_id(),
+                    'database_name' => filled($databaseName) ? str($databaseName)->limit(250)->toString() : null,
+                    'scheduled_database_backup_id' => $backup->id,
+                    'status' => 'failed',
+                    'message' => $message,
+                    'local_storage_deleted' => false,
+                    'finished_at' => now(),
+                ]);
+                BackupCreated::dispatch($backup->team_id);
+                $this->notifyMissedOccurrence($backup, fn () => $backup->team?->notify(new BackupFailed($backup, $backup->database, $message, $databaseName ?? 'unknown')));
+            } elseif ($occurrence->job_type === 'volume-backup') {
+                $backup = ScheduledVolumeBackup::with(['team', 'backupable.resource'])->find($occurrence->resource_id);
+                if (! $backup) {
+                    return;
+                }
+
+                ScheduledVolumeBackupExecution::create([
+                    'scheduled_volume_backup_id' => $backup->id,
+                    'status' => 'failed',
+                    'message' => $message,
+                    'finished_at' => now(),
+                ]);
+                BackupCreated::dispatch($backup->team_id);
+                $this->notifyMissedOccurrence($backup, fn () => $backup->team?->notify(new VolumeBackupFailed($backup, $message)));
             }
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to report missed scheduled occurrence', [

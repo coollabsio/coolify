@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Destinations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledVolumeBackup extends BaseModel
 {
+    use HasS3Destinations;
+
     public const int DEFAULT_TIMEOUT = 36000;
 
     protected $fillable = [
@@ -31,6 +35,7 @@ class ScheduledVolumeBackup extends BaseModel
         'retention_days_s3',
         'retention_max_storage_s3',
         'timeout',
+        'missing_backup_notification_days',
     ];
 
     protected function casts(): array
@@ -47,6 +52,7 @@ class ScheduledVolumeBackup extends BaseModel
             'retention_days_s3' => 'integer',
             'retention_max_storage_s3' => 'float',
             'timeout' => 'integer',
+            'missing_backup_notification_days' => 'integer',
         ];
     }
 
@@ -119,6 +125,11 @@ class ScheduledVolumeBackup extends BaseModel
     public function s3(): BelongsTo
     {
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
+    }
+
+    public function s3Storages(): BelongsToMany
+    {
+        return $this->belongsToMany(S3Storage::class, 'scheduled_volume_backup_s3_storage')->withTimestamps();
     }
 
     public function executions(): HasMany

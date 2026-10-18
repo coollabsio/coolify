@@ -261,3 +261,52 @@ it('rejects scheduled backups for unsupported database types', function () {
 
     expect(ScheduledDatabaseBackup::count())->toBe(0);
 });
+
+it('assigns a new database backup schedule to the team of the database, not the current team', function (string $databaseType, bool $rootTeam) {
+    if ($rootTeam) {
+        $rootTeamModel = Team::factory()->create(['id' => 0]);
+        $this->user->teams()->attach($rootTeamModel, ['role' => 'owner']);
+        $this->project->update(['team_id' => 0]);
+    }
+    $resourceTeamId = $this->project->fresh()->team_id;
+    $otherTeam = Team::factory()->create();
+    $this->user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    if ($databaseType === 'service') {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+        ]);
+        $database = ServiceDatabase::create([
+            'service_id' => $service->id,
+            'name' => 'postgres',
+            'image' => 'postgres:16-alpine',
+            'custom_type' => 'postgresql',
+        ]);
+    } else {
+        $database = StandalonePostgresql::create([
+            'name' => 'postgres',
+            'image' => 'postgres:16-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+    }
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(ScheduledDatabaseBackup::query()->sole()->team_id)->toBe($resourceTeamId);
+})->with([
+    'standalone database' => ['standalone', false],
+    'service database' => ['service', false],
+    'standalone database in the root team' => ['standalone', true],
+]);

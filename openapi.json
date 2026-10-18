@@ -11,6 +11,402 @@
         }
     ],
     "paths": {
+        "\/applications\/{uuid}\/previews": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "List Preview Deployments",
+                "description": "List the preview deployments of an application, newest pull request first.",
+                "operationId": "list-preview-deployments-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of preview deployments.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ApplicationPreview"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create Preview Deployment",
+                "description": "Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.",
+                "operationId": "create-preview-deployment-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "pull_request_id"
+                                ],
+                                "properties": {
+                                    "pull_request_id": {
+                                        "type": "integer",
+                                        "example": 42,
+                                        "maximum": 2147483647,
+                                        "minimum": 1
+                                    },
+                                    "pull_request_html_url": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "example": "https:\/\/github.com\/org\/repo\/pull\/42"
+                                    },
+                                    "git_type": {
+                                        "description": "Git provider that hosts the pull request. Sets the ref Coolify fetches (pull\/{id}\/head or merge-requests\/{id}\/head).",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "enum": [
+                                            "github",
+                                            "gitlab",
+                                            "gitea",
+                                            "bitbucket"
+                                        ]
+                                    },
+                                    "commit": {
+                                        "description": "Commit SHA to deploy. Required for Bitbucket.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "docker_tag": {
+                                        "description": "Docker image tag. Docker Image applications only.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "force": {
+                                        "description": "Rebuild without cache.",
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "instant_deploy": {
+                                        "description": "Queue a deployment. Set to false to only create the preview, for example to set its domains first.",
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Existing preview deployment updated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ApplicationPreviewDeployment"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Preview deployment created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ApplicationPreviewDeployment"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "description": "Deployment queue is full."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/previews\/{pull_request_id}": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get Preview Deployment",
+                "description": "Get a preview deployment by pull request ID.",
+                "operationId": "get-preview-deployment-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "description": "Pull request ID of the preview.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preview deployment.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ApplicationPreview"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Delete Preview Deployment",
+                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record.",
+                "operationId": "delete-preview-deployment-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "description": "Pull request ID of the preview to delete.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preview deletion queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Update Preview Domains",
+                "description": "Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.",
+                "operationId": "update-preview-domains-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "domains": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "example": "https:\/\/pr.example.com:3000"
+                                    },
+                                    "docker_compose_domains": {
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "domain": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "redirect": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "default": false
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Preview domains updated."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "$ref": "#\/components\/responses\/403"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Domain conflict."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications\/{uuid}\/secret-manager": {
             "patch": {
                 "tags": [
@@ -490,6 +886,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -514,6 +914,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -554,7 +959,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -584,6 +989,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -595,7 +1030,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -1081,6 +1516,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -1105,6 +1544,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -1145,7 +1589,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -1175,6 +1619,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -1186,7 +1660,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -1672,6 +2146,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -1696,6 +2174,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -1736,7 +2219,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -1766,6 +2249,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -1777,7 +2290,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -2158,6 +2671,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -2182,6 +2699,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2222,7 +2744,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -2252,6 +2774,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -2263,7 +2815,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -2624,6 +3176,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -2648,6 +3204,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2688,7 +3249,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -2718,6 +3279,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -2729,7 +3320,7 @@
                                     "autogenerate_domain": {
                                         "type": "boolean",
                                         "default": true,
-                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                                     },
                                     "is_container_label_escape_enabled": {
                                         "type": "boolean",
@@ -2919,7 +3510,7 @@
                     {
                         "name": "docker_cleanup",
                         "in": "query",
-                        "description": "Run docker cleanup.",
+                        "description": "Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
@@ -3307,6 +3898,32 @@
                                         "type": "boolean",
                                         "description": "Use Docker Build Secrets for build-time environment variables."
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "is_git_submodules_enabled": {
                                         "type": "boolean",
                                         "description": "Clone Git submodules."
@@ -3335,6 +3952,10 @@
                                         "type": "boolean",
                                         "description": "Sort environment variables."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -3359,6 +3980,11 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -3399,7 +4025,7 @@
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "Custom internal container name."
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
                                     },
                                     "custom_container_name_prefix": {
                                         "type": "string",
@@ -3575,6 +4201,15 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "service_name",
+                        "in": "query",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -3670,6 +4305,15 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "service_name",
+                        "in": "query",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -3696,175 +4340,6 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
-                    },
-                    "422": {
-                        "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/applications\/{uuid}\/previews\/{pull_request_id}": {
-            "delete": {
-                "tags": [
-                    "Applications"
-                ],
-                "summary": "Delete Preview Deployment",
-                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record.",
-                "operationId": "delete-preview-deployment-by-pull-request-id",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "description": "UUID of the application.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "pull_request_id",
-                        "in": "path",
-                        "description": "Pull request ID of the preview to delete.",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Preview deletion queued.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "422": {
-                        "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "patch": {
-                "tags": [
-                    "Applications"
-                ],
-                "summary": "Update Preview Domains",
-                "description": "Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.",
-                "operationId": "update-preview-domains-by-pull-request-id",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "pull_request_id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "properties": {
-                                    "domains": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "example": "https:\/\/pr.example.com:3000"
-                                    },
-                                    "docker_compose_domains": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "properties": {
-                                                "name": {
-                                                    "type": "string"
-                                                },
-                                                "domain": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "redirect": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ],
-                                                    "enum": [
-                                                        "www",
-                                                        "non-www",
-                                                        "both"
-                                                    ]
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "force_domain_override": {
-                                        "type": "boolean",
-                                        "default": false
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Preview domains updated."
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "403": {
-                        "$ref": "#\/components\/responses\/403"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "409": {
-                        "description": "Domain conflict."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -4359,7 +4834,7 @@
                     {
                         "name": "docker_cleanup",
                         "in": "query",
-                        "description": "Perform docker cleanup (prune networks, volumes, etc.).",
+                        "description": "Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.",
                         "schema": {
                             "type": "boolean",
                             "default": true
@@ -4725,7 +5200,7 @@
                                     },
                                     "fs_path": {
                                         "type": "string",
-                                        "description": "Host directory path (required when is_directory is true)."
+                                        "description": "Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory."
                                     }
                                 },
                                 "type": "object",
@@ -4753,6 +5228,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission for a mount outside the resource directory."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -4823,7 +5301,7 @@
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "The file content (file only, not allowed for read-only storages)."
+                                        "description": "The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission."
                                     }
                                 },
                                 "type": "object",
@@ -4851,6 +5329,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission to change the content of a file outside the resource directory."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -5481,6 +5962,178 @@
                 ]
             }
         },
+        "\/audit-events": {
+            "get": {
+                "tags": [
+                    "Audit Events"
+                ],
+                "summary": "List",
+                "description": "List audit events of the team. Only team admins and owners can view audit events. Actor e-mail, token, metadata, changes, IP address, and user agent are returned only for tokens with the read:sensitive or root permission.",
+                "operationId": "list-audit-events",
+                "parameters": [
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 25,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search text.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        }
+                    },
+                    {
+                        "name": "action",
+                        "in": "query",
+                        "description": "Filter by action. Use all for every action.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        }
+                    },
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "description": "Filter by source.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all",
+                                "ui",
+                                "api",
+                                "mcp",
+                                "webhook",
+                                "system",
+                                "scheduler"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of audit events, newest first.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "team_id": {
+                                                        "type": "integer",
+                                                        "nullable": true
+                                                    },
+                                                    "event": {
+                                                        "type": "string"
+                                                    },
+                                                    "source": {
+                                                        "type": "string"
+                                                    },
+                                                    "action": {
+                                                        "type": "string"
+                                                    },
+                                                    "level": {
+                                                        "type": "string"
+                                                    },
+                                                    "actor_type": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "actor_id": {
+                                                        "type": "integer",
+                                                        "nullable": true
+                                                    },
+                                                    "actor_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "per_page": {
+                                            "type": "integer"
+                                        },
+                                        "last_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can view audit logs."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/cloud-init-scripts": {
             "get": {
                 "tags": [
@@ -5719,7 +6372,8 @@
                                                 "enum": [
                                                     "hetzner",
                                                     "digitalocean",
-                                                    "vultr"
+                                                    "vultr",
+                                                    "hostinger"
                                                 ]
                                             },
                                             "team_id": {
@@ -5778,7 +6432,8 @@
                                         "enum": [
                                             "hetzner",
                                             "digitalocean",
-                                            "vultr"
+                                            "vultr",
+                                            "hostinger"
                                         ],
                                         "example": "hetzner",
                                         "description": "The cloud provider."
@@ -6256,7 +6911,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Get all backups for a database",
+                        "description": "Get all backups for a database. Each backup includes s3_storage_uuid (primary S3 destination) and s3_storage_uuids (every S3 destination, primary first).",
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -6326,7 +6981,14 @@
                                     },
                                     "s3_storage_uuid": {
                                         "type": "string",
-                                        "description": "S3 storage UUID (required if save_s3 is true)"
+                                        "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true."
+                                    },
+                                    "s3_storage_uuids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination."
                                     },
                                     "databases_to_backup": {
                                         "type": "string",
@@ -6512,7 +7174,7 @@
                     {
                         "name": "docker_cleanup",
                         "in": "query",
-                        "description": "Run docker cleanup.",
+                        "description": "Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
@@ -6780,6 +7442,10 @@
                                         "description": "Healthcheck start period in seconds.",
                                         "minimum": 0,
                                         "default": 5
+                                    },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions."
                                     }
                                 },
                                 "type": "object"
@@ -6929,7 +7595,14 @@
                                     },
                                     "s3_storage_uuid": {
                                         "type": "string",
-                                        "description": "S3 storage UUID"
+                                        "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay."
+                                    },
+                                    "s3_storage_uuids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination."
                                     },
                                     "backup_now": {
                                         "type": "boolean",
@@ -8467,7 +9140,7 @@
                     "Databases"
                 ],
                 "summary": "List backup executions",
-                "description": "Get all executions for a specific backup configuration.",
+                "description": "Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.",
                 "operationId": "list-backup-executions",
                 "parameters": [
                     {
@@ -8513,7 +9186,11 @@
                                                         "type": "string"
                                                     },
                                                     "message": {
-                                                        "type": "string"
+                                                        "description": "Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.",
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
                                                     },
                                                     "status": {
                                                         "type": "string"
@@ -8738,6 +9415,9 @@
                     },
                     "409": {
                         "description": "Another start, restart or import of this database is already in progress."
+                    },
+                    "422": {
+                        "description": "The database cannot start yet, for example because a CA certificate is missing."
                     }
                 },
                 "security": [
@@ -8768,7 +9448,7 @@
                     {
                         "name": "docker_cleanup",
                         "in": "query",
-                        "description": "Perform docker cleanup (prune networks, volumes, etc.).",
+                        "description": "Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.",
                         "schema": {
                             "type": "boolean",
                             "default": true
@@ -8856,6 +9536,9 @@
                     },
                     "409": {
                         "description": "Another start, restart or import of this database is already in progress."
+                    },
+                    "422": {
+                        "description": "The database cannot start yet, for example because a CA certificate is missing."
                     }
                 },
                 "security": [
@@ -9361,7 +10044,7 @@
                                     },
                                     "fs_path": {
                                         "type": "string",
-                                        "description": "Host directory path (required when is_directory is true)."
+                                        "description": "Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory."
                                     }
                                 },
                                 "type": "object",
@@ -9389,6 +10072,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission for a mount outside the resource directory."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -9459,7 +10145,7 @@
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "The file content (file only, not allowed for read-only storages)."
+                                        "description": "The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission."
                                     }
                                 },
                                 "type": "object",
@@ -9487,6 +10173,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission to change the content of a file outside the resource directory."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -10018,7 +10707,8 @@
                         "in": "query",
                         "description": "Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.",
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "maximum": 2147483647
                         }
                     },
                     {
@@ -10026,7 +10716,8 @@
                         "in": "query",
                         "description": "Preview deployment identifier. Alias of pr.",
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "maximum": 2147483647
                         }
                     },
                     {
@@ -10263,8 +10954,8 @@
                                     },
                                     "network": {
                                         "type": "string",
-                                        "maxLength": 255,
-                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                                        "maxLength": 255
                                     },
                                     "type": {
                                         "type": "string",
@@ -12260,6 +12951,189 @@
                 ]
             }
         },
+        "\/hostinger\/data-centers": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS data centers",
+                "operationId": "get-hostinger-data-centers",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS data centers."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/catalog": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS plans and prices",
+                "operationId": "get-hostinger-catalog",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS plans and prices."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/templates": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS operating system templates",
+                "operationId": "get-hostinger-templates",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS templates."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/ssh-keys": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger account SSH keys",
+                "operationId": "get-hostinger-ssh-keys",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger account SSH keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/post-install-scripts": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger post-install scripts",
+                "operationId": "get-hostinger-post-install-scripts",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger post-install scripts."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/hostinger": {
+            "post": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Purchase a Hostinger VPS and create a linked server",
+                "operationId": "create-hostinger-server",
+                "responses": {
+                    "201": {
+                        "description": "Hostinger VPS purchased and linked to a Coolify server."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/settings\/email": {
             "get": {
                 "tags": [
@@ -12726,58 +13600,6 @@
                                     "type": "string"
                                 },
                                 "example": "v4.0.0"
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/enable": {
-            "post": {
-                "summary": "Enable API",
-                "description": "Enable API (only with root permissions).",
-                "operationId": "enable-api",
-                "responses": {
-                    "200": {
-                        "description": "Enable API.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "API enabled."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "You are not allowed to enable the API.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "You are not allowed to enable the API."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
                             }
                         }
                     },
@@ -14182,7 +15004,8 @@
                                     "timeout": {
                                         "type": "integer",
                                         "description": "The timeout of the scheduled task in seconds.",
-                                        "default": 300
+                                        "default": 300,
+                                        "maximum": 36000
                                     },
                                     "enabled": {
                                         "type": "boolean",
@@ -14335,7 +15158,8 @@
                                     "timeout": {
                                         "type": "integer",
                                         "description": "The timeout of the scheduled task in seconds.",
-                                        "default": 300
+                                        "default": 300,
+                                        "maximum": 36000
                                     },
                                     "enabled": {
                                         "type": "boolean",
@@ -14528,7 +15352,8 @@
                                     "timeout": {
                                         "type": "integer",
                                         "description": "The timeout of the scheduled task in seconds.",
-                                        "default": 300
+                                        "default": 300,
+                                        "maximum": 36000
                                     },
                                     "enabled": {
                                         "type": "boolean",
@@ -14681,7 +15506,8 @@
                                     "timeout": {
                                         "type": "integer",
                                         "description": "The timeout of the scheduled task in seconds.",
-                                        "default": 300
+                                        "default": 300,
+                                        "maximum": 36000
                                     },
                                     "enabled": {
                                         "type": "boolean",
@@ -14968,70 +15794,6 @@
                         "bearerAuth": []
                     }
                 ]
-            },
-            "patch": {
-                "tags": [
-                    "Private Keys"
-                ],
-                "summary": "Update",
-                "description": "Update a private key.",
-                "operationId": "update-private-key",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "required": [
-                                    "private_key"
-                                ],
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "description": {
-                                        "type": "string"
-                                    },
-                                    "private_key": {
-                                        "type": "string"
-                                    }
-                                },
-                                "type": "object",
-                                "additionalProperties": false
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "The updated private key's UUID.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "uuid": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    },
-                    "422": {
-                        "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
             }
         },
         "\/security\/keys\/{uuid}": {
@@ -15139,6 +15901,81 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Private Keys"
+                ],
+                "summary": "Update",
+                "description": "Update a private key.",
+                "operationId": "update-private-key",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Private Key UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "private_key": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The updated private key's UUID.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "description": "Private Key not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -16215,6 +17052,14 @@
                                             "type": "boolean",
                                             "example": false
                                         },
+                                        "traefik_certificate_resolver": {
+                                            "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "example": "letsencrypt"
+                                        },
                                         "configuration": {
                                             "description": "Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.",
                                             "type": [
@@ -16249,7 +17094,7 @@
                     "Servers"
                 ],
                 "summary": "Update server proxy",
-                "description": "Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.",
+                "description": "Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.",
                 "operationId": "update-server-proxy",
                 "parameters": [
                     {
@@ -16280,6 +17125,13 @@
                                     },
                                     "generate_exact_labels": {
                                         "type": "boolean"
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
                                     },
                                     "proxy_type": {
                                         "description": "Proxy type (case-insensitive).",
@@ -16327,6 +17179,12 @@
                                         },
                                         "generate_exact_labels": {
                                             "type": "boolean"
+                                        },
+                                        "traefik_certificate_resolver": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
                                         },
                                         "configuration": {
                                             "type": [
@@ -16596,6 +17454,15 @@
                                         "geoip_refresh_days": {
                                             "type": "integer"
                                         },
+                                        "traffic_ip_mode": {
+                                            "description": "How Sentinel stores client IPs for the Top IPs breakdown.",
+                                            "type": "string",
+                                            "enum": [
+                                                "full",
+                                                "anonymized",
+                                                "off"
+                                            ]
+                                        },
                                         "geoip_maxmind_license_key": {
                                             "description": "Only present with read:sensitive.",
                                             "type": "string"
@@ -16675,6 +17542,7 @@
                                     },
                                     "traffic_topn": {
                                         "type": "integer",
+                                        "maximum": 1000,
                                         "minimum": 1
                                     },
                                     "traffic_sample_threshold": {
@@ -16683,10 +17551,12 @@
                                     },
                                     "traffic_retention_1h_days": {
                                         "type": "integer",
+                                        "maximum": 365,
                                         "minimum": 1
                                     },
                                     "traffic_retention_1d_days": {
                                         "type": "integer",
+                                        "maximum": 3650,
                                         "minimum": 1
                                     },
                                     "is_geoip_enabled": {
@@ -16700,6 +17570,15 @@
                                         "type": [
                                             "string",
                                             "null"
+                                        ]
+                                    },
+                                    "traffic_ip_mode": {
+                                        "description": "How Sentinel stores client IPs: full, anonymized (IPv4 \/24, IPv6 \/48), or off.",
+                                        "type": "string",
+                                        "enum": [
+                                            "full",
+                                            "anonymized",
+                                            "off"
                                         ]
                                     }
                                 },
@@ -17538,6 +18417,13 @@
                                     "is_gzip_enabled": {
                                         "type": [
                                             "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "description": "Traefik certificate resolver for this service application. Null uses the server setting, \"none\" uses no resolver.",
+                                        "type": [
+                                            "string",
                                             "null"
                                         ]
                                     },
@@ -18748,6 +19634,11 @@
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off."
                                     },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
                                     "tags": {
                                         "type": "array",
                                         "items": {
@@ -18942,7 +19833,7 @@
                     {
                         "name": "docker_cleanup",
                         "in": "query",
-                        "description": "Run docker cleanup.",
+                        "description": "Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
@@ -19075,6 +19966,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     }
                                 },
                                 "type": "object"
@@ -19895,7 +20791,7 @@
                     {
                         "name": "docker_cleanup",
                         "in": "query",
-                        "description": "Perform docker cleanup (prune networks, volumes, etc.).",
+                        "description": "Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.",
                         "schema": {
                             "type": "boolean",
                             "default": true
@@ -20118,7 +21014,7 @@
                                     },
                                     "fs_path": {
                                         "type": "string",
-                                        "description": "Host directory path (required when is_directory is true)."
+                                        "description": "Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory."
                                     }
                                 },
                                 "type": "object",
@@ -20146,6 +21042,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission for a mount outside the resource directory."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -20216,7 +21115,7 @@
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "The file content (file only, not allowed for read-only storages)."
+                                        "description": "The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission."
                                     }
                                 },
                                 "type": "object",
@@ -20244,6 +21143,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission to change the content of a file outside the resource directory."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -22592,6 +23494,105 @@
                 },
                 "type": "object"
             },
+            "ApplicationPreview": {
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "pull_request_id": {
+                        "type": "integer"
+                    },
+                    "pull_request_html_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "git_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "domains": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "docker_compose_domains": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "domain": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "redirect": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "domain_port_overrides": {
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "docker_registry_image_tag": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_online_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ApplicationPreviewDeployment": {
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    },
+                    "deployment_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "preview": {
+                        "$ref": "#\/components\/schemas\/ApplicationPreview"
+                    }
+                },
+                "type": "object"
+            },
             "VolumeBackupScheduleRequest": {
                 "required": [
                     "frequency"
@@ -22599,8 +23600,8 @@
                 "properties": {
                     "frequency": {
                         "type": "string",
-                        "maxLength": 255,
-                        "example": "0 2 * * *"
+                        "example": "0 2 * * *",
+                        "maxLength": 255
                     },
                     "enabled": {
                         "type": "boolean",
@@ -22619,10 +23620,18 @@
                         "default": false
                     },
                     "s3_storage_uuid": {
+                        "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.",
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "s3_storage_uuids": {
+                        "description": "UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "retention_amount_locally": {
                         "type": "integer",
@@ -22667,6 +23676,13 @@
                         "default": 36000,
                         "maximum": 36000,
                         "minimum": 60
+                    },
+                    "missing_backup_notification_days": {
+                        "description": "Alert after this many days without an execution; 0 disables alerts",
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 365,
+                        "minimum": 0
                     }
                 },
                 "type": "object",
@@ -22689,7 +23705,8 @@
                     "retention_amount_s3",
                     "retention_days_s3",
                     "retention_max_storage_s3",
-                    "timeout"
+                    "timeout",
+                    "missing_backup_notification_days"
                 ],
                 "properties": {
                     "uuid": {
@@ -22724,10 +23741,18 @@
                         "type": "boolean"
                     },
                     "s3_storage_uuid": {
+                        "description": "Primary S3 destination.",
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "s3_storage_uuids": {
+                        "description": "Every S3 destination, primary first.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "retention_amount_locally": {
                         "type": "integer"
@@ -22750,6 +23775,9 @@
                         "format": "float"
                     },
                     "timeout": {
+                        "type": "integer"
+                    },
+                    "missing_backup_notification_days": {
                         "type": "integer"
                     }
                 },
@@ -23161,6 +24189,32 @@
                         "nullable": true,
                         "description": "Password for HTTP Basic Authentication"
                     },
+                    "http_basic_auth_hash_algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "bcrypt",
+                            "argon2id"
+                        ],
+                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                    },
+                    "http_basic_auth_bcrypt_cost": {
+                        "type": "integer",
+                        "minimum": 4,
+                        "maximum": 14,
+                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                    },
+                    "http_basic_auth_argon2id_memory_cost": {
+                        "type": "integer",
+                        "minimum": 8192,
+                        "maximum": 262144,
+                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                    },
+                    "http_basic_auth_argon2id_time_cost": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 12,
+                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                    },
                     "settings": {
                         "$ref": "#\/components\/schemas\/ApplicationSetting"
                     }
@@ -23326,6 +24380,11 @@
                     "is_gzip_enabled": {
                         "type": "boolean"
                     },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver override. Null uses the server setting, \"none\" uses no resolver."
+                    },
                     "is_stripprefix_enabled": {
                         "type": "boolean"
                     },
@@ -23366,6 +24425,10 @@
                     },
                     "use_build_secrets": {
                         "type": "boolean"
+                    },
+                    "redact_all_env_values_in_logs": {
+                        "type": "boolean",
+                        "description": "Hide every environment variable value in logs. When false, only locked values are hidden."
                     },
                     "inject_build_args_to_dockerfile": {
                         "type": "boolean"
@@ -23787,6 +24850,19 @@
                     "geoip_refresh_days": {
                         "type": "integer"
                     },
+                    "traffic_ip_mode": {
+                        "type": "string",
+                        "enum": [
+                            "full",
+                            "anonymized",
+                            "off"
+                        ]
+                    },
+                    "traefik_certificate_resolver": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates."
+                    },
                     "is_reachable": {
                         "type": "boolean"
                     },
@@ -23938,6 +25014,10 @@
                     "is_container_label_escape_enabled": {
                         "type": "boolean",
                         "description": "The flag to enable the container label escape."
+                    },
+                    "redact_all_env_values_in_logs": {
+                        "type": "boolean",
+                        "description": "Hide every environment variable value in logs. When false, only locked values are hidden."
                     },
                     "is_container_label_readonly_enabled": {
                         "type": "boolean",
@@ -24228,12 +25308,16 @@
     },
     "tags": [
         {
+            "name": "Applications",
+            "description": "Applications"
+        },
+        {
             "name": "Secret Managers",
             "description": "Secret Managers"
         },
         {
-            "name": "Applications",
-            "description": "Applications"
+            "name": "Audit Events",
+            "description": "Audit Events"
         },
         {
             "name": "Cloud-init Scripts",
@@ -24270,6 +25354,10 @@
         {
             "name": "Hetzner",
             "description": "Hetzner"
+        },
+        {
+            "name": "Hostinger",
+            "description": "Hostinger"
         },
         {
             "name": "Settings",

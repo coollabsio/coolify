@@ -102,6 +102,38 @@ test('automatic dns is enabled by default and can be disabled when saving a clou
     expect(IntegrationToken::query()->sole()->automaticDnsEnabled())->toBeFalse();
 });
 
+test('cloudflare proxy mode is off by default and can be enabled when adding and editing a token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->assertSet('proxiedDns', false)
+        ->set('name', 'Proxied DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('proxiedDns', true)
+        ->call('addToken')
+        ->assertHasNoErrors();
+
+    $token = IntegrationToken::query()->sole();
+    expect($token->proxiedDnsEnabled())->toBeTrue();
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->assertSet('proxiedDns', true)
+        ->set('proxiedDns', false)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($token->refresh()->proxiedDnsEnabled())->toBeFalse();
+});
+
 test('deleting an integration token is audited without storing its value', function () {
     $token = IntegrationToken::query()->create([
         'team_id' => $this->team->id,
@@ -173,7 +205,7 @@ test('cloudflare dns scope guidance and token creation link are shown', function
         ->set('capabilities', ['dns'])
         ->assertSee('Zone - DNS - Edit')
         ->assertSee('Zone - Zone - Read')
-        ->assertSeeHtml('https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management');
+        ->assertSeeHtml(e(IntegrationToken::cloudflareTokenTemplateUrl(['dns'])));
 });
 
 test('saved integration token rows render modal editors with a gear button', function () {
@@ -436,4 +468,22 @@ test('saving a vault token with unchanged connection settings and a blank token 
     expect($savedToken->name)->toBe('Renamed Vault')
         ->and($savedToken->token)->toBe('hvs.stored-secret')
         ->and($savedToken->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
+
+test('the token list shows its empty state after the editor deletes the last token', function () {
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'secret',
+        'capabilities' => ['dns'],
+    ]);
+    $list = Livewire::test(IntegrationTokens::class)->assertDontSee('No integration tokens');
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->call('delete')
+        ->assertDispatched('integration-token-deleted', uuid: $token->uuid);
+
+    $list->dispatch('integration-token-deleted', uuid: $token->uuid)
+        ->assertSee('No integration tokens');
 });

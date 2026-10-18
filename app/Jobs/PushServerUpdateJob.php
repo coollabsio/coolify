@@ -11,8 +11,10 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Events\ServiceChecked;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -29,6 +31,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Notifications\Container\ContainerRestarted;
+use App\Notifications\Server\HighDiskUsage;
 use App\Services\ContainerStatusAggregator;
 use App\Services\RestartCountTracker;
 use App\Traits\CalculatesExcludedStatus;
@@ -196,14 +199,22 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // it is wasted work — and most servers sit well below the threshold.
         $diskThreshold = data_get($this->server, 'settings.server_disk_usage_notification_threshold', 80);
         $storageCacheKey = 'storage-check:'.$this->server->id;
+        // Set while usage was high, so the throttle is released only once when usage recovers.
+        $highUsageCacheKey = 'storage-high:'.$this->server->id;
         $lastPercentage = Cache::get($storageCacheKey);
         if ($filesystemUsageRoot !== null
             && $filesystemUsageRoot >= $diskThreshold
             && (string) $lastPercentage !== (string) $filesystemUsageRoot) {
             Cache::put($storageCacheKey, $filesystemUsageRoot, 600);
+            Cache::forever($highUsageCacheKey, true);
             ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
         } elseif ($filesystemUsageRoot !== null && $filesystemUsageRoot < $diskThreshold) {
             Cache::forget($storageCacheKey);
+            // The storage check does not run below the threshold, so the next spike alerts again only
+            // when the throttle is released here.
+            if (HighDiskUsage::hasRecovered($filesystemUsageRoot, $diskThreshold) && Cache::pull($highUsageCacheKey)) {
+                NotificationThrottle::release($this->server, HighDiskUsage::class);
+            }
         }
 
         if ($this->containers->isEmpty() && ! $this->isCompleteSnapshot()) {
@@ -366,6 +377,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         }
 
         if (! $this->isCompleteSnapshot()) {
+            ServiceChecked::dispatch($this->server->team_id);
+
             return;
         }
 
@@ -390,6 +403,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->aggregateServiceContainerStatuses();
 
         $this->checkLogDrainContainer();
+
+        ServiceChecked::dispatch($this->server->team_id);
     }
 
     private function isCompleteSnapshot(): bool
@@ -810,14 +825,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server, restartedResource: $this->server));
                     }
                 } catch (\Throwable $e) {
-                }
-            } else {
-                // Connect proxy to networks periodically as a safety net to avoid excessive job dispatches.
-                // On-demand triggers (new network, service deploy) use dispatchSync() and bypass this.
-                $proxyCacheKey = 'connect-proxy:'.$this->server->id;
-                if (! Cache::has($proxyCacheKey)) {
-                    Cache::put($proxyCacheKey, true, config('constants.proxy.connect_networks_interval_seconds', 3600));
-                    ConnectProxyToNetworksJob::dispatch($this->server);
                 }
             }
         }

@@ -22,12 +22,14 @@
             <form action="/login" method="POST" class="flex flex-col gap-4">
                 @csrf
                 @env('local')
-                    <x-forms.input value="test@example.com" type="email" autocomplete="email" name="email" required
+                    <x-forms.input value="test@example.com" type="email"
+                        autocomplete="{{ $passkeys_available ? 'email webauthn' : 'email' }}" name="email" required
                         autofocus label="{{ __('input.email') }}" />
                     <x-forms.input value="password" type="password" autocomplete="current-password" name="password"
                         required label="{{ __('input.password') }}" />
                 @else
-                    <x-forms.input type="email" name="email" autocomplete="email" required autofocus
+                    <x-forms.input type="email" name="email"
+                        autocomplete="{{ $passkeys_available ? 'email webauthn' : 'email' }}" required autofocus
                         label="{{ __('input.email') }}" />
                     <x-forms.input type="password" name="password" autocomplete="current-password" required
                         label="{{ __('input.password') }}" />
@@ -77,6 +79,10 @@
                     {{ __('auth.login') }}
                 </x-forms.button>
             </form>
+
+            @if ($passkeys_available)
+                <x-auth.passkey-verify autofill />
+            @endif
 
             @if ($enabled_oauth_providers->isNotEmpty())
                 <div class="auth-divider"><span>Or continue with</span></div>

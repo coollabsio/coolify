@@ -4,17 +4,26 @@
 - Reproduce the reported failure on the unchanged baseline before adding a fix.
 - When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.
 - Test old reports against the current branch because later changes can make the report obsolete.
+- Test serialized worker tasks with the real process driver. An in-process test does not prove that captured models or nested closures survive serialization.
 - Use the same regression test before and after the production change so the result shows the behavior difference.
 - Several dev instances can run from one checkout (see `./scripts/dev urls`). After you add a migration, run it on each running instance of that checkout, or those instances fail on the new code.
 - The checkout is shared with other sessions. When the full suite fails, rerun each failing file alone and compare with a clean `git archive HEAD` copy before you connect a failure to your change.
+- Run seeders and other artisan commands that write SSH keys in a dev container as `www-data` (`docker exec -u www-data`). Root-owned files in `storage/app/ssh` make every SSH call from the web process fail.
 - `sshd` keeps the login shell of an open multiplexed SSH connection. Call `SshMultiplexingHelper::removeMuxFile()` before a live test of SSH or login-shell behavior.
+- SSH retries replay the full command batch. Only exit code 255 is an SSH transport failure; other exit codes come from the remote command, so do not retry them. Keep batches safe to run twice (for example `docker rm -f <name> || true` before `docker run --name <name>`).
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
+- Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors.
+- A new worktree has no `vendor/` or `public/build/`. Run `composer install --ignore-platform-req=ext-zip` on the host and copy `public/build` from the main checkout before page-rendering tests; otherwise they fail with a Vite manifest error.
+- Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
+- Do not symlink `vendor` into another worktree. Composer resolves the base path from the real `vendor` path, so the tests load the app classes of the other checkout. Run `composer install --ignore-platform-req=ext-zip` in the worktree.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
+- SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
 - Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.
 - When the request covers more than one interface or resource type, inventory and verify each supported path.
+- When a change alters how stored data reaches running containers, simulate the upgrade on the dev VM: start resources on the old code, then migrate and restart them on the new code, and compare the results.
 
 ## Preserve product scope
 - Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.
@@ -54,6 +63,7 @@
 ## Trace infrastructure changes end to end
 - For container image changes, inspect Compose services and every relevant Dockerfile build stage.
 - Pin a stable release tag instead of using a floating `latest` tag.
+- Never give a test build an official image tag (for example `coollabsio/sentinel:<version>`) in the host Docker. Dev instances that use `testing-host` share the host Docker socket and run that tag without a pull. Load such a tag only inside a dev VM, and give the build the same version string, or Coolify's Sentinel check restarts it every minute.
 - A successful image pull does not prove that the complete application build no longer uses the old image.
 - Do not use `docker compose up --wait` for a stack with one-shot services; wait for the required long-running service's health instead.
 
@@ -64,6 +74,7 @@
 - A Redis instance that holds queues must use `maxmemory-policy noeviction`; an evicting policy deletes queued jobs without an error. Before changing scheduler code for missed runs, check `INFO stats` `evicted_keys`.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
 - Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
+- A job of a killed worker comes back after `retry_after` (one day) as attempt 2. With `tries > 1` it runs again a day late; queued jobs that must not run late need `tries = 1` or an attempt guard, and `failed()` must not guess its execution row from "the latest" record.
 
 ## Fail closed at public webhook boundaries
 - Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.
@@ -95,3 +106,13 @@
 - In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`, `--project-directory <dir>`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs. scp also runs as the SSH user; stage files outside `/data/coolify`.
 - The parsers add sudo only to line starts (and after `&&`, `||`, `|`, `$(`). Put `if`/`else` branches on their own lines. When a redirect or `cd` must stay, make the whole line one `sh -c '...'` script; it runs as `sudo sh -c` without inner sudo or bash.
 - Tests that replace `DatabaseStartCommandExecutor` or use root servers miss non-root bugs. Test the parsed commands of a non-root server.
+
+## Redact sensitive output before every sink
+- Use one fail-closed redaction policy for database logs, framework logs, notifications, API output, exports, and MCP responses.
+- Replace known resource secrets before storage; format detection is only a second layer.
+- Keep read-time redaction for legacy records, but do not use it as the primary control.
+
+## Cached and stored state
+- `StandaloneDocker`/`SwarmDocker` `server` uses `Server::findCached()`, a per-process identity map that is flushed only when the `servers` row updates. A `ServerSetting` save does not flush it, so pass the current `Server` instance (`setRelation('server', $server)`) when generated output depends on just-saved settings.
+- Application deployments use the stored `custom_labels` when they exist. When a server-level setting changes the generated labels, regenerate the stored labels of read-only (`is_container_label_readonly_enabled`) applications, or a redeploy keeps the old labels.
+- Tailwind `text-base` is a colour utility here (`--color-base`, near-black), not a font size. Use `text-[16px]` for size.

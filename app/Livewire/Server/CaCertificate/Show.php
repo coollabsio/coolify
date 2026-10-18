@@ -77,6 +77,7 @@ class Show extends Component
 
                 $this->caCertificate->ssl_certificate = $this->certificateContent;
                 $this->caCertificate->save();
+                auditLog('ui.server.ca_certificate.updated', $this->auditContext());
 
                 $this->loadCaCertificate();
 
@@ -103,6 +104,7 @@ class Show extends Component
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
+            auditLog('ui.server.ca_certificate.regenerated', $this->auditContext());
 
             $this->loadCaCertificate();
 
@@ -125,6 +127,20 @@ class Show extends Component
         $commands = SslHelper::caCertificateFileCommands($this->certificateContent);
 
         remote_process($commands, $this->server);
+    }
+
+    /**
+     * Identifies the server only. Certificate and key contents must never reach the audit log.
+     *
+     * @return array<string, mixed>
+     */
+    private function auditContext(): array
+    {
+        return [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ];
     }
 
     public function render()

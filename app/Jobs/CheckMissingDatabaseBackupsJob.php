@@ -18,6 +18,14 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 1800;
+
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), so the next hourly run is not
+     * blocked until the queue retry_after.
+     */
+    public int $uniqueFor = 1800;
+
     public function handle(): void
     {
         ScheduledDatabaseBackup::query()

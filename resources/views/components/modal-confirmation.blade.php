@@ -72,14 +72,18 @@
     dispatchEventMessage: @js($dispatchEventMessage),
     disableTwoStepConfirmation: @js($disableTwoStepConfirmation),
     skipPasswordConfirmation: @js($skipPasswordConfirmation),
-    resetModal() {
+    // A successful submit already re-rendered the component. Refreshing again
+    // after it can hit an ended session, for example after an account deletion.
+    resetModal(refresh = true) {
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
         this.submitting = false;
         this.userConfirmationText = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
-        $wire.$refresh();
+        if (refresh) {
+            $wire.$refresh();
+        }
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($effectiveStep2ButtonText),
@@ -332,7 +336,7 @@
                                         $nextTick(() => {
                                             submitForm().then((result) => {
                                                 submitting = false;
-                                                resetModal();
+                                                resetModal(result !== true);
                                             }).catch(() => {
                                                 submitting = false;
                                                 modalOpen = true;
@@ -390,7 +394,7 @@
                                         submitForm().then((result) => {
                                             submitting = false;
                                             if (result === true) {
-                                                resetModal();
+                                                resetModal(false);
                                             } else {
                                                 modalOpen = true;
                                                 passwordError = result;

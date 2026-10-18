@@ -97,6 +97,11 @@ class ImportFormRestoreOptionsTestComponent extends ImportForm
         $this->initializeRestoreOptions();
     }
 
+    protected function serverFileExists(string $path): bool
+    {
+        return true;
+    }
+
     public function render()
     {
         return view('livewire.project.database.import-form');
@@ -151,7 +156,7 @@ test('the import form strips owners by default and keeps them when the option is
     $form->set('keepOwners', true);
     expect($form->get('restoreCommandText'))->not->toContain('--no-owner');
 
-    $form->set('filename', 'backup.dump')->set('customLocation', '/backups/backup.dump')->call('runImport');
+    $form->set('customLocation', '/backups/backup.dump')->call('checkFile')->call('runImport');
 });
 
 test('passes the restore users option to the MariaDB all-databases restore script', function (bool $restoreMysqlUsers) {
@@ -174,7 +179,7 @@ test('the import form skips MySQL users by default and restores them when the op
     $form->set('restoreMysqlUsers', true)->assertSee('passwords');
     expect($form->get('restoreCommandText'))->not->toContain('awk');
 
-    $form->set('filename', 'all.sql.gz')->set('customLocation', '/backups/all.sql.gz')->call('runImport');
+    $form->set('customLocation', '/backups/all.sql.gz')->call('checkFile')->call('runImport');
 });
 
 test('the import form does not offer the restore users option for PostgreSQL', function () {
@@ -194,7 +199,7 @@ test('the import form lets the user pick the SQLite database file to restore int
         ->assertSet('sqliteDatabase', 'cache.db');
     expect($form->get('restoreCommandText'))->toContain("'/var/lib/sqlite/cache.db'");
 
-    $form->set('filename', 'backup.gz')->set('customLocation', '/backups/backup.gz')->call('runImport');
+    $form->set('customLocation', '/backups/sqlite-backup-cache.db-1700000000.gz')->call('checkFile')->assertSet('sqliteDatabase', 'cache.db')->call('runImport');
 });
 
 test('the import form does not accept a SQLite target from the client that is not a database file', function () {

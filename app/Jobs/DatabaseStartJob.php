@@ -24,6 +24,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Services\ResourceStatusRefresher;
 use App\Support\ResourceStartActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -33,6 +34,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Spatie\Activitylog\Models\Activity;
 use Throwable;
 
@@ -128,6 +130,13 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
 
         if (! $result instanceof Activity || data_get($result, 'properties.status') !== ProcessStatus::FINISHED->value) {
             throw DatabaseStartException::startCommandsDidNotRun();
+        }
+
+        // Store the new status now; the regular status check can wait behind other jobs.
+        try {
+            app(ResourceStatusRefresher::class)->refreshDatabase($database);
+        } catch (Throwable $e) {
+            Log::warning('Could not refresh the status of a started database.', ['database' => $database->uuid, 'error' => $e->getMessage()]);
         }
 
         event(new DatabaseStatusChanged($this->userId));

@@ -13,7 +13,9 @@ use Illuminate\Support\Stringable;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetServerDomains extends Tool
 {
     protected string $name = 'get_server_domains';
@@ -62,11 +64,7 @@ class GetServerDomains extends Tool
         $domains = collect();
 
         foreach ($applications as $application) {
-            $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
-                $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
-
-                return str(str($f[0])->explode(':')[0]);
-            })->filter(fn (Stringable $f) => $f->isNotEmpty());
+            $fqdn = str($application->fqdn)->explode(',')->map(fn ($fqdn) => self::domainHostWithoutPort((string) $fqdn))->filter(fn (Stringable $f) => $f->isNotEmpty());
 
             if ($fqdn->isNotEmpty()) {
                 $domains->push([
@@ -89,5 +87,18 @@ class GetServerDomains extends Tool
         return [
             'uuid' => $schema->string()->description('Server UUID.')->required(),
         ];
+    }
+
+    /**
+     * The host of a domain without the port: "[2a01:4f8::1]:8080" gives "[2a01:4f8::1]", "example.com:3000" gives "example.com".
+     */
+    private static function domainHostWithoutPort(string $fqdn): Stringable
+    {
+        $authority = (string) str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/')[0];
+        if (str_starts_with($authority, '[') && str_contains($authority, ']')) {
+            return str(substr($authority, 0, strpos($authority, ']') + 1));
+        }
+
+        return str(str($authority)->explode(':')[0]);
     }
 }

@@ -9,6 +9,7 @@ use App\Actions\Service\StopService;
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
+use App\Exceptions\RemoteSecretException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\DatabaseStartJob;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
@@ -103,18 +104,19 @@ function remoteSecretLifecyclePostgres(): StandalonePostgresql
  */
 function remoteSecretLifecycleWrittenEnvFile(Service $service): string
 {
-    $commands = collect();
-    Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+    $envFileContent = '';
+    Process::fake(function ($process) use (&$envFileContent) {
+        // The .env content goes to `tee <workdir>/<id>.env.tmp` over SSH stdin.
+        if (preg_match('/tee \S+\.env\.tmp/', $process->command)) {
+            $envFileContent = (string) $process->input;
+        }
 
         return Process::result(output: '');
     });
 
     $service->saveComposeConfigs();
 
-    preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d \| tee [^ ]+\.env\.tmp/", $commands->implode("\n"), $matches);
-
-    return base64_decode($matches[1] ?? '');
+    return $envFileContent;
 }
 
 /*
@@ -147,11 +149,11 @@ test('literal service variables with remote secrets are written as valid dotenv 
     expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('API_KEY="it\'s"');
 });
 
-test('service variables without remote secrets keep their .env format', function () {
+test('service variables without remote secrets use exact .env escaping', function () {
     $service = remoteSecretLifecycleService();
     $service->environment_variables()->create(['key' => 'PLAIN', 'value' => 'say "hi"']);
 
-    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('PLAIN=say \"hi\"');
+    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('PLAIN="say \"hi\""');
     Http::assertNothingSent();
 });
 
@@ -197,7 +199,7 @@ test('redis remote passwords are escaped the same way in the environment and the
     $startCommand = (new ReflectionMethod($action, 'buildStartCommand'))->invoke($action);
 
     expect($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
-        ->and($startCommand)->toContain('--requirepass p4$$word');
+        ->and($startCommand)->toContain("--requirepass 'p4\$\$word'");
 });
 
 test('a service restart keeps the service running when remote secrets cannot be fetched', function () {
@@ -210,7 +212,29 @@ test('a service restart keeps the service running when remote secrets cannot be 
         ->toThrow(RuntimeException::class, 'Doppler is down');
 });
 
-test('a service restart fetches remote secrets only once', function () {
+test('a literal service variable keeps reference text when no secret manager source is configured', function () {
+    Http::fake();
+    $service = remoteSecretLifecycleService();
+    $service->secretManagerLink()->delete();
+    $service->environment_variables()->create(['key' => 'TEMPLATE', 'value' => 'Hello {{vault.NAME}}', 'is_literal' => true]);
+
+    $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
+
+    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('TEMPLATE="Hello {{vault.NAME}}"');
+    Http::assertNothingSent();
+});
+
+test('a service start stops before the service when a non-literal variable references a secret without a source', function () {
+    StopService::shouldRun()->never();
+    $service = remoteSecretLifecycleService();
+    $service->secretManagerLink()->delete();
+    $service->environment_variables()->create(['key' => 'API_KEY', 'value' => '{{vault.API_KEY}}']);
+
+    expect(fn () => StartService::run($service, stopBeforeStart: true))
+        ->toThrow(RemoteSecretException::class, 'no secret manager source is configured');
+});
+
+test('a service restart fetches remote secrets once to start and once to redact the start output', function () {
     Http::fake([REMOTE_SECRET_LIFECYCLE_DOPPLER_URL => Http::response(['API_KEY' => 'value'])]);
     Process::fake(['*' => Process::result(output: '')]);
     StopService::shouldRun();
@@ -219,7 +243,8 @@ test('a service restart fetches remote secrets only once', function () {
 
     StartService::run($service, stopBeforeStart: true);
 
-    Http::assertSentCount(1);
+    // The start output is redacted in the activity job, which loads the service again.
+    Http::assertSentCount(2);
 });
 
 test('a database restart keeps the database running and reports the secret manager error', function () {

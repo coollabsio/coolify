@@ -8,6 +8,7 @@ use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\DatabaseStartCommandExecutor;
@@ -51,7 +52,7 @@ beforeEach(function () {
 });
 
 /**
- * @return array{command: string, healthcheck: list<string>}
+ * @return array{command: string, healthcheck: list<string>, environment: list<string>}
  */
 function legacyPasswordQuotingStartedService(object $executor, string $uuid): array
 {
@@ -59,7 +60,7 @@ function legacyPasswordQuotingStartedService(object $executor, string $uuid): ar
         if (preg_match("#^echo '([^']+)' \| base64 -d \| tee \S+/docker-compose\.yml#", $command, $matches)) {
             $service = Yaml::parse(base64_decode($matches[1]))['services'][$uuid];
 
-            return ['command' => $service['command'], 'healthcheck' => $service['healthcheck']['test']];
+            return ['command' => $service['command'], 'healthcheck' => $service['healthcheck']['test'], 'environment' => $service['environment']];
         }
     }
 
@@ -155,3 +156,201 @@ it('marks only databases that exist before the migration as legacy', function ()
         ->and($newKeydb->fresh()->legacy_password_quoting)->toBeFalse()
         ->and($newDragonfly->fresh()->legacy_password_quoting)->toBeFalse();
 });
+
+it('keeps the exact v4.3.23 start command when Docker Compose split or cut the unquoted legacy password', function (string $create, string $start, string $passwordColumn, string $commandFormat, string $password) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => $password]);
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+
+    $start::run($database->fresh(), new Activity);
+
+    expect(legacyPasswordQuotingStartedService($this->executor, $database->uuid)['command'])
+        ->toBe(sprintf($commandFormat, $password));
+})->with('legacy-password-quoting-engines')->with([
+    'semicolon' => 'ab;cd',
+    'space' => 'a b',
+    'tab' => "a\tb",
+    'pipe' => 'x|y',
+    'ampersand' => 'p&q',
+    'redirects' => 'a<b>',
+]);
+
+it('quotes a plain legacy password, which gives Docker Compose the same argument as v4.3.23', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'abc']);
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+
+    $start::run($database->fresh(), new Activity);
+
+    expect(legacyPasswordQuotingStartedService($this->executor, $database->uuid)['command'])
+        ->toBe(sprintf($commandFormat, "'abc'"));
+})->with('legacy-password-quoting-engines');
+
+it('quotes shell control characters in the password of a database created after the upgrade', function (string $create, string $start, string $passwordColumn, string $commandFormat, string $password) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => $password]);
+
+    $start::run($database->fresh(), new Activity);
+
+    expect(legacyPasswordQuotingStartedService($this->executor, $database->uuid)['command'])
+        ->toBe(sprintf($commandFormat, escapeshellarg($password)));
+})->with('legacy-password-quoting-engines')->with([
+    'semicolon' => 'ab;cd',
+    'space' => 'a b',
+    'pipe' => 'x|y',
+]);
+
+it('runs with a plain REDIS_PASSWORD variable instead of the stored password without changing either', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'storedpass']);
+    $env = $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => 'envpass']);
+
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, "'envpass'"))
+        ->and($service['healthcheck'][3])->toBe('envpass')
+        ->and($service['environment'])->toContain('REDIS_PASSWORD=envpass')
+        ->and($env->fresh()->value)->toBe('envpass')
+        ->and($database->fresh()->{$passwordColumn})->toBe('storedpass');
+})->with('legacy-password-quoting-engines');
+
+it('runs with the stored password again after the REDIS_PASSWORD variable is removed', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'storedpass']);
+    $env = $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => 'envpass']);
+    $start::run($database->fresh(), new Activity);
+
+    $env->delete();
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, "'storedpass'"))
+        ->and($service['healthcheck'][3])->toBe('storedpass')
+        ->and($service['environment'])->toContain('REDIS_PASSWORD=storedpass');
+})->with('legacy-password-quoting-engines');
+
+it('runs with the stored password when the REDIS_PASSWORD variable is empty', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'storedpass']);
+    $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => '']);
+
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, "'storedpass'"))
+        ->and($service['healthcheck'][3])->toBe('storedpass');
+})->with('legacy-password-quoting-engines');
+
+it('keeps the exact v4.3.23 command of a legacy database with a different plain REDIS_PASSWORD variable', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'stored;pass']);
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+    $env = $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => 'envpass']);
+
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, 'stored;pass'))
+        ->and($service['healthcheck'][3])->toBe('stored;pass')
+        ->and($service['environment'])->toContain('REDIS_PASSWORD=envpass')
+        ->and($env->fresh()->value)->toBe('envpass')
+        ->and($database->fresh()->{$passwordColumn})->toBe('stored;pass')
+        ->and($database->fresh()->legacy_password_quoting)->toBeTrue();
+})->with('legacy-password-quoting-engines');
+
+it('runs with a remote secret REDIS_PASSWORD without storing it', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    Http::fake(['https://api.doppler.com/*' => Http::response(['REDIS_PASSWORD' => 'secretpass'])]);
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->environment->project->team_id,
+        'provider' => 'doppler',
+        'name' => 'Doppler',
+        'token' => 'the-secret-token',
+        'capabilities' => ['secrets'],
+    ]);
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'storedpass']);
+    $database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    $env = $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => '{{vault.REDIS_PASSWORD}}']);
+
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, "'secretpass'"))
+        ->and($service['healthcheck'][3])->toBe('secretpass')
+        ->and($env->fresh()->value)->toBe('{{vault.REDIS_PASSWORD}}')
+        ->and($database->fresh()->{$passwordColumn})->toBe('storedpass');
+})->with('legacy-password-quoting-engines');
+
+it('runs with a shared REDIS_PASSWORD variable without storing it', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    SharedEnvironmentVariable::query()->create([
+        'key' => 'REDIS_PASSWORD',
+        'value' => 'sharedpass',
+        'type' => 'team',
+        'team_id' => $this->environment->project->team_id,
+    ]);
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'storedpass']);
+    $env = $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => '{{team.REDIS_PASSWORD}}']);
+
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, "'sharedpass'"))
+        ->and($service['healthcheck'][3])->toBe('sharedpass')
+        ->and($env->fresh()->value)->toBe('{{team.REDIS_PASSWORD}}')
+        ->and($database->fresh()->{$passwordColumn})->toBe('storedpass');
+})->with('legacy-password-quoting-engines');
+
+it('keeps the stored password of a legacy database with a shared REDIS_PASSWORD variable', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    SharedEnvironmentVariable::query()->create([
+        'key' => 'REDIS_PASSWORD',
+        'value' => 'sharedpass',
+        'type' => 'team',
+        'team_id' => $this->environment->project->team_id,
+    ]);
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'stored;pass']);
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+    $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => '{{team.REDIS_PASSWORD}}']);
+
+    $start::run($database->fresh(), new Activity);
+
+    $service = legacyPasswordQuotingStartedService($this->executor, $database->uuid);
+    expect($service['command'])->toBe(sprintf($commandFormat, 'stored;pass'))
+        ->and($service['healthcheck'][3])->toBe('stored;pass')
+        ->and($database->fresh()->{$passwordColumn})->toBe('stored;pass')
+        ->and($database->fresh()->legacy_password_quoting)->toBeTrue();
+})->with('legacy-password-quoting-engines');
+
+it('shows the password the server uses in the connection URLs', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    SharedEnvironmentVariable::query()->create([
+        'key' => 'REDIS_PASSWORD',
+        'value' => 'shared/pass',
+        'type' => 'team',
+        'team_id' => $this->environment->project->team_id,
+    ]);
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'stored/pass', 'is_public' => true, 'public_port' => 16379]);
+    expect($database->fresh()->internal_db_url)->toContain(':stored%2Fpass@')
+        ->and($database->fresh()->external_db_url)->toContain(':stored%2Fpass@');
+
+    $env = $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => 'env/pass']);
+    expect($database->fresh()->internal_db_url)->toContain(':env%2Fpass@')
+        ->and($database->fresh()->external_db_url)->toContain(':env%2Fpass@');
+
+    $env->update(['value' => '{{team.REDIS_PASSWORD}}']);
+    expect($database->fresh()->internal_db_url)->toContain(':shared%2Fpass@')
+        ->and($database->fresh()->external_db_url)->toContain(':shared%2Fpass@');
+
+    DB::table($database->getTable())->where('id', $database->id)->update(['legacy_password_quoting' => true]);
+    expect($database->fresh()->internal_db_url)->toContain(':stored%2Fpass@')
+        ->and($database->fresh()->external_db_url)->toContain(':stored%2Fpass@');
+})->with('legacy-password-quoting-engines');
+
+it('shows the unresolved remote secret reference in the connection URL without fetching it', function (string $create, string $start, string $passwordColumn, string $commandFormat) {
+    Http::fake();
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->environment->project->team_id,
+        'provider' => 'doppler',
+        'name' => 'Doppler',
+        'token' => 'the-secret-token',
+        'capabilities' => ['secrets'],
+    ]);
+    $database = $create($this->environment->id, $this->destination, [$passwordColumn => 'storedpass']);
+    $database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    $database->runtime_environment_variables()->create(['key' => 'REDIS_PASSWORD', 'value' => '{{vault.REDIS_PASSWORD}}']);
+
+    expect($database->fresh()->internal_db_url)->toContain(':'.rawurlencode('{{vault.REDIS_PASSWORD}}').'@')
+        ->not->toContain('storedpass');
+    Http::assertNothingSent();
+})->with('legacy-password-quoting-engines');

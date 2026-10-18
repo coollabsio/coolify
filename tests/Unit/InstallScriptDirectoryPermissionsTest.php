@@ -40,7 +40,7 @@ function installScriptFileMode(string $path): string
 
 $installScripts = [
     'stable install' => ['scripts/install.sh', ['source', 'ssh', 'images']],
-    'nightly install' => ['other/nightly/install.sh', ['source', 'ssh']],
+    'nightly install' => ['other/nightly/install.sh', ['source', 'ssh', 'images']],
 ];
 $resourceDirectories = ['applications', 'databases', 'backups', 'services', 'proxy', 'sentinel'];
 

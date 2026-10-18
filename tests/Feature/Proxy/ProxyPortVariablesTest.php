@@ -96,6 +96,32 @@ it('asks to start a stopped proxy whose ports use variables and checks only conc
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'sport = ') && str_contains($process->command, '${'));
 });
 
+it('asks to start a stopped proxy whose ports all use variables without defaults', function () {
+    $this->server->proxy->last_saved_proxy_configuration = "services:\n  traefik:\n    image: traefik:v3.6\n    ports:\n      - '\${HTTP_PORT}:80'\n      - '\${HTTPS_PORT}:443'\n";
+    $this->server->save();
+
+    expect(CheckProxy::run($this->server))->toBeTrue();
+
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'sport = '));
+});
+
+it('does not ask to start a stopped proxy without published ports', function () {
+    $this->server->proxy->last_saved_proxy_configuration = "services:\n  traefik:\n    image: traefik:v3.6\n    ports:\n";
+    $this->server->save();
+
+    expect(CheckProxy::run($this->server))->toBeFalse();
+});
+
+it('saves and starts a proxy whose ports key is empty', function () {
+    $configuration = "services:\n  traefik:\n    image: traefik:v3.6\n    ports:\n";
+
+    SaveProxyConfiguration::run($this->server, $configuration);
+    StartProxy::run($this->server->fresh(), async: false, force: true);
+
+    expect($this->server->fresh()->proxy->last_saved_proxy_configuration)->toBe($configuration);
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker compose -f /data/coolify/proxy/docker-compose.yml up -d --wait --remove-orphans'));
+});
+
 it('configures traffic analytics for a proxy whose ports use variables', function () {
     Queue::fake();
     StartSentinel::partialMock()->shouldReceive('handle')->atLeast()->once();

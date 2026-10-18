@@ -6,7 +6,6 @@ use App\Data\Traffic\TrafficPathData;
 use App\Data\Traffic\TrafficSeriesBucketData;
 use App\Livewire\Analytics as GlobalAnalytics;
 use App\Livewire\Project\Application\Analytics as ApplicationAnalytics;
-use App\Livewire\Project\Application\TrafficOverview;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\PrivateKey;
@@ -59,6 +58,19 @@ function resourceKeysOverview(int $requests, int $uniques = 10, float $p95 = 20.
         'status' => ['s2xx' => $requests, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0],
         'latency' => ['p50' => 5.0, 'p95' => $p95, 'p99' => 50.0],
         'unique_visitors' => $uniques,
+    ]);
+}
+
+/**
+ * The server-wide dashboard bundle; the global leaderboard reads its keys from `apps`.
+ *
+ * @param  array<int, string>  $keys
+ */
+function resourceKeysDashboard(array $keys): string
+{
+    return json_encode([
+        'overview' => [],
+        'apps' => array_map(fn (string $key) => ['uuid' => $key, 'overview' => []], $keys),
     ]);
 }
 
@@ -188,39 +200,6 @@ it('warms the key list and every key bundle in two batched execs', function () {
     $client->breakdown('res-web', 'country', 'F', 'T');
 });
 
-it('batches the individual endpoints of every key when Sentinel lacks the dashboard route', function () {
-    $client = new class($this->server) extends SentinelTrafficClient
-    {
-        public int $batchCalls = 0;
-
-        protected function batchRemoteFetch(array $urls): string
-        {
-            $this->batchCalls++;
-
-            return implode("\x1e", array_map(fn ($url) => match (true) {
-                str_contains($url, '/traffic/apps') => json_encode(['res-api', 'res-web']),
-                str_contains($url, '/traffic/dashboard') => 'Not Found',
-                str_contains($url, '/attribution') => '{"attribution":"demo"}',
-                str_contains($url, '/overview') => '{"requests":3}',
-                default => '[]',
-            }, $urls))."\x1e";
-        }
-
-        protected function remoteFetch(string $url): string
-        {
-            throw new RuntimeException("individual fetch should not run for: {$url}");
-        }
-    };
-
-    $keys = $client->prefetchResource('res', 'F', 'T', ['country'], '24h');
-
-    expect($keys)->toBe(['res-api', 'res-web'])
-        ->and($client->batchCalls)->toBe(3)
-        ->and($client->overview('res-api', 'F', 'T')->requests)->toBe(3)
-        ->and($client->overview('res-web', 'F', 'T')->requests)->toBe(3)
-        ->and($client->attribution())->toBe('demo');
-});
-
 it('merges overviews, paths, breakdowns, and series of several keys', function () {
     $aggregator = new TrafficAnalyticsAggregator(['country']);
 
@@ -232,9 +211,8 @@ it('merges overviews, paths, breakdowns, and series of several keys', function (
     $aggregator->addPaths(collect([
         TrafficPathData::fromSentinel(['path' => '/', 'app' => 'k-api', 'requests' => 10, 'p95' => 5]),
         TrafficPathData::fromSentinel(['path' => '/', 'app' => 'k-api', 'requests' => 5, 'p95' => 9]),
-    ]), 'k-api', $domainForKey);
-    // Older Sentinel omits `app`: the queried key is the fallback.
-    $aggregator->addPaths(collect([TrafficPathData::fromSentinel(['path' => '/', 'requests' => 30])]), 'k-web', $domainForKey);
+    ]), $domainForKey);
+    $aggregator->addPaths(collect([TrafficPathData::fromSentinel(['path' => '/', 'app' => 'k-web', 'requests' => 30])]), $domainForKey);
 
     $aggregator->addBreakdown('country', collect([TrafficBreakdownData::fromSentinel(['value' => 'US', 'requests' => 4, 'bytes_out' => 1])]));
     $aggregator->addBreakdown('country', collect([TrafficBreakdownData::fromSentinel(['value' => 'US', 'requests' => 6, 'bytes_out' => 2])]));
@@ -257,6 +235,18 @@ it('merges overviews, paths, breakdowns, and series of several keys', function (
     expect($aggregator->breakdowns()['country'])->toBe([['value' => 'US', 'requests' => 10, 'bytesOut' => 3]]);
     expect(array_column($aggregator->series(), 'bucket'))->toBe([1000, 2000])
         ->and($aggregator->series()[0]['s2xx'])->toBe(5);
+});
+
+it('folds the overflow path rows of all keys into one unlinked row', function () {
+    $aggregator = new TrafficAnalyticsAggregator([]);
+    $domains = ['k-api' => 'api.test', 'k-web' => 'web.test'];
+    $domainForKey = fn (string $key) => $domains[$key] ?? null;
+
+    $aggregator->addPaths(collect([TrafficPathData::fromSentinel(['path' => '__other__', 'app' => 'k-api', 'requests' => 7, 's4xx' => 1, 'p95' => 3])]), $domainForKey);
+    $aggregator->addPaths(collect([TrafficPathData::fromSentinel(['path' => '__other__', 'app' => 'k-web', 'requests' => 5, 's4xx' => 2, 'p95' => 8])]), $domainForKey);
+
+    expect($aggregator->topPaths())->toHaveCount(1)
+        ->and($aggregator->topPaths()[0])->toMatchArray(['path' => '__other__', 'domain' => null, 'requests' => 12, 's4xx' => 3, 'p95' => 8.0]);
 });
 
 it('shows a compose application with the data of all its compose service keys', function () {
@@ -286,7 +276,7 @@ it('shows a compose application with the data of all its compose service keys', 
         ->and($paths['/checkout']['domain'])->toBe('www.shop.test');
 });
 
-it('sums every compose key in the application traffic card', function () {
+it('sums every compose key on the application analytics page', function () {
     $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
@@ -297,7 +287,7 @@ it('sums every compose key in the application traffic card', function () {
         "/app/{$webKey}/traffic/overview" => resourceKeysOverview(200),
     ]);
 
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $application]))
+    loadLazy(Livewire::test(ApplicationAnalytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('4,200');
 });
@@ -308,7 +298,7 @@ it('groups compose keys of one application into one leaderboard row', function (
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 
     bindResourceKeysFake([
-        '/traffic/apps' => json_encode([$apiKey, $webKey, 'orphan-key']),
+        '/traffic/dashboard' => resourceKeysDashboard([$apiKey, $webKey, 'orphan-key']),
         "/app/{$apiKey}/traffic/overview" => resourceKeysOverview(100),
         "/app/{$webKey}/traffic/overview" => resourceKeysOverview(50),
         '/app/orphan-key/traffic/overview' => resourceKeysOverview(5),
@@ -346,7 +336,7 @@ it('lists services in the filter, links service rows to service analytics, and q
     $serviceKey = $service->uuid.'-'.traefikSafeServiceNameSegment('web');
 
     bindResourceKeysFake([
-        '/traffic/apps' => json_encode([$serviceKey]),
+        '/traffic/dashboard' => resourceKeysDashboard([$serviceKey]),
         "/app/{$serviceKey}/traffic/overview" => resourceKeysOverview(70),
         '/traffic/overview' => resourceKeysOverview(70),
     ]);
@@ -386,7 +376,7 @@ it('never names or links a key owned by another team resource', function () {
     $otherKey = $otherService->uuid.'-'.traefikSafeServiceNameSegment('web');
 
     bindResourceKeysFake([
-        '/traffic/apps' => json_encode([$otherKey]),
+        '/traffic/dashboard' => resourceKeysDashboard([$otherKey]),
         '/traffic/overview' => resourceKeysOverview(10),
     ]);
 

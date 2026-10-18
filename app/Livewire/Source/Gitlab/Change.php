@@ -156,7 +156,7 @@ class Change extends Component
                 $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
             }
             if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+                $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
             }
 
             $this->parameters = get_route_parameters();
@@ -264,10 +264,18 @@ class Change extends Component
         }
     }
 
+    private function authorizeSystemWideChange(): void
+    {
+        if ($this->isSystemWide && ! $this->gitlab_app->is_system_wide) {
+            $this->authorize('makeSystemWide', GitlabApp::class);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->gitlab_app);
+            $this->authorizeSystemWideChange();
 
             $this->validate();
 
@@ -283,6 +291,7 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->gitlab_app);
+            $this->authorizeSystemWideChange();
 
             $this->validateOnly('isSystemWide');
 

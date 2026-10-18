@@ -150,7 +150,12 @@ it('mounts application compose bind and content volumes from the server data pat
     $volumes = applicationParser($application)->get('services')->get('app')['volumes'];
     $directory = "{$base}/applications/{$application->uuid}";
 
-    expect(collect($volumes)->all())->toContain("{$directory}/data:/app/data", "{$directory}/config/app.conf:/etc/app.conf")
+    expect(collect($volumes)->all())->toContain("{$directory}/data:/app/data", [
+        'type' => 'bind',
+        'source' => "{$directory}/config/app.conf",
+        'target' => '/etc/app.conf',
+        'bind' => ['create_host_path' => true],
+    ])
         // Coolify writes the files through SSH to the normal path.
         ->and($application->fileStorages()->pluck('fs_path')->all())
         ->toContain("/data/coolify/applications/{$application->uuid}/config/app.conf");
@@ -171,7 +176,12 @@ it('mounts service compose bind and content volumes from the server data path', 
     $volumes = serviceParser($service->fresh())->get('services')->get('app')['volumes'];
     $directory = "{$base}/services/{$service->uuid}";
 
-    expect(collect($volumes)->all())->toContain("{$directory}/data:/app/data", "{$directory}/config/app.conf:/etc/app.conf");
+    expect(collect($volumes)->all())->toContain("{$directory}/data:/app/data", [
+        'type' => 'bind',
+        'source' => "{$directory}/config/app.conf",
+        'target' => '/etc/app.conf',
+        'bind' => ['create_host_path' => true],
+    ]);
 })->with(devPathKinds());
 
 it('mounts the Traefik proxy and log rotation directory from the server data path', function (string $kind, string $base) {

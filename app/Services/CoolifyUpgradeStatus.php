@@ -6,7 +6,15 @@ use DateTimeInterface;
 
 class CoolifyUpgradeStatus
 {
+    public const FILE = '/data/coolify/source/.upgrade-status';
+
     public const STALE_AFTER_MINUTES = 10;
+
+    /**
+     * An upgrade that has not written a status for this long is treated as stopped,
+     * so a crashed upgrade does not block new ones forever.
+     */
+    public const RUNNING_LOCK_EXPIRES_AFTER_MINUTES = 15;
 
     /**
      * @return array{status: string, step?: int, message?: string, running_version: string, target_version: string}
@@ -75,6 +83,30 @@ class CoolifyUpgradeStatus
             'message' => $message,
             ...$base,
         ];
+    }
+
+    public static function isRunning(string $content, ?DateTimeInterface $now = null): bool
+    {
+        $parts = explode('|', trim($content));
+        if (count($parts) < 3) {
+            return false;
+        }
+
+        [$step, , $timestamp] = $parts;
+        if (! in_array($step, ['1', '2', '3', '4', '5'], true) || trim($timestamp) === '') {
+            return false;
+        }
+
+        try {
+            $statusTime = new \DateTime($timestamp);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        $now = $now ?? new \DateTime;
+        $diffMinutes = ($now->getTimestamp() - $statusTime->getTimestamp()) / 60;
+
+        return $diffMinutes <= self::RUNNING_LOCK_EXPIRES_AFTER_MINUTES;
     }
 
     public static function hasReachedTargetVersion(string $runningVersion, string $targetVersion): bool

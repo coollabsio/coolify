@@ -18,9 +18,7 @@ use Illuminate\Support\Facades\RateLimiter;
  * IPs; one misconfigured repository (wrong secret, deleted application,
  * untracked branch) therefore cannot lock out deliveries for other repositories.
  *
- * After the failure limit is reached, the scope rejects all deliveries before
- * reading application secrets or verifying signatures. Correctly signed
- * deliveries in that scope must wait until the failure window expires.
+ * Valid deliveries are processed while locked: every sender shares the proxy's address.
  *
  * In one failure window, only distinct failed attempts are counted. An attempt
  * is identified by what the secret check depends on: the GitLab token, or the

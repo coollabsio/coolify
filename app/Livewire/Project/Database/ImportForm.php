@@ -18,6 +18,7 @@ use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -179,6 +180,13 @@ class ImportForm extends Component
 
     public string $customLocation = '';
 
+    /**
+     * The file source the user selected: 'upload' after a completed upload, 'server' after a checked server path.
+     * Only the server sets it, so an import never falls back to an older upload.
+     */
+    #[Locked]
+    public ?string $fileSource = null;
+
     public ?int $activityId = null;
 
     // S3 Restore properties
@@ -216,7 +224,16 @@ class ImportForm extends Component
             return null;
         }
 
-        return Server::ownedByCurrentTeam()->find($this->serverId);
+        return Server::query()->where('team_id', $this->resourceTeamId())->find($this->serverId);
+    }
+
+    /**
+     * Team of the loaded database. The session team can differ: a user can switch teams in
+     * another tab while this form stays open.
+     */
+    private function resourceTeamId(): ?int
+    {
+        return $this->resource?->team()?->id;
     }
 
     protected $listeners = [
@@ -420,20 +437,76 @@ class ImportForm extends Component
             }
 
             try {
-                $escapedPath = escapeshellarg($this->customLocation);
-                $result = instant_remote_process(["ls -l {$escapedPath}"], $this->server, throwError: false);
-                if (blank($result)) {
+                if (! $this->serverFileExists($this->customLocation)) {
                     $this->dispatch('error', 'The file does not exist or has been deleted.');
 
                     return;
                 }
                 $this->filename = $this->customLocation;
+                $this->fileSource = 'server';
+                $this->discardStagedUpload();
                 $this->selectSqliteDatabaseFor($this->customLocation);
                 $this->dispatch('success', 'The file exists.');
             } catch (\Throwable $e) {
                 return handleError($e, $this);
             }
         }
+    }
+
+    public function updatedCustomLocation(): void
+    {
+        if ($this->fileSource === 'server') {
+            $this->fileSource = null;
+        }
+    }
+
+    /**
+     * Called by the upload form after an upload is complete.
+     */
+    public function selectUploadedFile(string $name): void
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! Storage::exists($this->stagedUploadPath())) {
+            $this->fileSource = null;
+            $this->dispatch('error', 'The uploaded file was not found. Please upload it again.');
+
+            return;
+        }
+
+        $this->fileSource = 'upload';
+        $this->customLocation = '';
+        $this->selectSqliteDatabaseFor($name);
+    }
+
+    private function stagedUploadPath(): string
+    {
+        return "upload/{$this->resource->uuid}/restore";
+    }
+
+    /**
+     * Delete an upload that was not imported when the user selects another source. Skipped while
+     * an import of this database runs, because that import can still copy the upload.
+     */
+    private function discardStagedUpload(): void
+    {
+        $lock = Cache::lock(StartDatabaseImport::lockKey($this->resource->uuid), 60);
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            Storage::delete($this->stagedUploadPath());
+        } finally {
+            $lock->release();
+        }
+    }
+
+    protected function serverFileExists(string $path): bool
+    {
+        $escapedPath = escapeshellarg($path);
+
+        return filled(instant_remote_process(["ls -l {$escapedPath}"], $this->server, throwError: false));
     }
 
     public function runImport(string $password = ''): bool|string
@@ -450,7 +523,7 @@ class ImportForm extends Component
             return true;
         }
 
-        if ($this->filename === '') {
+        if (! in_array($this->fileSource, ['upload', 'server'], true)) {
             $this->dispatch('error', 'Please select a file to import.');
 
             return true;
@@ -464,10 +537,13 @@ class ImportForm extends Component
 
         try {
             $this->importRunning = true;
-            $source = Storage::exists("upload/{$this->resourceUuid}/restore")
+            if ($this->fileSource === 'server') {
+                $this->discardStagedUpload();
+            }
+            $source = $this->fileSource === 'upload'
                 ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers)
                 : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
-            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
@@ -488,6 +564,7 @@ class ImportForm extends Component
             return true;
         } finally {
             $this->filename = null;
+            $this->fileSource = null;
             $this->importCommands = [];
         }
 
@@ -497,7 +574,7 @@ class ImportForm extends Component
     public function loadAvailableS3Storages()
     {
         try {
-            $this->availableS3Storages = S3Storage::ownedByCurrentTeam(['id', 'name', 'description'])
+            $this->availableS3Storages = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId(), ['id', 'name', 'description'])
                 ->where('is_usable', true)
                 ->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description])
@@ -551,7 +628,7 @@ class ImportForm extends Component
         }
 
         try {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
+            $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
 
             // Validate bucket name early
             if (! $this->validateBucketName($s3Storage->bucket)) {
@@ -628,8 +705,9 @@ class ImportForm extends Component
 
         try {
             $this->importRunning = true;
+            $this->discardStagedUpload();
             $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
-            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');

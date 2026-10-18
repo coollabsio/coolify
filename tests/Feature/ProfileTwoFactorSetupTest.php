@@ -1,12 +1,17 @@
 <?php
 
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::query()->forceCreate(['id' => 0]);
+});
 
 /**
  * @return array{input: string, copied: string}

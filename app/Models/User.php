@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
@@ -41,9 +43,9 @@ use OpenApi\Attributes as OA;
         'marketing_emails' => ['type' => 'boolean', 'description' => 'The flag to receive marketing emails.'],
     ],
 )]
-class User extends Authenticatable implements SendsEmail
+class User extends Authenticatable implements PasskeyUser, SendsEmail
 {
-    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
@@ -304,7 +306,12 @@ class User extends Authenticatable implements SendsEmail
     public function sendVerificationEmail()
     {
         $mail = new MailMessage;
-        $url = URL::temporarySignedRoute(
+        // Sign the link for the configured instance URL instead of the request Host header.
+        $urlGenerator = clone URL::getFacadeRoot();
+        $instanceUrl = rtrim(base_url(), '/');
+        $urlGenerator->forceRootUrl($instanceUrl);
+        $urlGenerator->forceScheme(parse_url($instanceUrl, PHP_URL_SCHEME) ?: 'http');
+        $url = $urlGenerator->temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
@@ -592,6 +599,18 @@ class User extends Authenticatable implements SendsEmail
     public function hasSsoIdentity(): bool
     {
         return $this->oauthIdentities()->exists();
+    }
+
+    /**
+     * Hex handle: iOS Safari corrupts raw binary handles (laravel/passkeys-server#41).
+     */
+    public function getPasskeyUserHandle(): string
+    {
+        return hash_hmac(
+            'sha256',
+            $this->getTable().'|'.$this->getKey(),
+            Config::string('passkeys.user_handle_secret'),
+        );
     }
 
     /**
