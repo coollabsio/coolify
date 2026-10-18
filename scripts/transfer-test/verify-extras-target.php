@@ -60,6 +60,10 @@ $check('team shared variable created', SharedEnvironmentVariable::where('type', 
 $check('app variable that uses it moved', $app?->environment_variables()->where('key', 'USES_TEAM')->value('value') === '{{team.FAKE_TEAM_VAR}}');
 $check('maintenance mode moved', $app?->is_maintenance_enabled === true && $app?->maintenance_page === '<h1>fake maintenance</h1>');
 
+$gitShop = Application::where('name', 'git-shop')->first();
+$check('git-shop moved without its system-wide source', $gitShop !== null && $gitShop->source_id === null);
+$check('finish list has a git source step for git-shop', collect(data_get($server?->server_metadata, 'transfer.finish.items'))->contains('key', 'git_source:'.$gitShop?->uuid));
+
 $project = $environment?->project;
 $icon = $project ? app(ProjectIconStorageService::class)->projectContents($project) : null;
 $check('project icon moved', $icon !== null && str_starts_with($icon, "\xFF\xD8\xFF"));

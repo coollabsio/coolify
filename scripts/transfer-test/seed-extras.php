@@ -77,6 +77,15 @@ SharedEnvironmentVariable::create(['type' => 'team', 'team_id' => $teamId, 'key'
 EnvironmentVariable::create(['key' => 'USES_TEAM', 'value' => '{{team.FAKE_TEAM_VAR}}', 'resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id]);
 $app->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>fake maintenance</h1>'])->saveQuietly();
 
+// A git application that uses a system-wide GitHub App, which the transfer does not move
+$systemApp = $quiet(GithubApp::class, ['name' => 'fake-system-wide-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 0, 'is_system_wide' => true, 'is_public' => false]);
+$gitApp = new Application;
+$gitApp->forceFill([
+    'uuid' => new_public_id(), 'name' => 'git-shop', 'build_pack' => 'nixpacks', 'git_repository' => 'acme/shop', 'git_branch' => 'main', 'ports_exposes' => '3000',
+    'environment_id' => $environment->id, 'destination_id' => $app->destination_id, 'destination_type' => $app->destination_type,
+    'source_type' => GithubApp::class, 'source_id' => $systemApp->id,
+])->saveQuietly();
+
 // Project icon: a 1x1 JPEG
 app(ProjectIconStorageService::class)->storeProjectContents($project, base64_decode('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='));
 

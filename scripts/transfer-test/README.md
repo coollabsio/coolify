@@ -23,9 +23,12 @@ scripts/transfer-test/e2e.sh               # transfer both VMs A -> B through th
 scripts/transfer-test/reset.sh
 scripts/transfer-test/reverse-e2e.sh       # undo paths: transfer back, transfer over an archive, take back, archive delete (18 checks)
 scripts/transfer-test/reset.sh
-scripts/transfer-test/extras-e2e.sh        # fake tokens, DNS, secret links, runner config, links, icon ... (28 checks)
+scripts/transfer-test/extras-e2e.sh        # fake tokens, DNS, secret links, runner config, links, icon ... (31 checks)
 scripts/transfer-test/reset.sh
 ```
+
+For a manual test, run `scripts/transfer-test/manual-setup.sh`: it resets, adds the fake extra records to A, and
+prints the URLs, logins, and tokens.
 
 Each test ends with `=== N failure(s)` and exits with N. Run `reset.sh` between two tests: a test leaves servers
 transferred. After `reset.sh`, you can also test by hand: log in to A and B with `test@example.com` / `password`, open a
@@ -42,6 +45,7 @@ VM server on A → Transfer, and use the target URL `http://localhost:<B port>` 
 | `seed.sh` | Creates and deploys resources on A through the API |
 | `e2e.sh`, `reverse-e2e.sh`, `extras-e2e.sh` | The tests |
 | `seed-extras.php`, `verify-extras-*.php` | Fake records and checks of `extras-e2e.sh` |
+| `manual-setup.sh` | Reset plus the fake extra records, then prints what to open and enter for a manual test |
 | `seed-inventory.php` | Seeds a large database-only demo server (no deploys) on the current instance |
 
 Tokens and the VM SSH key are written to `<main checkout>/.dev-instances/transfer-test/<source>/` (not in git).
