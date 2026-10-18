@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -16,6 +17,7 @@ use App\Notifications\Application\DeploymentSuccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -301,7 +303,17 @@ it('keeps the old constructor working without a deployment record', function () 
 });
 
 it('passes the in-memory deployment record from the deployment job', function () {
-    $job = file_get_contents(app_path('Jobs/ApplicationDeploymentJob.php'));
+    Notification::fake();
+    $this->team->emailNotificationSettings->update(['smtp_enabled' => true, 'deployment_success_email_notifications' => true]);
+    $deployment = createDeploymentRow($this->application);
+    $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
+    $job = $reflection->newInstanceWithoutConstructor();
+    foreach (['application' => $this->application, 'deployment_uuid' => $deployment->deployment_uuid, 'preview' => null, 'application_deployment_queue' => $deployment] as $name => $value) {
+        $reflection->getProperty($name)->setValue($job, $value);
+    }
 
-    expect($job)->toContain('new $notificationClass($this->application, $this->deployment_uuid, $this->preview, $this->application_deployment_queue)');
+    $reflection->getMethod('sendDeploymentNotification')->invoke($job, DeploymentSuccess::class);
+
+    Notification::assertSentTo($this->team, DeploymentSuccess::class, fn (DeploymentSuccess $notification) => $notification->commit_sha === DEPLOYMENT_EMAIL_COMMIT_SHA
+        && str_starts_with($notification->commit_message, 'Add checkout page'));
 });

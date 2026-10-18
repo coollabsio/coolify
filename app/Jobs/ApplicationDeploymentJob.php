@@ -5990,9 +5990,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $unsuccessful = $deployments->first(fn (ApplicationDeploymentQueue $deployment) => $deployment->status !== ApplicationDeploymentStatus::FINISHED->value);
+        // Additional servers pull the image and do not clone, so only the main deployment has the commit message.
+        $parentDeployment = ApplicationDeploymentQueue::query()->where('deployment_uuid', $parentDeploymentUuid)->first();
         $this->application->environment->project->team?->notify($unsuccessful
-            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview)
-            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview));
+            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview, $parentDeployment)
+            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview, $parentDeployment));
     }
 
     /**
