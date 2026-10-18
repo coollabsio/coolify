@@ -116,8 +116,8 @@ Thank you so much!
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
-* [PetroSky Cloud](https://petrosky.io) - Open source cloud deployment solutions
 * [QuickSrv](https://quicksrv.io/) - Fast and reliable server hosting
+* [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
 
 ### Small Sponsors
 

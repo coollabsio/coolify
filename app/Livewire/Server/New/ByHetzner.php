@@ -697,10 +697,16 @@ class ByHetzner extends Component
             if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
+                ]);
+
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
             }
 
@@ -715,7 +721,7 @@ class ByHetzner extends Component
             if ($this->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
                 $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
             } elseif ($this->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
+                $ipAddress = hetznerServerIpv6($hetznerServer['public_net']['ipv6']['ip']);
             }
 
             // Create server in Coolify database immediately so the Hetzner

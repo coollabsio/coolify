@@ -235,7 +235,7 @@ function restoreScriptResource(string $engine): object
 /**
  * @return array{exit: int, stdout: string, stderr: string, calls: list<array{name: string, args: string, header: string, stdin: string}>, dir: string, backup: string, leftovers: list<string>}
  */
-function restoreScriptRun(string $engine, string $contents, bool $dumpAll = false, bool $replaceExisting = false, bool $keepOwners = false, bool $restoreMysqlUsers = false): array
+function restoreScriptRun(string $engine, string $contents, bool $dumpAll = false, bool $replaceExisting = false, bool $keepOwners = false, bool $restoreMysqlUsers = false, array $env = []): array
 {
     $dir = restoreScriptTempDir();
 
@@ -257,6 +257,11 @@ if [ ! -t 0 ]; then
     header=\$(head -c 5 {$escapedStdin}/\$call)
 fi
 printf '%s|%s|%s\\n' '{$client}' "\$*" "\$header" >> {$escapedLog}
+if [ -n "\${STUB_FAIL_MATCH:-}" ]; then
+    case "\$*" in *"\$STUB_FAIL_MATCH"*) exit 1 ;; esac
+fi
+case "\$*" in *"SELECT datname FROM pg_database"*) printf '%s\\n' "\${STUB_DATABASES:-}" ;; esac
+case "\$*" in *rolsuper*) printf '%s\\n' "\${STUB_ROLSUPER-t}" ;; esac
 exit 0
 SH);
             chmod($dir.'/bin/'.$client, 0755);
@@ -267,7 +272,7 @@ SH);
 
         $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource($engine), $backup, $dumpAll, $replaceExisting, $keepOwners, restoreMysqlUsers: $restoreMysqlUsers);
 
-        $result = restoreScriptProcess(['sh', '-c', $script], $dir, [
+        $environment = array_merge([
             'PATH' => $dir.'/bin'.PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin'),
             'TMPDIR' => $dir,
             'POSTGRES_USER' => 'postgres',
@@ -282,7 +287,8 @@ SH);
             'MARIADB_ROOT_PASSWORD' => 'root_pass',
             'MONGO_INITDB_ROOT_USERNAME' => 'root',
             'MONGO_INITDB_ROOT_PASSWORD' => 'mongo_pass',
-        ]);
+        ], $env);
+        $result = restoreScriptProcess(['sh', '-c', $script], $dir, array_filter($environment, fn (?string $value): bool => $value !== null));
 
         $lines = array_values(array_filter(explode("\n", (string) file_get_contents($log)), fn (string $line): bool => $line !== ''));
         $calls = array_map(function (string $line, int $index) use ($dir): array {
@@ -346,37 +352,185 @@ function restoreScriptNormalize(string $contents): array
     }
 }
 
+/**
+ * Runs a SQL replacement against stateful PostgreSQL client stubs. Database values represent
+ * their data, so accidental drops and a failed swap are visible in the final database state.
+ *
+ * @return array{exit: int, stdout: string, stderr: string, databases: array<string, string>}
+ */
+function postgresReplacementScriptRun(string $target = 'app', string $failure = '', bool $gzip = false, ?string $contents = null): array
+{
+    $dir = restoreScriptTempDir();
+
+    try {
+        $backup = $dir.'/backup.sql';
+        file_put_contents($backup, $contents ?? ($gzip ? gzencode('SELECT 1;') : 'SELECT 1;'));
+        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource('postgresql'), $backup, false, true);
+        preg_match('/new=(\w+)/', $script, $new);
+        preg_match('/old=(\w+)/', $script, $old);
+        $databases = ['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', $target => 'original'];
+        if (in_array($failure, ['new_collision', 'old_collision'], true)) {
+            $databases[$failure === 'new_collision' ? $new[1] : $old[1]] = 'collision';
+        }
+        $state = $dir.'/databases.json';
+        file_put_contents($state, json_encode($databases));
+        mkdir($dir.'/bin');
+
+        $client = <<<'PHP'
+<?php
+$state = getenv('PG_STATE');
+$databases = json_decode(file_get_contents($state), true);
+$name = basename($argv[0]);
+$args = array_slice($argv, 1);
+$sql = stream_get_contents(STDIN);
+$failure = getenv('PG_FAILURE');
+$save = static function () use ($state, &$databases): void { file_put_contents($state, json_encode($databases)); };
+if ($name === 'dropdb') {
+    unset($databases[end($args)]);
+} elseif ($name === 'createdb') {
+    $database = end($args);
+    if (isset($databases[$database])) { exit(1); }
+    $databases[$database] = 'empty';
+} elseif (in_array('-Atc', $args, true)) {
+    // Connection and superuser checks run their query as an argument and change nothing.
+    echo str_contains(end($args), 'rolsuper') ? "t\n" : "1\n";
+    exit(0);
+} else {
+    $variables = [];
+    foreach ($args as $index => $arg) {
+        if ($arg === '-v') {
+            [$key, $value] = explode('=', $args[$index + 1], 2);
+            $variables[$key] = $value;
+        }
+    }
+    if (str_contains($sql, 'SELECT 1 FROM pg_database')) {
+        if (isset($databases[$variables['new']]) || isset($databases[$variables['old']])) { echo "1\n"; }
+    } elseif (str_contains($sql, 'ALTER DATABASE')) {
+        preg_match_all('/ALTER DATABASE :"(\w+)" RENAME TO :"(\w+)";/', $sql, $renames, PREG_SET_ORDER);
+        foreach ($renames as $rename) {
+            $from = $variables[$rename[1]];
+            $to = $variables[$rename[2]];
+            if (! isset($databases[$from]) || isset($databases[$to]) || ($failure === 'swap' && $rename[1] === 'new')) {
+                $save();
+                exit(1);
+            }
+            $databases[$to] = $databases[$from];
+            unset($databases[$from]);
+        }
+    } else {
+        if ($failure === 'restore') { exit(1); }
+        $database = $args[array_search('-d', $args, true) + 1];
+        if (! isset($databases[$database])) { exit(1); }
+        $databases[$database] = 'restored';
+    }
+}
+$save();
+PHP;
+
+        foreach (['psql', 'createdb', 'dropdb'] as $name) {
+            file_put_contents($dir.'/bin/'.$name, '#!'.PHP_BINARY."\n".$client);
+            chmod($dir.'/bin/'.$name, 0755);
+        }
+
+        return restoreScriptProcess(['sh', '-c', $script], $dir, [
+            'PATH' => $dir.'/bin'.PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin'),
+            'POSTGRES_USER' => 'postgres',
+            'POSTGRES_DB' => $target,
+            'PG_STATE' => $state,
+            'PG_FAILURE' => $failure,
+        ]) + ['databases' => json_decode(file_get_contents($state), true)];
+    } finally {
+        restoreScriptRemoveDir($dir);
+    }
+}
+
+test('SQL replacement preserves unrelated PostgreSQL databases with the former scratch names', function (string $target, bool $gzip) {
+    $run = postgresReplacementScriptRun($target, gzip: $gzip);
+    $expected = ['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', $target => 'restored'];
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and($run['databases'])->toEqual($expected);
+})->with(['app', 'coolify_restore_new', 'coolify_restore_old'])->with([false, true]);
+
+test('failed SQL replacement preserves every existing PostgreSQL database and removes only its own scratch database', function (string $failure) {
+    $run = postgresReplacementScriptRun(failure: $failure);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['databases'])->toEqual(['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', 'app' => 'original']);
+})->with(['restore', 'swap']);
+
+dataset('corrupt restore gzip', [
+    'missing footer' => fn (string $contents): string => substr(gzencode($contents), 0, -8),
+    'truncated later member' => fn (string $contents): string => gzencode($contents).substr(gzencode('SELECT 2;'), 0, 10),
+]);
+
+test('corrupt gzip SQL replacement preserves every existing PostgreSQL database', function (Closure $corrupt) {
+    $run = postgresReplacementScriptRun(contents: $corrupt('SELECT 1;'));
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain('The gzip backup is corrupt or incomplete. Nothing was changed.')
+        ->and($run['databases'])->toEqual(['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', 'app' => 'original']);
+})->with('corrupt restore gzip');
+
+test('rejects corrupt gzip backups before any database client runs', function (string $engine, string $fixture, bool $dumpAll, bool $replaceExisting, Closure $corrupt) {
+    $run = restoreScriptRun($engine, $corrupt(restoreScriptFixture($fixture)), $dumpAll, $replaceExisting);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain('The gzip backup is corrupt or incomplete. Nothing was changed.')
+        ->and($run['calls'])->toBe([])
+        ->and($run['leftovers'])->toBe([]);
+})->with([
+    'single PostgreSQL SQL' => ['postgresql', 'pg-sql', false, false],
+    'PostgreSQL archive replacement' => ['postgresql', 'pg-custom', false, true],
+    'all PostgreSQL databases' => ['postgresql', 'pg-sql', true, false],
+    'single MySQL database' => ['mysql', 'mysql-sql', false, false],
+    'all MySQL databases' => ['mysql', 'mysql-sql', true, false],
+    'all MariaDB databases' => ['mariadb', 'mysql-sql', true, false],
+    'MongoDB replacement' => ['mongodb', 'mongo-archive', false, true],
+])->with('corrupt restore gzip');
+
+test('SQL replacement refuses scratch database name collisions without changing existing data', function (string $failure) {
+    $run = postgresReplacementScriptRun(failure: $failure);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['databases'])->toHaveCount(4)
+        ->and($run['databases']['app'])->toBe('original')
+        ->and($run['databases']['coolify_restore_new'])->toBe('unrelated-new')
+        ->and($run['databases']['coolify_restore_old'])->toBe('unrelated-old')
+        ->and(array_values($run['databases']))->toContain('collision');
+})->with(['new_collision', 'old_collision']);
+
 test('restores single PostgreSQL archives with pg_restore and SQL with psql', function (string $fixture, bool $replaceExisting, array $expectedCalls) {
     $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), false, $replaceExisting);
 
     expect($run['exit'])->toBe(0, $run['stderr']);
     restoreScriptExpectCalls($run['calls'], $expectedCalls);
 })->with([
-    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
-    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
-    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
-    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
-    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
-    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
-    'plain SQL' => ['pg-sql', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
-    'gzip SQL' => ['pg-sql-gz', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
+    'custom archive' => ['pg-custom', false, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'custom archive replacing existing objects' => ['pg-custom', true, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
+    'gzip custom archive' => ['pg-custom-gz', false, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
+    'tar archive' => ['pg-tar', false, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'gzip tar archive' => ['pg-tar-gz', false, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'plain SQL' => ['pg-sql', false, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
+    'gzip SQL' => ['pg-sql-gz', false, [['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']], ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
     // SQL cannot replace single objects: it restores into a new database, and only a
     // successful restore replaces the current one, so a failure changes nothing.
     'plain SQL replacing existing objects' => ['pg-sql', true, [
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
-        ['createdb', '', ['-U postgres coolify_restore_new']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
-        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -At', '-v new=coolify_restore_new_', '-v old=coolify_restore_old_']],
+        ['createdb', '', ['-U postgres coolify_restore_new_']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new_']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old_', '-v new=coolify_restore_new_', '-U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old_']],
     ]],
     'gzip SQL replacing existing objects' => ['pg-sql-gz', true, [
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
-        ['createdb', '', ['-U postgres coolify_restore_new']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
-        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', '', ['-U postgres -d template1 -Atc', 'SELECT 1']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -At', '-v new=coolify_restore_new_', '-v old=coolify_restore_old_']],
+        ['createdb', '', ['-U postgres coolify_restore_new_']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new_']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old_', '-v new=coolify_restore_new_', '-U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old_']],
     ]],
 ]);
 
@@ -384,8 +538,8 @@ test('keeps PostgreSQL owners and privileges only when requested', function (str
     $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), keepOwners: true);
 
     expect($run['exit'])->toBe(0, $run['stderr']);
-    restoreScriptExpectCalls($run['calls'], [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]);
-    expect($run['calls'][0]['args'])->not->toContain('--no-owner')->not->toContain('--no-acl');
+    restoreScriptExpectCalls($run['calls'], [['psql', '', ['SELECT 1']], ['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]);
+    expect($run['calls'][1]['args'])->not->toContain('--no-owner')->not->toContain('--no-acl');
 })->with(['custom archive' => ['pg-custom'], 'gzip custom archive' => ['pg-custom-gz']]);
 
 test('rejects unsupported single PostgreSQL backups before calling any client', function (string $fixture, string $message) {
@@ -399,23 +553,30 @@ test('rejects unsupported single PostgreSQL backups before calling any client', 
     'binary garbage' => ['garbage', 'Unsupported PostgreSQL backup format'],
 ]);
 
-test('restores PostgreSQL backups containing all databases after checking the format', function (string $fixture, array $restoreCall) {
-    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), dumpAll: true);
+test('restores PostgreSQL backups containing all databases after checking the format', function (string $fixture, array $restoreCall, array $environment, string $user) {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), dumpAll: true, env: $environment + ['STUB_DATABASES' => 'app']);
 
     $recreate = [
-        ['psql', '', ['-U postgres -c', 'pg_terminate_backend']],
-        ['psql', '', ['-U postgres -t -c', 'SELECT datname FROM pg_database']],
-        ['createdb', '', ['-U postgres app']],
+        ['psql', '', ["-U {$user} -d template1 -Atc", 'rolsuper']],
+        ['psql', '', ["-U {$user} -d template1 -c", 'pg_terminate_backend']],
+        ['psql', '', ["-U {$user} -d template1 -t -c", 'SELECT datname FROM pg_database']],
+        ['dropdb', '', ["-U {$user} --maintenance-db=template1 --if-exists app"]],
+        ['createdb', '', ["-U {$user} app"]],
     ];
     $inspect = $restoreCall[0] === 'pg_restore' ? [['pg_restore', 'PGDMP', ['-l']]] : [];
 
     expect($run['exit'])->toBe(0, $run['stderr']);
+    $restoreCall[2] = ["-U {$user} -d app"];
     restoreScriptExpectCalls($run['calls'], [...$inspect, ...$recreate, $restoreCall]);
 })->with([
     'custom archive' => ['pg-custom', ['pg_restore', 'PGDMP', ['-U postgres -d app']]],
     'gzip custom archive' => ['pg-custom-gz', ['pg_restore', 'PGDMP', ['-U postgres -d app']]],
     'plain SQL' => ['pg-sql', ['psql', '-- Po', ['-U postgres -d app']]],
     'gzip SQL' => ['pg-sql-gz', ['psql', '-- Po', ['-U postgres -d app']]],
+])->with([
+    'POSTGRES_USER' => [[], 'postgres'],
+    'PGUSER' => [['POSTGRES_USER' => null, 'PGUSER' => 'custom_user'], 'custom_user'],
+    'POSTGRESQL_USERNAME' => [['POSTGRES_USER' => null, 'POSTGRESQL_USERNAME' => 'bitnami'], 'bitnami'],
 ]);
 
 test('rejects unsupported PostgreSQL backups containing all databases before dropping anything', function () {
@@ -424,6 +585,46 @@ test('rejects unsupported PostgreSQL backups containing all databases before dro
     expect($run['exit'])->toBe(1)
         ->and($run['stderr'])->toContain('Unsupported PostgreSQL backup format')->toContain('Nothing was changed.')
         ->and($run['calls'])->toBe([]);
+});
+
+test('finds the PostgreSQL user from POSTGRES_USER, PGUSER, or POSTGRESQL_USERNAME', function (array $env, string $user) {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture('pg-custom'), env: ['POSTGRES_USER' => null, 'POSTGRES_DB' => null, ...$env]);
+
+    expect($run['exit'])->toBe(0, $run['stderr']);
+    restoreScriptExpectCalls($run['calls'], [
+        ['psql', '', ["-U {$user} -d template1 -Atc"]],
+        ['pg_restore', 'PGDMP', ["-U {$user} -d {$user}"]],
+    ]);
+})->with([
+    'POSTGRES_USER' => [['POSTGRES_USER' => 'app'], 'app'],
+    'PGUSER' => [['PGUSER' => 'pguser'], 'pguser'],
+    'Bitnami POSTGRESQL_USERNAME' => [['POSTGRESQL_USERNAME' => 'bitnami'], 'bitnami'],
+    'POSTGRES_USER wins over the others' => [['POSTGRES_USER' => 'app', 'PGUSER' => 'pguser', 'POSTGRESQL_USERNAME' => 'bitnami'], 'app'],
+    'nothing set' => [[], 'postgres'],
+]);
+
+test('stops a PostgreSQL restore before any change when it cannot connect as the user', function (string $fixture, bool $dumpAll, bool $replaceExisting, string $message) {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), $dumpAll, $replaceExisting, env: ['POSTGRES_USER' => null, 'STUB_FAIL_MATCH' => '-d template1 -Atc']);
+
+    $changing = array_filter($run['calls'], fn (array $call): bool => ! str_contains($call['args'], '-d template1 -Atc') && ! ($call['name'] === 'pg_restore' && $call['args'] === '-l'));
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain($message)->toContain('postgres')->toContain('Nothing was changed.')
+        ->and($changing)->toBe([]);
+})->with([
+    'custom archive' => ['pg-custom', false, false, 'Cannot connect to PostgreSQL as user'],
+    'SQL' => ['pg-sql', false, false, 'Cannot connect to PostgreSQL as user'],
+    'SQL replacing existing objects' => ['pg-sql', false, true, 'Cannot connect to PostgreSQL as user'],
+    'all databases' => ['pg-custom', true, false, 'needs a PostgreSQL superuser'],
+]);
+
+test('refuses to restore all PostgreSQL databases as a user that is not a superuser', function () {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture('pg-sql'), dumpAll: true, env: ['POSTGRES_USER' => null, 'POSTGRESQL_USERNAME' => 'bitnami', 'STUB_ROLSUPER' => 'f']);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain('needs a PostgreSQL superuser')->toContain('bitnami')->toContain('Nothing was changed.')
+        ->and(array_column($run['calls'], 'name'))->toBe(['psql'])
+        ->and($run['calls'][0]['args'])->toContain('rolsuper');
 });
 
 test('restores single MySQL and MariaDB SQL backups', function (string $engine, string $fixture) {

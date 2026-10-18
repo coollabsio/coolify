@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Traits\HasNextRunAt;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,7 +20,6 @@ use OpenApi\Attributes as OA;
         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.'],
-        'next_run_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The next time the scheduled task runs, in UTC. Null when it is disabled or not calculated yet.'],
         'created_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the scheduled task was created.'],
         'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the scheduled task was last updated.'],
     ],
@@ -29,7 +27,6 @@ use OpenApi\Attributes as OA;
 class ScheduledTask extends BaseModel
 {
     use HasFactory;
-    use HasNextRunAt;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -55,7 +52,6 @@ class ScheduledTask extends BaseModel
         return [
             'enabled' => 'boolean',
             'timeout' => 'integer',
-            'next_run_at' => 'datetime',
         ];
     }
 

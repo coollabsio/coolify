@@ -194,7 +194,7 @@
                                 class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                 x-on:click="typeFilter = option.value; close()">
                                 <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
+                                <svg x-show="typeFilter === option.value" class="size-3.5 text-black dark:text-fg"
                                     viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                     <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                         stroke-linecap="round" stroke-linejoin="round" />
@@ -216,7 +216,7 @@
                                 class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                 x-on:click="sortBy = option.value; close()">
                                 <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                     viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                     <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                         stroke-linecap="round" stroke-linejoin="round" />
@@ -268,8 +268,8 @@
                                 default => 'neutral',
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
-                            $databaseS3 = $databaseBackup->s3?->team_id === currentTeam()->id ? $databaseBackup->s3 : null;
-                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3 ? 'S3 storage: '.$databaseS3->name.' (bucket: '.$databaseS3->bucket.')' : 'S3 storage: Unavailable');
+                            $databaseS3s = ($databaseBackup->s3Storages->isNotEmpty() ? $databaseBackup->s3Storages : collect([$databaseBackup->s3])->filter())->where('team_id', $serviceTeamId);
+                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3s->isNotEmpty() ? 'S3 storage: '.$databaseS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
                         @endphp
                         <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
                             x-show="isVisible(@js($databaseBackupId))"
@@ -284,8 +284,8 @@
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
-                                <x-status-badge :status="$databaseBackup->save_s3 ? ($databaseS3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                    :type="$databaseBackup->save_s3 ? ($databaseS3 ? 'success' : 'error') : 'neutral'"
+                                <x-status-badge :status="$databaseBackup->save_s3 ? match ($databaseS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $databaseS3s->count().' storages' } : 'Not set'"
+                                    :type="$databaseBackup->save_s3 ? ($databaseS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
                                     :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
@@ -308,8 +308,8 @@
                     @foreach ($backups as $backup)
                         @php
                             $latestExecution = $backup->latestExecution;
-                            $volumeS3 = $backup->s3?->team_id === currentTeam()->id ? $backup->s3 : null;
-                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3 ? 'S3 storage: '.$volumeS3->name.' (bucket: '.$volumeS3->bucket.')' : 'S3 storage: Unavailable');
+                            $volumeS3s = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId);
+                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3s->isNotEmpty() ? 'S3 storage: '.$volumeS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {
                                 'running' => 'In progress',
@@ -338,8 +338,8 @@
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
-                                <x-status-badge :status="$backup->save_s3 ? ($volumeS3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                    :type="$backup->save_s3 ? ($volumeS3 ? 'success' : 'error') : 'neutral'"
+                                <x-status-badge :status="$backup->save_s3 ? match ($volumeS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $volumeS3s->count().' storages' } : 'Not set'"
+                                    :type="$backup->save_s3 ? ($volumeS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
                                     :data-tooltip="$volumeS3Tooltip" :aria-label="$volumeS3Tooltip" tabindex="0" />
                             </span>
                             <span>

@@ -8,7 +8,7 @@ use App\Actions\Proxy\RestoreTraefikAcmeBackup;
 use App\Actions\Proxy\SaveTraefikAcmeFile;
 use App\Enums\ProxyTypes;
 use App\Jobs\RestartProxyJob;
-use App\Livewire\Server\Proxy;
+use App\Livewire\Server\Proxy\Certificates;
 use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -219,7 +219,7 @@ it('lets an admin see and restore acme.json backups from the proxy page', functi
     actingAsAcmeBackupUser($this->server->team, 'admin');
     createAcmeBackup($this->proxyDirectory, 'acme.json.backup-20260101T000000Z-00000001', '{}');
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('loadTraefikCertificates')
         ->assertSee('acme.json.backup-20260101T000000Z-00000001')
         ->assertSee('2026-01-01 00:00:00 UTC')
@@ -245,7 +245,7 @@ it('restarts the proxy after a restore when the restart option is selected', fun
     actingAsAcmeBackupUser($this->server->team, 'admin');
     createAcmeBackup($this->proxyDirectory, 'acme.json.backup-20260101T000000Z-00000001', '{}');
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->assertSet('restartProxyAfterAcmeRestore', true)
         ->call('restoreTraefikAcmeBackup', 'acme.json.backup-20260101T000000Z-00000001', '', ['restartProxyAfterAcmeRestore'])
         ->assertDispatched('success');
@@ -260,7 +260,7 @@ it('does not restart the proxy after a restore when the restart option is cleare
     actingAsAcmeBackupUser($this->server->team, 'admin');
     createAcmeBackup($this->proxyDirectory, 'acme.json.backup-20260101T000000Z-00000001', '{}');
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('restoreTraefikAcmeBackup', 'acme.json.backup-20260101T000000Z-00000001', '')
         ->assertDispatched('success');
 
@@ -271,7 +271,7 @@ it('lets an admin delete an acme.json backup from the proxy page', function () {
     actingAsAcmeBackupUser($this->server->team, 'admin');
     createAcmeBackup($this->proxyDirectory, 'acme.json.backup-20260101T000000Z-00000001', '{}');
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('deleteTraefikAcmeBackup', 'acme.json.backup-20260101T000000Z-00000001')
         ->assertDispatched('success')
         ->assertSet('traefikAcmeBackups', []);
@@ -283,7 +283,7 @@ it('does not let a member list, restore, or delete acme.json backups', function 
     actingAsAcmeBackupUser($this->server->team, 'member');
     createAcmeBackup($this->proxyDirectory, 'acme.json.backup-20260101T000000Z-00000001', '{}');
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('loadTraefikCertificates')
         ->assertSet('traefikCertificates', fn (array $certificates): bool => count($certificates) === 2)
         ->assertSet('traefikAcmeBackups', [])
@@ -305,7 +305,7 @@ it('does not list, restore, or delete acme.json backups of another team', functi
     actingAsAcmeBackupUser(Team::factory()->create(), 'owner');
     createAcmeBackup($this->proxyDirectory, 'acme.json.backup-20260101T000000Z-00000001', '{}');
 
-    Livewire::test(Proxy::class, ['server' => $this->server])
+    Livewire::test(Certificates::class, ['server' => $this->server])
         ->call('loadTraefikCertificates')
         ->assertSet('traefikAcmeBackups', [])
         ->call('restoreTraefikAcmeBackup', 'acme.json.backup-20260101T000000Z-00000001')

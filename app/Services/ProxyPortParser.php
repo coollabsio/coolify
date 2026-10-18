@@ -38,6 +38,33 @@ class ProxyPortParser
      */
     public static function fromConfiguration(string $configuration): array
     {
+        $ports = [];
+
+        foreach (self::configuredPorts($configuration) as $configuredPort) {
+            $publishedPort = self::publishedPort($configuredPort);
+            if ($publishedPort !== null) {
+                $ports[] = $publishedPort;
+            }
+        }
+
+        return array_values(array_unique($ports));
+    }
+
+    /**
+     * For example, when every port uses a variable without a default.
+     */
+    public static function publishesOnlyUncheckedPorts(string $configuration): bool
+    {
+        return self::configuredPorts($configuration) !== [] && self::fromConfiguration($configuration) === [];
+    }
+
+    /**
+     * An empty `ports:` key (YAML null) is an empty list, as in Docker Compose.
+     *
+     * @return list<mixed>
+     */
+    private static function configuredPorts(string $configuration): array
+    {
         try {
             $parsed = self::withoutTags(Yaml::parse($configuration, Yaml::PARSE_CUSTOM_TAGS));
         } catch (ParseException $exception) {
@@ -51,26 +78,19 @@ class ProxyPortParser
         $ports = [];
 
         foreach (['traefik', 'caddy'] as $proxyService) {
-            $path = "services.{$proxyService}.ports";
-
-            if (! data_has($parsed, $path)) {
+            $configuredPorts = data_get($parsed, "services.{$proxyService}.ports");
+            if ($configuredPorts === null) {
                 continue;
             }
 
-            $configuredPorts = data_get($parsed, $path);
             if (! is_array($configuredPorts) || ! array_is_list($configuredPorts)) {
                 self::invalid();
             }
 
-            foreach ($configuredPorts as $configuredPort) {
-                $publishedPort = self::publishedPort($configuredPort);
-                if ($publishedPort !== null) {
-                    $ports[] = $publishedPort;
-                }
-            }
+            array_push($ports, ...$configuredPorts);
         }
 
-        return array_values(array_unique($ports));
+        return $ports;
     }
 
     private static function withoutTags(mixed $value): mixed

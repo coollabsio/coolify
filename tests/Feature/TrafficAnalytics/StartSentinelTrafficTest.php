@@ -44,8 +44,18 @@ it('produces traffic + geoip env when enabled', function () {
     expect($env['GEOIP_ENABLED'])->toBe('true');
     expect($env['GEOIP_REFRESH_DAYS'])->toBe('30');
     expect($env['GEOIP_MAXMIND_LICENSE_KEY'])->toBe('lic');
+    expect($env['TRAFFIC_IP_MODE'])->toBe('full');
     expect($env)->toHaveKey('TRAFFIC_ACCESS_LOG_PATH');
 });
+
+it('passes the saved client IP mode as sentinel env', function (string $mode) {
+    $server = trafficProxyServer($this);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->traffic_ip_mode = $mode;
+    $server->settings->save();
+
+    expect(StartSentinel::sentinelTrafficEnvironment($server->fresh())['TRAFFIC_IP_MODE'])->toBe($mode);
+})->with(['anonymized', 'off']);
 
 it('uses the dev proxy volume for traffic logs only on the testing-host server locally', function (string $ip, string $directory) {
     config()->set('app.env', 'local');
@@ -163,6 +173,12 @@ it('creates the access log before starting sentinel with traffic analytics', fun
     'traefik' => ['TRAEFIK', '/data/coolify/proxy'],
     'caddy' => ['CADDY', '/data/coolify/proxy/caddy'],
 ]);
+
+it('starts sentinel with a restart policy so Docker restarts it after a crash or reboot', function () {
+    $script = runStartSentinelAndCaptureScript(sentinelTrafficServer($this, 'TRAEFIK', analyticsEnabled: false));
+
+    expect($script)->toContain('--name coolify-sentinel --restart unless-stopped ');
+});
 
 it('does not touch the access log when traffic analytics cannot run', function (?string $proxyType, bool $analyticsEnabled) {
     $server = sentinelTrafficServer($this, $proxyType, $analyticsEnabled);

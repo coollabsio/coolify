@@ -179,18 +179,19 @@ class HetznerService
 
     public function findServerByIp(string $ip): ?array
     {
+        $ip = normalizeIpAddress($ip);
+        $isIpv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
         $servers = $this->getServers();
 
         foreach ($servers as $server) {
-            // Check IPv4
             $ipv4 = data_get($server, 'public_net.ipv4.ip');
-            if ($ipv4 === $ip) {
+            if (filled($ipv4) && normalizeIpAddress($ipv4) === $ip) {
                 return $server;
             }
 
-            // Check IPv6 (Hetzner returns the full /64 block)
-            $ipv6 = data_get($server, 'public_net.ipv6.ip');
-            if ($ipv6 && str_starts_with($ip, rtrim($ipv6, '/'))) {
+            // Hetzner returns the IPv6 network (2a01:4f8:c016:bd23::/64), not the server address.
+            $ipv6Network = data_get($server, 'public_net.ipv6.ip');
+            if ($isIpv6 && filled($ipv6Network) && str_contains($ipv6Network, '/') && ipMatch($ip, [$ipv6Network])) {
                 return $server;
             }
         }

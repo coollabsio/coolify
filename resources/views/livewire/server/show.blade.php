@@ -1,5 +1,5 @@
 <div x-data
-    x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif">
+    x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif @if ($server->hostinger_virtual_machine_id && $server->cloudProviderToken && !$hostingerVirtualMachineStatus) $wire.checkHostingerVirtualMachineStatus(); @endif">
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(24) }} | Server | Coolify
     </x-slot>
@@ -18,23 +18,26 @@
                         filled($server->hetzner_server_id) => 'Hetzner',
                         filled($server->digitalocean_droplet_id) => 'DigitalOcean',
                         filled($server->vultr_instance_id) => 'Vultr',
+                        filled($server->hostinger_virtual_machine_id) => 'Hostinger',
                         default => null,
                     };
                     $providerStatus = match ($provider) {
                         'Hetzner' => $hetznerServerStatus,
                         'DigitalOcean' => $digitalOceanDropletStatus,
                         'Vultr' => $vultrInstanceStatus,
+                        'Hostinger' => $hostingerVirtualMachineStatus,
                         default => null,
                     };
                     $providerStatusType = match (true) {
                         in_array($providerStatus, ['running', 'active']) => 'success',
-                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new']) => 'warning',
-                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted']) => 'error',
+                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'initial', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
+                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted', 'destroyed', 'error']) => 'error',
                         default => 'neutral',
                     };
                     $hasLinkableCloudProviders = (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
                         || (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
-                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty());
+                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty())
+                        || (!$server->hostinger_virtual_machine_id && $availableHostingerTokens->isNotEmpty());
                     $hetznerMatch = $matchedHetznerServer
                         ? [
                             'name' => $matchedHetznerServer['name'] ?? 'Hetzner server',
@@ -56,6 +59,13 @@
                             'status' => $matchedVultrInstance['status'] ?? null,
                         ]
                         : null;
+                    $hostingerMatch = $matchedHostingerVirtualMachine
+                        ? [
+                            'name' => $matchedHostingerVirtualMachine['hostname'] ?? 'Hostinger VPS',
+                            'id' => $matchedHostingerVirtualMachine['id'] ?? null,
+                            'status' => $matchedHostingerVirtualMachine['state'] ?? null,
+                        ]
+                        : null;
                 @endphp
 
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
@@ -65,6 +75,16 @@
 
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies, reaches, and validates this server.">
+                        <x-slot:badges>
+                            @if (isDev() && $server->isTransferredAway())
+                                @unless ($server->isManagementDisabled())
+                                    <x-status-badge label="Transferred away" type="warning" />
+                                @endunless
+                            @else
+                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @endif
+                        </x-slot:badges>
                         <x-slot:actions>
                             @if ($hasLinkableCloudProviders)
                                 <div x-data="{ open: false }" class="relative" @click.outside="open = false">
@@ -106,6 +126,18 @@
                                                 searchByIpMethod="searchVultrInstance" linkMethod="linkToVultr"
                                                 :searchError="$vultrSearchError" :noMatch="$vultrNoMatchFound"
                                                 :matched="$vultrMatch" />
+                                        @endif
+                                        @if (!$server->hostinger_virtual_machine_id && $availableHostingerTokens->isNotEmpty())
+                                            <x-server.provider-link-modal :server="$server" provider="hostinger"
+                                                providerLabel="Hostinger" tokenModel="selectedHostingerTokenId"
+                                                :tokens="$availableHostingerTokens"
+                                                manualModel="manualHostingerVirtualMachineId"
+                                                manualLabel="Virtual Machine ID" manualPlaceholder="17923"
+                                                searchByIdMethod="searchHostingerVirtualMachineById"
+                                                searchByIpMethod="searchHostingerVirtualMachine"
+                                                linkMethod="linkToHostinger"
+                                                :searchError="$hostingerSearchError" :noMatch="$hostingerNoMatchFound"
+                                                :matched="$hostingerMatch" />
                                         @endif
                                     </div>
                                 </div>
@@ -157,14 +189,6 @@
                                         </x-modal-confirmation>
                                     @endif
                                 </div>
-                            @endif
-                            @if (isDev() && $server->isTransferredAway())
-                                @unless ($server->isManagementDisabled())
-                                    <x-status-badge label="Transferred away" type="warning" />
-                                @endunless
-                            @else
-                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
                             @endif
                         </x-slot:actions>
 
@@ -219,13 +243,13 @@
                                 id="connectionTimeout" label="Connection timeout"
                                 helper="Seconds to wait before an SSH connection fails." min="1" max="300"
                                 required :disabled="$isValidating" />
-                            <x-forms.searchable-listbox id="serverTimezone" label="Server timezone"
+                            <x-forms.listbox searchable id="serverTimezone" label="Server timezone"
                                 helper="Used for backups, cron jobs, and displayed timestamps."
-                                searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                                searchPlaceholder="Search timezones" searchEmptyText="No matching timezone"
                                 :options="collect($this->timezones)->map(fn ($timezone) => [
                                     'value' => $timezone,
                                     'label' => $timezone,
-                                ])->all()" :disabled="$isValidating || !auth()->user()->can('update', $server)" />
+                                ])->all()" :disabled="$isValidating" canGate="update" :canResource="$server" />
                             @if (!$isSwarmWorker && $serverRole !== 'build')
                                 <x-forms.input canGate="update" :canResource="$server"
                                     placeholder="https://example.com" id="wildcardDomain" label="Wildcard domain"
@@ -238,11 +262,11 @@
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.listbox canGate="update" :canResource="$server" id="serverRole"
                                     label="Server role" onChange="requestServerRoleChange"
-                                    helper="Builds can use large amounts of CPU and memory. Deployments on the same server can become slow or unreachable during a build. GitHub Actions runners need the Builds only role."
+                                    helper="Builds can use large amounts of CPU and memory. Deployments on the same server can become slow or unreachable during a build. GitHub Actions runners need the Builds only or the Deployments and builds role."
                                     :disabled="$isValidating" :options="[
                                         ['value' => 'deployment', 'label' => 'Deployments only', 'description' => 'Runs your resources. Images are built on a build server.'],
-                                        ['value' => 'build', 'label' => 'Builds only', 'description' => 'Builds images for other servers. Required for GitHub Actions runners.'],
-                                        ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs your resources on this server.'],
+                                        ['value' => 'build', 'label' => 'Builds only', 'description' => 'Builds images for other servers and runs GitHub Actions runners.'],
+                                        ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs your resources on this server. Can also run GitHub Actions runners.'],
                                     ]" />
                             </div>
                         @endif
@@ -272,6 +296,12 @@
                                         title="Refresh provider status">
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </x-forms.button>
+                                @elseif ($provider === 'Hostinger')
+                                    <x-forms.button type="button" class="size-8! px-0!"
+                                        wire:click.prevent="checkHostingerVirtualMachineStatus(true)"
+                                        title="Refresh provider status">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                    </x-forms.button>
                                 @endif
                                 @if ($server->cloudProviderToken)
                                     @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
@@ -293,9 +323,11 @@
                                 @endif
                             @endif
                             @if ($server->server_metadata)
-                                <x-forms.button type="button" class="size-8! px-0!"
-                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    :disabled="! $server->isFunctional()"
+                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
                                     <x-reicon name="refresh" class="size-3.5" />
+                                    Refresh details
                                 </x-forms.button>
                             @endif
                         </x-slot:actions>
@@ -327,7 +359,9 @@
                             @include('livewire.server.partials.server-details', ['server' => $server])
                         @else
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    :disabled="! $server->isFunctional()"
+                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
                                     <x-reicon name="refresh" class="size-3.5" />
                                     Fetch server details
                                 </x-forms.button>

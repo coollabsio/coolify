@@ -7,6 +7,7 @@ use App\Actions\Server\InstallDocker;
 use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
@@ -18,9 +19,9 @@ use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
-use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\HostingerService;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
@@ -34,9 +35,11 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
@@ -126,6 +129,19 @@ class Server extends BaseModel
     public const PLACEHOLDER_IP = '1.2.3.4';
 
     public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
+
+    /**
+     * Serves the proxy error pages (503.html) for the Traefik and Caddy catch-all.
+     */
+    public const PROXY_ERROR_PAGE_CONTAINER = 'coolify-proxy-error-pages';
+
+    public const PROXY_ERROR_PAGE_IMAGE = 'busybox:musl';
+
+    /**
+     * Maximum size of a custom error or maintenance page. The page goes to the server with scp
+     * (see uploadProxyFile()), so this limit only keeps the Livewire payload reasonable.
+     */
+    public const PROXY_ERROR_PAGE_MAX_BYTES = 1048576;
 
     /**
      * Default Caddy proxy image. caddy-docker-proxy 2.13 ships Caddy 2.11.
@@ -235,14 +251,41 @@ class Server extends BaseModel
             $server->destinations()->each(function ($destination) {
                 $destination->delete();
             });
+            // Leftover active runner rows would block deleting the GitHub App.
+            GithubRunnerExecution::deleteAndDeregister(GithubRunnerExecution::query()->where('server_id', $server->id));
+            $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
         });
 
+        static::deleted(function (Server $server) {
+            $server->failQueuedDeployments();
+        });
+
         static::updated(function () {
             static::flushIdentityMap();
         });
+    }
+
+    /**
+     * Fail the queued deployments of a deleted server, because they can never start.
+     */
+    public function failQueuedDeployments(): void
+    {
+        ApplicationDeploymentQueue::query()
+            ->where('server_id', $this->id)
+            ->where('status', ApplicationDeploymentStatus::QUEUED->value)
+            ->eachById(function (ApplicationDeploymentQueue $deployment) {
+                $updated = ApplicationDeploymentQueue::query()
+                    ->whereKey($deployment->id)
+                    ->where('status', ApplicationDeploymentStatus::QUEUED->value)
+                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+
+                if ($updated > 0) {
+                    $deployment->addLogEntry('The server was deleted.', 'stderr');
+                }
+            });
     }
 
     /**
@@ -295,6 +338,7 @@ class Server extends BaseModel
     protected $hidden = [
         'logdrain_axiom_api_key',
         'logdrain_newrelic_license_key',
+        'proxy_error_page',
     ];
 
     protected $schemalessAttributes = [
@@ -316,6 +360,8 @@ class Server extends BaseModel
         'vultr_instance_status',
         'digitalocean_droplet_id',
         'digitalocean_droplet_status',
+        'hostinger_virtual_machine_id',
+        'hostinger_virtual_machine_status',
         'is_validating',
         'validation_logs',
         'detected_traefik_version',
@@ -329,7 +375,7 @@ class Server extends BaseModel
     public function setValidationLogsAttribute($value): void
     {
         $this->attributes['validation_logs'] = $value !== null
-            ? Purify::config('validation_logs')->clean($value)
+            ? Purify::config('validation_logs')->clean(remove_iip($value))
             : null;
     }
 
@@ -355,6 +401,7 @@ class Server extends BaseModel
      */
     public function backfillPlaceholderIp(?string $ip): bool
     {
+        $ip = blank($ip) ? null : self::normalizeIp($ip);
         if (self::isPlaceholderIp($ip)) {
             return false;
         }
@@ -405,7 +452,7 @@ class Server extends BaseModel
         $hetznerService = new HetznerService($this->cloudProviderToken->token);
         $server = $hetznerService->getServer($this->hetzner_server_id);
         $status = $server['status'] ?? null;
-        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? data_get($server, 'public_net.ipv6.ip');
+        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? hetznerServerIpv6(data_get($server, 'public_net.ipv6.ip'));
 
         $updates = [];
         if ($this->hetzner_server_status !== $status) {
@@ -489,6 +536,27 @@ class Server extends BaseModel
         $ip = $digitalOceanService->getPublicIpAddress($droplet);
 
         $this->persistProviderState(['digitalocean_droplet_status' => $status]);
+        $this->backfillPlaceholderIp($ip);
+
+        return $status;
+    }
+
+    public function refreshHostingerState(): ?string
+    {
+        if (! $this->hostinger_virtual_machine_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hostinger') {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        $hostingerService = new HostingerService($this->cloudProviderToken->token);
+        $virtualMachine = $hostingerService->getVirtualMachine((int) $this->hostinger_virtual_machine_id);
+
+        if (empty($virtualMachine)) {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        $status = $virtualMachine['state'] ?? null;
+        $ip = $hostingerService->getPublicIpAddress($virtualMachine);
+        $this->persistProviderState(['hostinger_virtual_machine_status' => $status]);
         $this->backfillPlaceholderIp($ip);
 
         return $status;
@@ -592,6 +660,10 @@ class Server extends BaseModel
         return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && $this->canHostResources();
     }
 
+    /**
+     * Writes the catch-all proxy configuration for requests that no resource handles.
+     * Priority: redirect URL > custom error page > Coolify default error page.
+     */
     public function setupDefaultRedirect()
     {
         $banner =
@@ -600,7 +672,6 @@ class Server extends BaseModel
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
-        $redirect_url = $this->proxy->redirect_url;
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_503.yaml";
         } elseif ($proxy_type === ProxyTypes::CADDY->value) {
@@ -612,67 +683,13 @@ class Server extends BaseModel
             "rm -f $dynamic_conf_path/default_redirect_404.yaml",
             "rm -f $dynamic_conf_path/default_redirect_404.caddy",
         ], $this);
+        // The error page container must run before the catch-all points to it.
+        $this->setupProxyErrorPageContainer();
 
         if ($redirect_enabled === false) {
             instant_remote_process(["rm -f $default_redirect_file"], $this);
         } else {
-            if ($proxy_type === ProxyTypes::CADDY->value) {
-                if (filled($redirect_url)) {
-                    $conf = ":80, :443 {
-   redir $redirect_url
-}";
-                } else {
-                    $conf = ':80, :443 {
-    respond 503
-}';
-                }
-            } elseif ($proxy_type === ProxyTypes::TRAEFIK->value) {
-                $dynamic_conf = [
-                    'http' => [
-                        'routers' => [
-                            'catchall' => [
-                                'entryPoints' => [
-                                    0 => 'http',
-                                    1 => 'https',
-                                ],
-                                'service' => 'noop',
-                                'rule' => 'PathPrefix(`/`)',
-                                'tls' => [
-                                    'certResolver' => 'letsencrypt',
-                                ],
-                                'priority' => -1000,
-                            ],
-                        ],
-                        'services' => [
-                            'noop' => [
-                                'loadBalancer' => [
-                                    'servers' => [],
-                                ],
-                            ],
-                        ],
-                    ],
-                ];
-                if (filled($redirect_url)) {
-                    $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
-                        0 => 'redirect-regexp',
-                    ];
-
-                    $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
-                        'url' => '',
-                    ];
-                    $dynamic_conf['http']['middlewares'] = [
-                        'redirect-regexp' => [
-                            'redirectRegex' => [
-                                'regex' => '(.*)',
-                                'replacement' => $redirect_url,
-                                'permanent' => false,
-                            ],
-                        ],
-                    ];
-                }
-                $conf = Yaml::dump($dynamic_conf, 12, 2);
-            }
-            $conf = $banner.$conf;
+            $conf = $banner.$this->defaultRedirectConfiguration();
             $base64 = base64_encode($conf);
             instant_remote_process([
                 "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
@@ -682,6 +699,346 @@ class Server extends BaseModel
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
+    }
+
+    /**
+     * Catch-all proxy configuration (without the banner) for an enabled default redirect.
+     */
+    public function defaultRedirectConfiguration(): string
+    {
+        $redirect_url = $this->proxy->redirect_url;
+        $usesErrorPage = $this->usesProxyErrorPage();
+
+        if ($this->proxyType() === ProxyTypes::CADDY->value) {
+            if (filled($redirect_url)) {
+                return ":80, :443 {
+   redir $redirect_url
+}";
+            }
+            if ($usesErrorPage) {
+                // busybox httpd answers 200, so copy_response sets the 503 status.
+                return ':80, :443 {
+    reverse_proxy '.self::PROXY_ERROR_PAGE_CONTAINER.':80 {
+        rewrite /503.html
+        handle_response {
+            copy_response 503
+        }
+    }
+}';
+            }
+
+            return ':80, :443 {
+    respond 503
+}';
+        }
+
+        $dynamic_conf = [
+            'http' => [
+                'routers' => [
+                    'catchall' => [
+                        'entryPoints' => [
+                            0 => 'http',
+                            1 => 'https',
+                        ],
+                        'service' => 'noop',
+                        'rule' => 'PathPrefix(`/`)',
+                        'tls' => $this->traefikCertificateResolver() ? ['certResolver' => $this->traefikCertificateResolver()] : [],
+                        'priority' => -1000,
+                    ],
+                ],
+                'services' => [
+                    'noop' => [
+                        'loadBalancer' => [
+                            'servers' => [],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        if (filled($redirect_url)) {
+            $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
+                0 => 'redirect-regexp',
+            ];
+
+            $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
+                'url' => '',
+            ];
+            $dynamic_conf['http']['middlewares'] = [
+                'redirect-regexp' => [
+                    'redirectRegex' => [
+                        'regex' => '(.*)',
+                        'replacement' => $redirect_url,
+                        'permanent' => false,
+                    ],
+                ],
+            ];
+        } elseif ($usesErrorPage) {
+            // The noop service (no servers) keeps the 503; the errors middleware only replaces the body.
+            $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
+                0 => 'error-pages',
+            ];
+            $dynamic_conf['http']['middlewares'] = [
+                'error-pages' => [
+                    'errors' => [
+                        'status' => ['503'],
+                        'service' => 'error-pages',
+                        'query' => '/503.html',
+                    ],
+                ],
+            ];
+            $dynamic_conf['http']['services']['error-pages'] = [
+                'loadBalancer' => [
+                    'servers' => [
+                        ['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80'],
+                    ],
+                ],
+            ];
+        }
+
+        // A router with `tls` matches only HTTPS, so plain HTTP needs its own catch-all router.
+        if (! $this->isSwarm()) {
+            $catchall = $dynamic_conf['http']['routers']['catchall'];
+            $dynamic_conf['http']['routers']['catchall']['entryPoints'] = ['https'];
+            unset($catchall['tls']);
+            $dynamic_conf['http']['routers']['catchall-http'] = array_merge($catchall, ['entryPoints' => ['http']]);
+        }
+
+        return Yaml::dump($dynamic_conf, 12, 2);
+    }
+
+    /**
+     * True when the catch-all shows the error page: a standalone Traefik or Caddy proxy with
+     * the default redirect enabled and no redirect URL. Swarm servers keep the plain 503.
+     */
+    public function usesProxyErrorPage(): bool
+    {
+        return ! $this->isSwarm()
+            && in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)
+            && ($this->proxy->redirect_enabled ?? true) !== false
+            && blank($this->proxy->redirect_url);
+    }
+
+    public function proxyErrorPagesPath(): string
+    {
+        return base_configuration_dir().'/proxy/error-pages';
+    }
+
+    /**
+     * The custom error page HTML, or the Coolify default page.
+     */
+    public function proxyErrorPageHtml(): string
+    {
+        return filled($this->proxy_error_page) ? $this->proxy_error_page : view('proxy.error-page')->render();
+    }
+
+    /**
+     * Applications and services on this server that are in maintenance mode.
+     *
+     * @return Collection<int, Application|Service>
+     */
+    public function maintenanceResources(): Collection
+    {
+        if ($this->isSwarm() || ! in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
+            return collect();
+        }
+
+        return $this->applications()->where('is_maintenance_enabled', true)->values()
+            ->concat($this->services()->where('is_maintenance_enabled', true)->get());
+    }
+
+    /**
+     * Writes 503.html and starts the error page container, or removes the container when
+     * neither the catch-all nor a maintenance page uses it. Swarm servers are not supported.
+     */
+    public function setupProxyErrorPageContainer(): void
+    {
+        if ($this->isSwarm()) {
+            return;
+        }
+
+        $container = self::PROXY_ERROR_PAGE_CONTAINER;
+        if (! $this->usesProxyErrorPage() && $this->maintenanceResources()->isEmpty()) {
+            instant_remote_process(["docker rm -f $container >/dev/null 2>&1 || true"], $this);
+
+            return;
+        }
+
+        $path = $this->proxyErrorPagesPath();
+        $mount = devHostDockerPath($this, $path);
+        $restart = RESTART_MODE;
+
+        instant_remote_process(["mkdir -p $path"], $this);
+        $this->uploadProxyFile("$path/503.html", $this->proxyErrorPageHtml());
+        instant_remote_process([
+            dockerNetworkEnsureCommand('coolify'),
+            "docker start $container >/dev/null 2>&1 || docker run -d --name $container --network coolify --restart $restart --label coolify.managed=true -v $mount:/www:ro ".self::PROXY_ERROR_PAGE_IMAGE.' httpd -f -p 80 -h /www',
+            // A proxy on custom networks only must still reach the error page container.
+            'docker network connect coolify coolify-proxy >/dev/null 2>&1 || true',
+        ], $this);
+    }
+
+    /**
+     * Writes $contents to $path on this server with scp. A shell command is limited to 128 KiB,
+     * so large pages and proxy files cannot go inside one command.
+     */
+    public function uploadProxyFile(string $path, string $contents): void
+    {
+        $uploadPath = '/tmp/coolify-upload-'.bin2hex(random_bytes(8));
+        $localPath = tempnam(sys_get_temp_dir(), 'coolify-proxy-file-');
+        try {
+            file_put_contents($localPath, $contents);
+            instant_scp($localPath, $uploadPath, $this);
+        } finally {
+            @unlink($localPath);
+        }
+
+        // The proxy and the page container read the file as root, other users do not need it.
+        instant_remote_process(["mv -f $uploadPath $path", "chmod 644 $path"], $this);
+    }
+
+    /**
+     * Writes the maintenance pages and the proxy configuration that shows them instead of the
+     * applications and services in maintenance mode. Swarm servers are not supported.
+     */
+    public function setupMaintenancePages(): void
+    {
+        $proxyType = $this->proxyType();
+        if ($this->isSwarm() || ! in_array($proxyType, [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
+            return;
+        }
+
+        $resources = $this->maintenanceResources();
+        $path = $this->proxyErrorPagesPath();
+        $keep = $resources->map(fn ($resource) => "! -name '{$resource->maintenancePageFile()}' ")->implode('');
+
+        instant_remote_process([
+            "mkdir -p $path",
+            "find $path -maxdepth 1 -name 'maintenance-*.html' {$keep}-delete",
+        ], $this);
+        $this->setupProxyErrorPageContainer();
+
+        foreach ($resources as $resource) {
+            $this->uploadProxyFile("$path/{$resource->maintenancePageFile()}", $resource->maintenancePageHtml());
+        }
+
+        $dynamicPath = $this->proxyPath().'/dynamic';
+        instant_remote_process(["mkdir -p $dynamicPath"], $this);
+        if ($proxyType === ProxyTypes::TRAEFIK->value) {
+            $file = "$dynamicPath/coolify-maintenance.yaml";
+            $configuration = $this->maintenanceTraefikConfiguration($resources);
+            if ($configuration === null) {
+                instant_remote_process(["rm -f $file"], $this);
+            } else {
+                $this->uploadProxyFile($file, $configuration);
+            }
+        } else {
+            // caddy-docker-proxy reads the base Caddyfile again on its next poll.
+            $this->uploadProxyFile("$dynamicPath/Caddyfile", $this->caddyBaseCaddyfile($resources));
+        }
+    }
+
+    /**
+     * Traefik routers that use the same rule as the resource routers, with a priority one
+     * higher. Traefik uses the rule length as the default priority, so a resource on a longer
+     * path of the same host keeps its own router.
+     *
+     * @param  Collection<int, Application|Service>  $resources
+     */
+    public function maintenanceTraefikConfiguration(Collection $resources): ?string
+    {
+        $routers = [];
+        $middlewares = [];
+        foreach ($resources as $resource) {
+            $routes = $resource->maintenanceRoutes();
+            if ($routes->isEmpty()) {
+                continue;
+            }
+            $middleware = "coolify-maintenance-{$resource->uuid}";
+            $middlewares[$middleware] = [
+                'errors' => [
+                    'status' => ['503'],
+                    'service' => 'coolify-maintenance-pages',
+                    'query' => '/'.$resource->maintenancePageFile(),
+                ],
+            ];
+            foreach ($routes as $index => $route) {
+                $rule = "Host(`{$route['host']}`) && PathPrefix(`{$route['path']}`)";
+                $router = [
+                    'entryPoints' => ['http'],
+                    'rule' => $rule,
+                    'service' => 'coolify-maintenance-noop',
+                    'middlewares' => ['coolify-maintenance-headers', $middleware],
+                    'priority' => strlen($rule) + 1,
+                ];
+                $routers["coolify-maintenance-{$resource->uuid}-{$index}-http"] = $router;
+                if ($route['scheme'] === 'https') {
+                    $routers["coolify-maintenance-{$resource->uuid}-{$index}-https"] = array_merge($router, [
+                        'entryPoints' => ['https'],
+                        'tls' => ['certResolver' => 'letsencrypt'],
+                    ]);
+                }
+            }
+        }
+
+        if ($routers === []) {
+            return null;
+        }
+
+        $middlewares['coolify-maintenance-headers'] = [
+            'headers' => ['customResponseHeaders' => ['Retry-After' => '300']],
+        ];
+
+        return "# This file is generated by Coolify, do not edit it manually.\n\n".Yaml::dump([
+            'http' => [
+                'routers' => $routers,
+                'middlewares' => $middlewares,
+                'services' => [
+                    // No servers: Traefik answers 503 and the errors middleware adds the page.
+                    'coolify-maintenance-noop' => ['loadBalancer' => ['servers' => []]],
+                    'coolify-maintenance-pages' => [
+                        'loadBalancer' => ['servers' => [['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80']]],
+                    ],
+                ],
+            ],
+        ], 12, 2);
+    }
+
+    /**
+     * The base Caddyfile of caddy-docker-proxy. A maintenance block uses the same site address
+     * as the resource labels, so caddy-docker-proxy merges both into one site block. Its named
+     * matcher has the same path as the resource handle, so Caddy runs it first.
+     *
+     * @param  Collection<int, Application|Service>|null  $resources
+     */
+    public function caddyBaseCaddyfile(?Collection $resources = null): string
+    {
+        $resources ??= $this->maintenanceResources();
+        $sites = [];
+        foreach ($resources as $resource) {
+            foreach ($resource->maintenanceRoutes() as $index => $route) {
+                $address = caddySiteAddress($route['scheme'], $route['host'], $route['force_https']);
+                $matcher = "@coolify-maintenance-{$resource->uuid}-{$index}";
+                $sites[$address][] = implode("\n", [
+                    "\t{$matcher} path {$route['path']}*",
+                    "\thandle {$matcher} {",
+                    "\t\treverse_proxy ".self::PROXY_ERROR_PAGE_CONTAINER.':80 {',
+                    "\t\t\trewrite /{$resource->maintenancePageFile()}",
+                    "\t\t\theader_down Retry-After 300",
+                    "\t\t\thandle_response {",
+                    "\t\t\t\tcopy_response 503",
+                    "\t\t\t}",
+                    "\t\t}",
+                    "\t}",
+                ]);
+            }
+        }
+
+        $caddyfile = 'import /dynamic/*.caddy';
+        foreach ($sites as $address => $blocks) {
+            $caddyfile .= "\n\n{$address} {\n".implode("\n", $blocks)."\n}";
+        }
+
+        return $caddyfile."\n";
     }
 
     public function setupDynamicProxyConfiguration()
@@ -696,7 +1053,7 @@ class Server extends BaseModel
                 ], $this);
             } else {
                 $url = Url::fromString($settings->fqdn);
-                $host = $url->getHost();
+                $host = $this->dashboardTraefikHost($url->getHost());
                 $schema = $url->getScheme();
                 $traefik_dynamic_conf = [
                     'http' => [
@@ -776,6 +1133,8 @@ class Server extends BaseModel
                 ];
 
                 if ($schema === 'https') {
+                    $certificateResolver = $this->traefikCertificateResolver();
+                    $tls = $certificateResolver ? ['certresolver' => $certificateResolver] : [];
                     $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = $this->dashboardHttpMiddlewares($settings);
 
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
@@ -787,9 +1146,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify',
                         'rule' => "Host(`{$host}`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-reverb-wss'] = [
                         'entryPoints' => [
@@ -797,9 +1154,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify-reverb',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
                         'entryPoints' => [
@@ -807,9 +1162,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify-reverb',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
                         'entryPoints' => [
@@ -817,9 +1170,7 @@ class Server extends BaseModel
                         ],
                         'service' => 'coolify-terminal',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/terminal/ws`)",
-                        'tls' => [
-                            'certresolver' => 'letsencrypt',
-                        ],
+                        'tls' => $tls,
                     ];
                 }
                 $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
@@ -883,6 +1234,14 @@ $siteAddress {
         }
 
         return ['gzip'];
+    }
+
+    /**
+     * Traefik matches an IPv6 Host() rule only without brackets (Host(`2a01:4f8::1`)).
+     */
+    public function dashboardTraefikHost(string $host): string
+    {
+        return trim($host, '[]');
     }
 
     public function dashboardCaddySiteAddress(InstanceSettings $settings, string $schema, string $host): string
@@ -1050,7 +1409,6 @@ $siteAddress {
         $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
-        $this->disableSshMux();
     }
 
     public function sentinelHeartbeat(bool $isReset = false)
@@ -1077,6 +1435,30 @@ $siteAddress {
     public function firstSentinelReportTimeoutSeconds(): int
     {
         return max(30, $this->settings->sentinel_push_interval_seconds + 30);
+    }
+
+    public static function sentinelReportedVersionCacheKey(int $serverId): string
+    {
+        return "sentinel:reported-version:{$serverId}";
+    }
+
+    /**
+     * The last known reason why Sentinel pushes do not arrive. It is shown while Sentinel is out of sync.
+     */
+    public function sentinelPushProblem(): ?string
+    {
+        return Cache::get("sentinel:push-problem:{$this->id}");
+    }
+
+    public function rememberSentinelPushProblem(?string $problem): void
+    {
+        if (blank($problem)) {
+            Cache::forget("sentinel:push-problem:{$this->id}");
+
+            return;
+        }
+
+        Cache::put("sentinel:push-problem:{$this->id}", Str::limit($problem, 500), now()->addDay());
     }
 
     public function isSentinelLive()
@@ -1106,6 +1488,17 @@ $siteAddress {
     public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
+    }
+
+    /**
+     * Traefik certificate resolver for generated HTTPS routers, or null when the proxy uses its own certificates.
+     * A resource value overrides the server value; "none" turns the resolver off.
+     */
+    public function traefikCertificateResolver(?string $resourceResolver = null): ?string
+    {
+        $resolver = filled($resourceResolver) ? $resourceResolver : data_get($this, 'settings.traefik_certificate_resolver');
+
+        return filled($resolver) && $resolver !== ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE ? $resolver : null;
     }
 
     public function isTrafficAnalyticsEnabled(): bool
@@ -1218,6 +1611,12 @@ $siteAddress {
     public function caddySupportsBasicAuthDirective(): bool
     {
         return $this->caddyRunsCurrentVersion();
+    }
+
+    public function caddySupportsArgon2idBasicAuth(): bool
+    {
+        return $this->caddyRunsCurrentVersion()
+            && self::caddyDockerProxyImageVersion($this->configuredCaddyProxyImage()) >= [2, 11];
     }
 
     public function isServerApiEnabled(): bool
@@ -1471,10 +1870,17 @@ $siteAddress {
             get: function ($value) {
                 return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
             },
-            set: function ($value) {
-                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
-            }
+            set: fn ($value) => self::normalizeIp($value),
         );
+    }
+
+    /**
+     * The form a server IP is stored in: unsafe characters removed (including IPv6 brackets) and
+     * IPv6 addresses in their short lower-case form (2A01:04F8::0001 -> 2a01:4f8::1).
+     */
+    public static function normalizeIp(?string $value): string
+    {
+        return normalizeIpAddress(preg_replace('/[^0-9a-zA-Z.:%-]/', '', (string) $value));
     }
 
     public function getIp(): Attribute
@@ -1780,31 +2186,39 @@ $siteAddress {
     {
         ['uptime' => $uptime] = $this->validateConnection();
         if ($uptime === false) {
-            foreach ($this->applications() as $application) {
-                $application->status = 'exited';
-                $application->save();
-            }
-            foreach ($this->databases() as $database) {
-                $database->status = 'exited';
-                $database->save();
-            }
-            foreach ($this->services() as $service) {
-                $apps = $service->applications()->get();
-                $dbs = $service->databases()->get();
-                foreach ($apps as $app) {
-                    $app->status = 'exited';
-                    $app->save();
-                }
-                foreach ($dbs as $db) {
-                    $db->status = 'exited';
-                    $db->save();
-                }
-            }
+            $this->markResourcesAsExited();
 
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Mark all resources on this server as exited, because their containers cannot be checked.
+     */
+    public function markResourcesAsExited(): void
+    {
+        foreach ($this->applications() as $application) {
+            $application->status = 'exited';
+            $application->save();
+        }
+        foreach ($this->databases() as $database) {
+            $database->status = 'exited';
+            $database->save();
+        }
+        foreach ($this->services() as $service) {
+            $apps = $service->applications()->get();
+            $dbs = $service->databases()->get();
+            foreach ($apps as $app) {
+                $app->status = 'exited';
+                $app->save();
+            }
+            foreach ($dbs as $db) {
+                $db->status = 'exited';
+                $db->save();
+            }
+        }
     }
 
     public function isReachableChanged()
@@ -1840,13 +2254,11 @@ $siteAddress {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        $this->disableSshMux();
-
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            instant_remote_process(['ls /'], $this);
+            instant_remote_process(['ls /'], $this, disableMultiplexing: true);
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
@@ -2137,12 +2549,6 @@ $siteAddress {
         return $this->applications()->count() == 0 &&
             $this->databases()->count() == 0 &&
             $this->services()->count() == 0;
-    }
-
-    private function disableSshMux(): void
-    {
-        $configRepository = app(ConfigurationRepository::class);
-        $configRepository->disableSshMux();
     }
 
     /**

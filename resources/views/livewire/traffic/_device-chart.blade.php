@@ -27,10 +27,11 @@
             if (!el) { return; }
 
             const palette = ['#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#14b8a6', '#6b7280'];
-            const legend = () => ({ position: 'bottom', labels: { colors: textColor } });
             const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;',
             })[character]);
+            // ApexCharts writes legend text with innerHTML; device labels come from request data.
+            const legend = () => ({ position: 'bottom', labels: { colors: textColor }, formatter: seriesName => escapeHtml(seriesName) });
 
             const chart = new ApexCharts(el, {
                 chart: { type: 'donut', height: 240, background: 'transparent', animations: { enabled: false } },

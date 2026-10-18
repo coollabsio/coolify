@@ -4,6 +4,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\StartService;
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\CoolifyTask;
 use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -380,6 +381,7 @@ test('a Dockerfile deployment to an additional server writes missing content fil
         'application_deployment_queue' => $queue,
         'server' => $otherServer,
         'mainServer' => $otherServer,
+        'destination' => $this->destination,
         'deployment_uuid' => 'deployment-uuid',
         'workdir' => '/artifacts/deployment-uuid',
         'configuration_dir' => $this->application->workdir(),
@@ -402,6 +404,10 @@ test('a Dockerfile deployment to an additional server writes missing content fil
         ->and($write)->toBeLessThan($up)
         ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
         ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
+
+    $connect = ContentFilesUpRecorder::indexOf('deployment', "docker network connect '{$this->destination->network}' coolify-proxy");
+    expect($connect)->not->toBeNull()
+        ->and($connect)->toBeLessThan($up);
 });
 
 test('the content file check and write are safe for non-root servers', function () {
@@ -579,3 +585,22 @@ test('the server file sync still marks a storage without content as a directory'
 
     expect($volume->fresh()->is_directory)->toBeTruthy();
 });
+
+test('starting a service runs its commands on the deployment queue', function (bool $selfHosted, string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx:alpine\n",
+    ]);
+    fakeContentFilesServer([]);
+
+    StartService::run($service);
+
+    Bus::assertDispatched(CoolifyTask::class, fn (CoolifyTask $job) => $job->queue === $queue);
+})->with([
+    'cloud' => [false, 'deployments'],
+    'self-hosted' => [true, 'high'],
+]);

@@ -107,5 +107,5 @@ it('records a failed SQLite dump as failed and removes the partial backup file',
     $execution = $backup->executions()->latest('id')->firstOrFail();
     expect($execution->status)->toBe('failed')
         ->and($execution->filename)->toBeNull()
-        ->and($commands->implode("\n"))->toMatch("/rm -f '[^']*sqlite-backup-app\\.db-\\d+\\.gz'/");
+        ->and($commands->implode("\n"))->toMatch("/rm -f '[^']*sqlite-backup-app\\.db-\\d+-[a-z0-9]+\\.gz'/");
 });

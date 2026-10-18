@@ -66,7 +66,7 @@
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                         <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
                                             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
@@ -75,27 +75,8 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle :list-url="route('project.index')"
+                        :canvas-url="route('project.canvas.index')" />
                 </div>
             </div>
 
@@ -116,12 +97,13 @@
                                         <x-reicon name="projects" class="size-4" />
                                     </template>
                                 </div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 self-center">
                                     <h2
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                         x-text="project.name"></h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                        x-text="project.description || ''"></p>
+                                        x-show="project.description?.trim()"
+                                        x-text="project.description"></p>
                                 </div>
                             </div>
 
@@ -243,7 +225,7 @@
             search: '',
             sortBy: 'name-asc',
             sortOpen: false,
-            viewMode: localStorage.getItem('projects-view') || 'grid',
+            viewMode: @js($this->listView('projects', 'grid')),
             page: 1,
             pageSize: 12,
             projects: @js($projectsJs),
@@ -311,7 +293,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 this.page = 1;
-                localStorage.setItem('projects-view', mode);
+                this.$wire.saveListView('projects', mode);
             },
             previousPage() {
                 this.page = Math.max(1, this.page - 1);

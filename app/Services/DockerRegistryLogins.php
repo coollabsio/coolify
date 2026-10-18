@@ -6,16 +6,22 @@ use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyProcessTimedOutException;
 
 class DockerRegistryLogins
 {
     public const DOCKER_HUB = 'docker.io';
 
-    public const REGISTRY_PATTERN = '/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$/';
+    /**
+     * A registry host with an optional port. An IPv6 host is bracketed ([2a01:4f8::1]:5000) and holds only
+     * hex digits, ':' and '.', so the value stays safe in shell commands.
+     */
+    public const REGISTRY_PATTERN = '/^(?:[a-z0-9]([a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(:[0-9]{1,5})?$/';
 
     /**
      * Read the registries a server is logged in to from the Docker config that deployments mount.
@@ -210,8 +216,10 @@ class DockerRegistryLogins
     /**
      * Run docker login on the server, writing to the same config file that deployments mount.
      *
-     * The secret goes to docker through stdin via the shell builtin echo, so it is never a process argument
-     * on the server, and it is kept out of SSH error logs and exception messages.
+     * The SSH wrapper sends this script to the server's shell on stdin, and the shell builtin echo passes the
+     * secret to docker on stdin, so it is not a process argument on the server. On the Coolify host it is still
+     * in the command line of the local shell that runs ssh, because SshMultiplexingHelper::generateSshCommand()
+     * embeds the script in a heredoc. It is kept out of SSH error logs and exception messages.
      */
     public static function login(Server $server, string $registry, string $username, string $password): void
     {
@@ -268,7 +276,12 @@ class DockerRegistryLogins
     private static function run(Server $server, string $command, array $secrets = [], ?string $emptyErrorMessage = null): void
     {
         $commands = $server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $server) : [$command];
-        $process = Process::timeout(60)->run(SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands)));
+        try {
+            $process = Process::timeout(60)->run(SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands)));
+        } catch (ProcessTimedOutException|SymfonyProcessTimedOutException) {
+            // The timeout message contains the full SSH command, including the registry password.
+            throw new RuntimeException('The command on the server timed out after 60 seconds.', 124);
+        }
 
         if ($process->exitCode() === 0) {
             return;

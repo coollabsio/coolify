@@ -4,6 +4,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -498,5 +499,223 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
             ->getJson("/api/v1/applications/{$this->application->uuid}/logs?service_name=work")
             ->assertNotFound()
             ->assertJson(['message' => "No running container found for service_name 'work'."]);
+    });
+});
+
+describe('GET /api/v1/applications/{uuid}/previews', function () {
+    test('lists only the previews of the application', function () {
+        createPreview($this->application, 12);
+        createPreview($this->application, 3);
+        $otherApplication = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        createPreview($otherApplication, 99);
+
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($this->user, $this->team, ['read'])))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews")
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonPath('0.pull_request_id', 12)
+            ->assertJsonPath('1.pull_request_id', 3)
+            ->assertJsonPath('1.pull_request_html_url', 'https://github.com/example/repo/pull/3');
+    });
+
+    test('returns 404 for an application of another team', function () {
+        $otherTeam = Team::factory()->create();
+        $otherUser = User::factory()->create();
+        $otherTeam->members()->attach($otherUser->id, ['role' => 'owner']);
+        createPreview($this->application, 3);
+
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($otherUser, $otherTeam, ['*'])))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews")
+            ->assertNotFound();
+    });
+});
+
+describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}', function () {
+    test('returns the preview', function () {
+        $preview = createPreview($this->application, 42);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42")
+            ->assertOk()
+            ->assertJsonPath('uuid', $preview->uuid)
+            ->assertJsonPath('pull_request_html_url', 'https://github.com/example/repo/pull/42');
+    });
+
+    test('returns 404 when the preview does not exist', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42")
+            ->assertNotFound()
+            ->assertJson(['message' => 'Preview not found.']);
+    });
+});
+
+describe('POST /api/v1/applications/{uuid}/previews', function () {
+    test('creates a preview and queues a deployment of the merge request ref', function () {
+        $this->application->update(['fqdn' => 'https://app.example.com']);
+
+        $response = $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 42,
+                'pull_request_html_url' => 'https://gitlab.com/example/repo/-/merge_requests/42',
+                'git_type' => 'gitlab',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('preview.pull_request_id', 42)
+            ->assertJsonPath('preview.git_type', 'gitlab');
+
+        expect($response->json('preview.domains'))->toContain('app.example.com');
+
+        $deployment = $this->application->deployment_queue()->latest('id')->first();
+        expect($deployment->deployment_uuid)->toBe($response->json('deployment_uuid'))
+            ->and($deployment->pull_request_id)->toBe(42)
+            ->and($deployment->git_type)->toBe('gitlab');
+    });
+
+    test('uses the GitHub App source to choose the pull request ref', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'preview-api-app',
+            'team_id' => $this->team->id,
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => false,
+            'app_id' => 111,
+            'installation_id' => 222,
+            'client_id' => 'client',
+            'client_secret' => 'secret',
+            'webhook_secret' => 'webhook',
+        ]);
+        $this->application->update(['source_id' => $githubApp->id, 'source_type' => GithubApp::class]);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", ['pull_request_id' => 7])
+            ->assertCreated()
+            ->assertJsonPath('preview.git_type', 'github');
+
+        expect($this->application->deployment_queue()->latest('id')->first()->git_type)->toBe('github');
+    });
+
+    test('requires git_type when the application has no Git App source', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", ['pull_request_id' => 7])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('git_type');
+
+        expect(ApplicationPreview::where('application_id', $this->application->id)->exists())->toBeFalse();
+    });
+
+    test('requires a commit for Bitbucket pull requests', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 7,
+                'git_type' => 'bitbucket',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('commit');
+    });
+
+    test('redeploys an existing preview with its stored git type', function () {
+        $preview = createPreview($this->application, 42);
+        $preview->update(['git_type' => 'gitea']);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", ['pull_request_id' => 42])
+            ->assertOk()
+            ->assertJsonPath('preview.uuid', $preview->uuid);
+
+        expect(ApplicationPreview::where('application_id', $this->application->id)->count())->toBe(1)
+            ->and($this->application->deployment_queue()->latest('id')->first()->git_type)->toBe('gitea');
+    });
+
+    test('creates the preview without a deployment when instant_deploy is false', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 42,
+                'git_type' => 'github',
+                'instant_deploy' => false,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('deployment_uuid', null);
+
+        expect($this->application->deployment_queue()->exists())->toBeFalse();
+    });
+
+    test('requires a docker tag for a new Docker Image preview and stores it', function () {
+        $this->application->update([
+            'build_pack' => 'dockerimage',
+            'docker_registry_image_name' => 'ghcr.io/example/app',
+            'docker_registry_image_tag' => 'latest',
+        ]);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", ['pull_request_id' => 5])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_tag');
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 5,
+                'docker_tag' => 'pr-5',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('preview.docker_registry_image_tag', 'pr-5');
+
+        expect($this->application->deployment_queue()->latest('id')->first()->docker_registry_image_tag)->toBe('pr-5');
+    });
+
+    test('rejects applications without a Git repository or Docker image', function () {
+        $this->application->update(['dockerfile' => 'FROM nginx']);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 5,
+                'git_type' => 'github',
+            ])
+            ->assertBadRequest();
+    });
+
+    test('returns 403 when token lacks deploy ability', function (array $abilities) {
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($this->user, $this->team, $abilities)))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 5,
+                'git_type' => 'github',
+            ])
+            ->assertForbidden();
+
+        expect(ApplicationPreview::where('application_id', $this->application->id)->exists())->toBeFalse();
+    })->with([
+        'read' => [['read']],
+        'write' => [['write']],
+    ]);
+
+    test('returns 404 for an application of another team', function () {
+        $otherTeam = Team::factory()->create();
+        $otherUser = User::factory()->create();
+        $otherTeam->members()->attach($otherUser->id, ['role' => 'owner']);
+
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($otherUser, $otherTeam, ['*'])))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 5,
+                'git_type' => 'github',
+            ])
+            ->assertNotFound();
+
+        expect(ApplicationPreview::where('application_id', $this->application->id)->exists())->toBeFalse();
+    });
+});
+
+describe('POST /api/v1/deploy with pull_request_id', function () {
+    test('deploys the preview with its stored git type', function () {
+        $preview = createPreview($this->application, 42);
+        $preview->update(['git_type' => 'gitlab']);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->postJson('/api/v1/deploy', ['uuid' => $this->application->uuid, 'pull_request_id' => 42])
+            ->assertOk();
+
+        expect($this->application->deployment_queue()->latest('id')->first()->git_type)->toBe('gitlab');
     });
 });

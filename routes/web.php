@@ -1,18 +1,36 @@
 <?php
 
+use App\Http\Controllers\Api\ApplicationsController;
+use App\Http\Controllers\Api\DatabasesController;
+use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\DestinationsController;
+use App\Http\Controllers\Api\EnvironmentCanvasController;
+use App\Http\Controllers\Api\GithubController;
+use App\Http\Controllers\Api\ProjectCanvasController;
+use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\SecurityController;
+use App\Http\Controllers\Api\ServerCanvasController;
+use App\Http\Controllers\Api\ServersController;
+use App\Http\Controllers\Api\ServicesController;
+use App\Http\Controllers\Api\SharedVariableCanvasController;
+use App\Http\Controllers\Api\TagCanvasController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
+use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
+use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\DeployCanvas;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
+use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -32,8 +50,11 @@ use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
+use App\Livewire\Project\EnvironmentCanvas;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Index as ProjectIndex;
+use App\Livewire\Project\ProjectCanvas;
+use App\Livewire\Project\ProjectsCanvas;
 use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
@@ -57,6 +78,7 @@ use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\Analytics\Show as ServerAnalytics;
 use App\Livewire\Server\CaCertificate\Show as CaCertificateShow;
+use App\Livewire\Server\Canvas as ServerCanvas;
 use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnel;
 use App\Livewire\Server\CloudProviderToken\Show as CloudProviderTokenShow;
@@ -70,6 +92,7 @@ use App\Livewire\Server\GithubRunners;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
+use App\Livewire\Server\Proxy\CertificatesShow as ProxyCertificatesShow;
 use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfigurations;
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
@@ -89,6 +112,7 @@ use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
 use App\Livewire\SettingsOauth;
+use App\Livewire\SharedVariables\Canvas as SharedVariablesCanvas;
 use App\Livewire\SharedVariables\Environment\Index as EnvironmentSharedVariablesIndex;
 use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesShow;
 use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
@@ -103,6 +127,7 @@ use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
+use App\Livewire\Tags\Canvas as TagsCanvas;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\AuditLog as TeamAuditLog;
@@ -166,6 +191,61 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/analytics', Analytics::class)->name('analytics');
+    Route::get('/metrics', FleetMetrics::class)->name('metrics');
+    Route::get('/canvas', DeployCanvas::class)->name('deploy-canvas');
+    Route::get('/canvas/tags', TagsCanvas::class)->name('tags.canvas');
+    // The canvas calls these API controllers with the browser session (no API token).
+    Route::prefix('canvas/api')->middleware([UseSessionTeamApiToken::class, 'api.token.team', 'api.sensitive'])->group(function () {
+        Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
+        Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:write']);
+        Route::get('/projects/canvas', [ProjectCanvasController::class, 'index'])->middleware(['api.ability:read']);
+        Route::get('/projects/{uuid}/canvas', [ProjectCanvasController::class, 'show'])->middleware(['api.ability:read']);
+        Route::get('/projects/{uuid}/environments', [ProjectController::class, 'get_environments'])->middleware(['api.ability:read']);
+        Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
+        Route::get('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas', [EnvironmentCanvasController::class, 'show'])->middleware(['api.ability:read']);
+        Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/positions', [EnvironmentCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
+        Route::post('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/links', [EnvironmentCanvasController::class, 'storeLink'])->middleware(['api.ability:write']);
+        Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/links/{link_uuid}', [EnvironmentCanvasController::class, 'updateLink'])->middleware(['api.ability:write']);
+        Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/links/{link_uuid}', [EnvironmentCanvasController::class, 'destroyLink'])->middleware(['api.ability:write']);
+        Route::get('/tags/canvas', [TagCanvasController::class, 'show'])->middleware(['api.ability:read']);
+        Route::post('/tags/canvas/links', [TagCanvasController::class, 'storeLink'])->middleware(['api.ability:write']);
+        Route::delete('/tags/canvas/links/{link_id}', [TagCanvasController::class, 'destroyLink'])->middleware(['api.ability:write']);
+        Route::get('/shared-variables/team/canvas', [SharedVariableCanvasController::class, 'show'])->middleware(['api.ability:read']);
+        Route::post('/shared-variables/team/canvas/links', [SharedVariableCanvasController::class, 'storeLink'])->middleware(['api.ability:write']);
+        Route::delete('/shared-variables/team/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->middleware(['api.ability:write']);
+        Route::get('/shared-variables/{scope}/{uuid}/canvas', [SharedVariableCanvasController::class, 'show'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:read']);
+        Route::post('/shared-variables/{scope}/{uuid}/canvas/links', [SharedVariableCanvasController::class, 'storeLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
+        Route::delete('/shared-variables/{scope}/{uuid}/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
+        Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
+        Route::get('/servers/canvas', [ServerCanvasController::class, 'index'])->middleware(['api.ability:read']);
+        Route::get('/servers/{uuid}/canvas', [ServerCanvasController::class, 'show'])->middleware(['api.ability:read']);
+        Route::get('/servers/{uuid}/canvas/containers', [ServerCanvasController::class, 'containers'])->middleware(['api.ability:read']);
+        Route::get('/servers/{server_uuid}/destinations', [DestinationsController::class, 'index_by_server'])->middleware(['api.ability:read']);
+        Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
+        Route::get('/github-apps/{github_app_id}/repositories', [GithubController::class, 'load_repositories'])->middleware(['api.ability:read']);
+        Route::get('/github-apps/{github_app_id}/repositories/{owner}/{repo}/branches', [GithubController::class, 'load_branches'])->middleware(['api.ability:read']);
+        Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['api.ability:read']);
+        Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware(['api.ability:write']);
+        Route::post('/applications/private-github-app', [ApplicationsController::class, 'create_private_gh_app_application'])->middleware(['api.ability:write']);
+        Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
+        Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
+        Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
+        Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
+        Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
+        Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
+        Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
+        Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
+        Route::post('/databases/postgresql', [DatabasesController::class, 'create_database_postgresql'])->middleware(['api.ability:write']);
+        Route::post('/databases/mysql', [DatabasesController::class, 'create_database_mysql'])->middleware(['api.ability:write']);
+        Route::post('/databases/mariadb', [DatabasesController::class, 'create_database_mariadb'])->middleware(['api.ability:write']);
+        Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
+        Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
+        Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
+        Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
+        Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
+        Route::post('/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:deploy']);
+        Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid'])->middleware(['api.ability:read']);
+    });
     Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
@@ -185,6 +265,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+    Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
+        ->middleware('password.confirm')
+        ->name('profile.passkeys.confirm');
 
     Route::prefix('tags')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
@@ -208,17 +291,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('shared-variables')->group(function () {
         Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index');
         Route::get('/team', TeamSharedVariablesIndex::class)->name('shared-variables.team.index');
+        Route::get('/team/canvas', SharedVariablesCanvas::class)->name('shared-variables.team.canvas');
         Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
         Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
+        Route::get('/project/{project_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.project.canvas');
         Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
         Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
+        Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.environment.canvas');
         Route::get('/servers', ServerSharedVariablesIndex::class)->name('shared-variables.server.index');
         Route::get('/server/{server_uuid}', ServerSharedVariablesShow::class)->name('shared-variables.server.show');
+        Route::get('/server/{server_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.server.canvas');
     });
 
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
+        Route::get('/{team_id}/avatar', TeamAvatarController::class)->whereNumber('team_id')->name('team.avatar');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
         Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
@@ -272,9 +361,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
+    Route::get('/projects/canvas', ProjectsCanvas::class)->name('project.canvas.index');
     Route::get('/project/{project_uuid}/icon', ProjectIconController::class)->name('project.icon');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
+        Route::get('/canvas', ProjectCanvas::class)->name('project.canvas');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
@@ -282,6 +373,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
+        Route::get('/canvas', EnvironmentCanvas::class)->name('project.environment.canvas');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
@@ -373,14 +465,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
+    Route::get('/servers/canvas', ServerCanvas::class)->name('server.canvas.index');
     Route::get('/registries', ServerDockerRegistries::class)->name('registries.index');
     Route::get('/servers/import', ServerTransferImport::class)->name('server.transfer.import')->middleware('can:create,'.Server::class);
     Route::get('/servers/new', ServerCreatePage::class)->name('server.create')->middleware('can:create,'.Server::class);
-    Route::get('/servers/new/{type}/{token_uuid}', ServerCreatePage::class)->name('server.create.token')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean']);
-    Route::get('/servers/new/{type}', ServerCreatePage::class)->name('server.create.type')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'manual']);
+    Route::get('/servers/new/{type}/{token_uuid}', ServerCreatePage::class)->name('server.create.token')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger']);
+    Route::get('/servers/new/{type}', ServerCreatePage::class)->name('server.create.type')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger', 'manual']);
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
+        Route::get('/canvas', ServerCanvas::class)->name('server.canvas');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
         Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
         Route::get('/sentinel', SentinelShow::class)->name('server.sentinel');
@@ -397,6 +491,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/transfer', ServerTransfer::class)->name('server.transfer');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
+        Route::get('/proxy/certificates', ProxyCertificatesShow::class)->name('server.proxy.certificates');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');

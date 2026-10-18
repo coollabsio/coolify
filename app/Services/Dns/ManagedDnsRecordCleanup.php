@@ -269,7 +269,7 @@ class ManagedDnsRecordCleanup
         }
 
         if (! $record->owned || ! $deleteRecord) {
-            $record->delete();
+            $this->forget($record, $record->owned ? 'kept_by_user' : 'not_owned', 'info');
 
             return $record->owned ? null : ManagedDnsDeletionResult::NotOwned;
         }
@@ -400,13 +400,13 @@ class ManagedDnsRecordCleanup
     /**
      * Stops tracking the record without touching the provider.
      */
-    private function forget(ManagedDnsRecord $record, string $reason): void
+    private function forget(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
         $record->delete();
-        $this->auditSkipped($record, $reason);
+        $this->auditSkipped($record, $reason, $level);
     }
 
-    private function auditSkipped(ManagedDnsRecord $record, string $reason): void
+    private function auditSkipped(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
         $source = auth()->check() ? 'ui' : 'system';
         auditLog("{$source}.dns_record.delete_skipped", [
@@ -414,7 +414,7 @@ class ManagedDnsRecordCleanup
             'hostname' => $record->name,
             'provider' => 'cloudflare',
             'reason' => $reason,
-        ], 'warning');
+        ], $level);
     }
 
     /**

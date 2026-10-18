@@ -27,7 +27,7 @@
 
                 @php($missingRunnerRequirements = $github_app->missingRunnerRequirements())
                 <x-application.settings-section title="GitHub Actions runners"
-                    description="Build servers can run the organization's workflow jobs in Docker containers. Configure them in the GitHub Runners menu of a build server.">
+                    description="Your servers can run the organization's workflow jobs in Docker containers. Configure them in the GitHub Runners menu of a server.">
                     <div class="grid gap-4 lg:grid-cols-3">
                         <x-forms.input canGate="view" :canResource="$github_app"
                             label="Self-hosted runners" readonly placeholder="N/A"
@@ -49,6 +49,15 @@
                                     <li>{{ $requirement }}</li>
                                 @endforeach
                             </ul>
+                            @can('view', $github_app)
+                                <div class="mt-2">
+                                    <a href="{{ getPermissionsPath($github_app) }}" class="button" target="_blank"
+                                        rel="noopener noreferrer">
+                                        Update on GitHub
+                                        <x-external-link />
+                                    </a>
+                                </div>
+                            @endcan
                         </x-callout>
                     @endif
                 </x-application.settings-section>

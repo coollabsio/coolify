@@ -3,6 +3,7 @@
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -115,6 +116,23 @@ it('renders preview deployment enablement as a section action', function () {
         ->assertSet('isPreviewDeploymentsEnabled', true);
 
     expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeTrue();
+});
+
+it('does not load GitHub pull requests for GitLab sources', function () {
+    $gitlabApp = GitlabApp::create([
+        'name' => 'Self-hosted GitLab',
+        'api_url' => 'https://gitlab.example.com/api/v4',
+        'html_url' => 'https://gitlab.example.com',
+        'team_id' => $this->team->id,
+    ]);
+    $this->application->update(['source_id' => $gitlabApp->id, 'source_type' => GitlabApp::class]);
+
+    Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->assertSee('PR deployment access')
+        ->assertDontSee('Load pull requests')
+        ->call('load_prs')
+        ->assertSet('rate_limit_remaining', 0)
+        ->assertDispatched('error');
 });
 
 it('does not show git preview settings for non-git applications', function (string $buildPack, ?string $dockerfile) {

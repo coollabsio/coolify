@@ -82,6 +82,12 @@ trait HandlesDatabaseImportsApi
 
             return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
         }
+        // A server import reads any absolute path on the host, so it needs the same permission as host mounts outside the resource directory.
+        if ($payload['source'] === 'server' && ! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
+            return response()->json([
+                'message' => 'Missing required permissions: deploy. An import from a server path needs a token with the deploy permission.',
+            ], 403);
+        }
 
         try {
             $source = new DatabaseImportSource((string) $payload['source'], $payload['upload_id'] ?? null, $payload['path'] ?? null, $payload['s3_storage_uuid'] ?? null, (bool) ($payload['dump_all'] ?? false), (bool) ($payload['replace_existing'] ?? false), (bool) ($payload['keep_owners'] ?? false), isset($payload['sqlite_database']) ? (string) $payload['sqlite_database'] : null, (bool) ($payload['restore_mysql_users'] ?? false));
@@ -121,7 +127,9 @@ trait HandlesDatabaseImportsApi
             'id' => $activity->id,
             'status' => $status,
             'exit_code' => data_get($activity, 'properties.exitCode'),
-            'output' => remove_iip(RunRemoteProcess::decodeOutput($activity)),
+            'output' => request()->attributes->get('can_read_sensitive', false) === true && request()->user()->can('update', $resource)
+                ? remove_iip(RunRemoteProcess::decodeOutput($activity))
+                : null,
             'created_at' => $activity->created_at,
             'updated_at' => $activity->updated_at,
             'finished_at' => $terminal ? $activity->updated_at : null,

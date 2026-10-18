@@ -55,7 +55,8 @@
     };
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start">
+<aside class="application-settings-navigation min-w-0 xl:self-start"
+    data-settings-search-items="{{ json_encode(settingsSearchItems(['Backup' => collect($items)->map(fn (array $item): array => [...$item, 'route' => $routes[$item['key']]])], $parameters)) }}">
     <nav aria-label="Backup settings"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         <div class="nav-section hidden xl:block">Backup</div>

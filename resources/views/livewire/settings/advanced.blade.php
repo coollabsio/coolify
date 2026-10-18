@@ -32,6 +32,12 @@
                             ['value' => false, 'label' => 'Require two-step confirmation'],
                             ['value' => true, 'label' => 'Skip two-step confirmation'],
                         ]" />
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="is_passkey_enabled" label="Passkeys"
+                        helper="Let users sign in with a passkey. Passkeys need an HTTPS instance URL. Stored passkeys are kept when this is disabled."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
                 </div>
             </x-application.settings-section>
 
@@ -101,7 +107,9 @@
                 @endif
                 @if ($is_mcp_server_enabled)
                     <x-callout type="info" title="MCP endpoint" class="mt-4">
-                        <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
+                        <span class="inline-flex items-center gap-1 align-middle"><code>{{ url('/mcp') }}</code><x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" /></span>
+                        uses bearer tokens from
+                        <a href="{{ route('security.api-tokens') }}" class="underline" {{ wireNavigate() }}>Security → API Tokens</a>.
                     </x-callout>
                 @endif
             </x-application.settings-section>

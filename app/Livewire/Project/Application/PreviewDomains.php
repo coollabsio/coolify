@@ -11,6 +11,7 @@ use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class PreviewDomains extends Component
@@ -19,6 +20,8 @@ class PreviewDomains extends Component
 
     public ApplicationPreview $preview;
 
+    /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
@@ -489,8 +492,21 @@ class PreviewDomains extends Component
         foreach ($this->domainRows as $index => $row) {
             $this->domainRows[$index]['url'] = DomainPortOverrides::withoutPort($row['url']);
         }
+        $changedFields = array_values(array_intersect(
+            auditChangedFields($this->preview),
+            ['fqdn', 'docker_compose_domains', 'domain_port_overrides'],
+        ));
         $this->preview->save();
-        $dnsCleanup->queueReleaseOfRemovedHostnames($this->preview, $previousDnsHostnames, currentTeam()->id);
+        if ($changedFields !== []) {
+            auditLog('ui.application.preview_updated', [
+                'team_id' => $this->preview->application->team()?->id,
+                'application_uuid' => $this->preview->application->uuid,
+                'application_name' => $this->preview->application->name,
+                'pull_request_id' => $this->preview->pull_request_id,
+                'changed_fields' => $changedFields,
+            ]);
+        }
+        $dnsCleanup->queueReleaseOfRemovedHostnames($this->preview, $previousDnsHostnames, $this->preview->application->team()->id);
         $this->persistDnsStatuses();
         $this->refreshDomains();
         $this->dispatch('update_links');

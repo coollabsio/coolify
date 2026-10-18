@@ -27,6 +27,11 @@ class RevalidateUnusableS3StoragesJob implements ShouldBeEncrypted, ShouldBeUniq
     public $timeout = 1800;
 
     /**
+     * Releases the unique lock of a killed worker after one run, instead of after the queue retry_after.
+     */
+    public int $uniqueFor = 1800;
+
+    /**
      * Stay well below $timeout, because a single unreachable endpoint can take a while to fail.
      */
     public const TIME_BUDGET_SECONDS = 1200;

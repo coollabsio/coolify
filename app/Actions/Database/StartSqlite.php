@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Models\StandaloneSqlite;
 use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -32,6 +33,7 @@ class StartSqlite
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
 
@@ -147,7 +149,7 @@ class StartSqlite
             $environment_variables->push($env->key.'='.$resolvedValue);
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('SQLITE_DATABASES'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'SQLITE_DATABASES')) {
             $environment_variables->push("SQLITE_DATABASES={$this->database->sqlite_databases}");
         }
 

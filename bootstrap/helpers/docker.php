@@ -89,10 +89,12 @@ function containerOwnerUuid(Collection|array|string $labels, string $type): ?str
 
 /**
  * Resource that owns a container, from the given candidates, by UUID label or compose project /
- * stack namespace (see containerOwnerUuid()). Applications deployed before mid-2024 used the
- * deployment directory as compose project; their compose service (the container name) starts
- * with the application UUID. The numeric id label is never used: another Coolify instance that
- * manages the same server can have a resource with the same id.
+ * stack namespace (see containerOwnerUuid()). Some older application containers have another
+ * compose project: the deployment directory (before mid-2024, or a custom Compose start command
+ * without --project-name). Their container name (`coolify.name`, for Dockerfile-style builds also
+ * the compose service) contains the application UUID as a dash-separated part, for example
+ * `{uuid}-104512123456` or `{service}-{uuid}-104512123456`. The numeric id label is never used:
+ * another Coolify instance that manages the same server can have a resource with the same id.
  *
  * @template TResource of \Illuminate\Database\Eloquent\Model
  *
@@ -110,9 +112,11 @@ function resolveContainerOwner(Collection $resources, Collection|array|string $l
         return $owner;
     }
 
-    $composeService = (string) $labels->get('com.docker.compose.service');
+    $names = [(string) $labels->get('com.docker.compose.service'), (string) $labels->get('coolify.name')];
 
-    return $resources->first(fn ($resource) => $composeService === $resource->uuid || str_starts_with($composeService, $resource->uuid.'-'));
+    return $resources->first(fn ($resource) => collect($names)->contains(
+        fn (string $name) => filled($resource->uuid) && preg_match('/(?:^|-)'.preg_quote($resource->uuid, '/').'(?:-|$)/', $name) === 1
+    ));
 }
 
 /**
@@ -238,8 +242,8 @@ function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters
         $base.' '.$filters(["label=coolify.{$type}Id", "label=com.docker.compose.project={$uuid}", ...$legacyFilters]).' '.$formatArgument,
     ];
     if ($type === 'application') {
-        // Deployed before mid-2024 (see resolveContainerOwner()): the container name starts with the UUID.
-        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name=^{$uuid}", ...$legacyFilters]).' '.$formatArgument;
+        // Compose project is the deployment directory (see resolveContainerOwner()): the container name contains the UUID.
+        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name={$uuid}", ...$legacyFilters]).' '.$formatArgument;
     }
 
     return $commands;
@@ -304,7 +308,7 @@ function getCurrentApplicationContainerStatus(Server $server, Application $appli
             if ($includePullrequests) {
                 return $container;
             }
-            if ($pullRequestId !== null && $pullRequestId !== 0 && str($labels)->contains("coolify.pullRequestId={$pullRequestId}")) {
+            if ($pullRequestId !== null && $pullRequestId !== 0 && (int) $prLabelValue === $pullRequestId) {
                 return $container;
             }
 
@@ -766,7 +770,20 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
+/**
+ * Caddy site address of a domain. Maintenance blocks in the base Caddyfile must use the same
+ * address as the labels, so caddy-docker-proxy merges them into one site block.
+ */
+function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnabled): string
+{
+    if ($scheme === 'https' && ! $isForceHttpsEnabled) {
+        return "http://{$host}, https://{$host}";
+    }
+
+    return "{$scheme}://{$host}";
+}
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [])
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -777,7 +794,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     if ($is_http_basic_auth_enabled) {
-        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $hashedPassword = $http_basic_auth_argon2id_options
+            ? password_hash($http_basic_auth_password, PASSWORD_ARGON2ID, $http_basic_auth_argon2id_options)
+            : password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => $http_basic_auth_bcrypt_cost ?? 10]);
     }
 
     $trafficAppKey = caddyTrafficAppKey($uuid, $service_name);
@@ -788,10 +807,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $path = $url->getPath();
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
-        $siteAddress = "{$schema}://{$host}";
-        if ($schema === 'https' && ! $is_force_https_enabled) {
-            $siteAddress = "http://{$host}, https://{$host}";
-        }
+        $siteAddress = caddySiteAddress($schema, $host, $is_force_https_enabled);
         $portlessDomain = ServiceApplication::withoutPort($domain);
         $port = $url->getPort() ?? ($domainPortOverrides[$portlessDomain] ?? null);
         $handle = 'handle_path';
@@ -834,6 +850,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($is_http_basic_auth_enabled) {
             // Caddy 2.8 renamed basicauth to basic_auth; see Server::caddySupportsBasicAuthDirective().
             $basicAuthDirective = $supports_basic_auth_directive ? 'basic_auth' : 'basicauth';
+            if ($http_basic_auth_argon2id_options) {
+                $labels->push("caddy_{$loop}.{$basicAuthDirective}=argon2id");
+            }
             $labels->push("caddy_{$loop}.{$basicAuthDirective}.{$http_basic_auth_username}=\"{$hashedPassword}\"");
         }
         if ($is_traffic_analytics_enabled) {
@@ -893,7 +912,7 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
     }
 
     try {
-        $services = data_get(Yaml::parse($compose), 'services', []);
+        $services = data_get(parseDockerComposeYaml($compose), 'services', []);
     } catch (Throwable) {
         return [];
     }
@@ -907,7 +926,20 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
         ->unique()->values()->all();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
+/**
+ * Traefik matches an IPv6 host without brackets: Host(`[2a01:4f8::1]`) never matches a request,
+ * Host(`2a01:4f8::1`) does. Labels that were saved with brackets get them removed here.
+ */
+function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
+{
+    return $labels->map(fn ($label) => is_string($label) ? preg_replace_callback(
+        '/Host\(`\[([0-9A-Fa-f:.]+)\]`\)/',
+        fn (array $matches): string => filter_var($matches[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "Host(`{$matches[1]}`)" : $matches[0],
+        $label,
+    ) : $label);
+}
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -919,7 +951,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     $http_basic_auth_label = "http-basic-auth-{$uuid}";
     if ($is_http_basic_auth_enabled) {
-        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => $http_basic_auth_bcrypt_cost ?? 10]);
     }
 
     if ($is_http_basic_auth_enabled) {
@@ -960,6 +992,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
             $url = Url::fromString($domain);
             $host = $url->getHost();
+            // Traefik matches an IPv6 Host header without brackets: Host(`[2a01:4f8::1]`) never matches.
+            $traefikHost = trim($host, '[]');
             $path = $url->getPath();
             $schema = $url->getScheme();
             $portlessDomain = ServiceApplication::withoutPort($domain);
@@ -1004,7 +1038,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             ];
             if ($schema === 'https') {
                 // Set labels for https
-                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
                 if ($port) {
                     $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
@@ -1073,10 +1107,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
-                $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
+                if (filled($certificate_resolver)) {
+                    $labels->push("traefik.http.routers.{$https_label}.tls.certresolver={$certificate_resolver}");
+                }
 
                 // Set labels for http (redirect to https)
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
@@ -1096,7 +1132,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
             } else {
                 // Set labels for http
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$traefikHost}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
@@ -1186,6 +1222,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
     $labels = collect([]);
+    $httpBasicAuthArgon2idOptions = $application->usesArgon2idBasicAuth() ? [
+        'memory_cost' => $application->http_basic_auth_argon2id_memory_cost,
+        'time_cost' => $application->http_basic_auth_argon2id_time_cost,
+    ] : [];
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
@@ -1205,8 +1245,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
+                            certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1222,6 +1264,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                            http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                             noindex_domains: $noindexDomains,
                             is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1242,9 +1286,11 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
+                    certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -1258,6 +1304,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                    http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                     noindex_domains: $noindexDomains,
                     is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1288,9 +1336,11 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                         noindex_domains: $noindexDomains,
                         escape_redirect_replacement_for_compose: false,
                         domainPortOverrides: $preview->domain_port_overrides ?? [],
+                        certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -1305,6 +1355,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                        http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                         noindex_domains: $noindexDomains,
                         is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                         supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1324,9 +1376,11 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                 noindex_domains: $noindexDomains,
                 escape_redirect_replacement_for_compose: false,
                 domainPortOverrides: $preview->domain_port_overrides ?? [],
+                certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -1339,6 +1393,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                 noindex_domains: $noindexDomains,
                 is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                 supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1713,6 +1769,27 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         }
     }
 
+    // Short interactive/TTY flags (-i, -t, -it, -ti) and their long forms are not matched by
+    // the long-option regex above. Map them to compose so a single-image app can keep STDIN
+    // open (docker -i) and/or allocate a TTY (docker -t) — required for `docker attach` to an
+    // interactive main process, e.g. game-server consoles.
+    // Keep quoted option values together so flags inside an entrypoint are not options.
+    preg_match_all('/(?:[^\\s\'"\\\\]+|\\\\.|"(?:\\\\.|[^"\\\\])*"|\'(?:\\\\.|[^\'\\\\])*\')+/', (string) $custom_docker_run_options, $tokens);
+    foreach ($tokens[0] as $token) {
+        if ($token === '--interactive') {
+            $compose_options->put('stdin_open', true);
+        } elseif ($token === '--tty') {
+            $compose_options->put('tty', true);
+        } elseif (preg_match('/^-[dit]+$/', $token)) {
+            if (str_contains($token, 'i')) {
+                $compose_options->put('stdin_open', true);
+            }
+            if (str_contains($token, 't')) {
+                $compose_options->put('tty', true);
+            }
+        }
+    }
+
     return $compose_options->toArray();
 }
 
@@ -1782,7 +1859,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         if (! $server) {
             throw new Exception('Server not found');
         }
-        $yaml_compose = Yaml::parse($compose);
+        $yaml_compose = parseDockerComposeYaml($compose);
 
         // Remove Coolify's custom fields before Docker validation
         $yaml_compose = stripCoolifyCustomFields($yaml_compose);
@@ -1885,6 +1962,17 @@ function escapeBashEnvValue(?string $value): string
 
     // Wrap in single quotes
     return "'{$escaped}'";
+}
+
+function escapeComposeEnvFileValue(?string $value, bool $allowInterpolation = false): string
+{
+    $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $value ?? '');
+
+    if (! $allowInterpolation) {
+        $escaped = str_replace('$', '\\$', $escaped);
+    }
+
+    return '"'.$escaped.'"';
 }
 
 /**
@@ -2077,4 +2165,38 @@ function injectDockerComposeBuildArgs(string $command, string $buildArgsString):
     );
 
     return $modifiedCommand ?? $command;
+}
+
+/**
+ * Run a command that uses the Railpack BuildKit builder, then stop the builder when no other
+ * process uses it. An idle buildkitd keeps the memory of earlier builds until it restarts.
+ *
+ * The lock file is in the buildx metadata directory, which all helper containers of a server share.
+ * The script has no `&&`, `||`, pipe, or `$(`, because the sudo parser would put sudo into it.
+ */
+function railpackBuilderLockedScript(string $command): string
+{
+    return 'exec 9>/root/.docker/buildx/coolify-railpack.lock; if flock -s 9; then :; else exit $?; fi; '
+        ."{$command}; status=\$?; "
+        .'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi; '
+        .'exit $status';
+}
+
+/**
+ * The buildx metadata of a server, as the `docker run -v` source that the deployment helper uses.
+ */
+function railpackBuildxMetadataVolume(Server $server): string
+{
+    return isDev() && $server->isLocalhost() ? 'coolify-buildx' : '$HOME/.docker/buildx';
+}
+
+/**
+ * Run a command for the Railpack builder from a temporary helper container, then stop the builder
+ * when no build uses it.
+ */
+function railpackBuilderHelperCommand(string $buildxMetadataVolume, string $helperImage, string $command): string
+{
+    $script = railpackBuilderLockedScript($command);
+
+    return "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImage} bash -c '{$script}' 2>/dev/null || true";
 }

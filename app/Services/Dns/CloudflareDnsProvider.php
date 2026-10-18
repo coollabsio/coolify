@@ -31,6 +31,9 @@ class CloudflareDnsProvider
         $page = 1;
         do {
             $response = $this->client($token)->get('https://api.cloudflare.com/client/v4/zones', ['page' => $page, 'per_page' => 50]);
+            if ($response->status() === 403) {
+                throw new RuntimeException(self::missingPermissionMessage('Zone → Zone → Read'));
+            }
             if (! $response->successful() || $response->json('success') !== true) {
                 throw new RuntimeException('Cloudflare zones could not be synchronized.');
             }
@@ -78,27 +81,52 @@ class CloudflareDnsProvider
             ->get();
     }
 
+    public static function missingPermissionMessage(string $permission): string
+    {
+        return "The Cloudflare token needs the {$permission} permission.";
+    }
+
     /**
-     * All records of the given type for a hostname (several records form a round-robin set).
+     * All records of the given type (all types when null) for a hostname (several records form a round-robin set).
      *
      * @return array<int, array{id: string, type: string, name: string, content: string, proxied: bool|null, ttl: int|null, comment: string|null}>
      */
-    public function findRecords(DnsProviderZone $zone, string $hostname, string $type): array
+    public function findRecords(DnsProviderZone $zone, string $hostname, ?string $type): array
     {
         $hostname = strtolower(rtrim($hostname, '.'));
         $response = $this->client($zone->integrationToken)->get(
             "https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records",
-            ['type' => $type, 'name' => $hostname, 'per_page' => 100],
+            array_filter(['type' => $type, 'name' => $hostname, 'per_page' => 100]),
         );
+        if ($response->status() === 403) {
+            throw new RuntimeException(self::missingPermissionMessage('Zone → DNS → Edit'));
+        }
         if (! $response->successful()) {
             throw new RuntimeException('Cloudflare DNS records could not be checked.');
         }
 
         return collect($response->json('result', []))
             ->filter(fn ($remote): bool => is_array($remote))
-            ->map(fn (array $remote): array => $this->normalizeRemoteRecord($remote, $hostname, $type))
+            ->map(fn (array $remote): array => $this->normalizeRemoteRecord($remote, $hostname, $type ?? ''))
             ->values()
             ->all();
+    }
+
+    /**
+     * Records that block a new record of the type. A CNAME cannot share its name with A, AAAA, or other CNAME records.
+     *
+     * @return array<int, array{id: string, type: string, name: string, content: string, proxied: bool|null, ttl: int|null, comment: string|null}>
+     */
+    private function conflictingRecords(DnsProviderZone $zone, string $hostname, string $type): array
+    {
+        if ($type !== 'CNAME') {
+            return $this->findRecords($zone, $hostname, $type);
+        }
+
+        return array_values(array_filter(
+            $this->findRecords($zone, $hostname, null),
+            fn (array $remote): bool => in_array($remote['type'], ['A', 'AAAA', 'CNAME'], true),
+        ));
     }
 
     /**
@@ -111,15 +139,15 @@ class CloudflareDnsProvider
      *
      * @throws LockTimeoutException when another change for the hostname does not finish in time
      */
-    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, array $additionalResources = []): ManagedDnsRecord
+    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, array $additionalResources = [], ?bool $proxied = null): ManagedDnsRecord
     {
         $hostname = strtolower(rtrim($hostname, '.'));
 
         return $this->hostnameLock->run(
             (int) $zone->integrationToken->team_id,
             $hostname,
-            function () use ($zone, $hostname, $content, $resource, $additionalResources): ManagedDnsRecord {
-                $record = $this->createRecordLocked($zone, $hostname, $content, $resource);
+            function () use ($zone, $hostname, $content, $resource, $additionalResources, $proxied): ManagedDnsRecord {
+                $record = $this->createRecordLocked($zone, $hostname, $content, $resource, $proxied);
                 foreach ($additionalResources as $additionalResource) {
                     $record->addReference($additionalResource);
                 }
@@ -129,11 +157,11 @@ class CloudflareDnsProvider
         );
     }
 
-    private function createRecordLocked(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource): ManagedDnsRecord
+    private function createRecordLocked(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource, ?bool $proxied): ManagedDnsRecord
     {
         $type = $this->recordType($content);
-        $remoteRecords = $this->findRecords($zone, $hostname, $type);
-        $matching = collect($remoteRecords)->first(fn (array $remote): bool => DnsRecordHints::sameAddress($remote['content'], $content));
+        $remoteRecords = $this->conflictingRecords($zone, $hostname, $type);
+        $matching = collect($remoteRecords)->first(fn (array $remote): bool => $remote['type'] === $type && DnsRecordHints::sameAddress($remote['content'], $content));
         if ($matching !== null) {
             if ($matching['id'] === '') {
                 throw new RuntimeException('Cloudflare DNS records could not be checked.');
@@ -153,9 +181,13 @@ class CloudflareDnsProvider
 
         $uuid = new_public_id();
         $response = $this->client($zone->integrationToken)->post("https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records", [
-            'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1, 'proxied' => false,
+            'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1,
+            'proxied' => $proxied ?? $zone->integrationToken->proxiedDnsEnabled(),
             'comment' => ManagedDnsRecord::ownershipCommentFor($uuid),
         ]);
+        if ($response->status() === 403) {
+            throw new RuntimeException(self::missingPermissionMessage('Zone → DNS → Edit'));
+        }
         if (! $response->successful() || ! is_string($response->json('result.id'))) {
             throw new RuntimeException('Cloudflare could not create the DNS record.');
         }
@@ -175,7 +207,8 @@ class CloudflareDnsProvider
 
     /**
      * Points an existing (conflicting) record at the new content after explicit user confirmation.
-     * Only the content changes: proxy status, TTL, comment and other settings stay as they are.
+     * Only the content (and the type, when it differs) changes: TTL, comment and other settings stay as they are.
+     * The proxy status changes only when $proxied is set.
      *
      * @param  array<int, Model>  $additionalResources  Other resources that use the hostname and also reference the record.
      *
@@ -189,14 +222,15 @@ class CloudflareDnsProvider
         ?Model $resource = null,
         ?string $expectedCurrent = null,
         array $additionalResources = [],
+        bool $proxied = false,
     ): ManagedDnsRecord {
         $hostname = strtolower(rtrim($hostname, '.'));
 
         return $this->hostnameLock->run(
             (int) $zone->integrationToken->team_id,
             $hostname,
-            function () use ($zone, $recordId, $hostname, $content, $resource, $expectedCurrent, $additionalResources): ManagedDnsRecord {
-                $record = $this->replaceRecordLocked($zone, $recordId, $hostname, $content, $resource, $expectedCurrent);
+            function () use ($zone, $recordId, $hostname, $content, $resource, $expectedCurrent, $additionalResources, $proxied): ManagedDnsRecord {
+                $record = $this->replaceRecordLocked($zone, $recordId, $hostname, $content, $resource, $expectedCurrent, $proxied);
                 foreach ($additionalResources as $additionalResource) {
                     $record->addReference($additionalResource);
                 }
@@ -213,9 +247,10 @@ class CloudflareDnsProvider
         string $content,
         ?Model $resource,
         ?string $expectedCurrent,
+        bool $proxied,
     ): ManagedDnsRecord {
         $type = $this->recordType($content);
-        $remoteRecords = $this->findRecords($zone, $hostname, $type);
+        $remoteRecords = $this->conflictingRecords($zone, $hostname, $type);
         if (count($remoteRecords) > 1) {
             throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
         }
@@ -228,10 +263,20 @@ class CloudflareDnsProvider
             throw new RuntimeException('The DNS conflict is no longer available. Check the record again.');
         }
 
+        $changes = ['content' => $content];
+        if ($remote['type'] !== $type) {
+            $changes['type'] = $type;
+        }
+        if ($proxied) {
+            $changes['proxied'] = true;
+        }
         $response = $this->client($zone->integrationToken)->patch(
             "https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records/{$remote['id']}",
-            ['content' => $content],
+            $changes,
         );
+        if ($response->status() === 403) {
+            throw new RuntimeException(self::missingPermissionMessage('Zone → DNS → Edit'));
+        }
         if (! $response->successful()) {
             throw new RuntimeException('Cloudflare could not replace the conflicting DNS record.');
         }
@@ -288,9 +333,7 @@ class CloudflareDnsProvider
     private function forgetDeletedRecord(ManagedDnsRecord $record, ManagedDnsDeletionResult $result, ?Model $resource): ManagedDnsDeletionResult
     {
         $record->delete();
-        if ($result === ManagedDnsDeletionResult::Deleted) {
-            $this->auditDnsRecord('deleted', $record->zone, $record->name, $resource);
-        }
+        $this->auditDnsRecord($result === ManagedDnsDeletionResult::Deleted ? 'deleted' : 'already_deleted', $record->zone, $record->name, $resource);
 
         return $result;
     }
@@ -338,7 +381,11 @@ class CloudflareDnsProvider
 
     private function recordType(string $content): string
     {
-        return filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? 'AAAA' : 'A';
+        return match (true) {
+            filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false => 'AAAA',
+            filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false => 'A',
+            default => 'CNAME',
+        };
     }
 
     private function auditDnsRecord(string $action, DnsProviderZone $zone, string $hostname, ?Model $resource): void

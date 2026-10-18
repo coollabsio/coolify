@@ -9,12 +9,14 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Queue::fake();
     Carbon::setTestNow('2025-01-15 12:00:00');
     InstanceSettings::forceCreate(['id' => 0, 'instance_timezone' => 'UTC']);
@@ -44,6 +46,8 @@ function createSentinelCheckServer(Team $team, Carbon $sentinelUpdatedAt, Server
 
 it('dispatches an hourly Sentinel version check for a healthy Sentinel', function () {
     $server = createSentinelCheckServer($this->team, Carbon::now());
+    Carbon::setTestNow(Carbon::now()->setMinute($server->id % 60));
+    $server->update(['sentinel_updated_at' => Carbon::now()]);
 
     expect($server->isSentinelEnabled())->toBeTrue()
         ->and($server->isSentinelLive())->toBeTrue();
@@ -54,6 +58,25 @@ it('dispatches an hourly Sentinel version check for a healthy Sentinel', functio
     Queue::assertPushed(CheckAndStartSentinelJob::class, function ($job) use ($server) {
         return $job->server->id === $server->id;
     });
+});
+
+it('skips the hourly Sentinel version check when the server is unreachable or unusable', function (string $flag) {
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Carbon::setTestNow(Carbon::now()->setMinute($server->id % 60));
+    $server->settings->update([$flag => false]);
+
+    (new ServerManagerJob)->handle();
+
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
+})->with(['is_reachable', 'is_usable']);
+
+it('skips the hourly SSH version check when Sentinel reports its version on push', function () {
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Cache::put(Server::sentinelReportedVersionCacheKey($server->id), '1.0.2', now()->addHours(2));
+
+    (new ServerManagerJob)->handle();
+
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
 });
 
 it('does not schedule periodic Sentinel restart checks', function () {

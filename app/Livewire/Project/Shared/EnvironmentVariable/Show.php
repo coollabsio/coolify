@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Services\SharedVariableCanvas;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
@@ -24,6 +25,9 @@ use Livewire\Component;
 class Show extends Component
 {
     public bool $showEnvironmentType = true;
+
+    /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    public ?array $composeInfo = null;
 
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
 
@@ -91,6 +95,11 @@ class Show extends Component
     public bool $editorOpen = false;
 
     public array $problematicVariables = [];
+
+    /**
+     * The variable was saved before exact escaping, and the container gets a different value.
+     */
+    public bool $legacyEscapingChangesValue = false;
 
     protected $listeners = [
         'refresh',
@@ -168,12 +177,16 @@ class Show extends Component
         }
 
         $this->hydrateValueFields();
+        $this->legacyEscapingChangesValue = $this->env instanceof ModelsEnvironmentVariable
+            && is_object($this->env->resourceable)
+            && method_exists($this->env->resourceable, 'legacyEscapingChangesValue')
+            && $this->env->resourceable->legacyEscapingChangesValue($this->env);
         $this->valuesLoaded = true;
     }
 
     public function copyValue(): ?string
     {
-        if ($this->env->is_shown_once || (auth()->user()?->cannot('update', $this->env) ?? true)) {
+        if ($this->env->is_shown_once || $this->valuesHiddenForUser()) {
             return null;
         }
 
@@ -184,6 +197,7 @@ class Show extends Component
         return $this->env->get_real_environment_variables_with_server(
             $this->env->resolveReferencedValue(),
             $this->env->resourceable,
+            revealLockedSharedVariables: false,
         );
     }
 
@@ -230,7 +244,7 @@ class Show extends Component
             $this->is_required = (bool) ($this->env->is_required ?? false);
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
-            $this->isValueHidden = auth()->user()?->isMember() ?? true;
+            $this->isValueHidden = $this->valuesHiddenForUser();
 
             if ($this->valuesLoaded) {
                 $this->hydrateValueFields();
@@ -250,19 +264,26 @@ class Show extends Component
         $this->is_shared = (bool) ($this->env->is_shared ?? false);
 
         if ($this->is_shared) {
-            $this->real_value = $this->env->real_value;
+            $this->real_value = $this->env instanceof ModelsEnvironmentVariable
+                ? $this->env->displayRealValue()
+                : $this->env->real_value;
             $this->is_really_required = $this->is_required && blank($this->real_value);
         } else {
             $this->real_value = null;
             $this->is_really_required = $this->is_required && blank($this->value);
         }
 
-        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
+        if ($this->env->is_shown_once || $this->valuesHiddenForUser()) {
             $this->value = null;
             $this->real_value = null;
         }
 
-        $this->isValueHidden = auth()->user()?->isMember() ?? true;
+        $this->isValueHidden = $this->valuesHiddenForUser();
+    }
+
+    private function valuesHiddenForUser(): bool
+    {
+        return auth()->user()?->cannot('update', $this->env) ?? true;
     }
 
     public function checkEnvs()
@@ -304,11 +325,36 @@ class Show extends Component
         $this->submit();
     }
 
+    public function useComposeDefault(): void
+    {
+        $this->authorize('update', $this->env);
+        $this->loadValues();
+        $composeInfo = $this->serverComposeInfo();
+        if ($this->env->is_shown_once || $composeInfo === null || $composeInfo['default'] === null || $composeInfo['required']) {
+            return;
+        }
+
+        $this->env->preserve_compose_null = false;
+        $this->value = null;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->env);
             $this->loadValues();
+
+            $composeInfo = $this->serverComposeInfo();
+            if ($composeInfo !== null) {
+                $storedKey = $this->env->fresh()?->key;
+                if ($storedKey === null || $this->key !== $storedKey) {
+                    $this->key = $storedKey ?? $this->key;
+                    $this->dispatch('error', 'Compose-linked environment variable names cannot be changed.');
+
+                    return;
+                }
+            }
 
             if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
@@ -336,13 +382,45 @@ class Show extends Component
         }
     }
 
+    /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    private function serverComposeInfo(): ?array
+    {
+        if ($this->isSharedVariable) {
+            return null;
+        }
+
+        $storedEnvironmentVariable = $this->env->fresh();
+        if ($storedEnvironmentVariable === null) {
+            return null;
+        }
+
+        $resource = $storedEnvironmentVariable->resourceable;
+        if (! $resource instanceof Application && ! $resource instanceof Service) {
+            return null;
+        }
+
+        return dockerComposeEnvironmentVariableInfo(
+            $resource->docker_compose_raw ?? $resource->docker_compose,
+            $storedEnvironmentVariable->key
+        );
+    }
+
+    /**
+     * Shared variables only: the connect envs canvas with this variable selected.
+     */
+    #[Computed]
+    public function connectLink(): ?string
+    {
+        return $this->isSharedVariable ? app(SharedVariableCanvas::class)->connectLink($this->env) : null;
+    }
+
     #[Computed]
     public function availableSharedVariables(): array
     {
         // Shared across all Show row components in the same request (edit modals).
         static $requestCache = [];
 
-        $team = currentTeam();
+        $team = $this->isSharedVariable ? $this->env->team : $this->env->resourceable?->team();
         $cacheKey = implode('|', [
             $team?->id ?? 'none',
             data_get($this->parameters, 'project_uuid', ''),

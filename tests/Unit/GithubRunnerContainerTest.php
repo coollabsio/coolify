@@ -44,7 +44,7 @@ it('passes the JIT config through a root-only env file and never mounts the host
     expect($all)->not->toContain('SECRET')
         ->toContain(base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n"))
         ->not->toContain('docker.sock:/var/run/docker.sock')
-        ->and($commands[2])->toBe('chmod 600 /data/coolify/github-runners/abc123.env')
+        ->and($commands[1])->toBe("sh -c 'umask 077 && rm -f /data/coolify/github-runners/abc123.env && echo ".base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n")." | base64 -d > /data/coolify/github-runners/abc123.env'")
         ->and(collect($commands)->first(fn (string $command) => str_starts_with($command, 'docker run -d --name coolify-runner-abc123 ')))
         ->toStartWith('docker run -d --name coolify-runner-abc123 --network coolify-runner-abc123')
         ->toContain('--env-file /data/coolify/github-runners/abc123.env ')
@@ -113,8 +113,7 @@ it('keeps every command valid for servers with a non-root user', function () {
 
     expect($parsed)
         ->toContain('sudo docker pull '."'".config('constants.github_runner.image')."'".' || sudo docker image inspect '."'".config('constants.github_runner.image')."'".' > /dev/null')
-        ->toContain('echo '.base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n").' | sudo base64 -d | sudo tee /data/coolify/github-runners/abc123.env > /dev/null')
-        ->toContain('sudo chmod 600 /data/coolify/github-runners/abc123.env')
+        ->toContain("sudo sh -c 'umask 077 && rm -f /data/coolify/github-runners/abc123.env && echo ".base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n")." | base64 -d > /data/coolify/github-runners/abc123.env'")
         ->toContain('echo '.base64_encode(GithubRunnerContainer::pullRequestHookScript()).' | sudo base64 -d | sudo tee /data/coolify/github-runners/abc123-job-started.sh > /dev/null')
         ->toContain('sudo chmod 644 /data/coolify/github-runners/abc123-job-started.sh')
         ->toContain('sudo docker rm -f -v coolify-runner-abc123 coolify-runner-abc123-dind > /dev/null 2>&1 || sudo true')

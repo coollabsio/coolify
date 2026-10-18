@@ -13,7 +13,7 @@
                 :placeholder="$use_for_github_runners ? 'GitHub organization, for example coollabsio' : 'Personal account when empty'" />
         </div>
 
-        @if (! isCloud())
+        @if (! isCloud() && auth()->user()->can('makeSystemWide', \App\Models\GithubApp::class))
             <div x-data="{ showWarning: @entangle('is_system_wide') }">
                 <div class="max-w-xs">
                     <x-forms.checkbox id="is_system_wide" label="System wide"
@@ -37,7 +37,7 @@
                 <x-forms.checkbox id="use_for_pull_request_previews" label="Pull request previews"
                     helper="Deploys pull requests and posts deployment status on them." />
                 <x-forms.checkbox id="use_for_github_runners" live label="GitHub Actions runners"
-                    helper="Runs workflow jobs on your build servers. Needs an organization." />
+                    helper="Runs workflow jobs on your servers. Needs an organization." />
             </div>
         </div>
 

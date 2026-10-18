@@ -2,16 +2,23 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyPortParser;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 use Spatie\Activitylog\Models\Activity;
 
 class StartProxy
 {
     use AsAction;
+
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(deployment_queue());
+    }
 
     public function handle(Server $server, bool $async = true, bool $force = false, bool $restarting = false): string|Activity
     {
@@ -49,10 +56,11 @@ class StartProxy
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            $caddyfile = 'import /dynamic/*.caddy';
+            // The base Caddyfile also holds the maintenance blocks (see Server::caddyBaseCaddyfile()).
+            $caddyfile = base64_encode($server->caddyBaseCaddyfile());
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
+                "echo '$caddyfile' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
                 "docker compose -f $compose_file pull",
@@ -71,6 +79,10 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
             ]);
+            if ($proxyType !== ProxyTypes::TRAEFIK->value) {
+                // The sidecar belongs to the Traefik compose project, so --remove-orphans of another proxy keeps it.
+                $commands->push('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
+            }
             // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
             $commands = $commands->merge(ensureProxyNetworksExist($server));
             $commands = $commands->merge([
@@ -82,7 +94,7 @@ class StartProxy
         }
 
         if ($async) {
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id);
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
         } else {
             instant_remote_process($commands, $server);
 

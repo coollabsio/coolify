@@ -283,7 +283,9 @@ done
 
 # Start the same image tag again after the restore.
 LATEST_IMAGE=$(docker inspect -f '{{.Config.Image}}' coolify | sed 's/.*://')
-docker stop coolify coolify-realtime >/dev/null
+docker stop coolify >/dev/null
+# coolify-realtime only exists before 4.4; compose recreates it when the restored version still uses it.
+docker rm -f coolify-realtime >/dev/null 2>&1 || true
 
 sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY}|" .env
 

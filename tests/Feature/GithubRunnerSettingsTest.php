@@ -133,14 +133,12 @@ describe('runner settings page', function () {
         expect($config->allow_pull_requests)->toBeFalse();
     });
 
-    it('opens an existing private runner group to public repositories', function () {
+    it('keeps the restrictions an organization admin set on an existing runner group', function () {
         $this->githubApp->update(['runner_group_id' => 77]);
         Http::fake([
             'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             "https://api.github.com/app/installations/{$this->githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
-            'https://api.github.com/orgs/acme/actions/runner-groups/77' => fn ($request) => $request->method() === 'PATCH'
-                ? Http::response(['id' => 77, 'default' => false, 'visibility' => 'all', 'allows_public_repositories' => true])
-                : Http::response(['id' => 77, 'default' => false, 'visibility' => 'private', 'allows_public_repositories' => false]),
+            'https://api.github.com/orgs/acme/actions/runner-groups/77' => Http::response(['id' => 77, 'default' => false, 'visibility' => 'selected', 'allows_public_repositories' => false]),
         ]);
 
         Livewire::actingAs($this->owner)
@@ -150,10 +148,10 @@ describe('runner settings page', function () {
             ->assertHasNoErrors()
             ->assertDispatched('success');
 
-        Http::assertSent(fn ($request) => $request->method() === 'PATCH'
-            && str_ends_with($request->url(), '/orgs/acme/actions/runner-groups/77')
-            && $request['allows_public_repositories'] === true
-            && $request['visibility'] === 'all');
+        expect($this->githubApp->fresh()->runner_group_id)->toBe(77)
+            ->and(GithubRunnerConfig::count())->toBe(1);
+        Http::assertNotSent(fn ($request) => in_array($request->method(), ['PATCH', 'POST'], true)
+            && str_contains($request->url(), '/runner-groups'));
     });
 
     it('saves whether runners take pull request jobs', function () {
@@ -270,21 +268,47 @@ describe('runner settings page', function () {
             ->assertRedirect(route('server.index'));
     });
 
-    it('refuses to save runners on a server without the build role', function () {
+    it('asks for confirmation before it enables runners on a server that also runs resources', function () {
         $server = settingsTestServer($this->team, 'both');
+        fakeRunnerGroupApi($this->githubApp);
+
+        Livewire::actingAs($this->owner)
+            ->test(GithubRunners::class, ['server_uuid' => $server->uuid])
+            ->assertSee('Enable runners on this server?')
+            ->assertDontSee('Application builds')
+            ->call('toggleEnabled')
+            ->assertDispatched('success')
+            ->assertSee('Runners share this server with your resources');
+
+        expect(GithubRunnerConfig::sole())->server_id->toBe($server->id)->is_enabled->toBeTrue();
+    });
+
+    it('refuses runners on a deployments only server', function () {
+        $server = settingsTestServer($this->team, 'deployment');
         Http::fake();
 
         Livewire::actingAs($this->owner)
             ->test(GithubRunners::class, ['server_uuid' => $server->uuid])
             ->assertSee('This server is not enabled for builds')
-            ->assertSee(route('server.show', ['server_uuid' => $server->uuid]))
-            ->assertSee(route('server.github-runners', ['server_uuid' => $server->uuid]))
             ->assertDontSee('Recent runners')
             ->set('githubAppId', $this->githubApp->id)
-            ->call('submit')
+            ->call('toggleEnabled')
             ->assertDispatched('error');
 
         expect(GithubRunnerConfig::count())->toBe(0);
+        Http::assertNothingSent();
+    });
+
+    it('enables runners on a build server without a confirmation', function () {
+        fakeRunnerGroupApi($this->githubApp);
+
+        Livewire::actingAs($this->owner)
+            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+            ->assertDontSee('Enable runners on this server?')
+            ->call('toggleEnabled')
+            ->assertDispatched('success')
+            ->assertSee('Application builds')
+            ->assertDontSee('Runners share this server with your resources');
     });
 
     it('disables runners and removes only the idle ones', function () {
@@ -541,10 +565,22 @@ describe('build server role', function () {
         GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $this->githubApp->id, 'labels' => ['coolify']]);
     });
 
-    it('blocks a role change in the UI while runners are enabled', function () {
+    it('changes the role in the UI while runners are enabled', function () {
         Livewire::actingAs($this->owner)
             ->test(Show::class, ['server_uuid' => $this->server->uuid])
             ->set('serverRole', 'both')
+            ->call('requestServerRoleChange')
+            ->assertNotDispatched('error')
+            ->assertDispatched('open-server-role-confirmation')
+            ->call('confirmServerRoleChange');
+
+        expect($this->server->settings->fresh()->server_role->value)->toBe('both');
+    });
+
+    it('blocks a change to deployments only in the UI while runners are enabled', function () {
+        Livewire::actingAs($this->owner)
+            ->test(Show::class, ['server_uuid' => $this->server->uuid])
+            ->set('serverRole', 'deployment')
             ->call('requestServerRoleChange')
             ->assertSet('serverRole', 'build')
             ->assertDispatched('error');
@@ -552,14 +588,26 @@ describe('build server role', function () {
         expect($this->server->settings->fresh()->server_role->value)->toBe('build');
     });
 
-    it('blocks a role change through the API while runners are enabled', function () {
+    it('blocks a change to deployments only through the API while runners are enabled', function () {
+        $token = $this->owner->createToken('runner-test', ['*']);
+        $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+        settingsTestServer($this->team, 'build');
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token->plainTextToken])
+            ->patchJson('/api/v1/servers/'.$this->server->uuid, ['server_role' => 'deployment'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.server_role.0', 'Disable the GitHub runners before you set this server to deployments only.');
+    });
+
+    it('changes the role through the API while runners are enabled', function () {
         $token = $this->owner->createToken('runner-test', ['*']);
         $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token->plainTextToken])
             ->patchJson('/api/v1/servers/'.$this->server->uuid, ['server_role' => 'both'])
-            ->assertStatus(422)
-            ->assertJsonPath('errors.server_role.0', 'Disable the GitHub runners before you change the role of this server.');
+            ->assertSuccessful();
+
+        expect($this->server->settings->fresh()->server_role->value)->toBe('both');
     });
 
     it('leaves dedicated runner servers out of application builds', function () {

@@ -59,9 +59,6 @@
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
-                                @if (blank($storage->host_path))
-                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
-                                @endif
                                 @if ($form['replacedExternalVolume'])
                                     <span class="block text-xs text-amber-800 dark:text-amber-300/90">
                                         Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
@@ -202,8 +199,6 @@
                                     <a href="{{ $storage->standaloneSqlite->link() }}"
                                         class="block text-xs text-neutral-500 underline underline-offset-2 hover:text-black dark:text-fg-dim dark:hover:text-fg">SQLite
                                         database {{ $storage->standaloneSqlite->name }}</a>
-                                @elseif (blank($storage->host_path))
-                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
                                 @endif
                             </div>
 

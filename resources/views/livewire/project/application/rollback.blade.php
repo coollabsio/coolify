@@ -90,10 +90,7 @@
         </div>
 
         <div class="w-full" wire:target="loadImages" wire:loading>
-            <div class="flex items-center justify-center gap-2 px-4 py-10 text-[13px] text-neutral-500 dark:text-fg-dim">
-                <x-loading class="size-4" />
-                Loading available images…
-            </div>
+            <x-skeleton.list :rows="3" label="Loading available images" />
         </div>
     </x-application.settings-section>
 </div>

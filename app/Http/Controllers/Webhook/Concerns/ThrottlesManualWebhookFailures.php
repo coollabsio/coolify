@@ -18,9 +18,7 @@ use Illuminate\Support\Facades\RateLimiter;
  * IPs; one misconfigured repository (wrong secret, deleted application,
  * untracked branch) therefore cannot lock out deliveries for other repositories.
  *
- * The lockout applies only to deliveries that fail authentication. A delivery
- * with a valid secret for a matched application is always processed, so failed
- * attempts from anyone sharing the scope cannot block real deliveries.
+ * Valid deliveries are processed while locked: every sender shares the proxy's address.
  *
  * In one failure window, only distinct failed attempts are counted. An attempt
  * is identified by what the secret check depends on: the GitLab token, or the

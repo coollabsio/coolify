@@ -9,10 +9,13 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
     Server::flushIdentityMap();
     InstanceSettings::forceCreate(['id' => 0]);
     config(['app.maintenance.store' => 'array', 'constants.ssh.mux_enabled' => false]);
@@ -114,7 +117,7 @@ test('a missing source volume still creates an empty target volume', function ()
     expect(volumeCloneCommands())->toContain(escapeshellarg("docker volume create 'clone-target'"));
 });
 
-test('a bind-type source volume is created with its options but its host folder is not copied', function () {
+test('a bind-type source volume gets independent empty storage without copying its host folder', function () {
     fakeVolumeCloneServer([
         'Name' => 'clone-source',
         'Driver' => 'local',
@@ -124,7 +127,9 @@ test('a bind-type source volume is created with its options but its host folder 
     (new VolumeCloneJob('clone-source', 'clone-target', $this->server, $this->server, $this->volume))->handle();
 
     $commands = volumeCloneCommands();
-    expect($commands)->toContain(escapeshellarg("docker volume create --opt 'type=none' --opt 'o=bind' --opt 'device=/srv/app-data' 'clone-target'"))
+    expect($commands)->toContain(escapeshellarg("docker volume create 'clone-target'"))
+        ->and($this->volume->fresh()->ignores_compose_driver_options)->toBeTrue()
+        ->and(composeRenamedVolumeDeclarationFor(['driver' => 'local', 'driver_opts' => ['type' => 'none', 'o' => 'bind', 'device' => '/srv/app-data']], 'clone-target', $this->volume->fresh()))->toBe(['name' => 'clone-target'])
         ->and($commands)->not->toContain('cp -a')
         ->and($commands)->not->toContain('chown -R');
 });
@@ -148,7 +153,7 @@ test('a remote clone creates the target volume with the source driver options on
         ->and($commands)->toContain('tar xzf /clone/volume-data.tar.gz');
 });
 
-test('a remote clone of a bind-type volume does not copy the host folder', function () {
+test('a remote bind-type clone gets independent empty storage without copying the host folder', function () {
     $targetServer = Server::factory()->create([
         'team_id' => $this->team->id,
         'user' => 'root',
@@ -163,7 +168,8 @@ test('a remote clone of a bind-type volume does not copy the host folder', funct
     (new VolumeCloneJob('clone-source', 'clone-target', $this->server, $targetServer, $this->volume))->handle();
 
     $commands = volumeCloneCommands();
-    expect($commands)->toContain(escapeshellarg("docker volume create --opt 'type=none' --opt 'o=bind,rw' --opt 'device=/srv/app-data' 'clone-target'"))
+    expect($commands)->toContain(escapeshellarg("docker volume create 'clone-target'"))
+        ->and($this->volume->fresh()->ignores_compose_driver_options)->toBeTrue()
         ->and($commands)->not->toContain('tar czf')
         ->and($commands)->not->toContain('tar xzf');
 });

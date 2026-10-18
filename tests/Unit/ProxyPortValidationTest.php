@@ -110,8 +110,26 @@ it('rejects invalid proxy port collection shapes', function (mixed $ports) {
 })->with([
     'scalar' => ['80:80'],
     'map' => [['published' => 80]],
-    'null' => [null],
     'boolean' => [true],
+]);
+
+it('accepts an empty ports key like v4.3.23 did', function (string $configuration) {
+    expect(ProxyPortParser::fromConfiguration($configuration))->toBe([])
+        ->and(ProxyPortParser::publishesOnlyUncheckedPorts($configuration))->toBeFalse();
+})->with([
+    'empty value' => ["services:\n  traefik:\n    image: traefik:v3.6\n    ports:\n"],
+    'explicit null' => ["services:\n  caddy:\n    ports: null\n"],
+]);
+
+it('reports proxies whose published ports cannot be checked for conflicts', function (string $configuration, bool $expected) {
+    expect(ProxyPortParser::publishesOnlyUncheckedPorts($configuration))->toBe($expected);
+})->with([
+    'variables without defaults' => ["services:\n  traefik:\n    ports: ['\${HTTP_PORT}:80', '\${HTTPS_PORT}:443']\n", true],
+    'a concrete port' => ["services:\n  traefik:\n    ports: ['\${HTTP_PORT}:80', '443:443']\n", false],
+    'only port ranges' => ["services:\n  traefik:\n    ports: ['10000-10100:10000-10100']\n", true],
+    'a variable with a default' => ["services:\n  traefik:\n    ports: ['\${HTTP_PORT:-80}:80']\n", false],
+    'no ports' => ["services:\n  traefik:\n    image: traefik:v3.6\n", false],
+    'empty ports' => ["services:\n  traefik:\n    ports: []\n", false],
 ]);
 
 it('accepts Docker Compose merge tags in proxy configurations', function (string $configuration, array $expected) {

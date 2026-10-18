@@ -160,6 +160,14 @@ trait HasDatabaseStatusInfo
                 isPemKeyFileRequired: $existingCert->requiresPemKeyFile(),
             );
 
+            auditLog('ui.database.ssl_certificate_regenerated', [
+                'team_id' => $server->team_id,
+                'database_uuid' => $this->database->uuid,
+                'database_name' => $this->database->name,
+                'database_type' => $this->database->type(),
+                'server_uuid' => $server->uuid,
+            ]);
+
             $this->refresh();
             $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
         } catch (Exception $e) {

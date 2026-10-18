@@ -36,15 +36,23 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * Create a new job instance.
+     *
+     * @param  int|null  $timeout  Job timeout in seconds; null keeps the default above.
+     * @param  string  $queue  Queue to run on; start actions pass deployment_queue().
      */
     public function __construct(
         public Activity $activity,
         public bool $ignore_errors,
         public $call_event_on_finish,
         public $call_event_data,
+        ?int $timeout = null,
+        string $queue = 'high',
     ) {
+        if ($timeout !== null) {
+            $this->timeout = $timeout;
+        }
 
-        $this->onQueue('high');
+        $this->onQueue($queue);
     }
 
     /**
@@ -91,10 +99,21 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
             'job' => 'CoolifyTask',
             'activity_id' => $this->activity->id,
             'server_uuid' => $this->activity->getExtraProperty('server_uuid'),
-            'error' => $exception?->getMessage(),
+            'error' => $exception ? remove_iip($exception->getMessage()) : null,
             'total_attempts' => $this->attempts(),
             'trace' => $exception?->getTraceAsString(),
         ]);
+
+        // A database import whose restore can still run in the database container stays in progress
+        // until its stop has run, so it keeps blocking other operations on the database.
+        // The message can contain command output or the SSH command, so store only a redacted copy.
+        $message = filled($exception?->getMessage()) ? remove_iip($exception->getMessage()) : null;
+
+        if (DatabaseImportCleanup::stopAfterTaskFailure($this->activity, $message ?: 'Job permanently failed')) {
+            RemoteProcessCommand::forget($this->activity);
+
+            return;
+        }
 
         // Update activity status to reflect permanent failure
         // A stopped database import already has the message that explains the stop; the process
@@ -102,7 +121,7 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         $stopRequested = DatabaseImportCleanup::stopRequested($this->activity);
         $this->activity->properties = $this->activity->properties->merge(array_filter([
             'status' => ProcessStatus::ERROR->value,
-            'error' => $stopRequested ? null : ($exception?->getMessage() ?? 'Job permanently failed'),
+            'error' => $stopRequested ? null : ($message ?? 'Job permanently failed'),
             'failed_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null));
         $this->activity->save();

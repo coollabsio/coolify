@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Jobs\ConnectProxyToNetworksJob;
 use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -45,8 +44,8 @@ class StandaloneDocker extends BaseModel
             $server = $newStandaloneDocker->server;
             instant_remote_process([
                 $newStandaloneDocker->networkCreateCommand(),
+                $newStandaloneDocker->proxyConnectCommand(),
             ], $server, false);
-            ConnectProxyToNetworksJob::dispatchSync($server);
         });
     }
 
@@ -55,6 +54,13 @@ class StandaloneDocker extends BaseModel
         $safeNetwork = escapeshellarg($this->network);
 
         return "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --attachable {$safeNetwork} >/dev/null";
+    }
+
+    public function proxyConnectCommand(): string
+    {
+        $safeNetwork = escapeshellarg($this->network);
+
+        return "docker network connect {$safeNetwork} coolify-proxy >/dev/null 2>&1 || true";
     }
 
     public function setNetworkAttribute(string $value): void

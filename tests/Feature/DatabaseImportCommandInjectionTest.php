@@ -89,7 +89,7 @@ describe('locked properties', function () {
 });
 
 describe('server method uses team scoping', function () {
-    test('server computed property calls ownedByCurrentTeam', function () {
+    test('server computed property is scoped to the database team', function () {
         $method = new ReflectionMethod(ImportForm::class, 'server');
 
         // Extract the server method body
@@ -98,7 +98,7 @@ describe('server method uses team scoping', function () {
         $lines = array_slice(file($method->getFileName()), $startLine - 1, $endLine - $startLine + 1);
         $methodBody = implode('', $lines);
 
-        expect($methodBody)->toContain('ownedByCurrentTeam');
+        expect($methodBody)->toContain('where(\'team_id\', $this->resourceTeamId())');
         expect($methodBody)->not->toContain('Server::find($this->serverId)');
     });
 });
