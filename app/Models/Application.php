@@ -546,24 +546,21 @@ class Application extends BaseModel
         }
     }
 
+    /**
+     * Removes the volumes by the names that Coolify stored.
+     */
     public function deleteVolumes()
     {
-        $persistentStorages = $this->persistentStorages()->get() ?? collect();
-        if ($this->build_pack === 'dockercompose') {
-            $server = data_get($this, 'destination.server');
-            // --project-directory instead of cd: a non-root SSH user cannot enter the directory on the Coolify host.
-            instant_remote_process(["docker compose --project-directory {$this->dirOnServer()} down -v"], $server, false);
-        } else {
-            if ($persistentStorages->count() === 0) {
-                return;
+        $persistentStorages = $this->persistentStorages()->get();
+        if ($persistentStorages->isEmpty()) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            if ($storage->isSharedWithAnotherResource()) {
+                continue;
             }
-            $server = data_get($this, 'destination.server');
-            foreach ($persistentStorages as $storage) {
-                if ($storage->isSharedWithAnotherResource()) {
-                    continue;
-                }
-                instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
-            }
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 

@@ -45,16 +45,17 @@ class StartService
         // doesn't match configuration. Recreate?") would read the next script lines as the answer.
         // Give Compose no stdin so it uses the default answer (keep the volume). Never pass --yes:
         // it recreates the volume and deletes its data.
+        // Pass -f so Compose uses only the file that Coolify wrote.
+        $compose = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
-            $commands[] = "docker compose --project-directory {$workdir} pull < /dev/null";
+            $commands[] = "{$compose} pull < /dev/null";
         }
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         }
         $commands[] = 'echo Starting service.';
-        $compose = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
         if (data_get($service, 'connect_to_docker_network')) {
             // Connect the created containers to the predefined network before they start. A container
             // that needs this network during a service_healthy wait never gets it after `up -d`.
