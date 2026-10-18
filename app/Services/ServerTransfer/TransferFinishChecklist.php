@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Events\TransferFinishChanged;
 use App\Jobs\CheckTransferFinishStepsJob;
 use App\Models\Application;
 use App\Models\GithubApp;
@@ -134,6 +135,23 @@ class TransferFinishChecklist
         return ! in_array($item['type'], self::MANUAL_TYPES, true);
     }
 
+    /**
+     * Where the user does the step. GitHub App links are built on each render, so lists saved before a rename of
+     * the App, or before the link existed, still point to the right page.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function linkOf(array $item): ?array
+    {
+        if (in_array($item['type'], ['github_app_webhook', 'github_app_urls'], true)) {
+            $githubApp = GithubApp::where('uuid', $item['subject'])->first();
+
+            return $githubApp ? [$githubApp->settingsUrl(), 'Open on GitHub'] : null;
+        }
+
+        return filled($item['link'] ?? null) ? [$item['link'], $item['link_label'] ?? 'Open'] : null;
+    }
+
     public function fixLabel(array $item): ?string
     {
         return self::FIX_LABELS[$item['type']] ?? null;
@@ -165,7 +183,10 @@ class TransferFinishChecklist
             }
             $this->runFix($server, $item);
 
-            return $this->runCheck($server, $item);
+            // Sentinel restarts in the background, so a check now would always fail.
+            return $item['type'] === 'sentinel'
+                ? ['pending', 'Sentinel restarts. The step turns OK when Sentinel sends data.', null]
+                : $this->runCheck($server, $item);
         });
     }
 
@@ -499,6 +520,7 @@ class TransferFinishChecklist
             $server->server_metadata = $metadata;
             $server->syncOriginalAttribute('server_metadata');
         });
+        TransferFinishChanged::dispatch($server);
     }
 
     /**

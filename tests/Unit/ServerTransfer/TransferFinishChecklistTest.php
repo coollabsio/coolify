@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\TransferFinishChanged;
 use App\Jobs\CheckTransferFinishStepsJob;
 use App\Livewire\Server\TransferFinish;
 use App\Models\Application;
@@ -19,6 +20,7 @@ use App\Models\User;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -239,4 +241,38 @@ test('an application that lost its system-wide git source gets a git source step
     $application->forceFill(['source_type' => GitlabApp::class, 'source_id' => $gitlabApp->id])->save();
 
     expect($this->checklist->check($this->server, $key)['status'])->toBe('ok');
+});
+
+test('restarting Sentinel waits for its data instead of failing the step at once', function () {
+    $this->checklist->start($this->server);
+
+    Livewire::test(TransferFinish::class, ['server' => $this->server])
+        ->call('fixStep', 'sentinel:server')
+        ->assertDispatched('info')
+        ->assertNotDispatched('error');
+
+    expect(finishTestItem($this->server, 'sentinel:server')['status'])->toBe('pending');
+});
+
+test('a changed step is broadcast to the team, and the open panel shows it without a reload', function () {
+    Event::fake([TransferFinishChanged::class]);
+    $this->checklist->start($this->server);
+    $component = Livewire::test(TransferFinish::class, ['server' => $this->server])->assertSee('0 of 2 done.');
+
+    $this->checklist->markDone($this->server->fresh(), 'sentinel:server');
+
+    Event::assertDispatched(TransferFinishChanged::class, fn ($event) => $event->serverUuid === $this->server->uuid && $event->teamId === $this->team->id);
+    $component->call('handleTransferFinishChanged', ['serverUuid' => $this->server->uuid])->assertSee('1 of 2 done.');
+});
+
+test('the GitHub App steps link to the App settings at GitHub', function () {
+    finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id]);
+    $items = collect($this->checklist->start($this->server));
+
+    expect($this->checklist->linkOf($items->firstWhere('key', "github_app_webhook:{$this->githubApp->uuid}")))->toBe(['https://github.com/organizations/acme/settings/apps/deploy-bot', 'Open on GitHub'])
+        ->and($this->checklist->linkOf($items->firstWhere('key', "github_app_urls:{$this->githubApp->uuid}")))->toBe(['https://github.com/organizations/acme/settings/apps/deploy-bot', 'Open on GitHub']);
+
+    Livewire::test(TransferFinish::class, ['server' => $this->server])
+        ->assertSeeHtml('href="https://github.com/organizations/acme/settings/apps/deploy-bot" target="_blank"')
+        ->assertSee('Open on GitHub');
 });

@@ -1,4 +1,8 @@
-<div @if ($finish && $openCount > 0) wire:init="refreshSteps" wire:poll.15s="refreshSteps" @endif>
+<div>
+    @if ($finish && $openCount > 0)
+        {{-- Not on the root element: Livewire starts a poll that a later render adds only on a new element. --}}
+        <div wire:key="transfer-finish-poll" wire:init="refreshSteps" wire:poll.15s="refreshSteps" hidden></div>
+    @endif
     @if ($finish)
         @php
             $doneCount = $totalCount - $openCount;
@@ -51,12 +55,16 @@
                             @php
                                 $fixLabel = $checklist->fixLabel($step);
                                 $manualOnly = ! $checklist->canCheck($step);
+                                [$link, $linkLabel] = $checklist->linkOf($step) ?? [null, null];
+                                $linkAttributes = $link && str_starts_with($link, 'http') ? 'target="_blank" rel="noopener noreferrer"' : wireNavigate();
+                                $hasMenu = ! $manualOnly || $link;
                                 $hasDetails = filled($step['hint'] ?? null) || count($step['details'] ?? []) > 0 || filled($step['error'] ?? null);
                                 [$badgeLabel, $badgeType] = $badges[$step['status']] ?? ['Not checked yet', 'neutral'];
                             @endphp
                             <li wire:key="transfer-step-{{ $step['key'] }}" class="py-2" x-data="{ details: false, menu: false }">
                                 <div class="flex items-center gap-3">
-                                    <x-status-badge :label="$badgeLabel" :type="$badgeType" />
+                                    <span class="size-2 shrink-0 rounded-full {{ $badgeType === 'warning' ? 'bg-warning' : 'bg-neutral-400 dark:bg-neutral-500' }}"
+                                        title="{{ $badgeLabel }}" role="img" aria-label="{{ $badgeLabel }}"></span>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm text-neutral-950 dark:text-fg">{{ $step['label'] }}</p>
                                         <p class="truncate text-xs text-neutral-500 dark:text-fg-dim">
@@ -69,13 +77,7 @@
                                     </div>
                                     @can('update', $server)
                                         <div class="flex shrink-0 items-center gap-1">
-                                            @if ($fixLabel)
-                                                <x-forms.button wire:click="fixStep('{{ $step['key'] }}')">{{ $fixLabel }}</x-forms.button>
-                                            @elseif ($step['link'] ?? null)
-                                                <a href="{{ $step['link'] }}" {{ wireNavigate() }} class="button">{{ $step['link_label'] ?? 'Open' }}</a>
-                                            @elseif ($manualOnly)
-                                                <x-forms.button wire:click="markStepDone('{{ $step['key'] }}')">Mark as done</x-forms.button>
-                                            @endif
+                                            @if ($hasMenu)
                                             <div class="relative" @click.outside="menu = false" @keydown.escape.window="menu = false">
                                                 <button type="button" class="icon-button" title="More actions" aria-haspopup="menu"
                                                     :aria-expanded="menu" @click="menu = !menu">
@@ -86,15 +88,25 @@
                                                     @unless ($manualOnly)
                                                         <button type="button" class="listbox-option justify-start!" role="menuitem"
                                                             wire:click="checkStep('{{ $step['key'] }}')" @click="menu = false">Check now</button>
+                                                    @endunless
+                                                    @if (! $manualOnly || $link)
                                                         <button type="button" class="listbox-option justify-start!" role="menuitem"
                                                             wire:click="markStepDone('{{ $step['key'] }}')" @click="menu = false">Mark as done</button>
-                                                    @endunless
-                                                    @if ($fixLabel && ($step['link'] ?? null))
-                                                        <a href="{{ $step['link'] }}" {{ wireNavigate() }} class="listbox-option justify-start!"
-                                                            role="menuitem">{{ $step['link_label'] ?? 'Open' }}</a>
+                                                    @endif
+                                                    @if ($fixLabel && $link)
+                                                        <a href="{{ $link }}" {!! $linkAttributes !!} class="listbox-option justify-start!"
+                                                            role="menuitem">{{ $linkLabel }}</a>
                                                     @endif
                                                 </div>
                                             </div>
+                                            @endif
+                                            @if ($fixLabel)
+                                                <x-forms.button wire:click="fixStep('{{ $step['key'] }}')">{{ $fixLabel }}</x-forms.button>
+                                            @elseif ($link)
+                                                <a href="{{ $link }}" {!! $linkAttributes !!} class="button">{{ $linkLabel }}</a>
+                                            @elseif ($manualOnly)
+                                                <x-forms.button wire:click="markStepDone('{{ $step['key'] }}')">Mark as done</x-forms.button>
+                                            @endif
                                         </div>
                                     @endcan
                                 </div>

@@ -19,6 +19,13 @@ class TransferFinish extends Component
 
     public Server $server;
 
+    public function getListeners(): array
+    {
+        return [
+            "echo-private:team.{$this->server->team_id},TransferFinishChanged" => 'handleTransferFinishChanged',
+        ];
+    }
+
     /**
      * The server page sends this after a take back, which starts a new list.
      */
@@ -26,6 +33,16 @@ class TransferFinish extends Component
     public function reloadServer(): void
     {
         $this->server->refresh();
+    }
+
+    /**
+     * A background check, or a user in another tab, changed a step of this list.
+     */
+    public function handleTransferFinishChanged(array $event): void
+    {
+        if (($event['serverUuid'] ?? null) === $this->server->uuid) {
+            $this->server->refresh();
+        }
     }
 
     /**
@@ -55,7 +72,12 @@ class TransferFinish extends Component
     {
         $this->authorize('update', $this->server);
         $item = $checklist->fix($this->server, $key);
-        $this->dispatch($item['status'] === 'ok' ? 'success' : 'error', $item['message'] ?? 'Done.');
+        $toast = match ($item['status']) {
+            'ok' => 'success',
+            'pending' => 'info',
+            default => 'error',
+        };
+        $this->dispatch($toast, $item['message'] ?? 'Done.');
     }
 
     public function markStepDone(TransferFinishChecklist $checklist, string $key): void
