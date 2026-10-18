@@ -9335,7 +9335,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9349,6 +9349,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9440,7 +9442,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9454,6 +9456,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9573,7 +9577,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9587,6 +9591,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9678,7 +9684,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9692,6 +9698,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9740,7 +9748,7 @@ paths:
       tags:
         - 'Scheduled Tasks'
       summary: 'Execute Task'
-      description: 'Queue immediate execution of a scheduled task for an application.'
+      description: 'Queue immediate execution of a scheduled task for an application. Requires the deploy ability.'
       operationId: execute-scheduled-task-by-application-uuid
       parameters:
         -
@@ -9762,6 +9770,8 @@ paths:
           description: 'Scheduled task execution queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -9772,7 +9782,7 @@ paths:
       tags:
         - 'Scheduled Tasks'
       summary: 'Execute Task'
-      description: 'Queue immediate execution of a scheduled task for a service.'
+      description: 'Queue immediate execution of a scheduled task for a service. Requires the deploy ability.'
       operationId: execute-scheduled-task-by-service-uuid
       parameters:
         -
@@ -9794,6 +9804,8 @@ paths:
           description: 'Scheduled task execution queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -10510,7 +10522,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team.'
+      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Changing `logdrain_custom_config` or `logdrain_custom_config_parser` needs a token with the `deploy` permission. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -10552,6 +10564,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'Missing the deploy permission for a custom log drain change.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10664,7 +10678,7 @@ paths:
       tags:
         - Servers
       summary: 'Save server proxy configuration'
-      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
+      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
       operationId: save-server-proxy-configuration
       parameters:
         -
@@ -10717,7 +10731,7 @@ paths:
       tags:
         - Servers
       summary: 'Restart server proxy'
-      description: 'Queue a proxy restart for a team-owned server.'
+      description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.'
       operationId: restart-server-proxy
       parameters:
         -
@@ -15296,6 +15310,8 @@ components:
         is_container_label_escape_enabled:
           type: boolean
         is_env_sorting_enabled:
+          type: boolean
+        include_coolify_default_variables:
           type: boolean
         is_container_label_readonly_enabled:
           type: boolean

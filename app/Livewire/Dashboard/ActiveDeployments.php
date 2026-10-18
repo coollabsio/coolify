@@ -4,7 +4,6 @@ namespace App\Livewire\Dashboard;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\Server;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -21,8 +20,6 @@ class ActiveDeployments extends Component
 
     public function refreshDeployments(): void
     {
-        $serverIds = Server::ownedByCurrentTeamCached()->pluck('id');
-
         $columns = [
             'id',
             'application_id',
@@ -39,7 +36,7 @@ class ActiveDeployments extends Component
 
         $baseQuery = ApplicationDeploymentQueue::query()
             ->with(['application.environment.project'])
-            ->whereIn('server_id', $serverIds);
+            ->ownedByTeam(currentTeam()->id);
 
         $this->activeDeployments = (clone $baseQuery)
             ->whereIn('status', [

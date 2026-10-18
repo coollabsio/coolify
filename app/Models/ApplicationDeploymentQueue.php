@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -147,6 +148,20 @@ class ApplicationDeploymentQueue extends Model
     public function application()
     {
         return $this->belongsTo(Application::class);
+    }
+
+    /**
+     * Scope to deployments of the team's applications.
+     */
+    public function scopeOwnedByTeam(Builder $query, int $teamId): Builder
+    {
+        // application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
+        $applicationIds = Application::withTrashed()
+            ->whereRelation('environment.project.team', 'id', $teamId)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id);
+
+        return $query->whereIn('application_id', $applicationIds);
     }
 
     public function server(): Attribute

@@ -33,6 +33,20 @@ class ScheduledTasksController extends Controller
         return request()->attributes->get('can_read_sensitive', false) === true;
     }
 
+    /**
+     * The scheduler runs an enabled task's command in the resource's containers, so the token needs the deploy permission.
+     */
+    private function enabledTaskForbiddenResponse(Request $request, bool $enabled): ?JsonResponse
+    {
+        if (! $enabled || $request->user()->tokenCan('deploy') || $request->user()->tokenCan('root')) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Missing required permissions: deploy. An enabled scheduled task runs commands in the resource containers, so it needs a token with the deploy permission.',
+        ], 403);
+    }
+
     private function resolveApplication(Request $request, int $teamId): ?Application
     {
         return Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -96,6 +110,11 @@ class ScheduledTasksController extends Controller
             ], 422);
         }
 
+        $enabled = $request->has('enabled') ? $request->boolean('enabled') : true;
+        if ($response = $this->enabledTaskForbiddenResponse($request, $enabled)) {
+            return $response;
+        }
+
         $teamId = getTeamIdFromToken();
 
         $task = new ScheduledTask;
@@ -104,7 +123,7 @@ class ScheduledTasksController extends Controller
         $task->frequency = $request->frequency;
         $task->container = $request->container;
         $task->timeout = $request->has('timeout') ? $request->timeout : 300;
-        $task->enabled = $request->has('enabled') ? $request->enabled : true;
+        $task->enabled = $enabled;
         $task->team_id = $teamId;
 
         if ($resource instanceof Application) {
@@ -175,6 +194,11 @@ class ScheduledTasksController extends Controller
         $task = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->first();
         if (! $task) {
             return response()->json(['message' => 'Scheduled task not found.'], 404);
+        }
+
+        $enabled = $request->has('enabled') ? $request->boolean('enabled') : $task->enabled;
+        if ($response = $this->enabledTaskForbiddenResponse($request, $enabled)) {
+            return $response;
         }
 
         $task->update($request->only($allowedFields));
@@ -351,7 +375,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
-                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
+                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
             )
@@ -374,6 +398,10 @@ class ScheduledTasksController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability for an enabled task.',
             ),
             new OA\Response(
                 response: 422,
@@ -438,7 +466,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
-                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
+                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
             )
@@ -461,6 +489,10 @@ class ScheduledTasksController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability for an enabled task.',
             ),
             new OA\Response(
                 response: 422,
@@ -714,7 +746,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
-                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
+                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
             )
@@ -737,6 +769,10 @@ class ScheduledTasksController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability for an enabled task.',
             ),
             new OA\Response(
                 response: 422,
@@ -801,7 +837,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
-                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
+                        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
             )
@@ -824,6 +860,10 @@ class ScheduledTasksController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability for an enabled task.',
             ),
             new OA\Response(
                 response: 422,
@@ -986,7 +1026,7 @@ class ScheduledTasksController extends Controller
 
     #[OA\Post(
         summary: 'Execute Task',
-        description: 'Queue immediate execution of a scheduled task for an application.',
+        description: 'Queue immediate execution of a scheduled task for an application. Requires the deploy ability.',
         path: '/applications/{uuid}/scheduled-tasks/{task_uuid}/execute',
         operationId: 'execute-scheduled-task-by-application-uuid',
         security: [['bearerAuth' => []]],
@@ -998,6 +1038,7 @@ class ScheduledTasksController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'Scheduled task execution queued.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
@@ -1018,7 +1059,7 @@ class ScheduledTasksController extends Controller
 
     #[OA\Post(
         summary: 'Execute Task',
-        description: 'Queue immediate execution of a scheduled task for a service.',
+        description: 'Queue immediate execution of a scheduled task for a service. Requires the deploy ability.',
         path: '/services/{uuid}/scheduled-tasks/{task_uuid}/execute',
         operationId: 'execute-scheduled-task-by-service-uuid',
         security: [['bearerAuth' => []]],
@@ -1030,6 +1071,7 @@ class ScheduledTasksController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'Scheduled task execution queued.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
