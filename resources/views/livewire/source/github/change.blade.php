@@ -3,6 +3,10 @@
         {{ $github_app->name ?: 'GitHub App' }} | Sources | Coolify
     </x-slot>
 
+    @if (session('error'))
+        <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
+    @endif
+
     @if (data_get($github_app, 'app_id'))
         @php
             $githubAppRouteParameters = ['github_app_uuid' => $github_app->uuid];
@@ -43,7 +47,8 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <aside class="application-settings-navigation min-w-0 xl:self-start">
+                    <aside class="application-settings-navigation min-w-0 xl:self-start"
+                        data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                             <div class="nav-section hidden xl:block">Settings</div>
@@ -133,6 +138,7 @@
                                             label="Organization" placeholder="Personal account when empty" />
 
                                         @if (!isCloud())
+                                            @can('makeSystemWide', \App\Models\GithubApp::class)
                                             <div class="lg:col-span-2">
                                                 <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
@@ -141,6 +147,7 @@
                                                     helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
                                                     :disabled="!auth()->user()->can('update', $github_app)" />
                                             </div>
+                                            @endcan
                                             @if ($isSystemWide)
                                                 <div class="lg:col-span-2">
                                                     <x-callout type="warning" title="Shared with every team">
@@ -314,7 +321,7 @@
                                 :disabled="blank($github_app->organization)"
                                 :options="[
                                     ['value' => false, 'label' => 'Do not run workflow jobs'],
-                                    ['value' => true, 'label' => 'Run workflow jobs on build servers'],
+                                    ['value' => true, 'label' => 'Run workflow jobs on your servers'],
                                 ]"
                                 :helper="filled($github_app->organization)
                                     ? 'Adds the organization Self-hosted runners (write) and Actions (read) permissions and the Workflow job webhook event.'

@@ -108,7 +108,7 @@
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
-                            rows="20" id="content"
+                            rows="20" id="content" :useMonacoEditor="$isYamlFile" monacoEditorLanguage="yaml"
                             readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary || $fileStorage->is_too_large }}"></x-forms.textarea>
                     @else
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
@@ -141,7 +141,7 @@
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
-                            rows="20" id="content" disabled></x-forms.textarea>
+                            rows="20" id="content" :useMonacoEditor="$isYamlFile" monacoEditorLanguage="yaml" disabled></x-forms.textarea>
                     @else
                         <x-callout type="info" title="Hidden (only admins can view)">
                             The file content can contain secrets.

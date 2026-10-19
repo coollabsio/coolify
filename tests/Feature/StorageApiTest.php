@@ -298,8 +298,8 @@ describe('POST /api/v1/applications/{uuid}/storages', function () {
 
     test('hides created file storage content for write tokens and reveals it for sensitive tokens', function () {
         $app = createTestApplication($this);
-        $writeToken = createStorageApiToken($this, ['write']);
-        $sensitiveToken = createStorageApiToken($this, ['write', 'read:sensitive']);
+        $writeToken = createStorageApiToken($this, ['write', 'deploy']);
+        $sensitiveToken = createStorageApiToken($this, ['write', 'deploy', 'read:sensitive']);
 
         $writeResponse = $this->withHeaders([
             'Authorization' => 'Bearer '.$writeToken,
@@ -648,6 +648,26 @@ describe('DELETE /api/v1/databases/{uuid}/storages/{storage_uuid}', function () 
 
         $response->assertStatus(200);
         expect(LocalPersistentVolume::find($vol->id))->toBeNull();
+    });
+
+    test('deletes a file storage', function () {
+        $db = createTestDatabase($this);
+
+        $vol = LocalFileVolume::create([
+            'fs_path' => database_configuration_dir().'/'.$db->uuid.'/postgres/postgresql.conf',
+            'mount_path' => '/postgres/postgresql.conf',
+            'content' => 'listen_addresses = "*"',
+            'is_directory' => false,
+            'resource_id' => $db->id,
+            'resource_type' => $db->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->deleteJson("/api/v1/databases/{$db->uuid}/storages/{$vol->uuid}");
+
+        $response->assertStatus(200);
+        expect(LocalFileVolume::find($vol->id))->toBeNull();
     });
 });
 

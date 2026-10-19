@@ -89,8 +89,8 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]" />
                     <div class="lg:col-span-2">
-                        <x-forms.input id="allowed_ips" label="Allowed API IPs"
-                            helper="Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
+                        <x-forms.input id="allowed_ips" label="Allowed IPs"
+                            helper="Applies to the REST API and the MCP endpoint. Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
                             placeholder="192.168.1.100, 10.0.0.0/8" />
                     </div>
                 </div>
@@ -101,7 +101,12 @@
                 @endif
                 @if ($is_mcp_server_enabled)
                     <x-callout type="info" title="MCP endpoint" class="mt-4">
-                        <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
+                        <div class="flex items-center gap-1">
+                            <code>{{ url('/mcp') }}</code>
+                            <x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" />
+                        </div>
+                        Authenticate with a bearer token from
+                        <a href="{{ route('security.api-tokens') }}" class="font-medium underline" {{ wireNavigate() }}>Security → API Tokens</a>.
                     </x-callout>
                 @endif
             </x-application.settings-section>
@@ -155,7 +160,7 @@
                     <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
                         :options="$avatar_storage_options" />
                     <x-forms.input id="image_cdn_url" label="Image CDN URL"
-                        helper="Optional public CDN URL for profile pictures and project icons stored on S3. Leave empty to use the S3 endpoint." placeholder="https://images.example.com" />
+                        helper="Optional public URL (for example a CDN or public bucket domain) that serves profile pictures and project icons stored on S3. Leave empty to serve them through Coolify." placeholder="https://images.example.com" />
                 </div>
                 @if (count($avatar_storage_options) === 1)
                     <x-callout type="info" title="No usable S3 storage configured" class="mt-4">

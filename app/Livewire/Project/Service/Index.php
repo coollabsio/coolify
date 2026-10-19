@@ -5,7 +5,10 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\DeleteService;
+use App\Enums\ProxyTypes;
+use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -86,6 +89,13 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
+    /**
+     * How the Traefik certificate resolver is chosen: `server`, `none`, or `custom`.
+     */
+    public string $certificateResolverMode = 'server';
+
+    public ?string $certificateResolverName = null;
+
     public mixed $maxRestartCount = 0;
 
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
@@ -104,6 +114,13 @@ class Index extends Component
         'fqdn' => 'nullable',
         'isGzipEnabled' => 'nullable|boolean',
         'isStripprefixEnabled' => 'nullable|boolean',
+        'certificateResolverMode' => 'required|in:server,none,custom',
+        'certificateResolverName' => ['exclude_unless:certificateResolverMode,custom', 'required', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN, 'not_in:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE],
+    ];
+
+    protected $validationAttributes = [
+        'certificateResolverMode' => 'certificate resolver',
+        'certificateResolverName' => 'certificate resolver name',
     ];
 
     public function mount(
@@ -128,7 +145,7 @@ class Index extends Component
                 $this->serviceApplication = null;
                 $this->resourceType = 'database';
                 $this->initializeDatabaseProperties();
-                $this->s3s = currentTeam()->s3s;
+                $this->s3s = $this->serviceTeamS3Storages();
 
                 return;
             }
@@ -146,7 +163,7 @@ class Index extends Component
                 $this->serviceApplication = $serviceApplication;
                 $this->resourceType = 'application';
                 $this->initializeApplicationProperties();
-                $this->s3s = currentTeam()->s3s;
+                $this->s3s = $this->serviceTeamS3Storages();
 
                 return;
             }
@@ -189,10 +206,18 @@ class Index extends Component
                 $this->serviceDatabase->getFilesFromServer();
                 $this->initializeDatabaseProperties();
             }
-            $this->s3s = currentTeam()->s3s;
+            $this->s3s = $this->serviceTeamS3Storages();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function serviceTeamS3Storages(): Collection
+    {
+        return S3Storage::query()
+            ->where('team_id', $this->service->team()->id)
+            ->where('is_usable', true)
+            ->get();
     }
 
     private function initializeDatabaseProperties(): void
@@ -438,6 +463,11 @@ class Index extends Component
             $this->serviceApplication->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->serviceApplication->is_gzip_enabled = $this->isGzipEnabled;
             $this->serviceApplication->is_stripprefix_enabled = $this->isStripprefixEnabled;
+            $this->serviceApplication->traefik_certificate_resolver = match ($this->certificateResolverMode) {
+                'none' => ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+                'custom' => $this->certificateResolverName,
+                default => null,
+            };
             if ($this->serviceApplication->max_restart_count !== (int) $this->maxRestartCount) {
                 $this->serviceApplication->restart_limit_reached = false;
             }
@@ -451,8 +481,23 @@ class Index extends Component
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
+            $resolver = $this->serviceApplication->traefik_certificate_resolver;
+            $this->certificateResolverMode = match (true) {
+                blank($resolver) => 'server',
+                $resolver === ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE => 'none',
+                default => 'custom',
+            };
+            $this->certificateResolverName = $this->certificateResolverMode === 'custom' ? $resolver : null;
             $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
+    }
+
+    private function validateCertificateResolver(): void
+    {
+        $this->validate([
+            'certificateResolverMode' => $this->rules['certificateResolverMode'],
+            'certificateResolverName' => $this->rules['certificateResolverName'],
+        ]);
     }
 
     public function saveMaxRestartCount(): void
@@ -508,6 +553,7 @@ class Index extends Component
 
                 return;
             }
+            $this->validateCertificateResolver();
             $this->syncApplicationData(true);
             $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
@@ -611,6 +657,7 @@ class Index extends Component
             $this->validate([
                 'fqdn' => ValidationPatterns::applicationDomainRules(),
             ]);
+            $this->validateCertificateResolver();
 
             $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
@@ -661,7 +708,7 @@ class Index extends Component
             $this->serviceApplication->save();
             $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->serviceApplication->refresh();
-            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, currentTeam()->id);
+            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, $this->service->team()->id);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {
@@ -683,7 +730,12 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.project.service.index');
+        $server = $this->resourceType === 'application' ? $this->service?->destination?->server : null;
+
+        return view('livewire.project.service.index', [
+            'showCertificateResolver' => $server?->proxyType() === ProxyTypes::TRAEFIK->value,
+            'serverCertificateResolver' => $server?->traefikCertificateResolver() ?? ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+        ]);
     }
 
     /**

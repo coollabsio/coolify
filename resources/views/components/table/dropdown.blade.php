@@ -17,6 +17,9 @@
         this.open = true;
         this.$nextTick(() => this.updatePosition());
     },
+    close() {
+        this.open = false;
+    },
     updatePosition() {
         const trigger = this.$refs.trigger.getBoundingClientRect();
         const panel = this.$refs.panel.getBoundingClientRect();
@@ -29,7 +32,7 @@
 
         this.panelStyle = `position: fixed; left: ${left}px; top: ${top}px; min-width: 0;`;
     }
-}" @click.outside="open = false" @keydown.escape.window="open = false"
+}" @click.outside="close()" @keydown.escape.window="close()"
     x-on:resize.window="if (open) updatePosition()" x-on:scroll.window="if (open) updatePosition()">
     <div x-ref="trigger" @click="toggle()">
         {{ $trigger }}

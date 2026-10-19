@@ -111,8 +111,8 @@ class GithubRunnerContainer
 
         $commands = [
             'mkdir -p '.self::SECRETS_DIRECTORY,
-            "echo {$environment} | base64 -d | tee {$envFile} > /dev/null",
-            "chmod 600 {$envFile}",
+            // umask 077 creates the file as 0600; rm drops a world-readable file left by an interrupted start.
+            "sh -c 'umask 077 && rm -f {$envFile} && echo {$environment} | base64 -d > {$envFile}'",
         ];
 
         $runnerFlags = "--name {$name} --network {$name} {$this->labelFlags()} {$this->limitFlags()} --env-file {$envFile}";
@@ -162,7 +162,7 @@ class GithubRunnerContainer
             #!/bin/bash
             case "\${GITHUB_EVENT_NAME:-}" in
               {$events}|"")
-                echo "::error::This Coolify runner does not run pull request jobs. Allow pull request jobs in the GitHub runner settings of the build server to run them."
+                echo "::error::This Coolify runner does not run pull request jobs. Allow pull request jobs in the GitHub runner settings of the server to run them."
                 exit 1
                 ;;
             esac

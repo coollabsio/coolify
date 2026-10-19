@@ -288,6 +288,26 @@ describe('applicationParser', function () {
         expect($parsed['services']['web']['volumes'])->toBe(['nfs-data:/nfs', "{$uuid}_app-data:/app"])
             ->and($parsed['volumes']['nfs-data']['driver_opts']['type'])->toBe('nfs');
     });
+
+    it('gives the preview its own volume instead of the network volume of production', function (string $type, string $device) {
+        // The preview must not mount the network share of production: two deployments that write into the
+        // same data directory (for example two databases) can corrupt it.
+        $compose = str_replace(['type: nfs', "':/exports/data'"], ["type: {$type}", "'{$device}'"], DRIVER_OPTIONS_NFS_MIXED_COMPOSE);
+        $application = driverOptionsApplication($compose);
+        $uuid = $application->uuid;
+        $preview = driverOptionsPreview($application);
+        $name = addPreviewDeploymentSuffix("{$uuid}_nfs-data", 42);
+
+        $parsed = applicationParser($application, 42, $preview->id)->toArray();
+
+        expect($parsed['services']['web-pr-42']['volumes'])->toBe(["{$name}:/nfs", addPreviewDeploymentSuffix("{$uuid}_app-data", 42).':/app'])
+            ->and($parsed['volumes'])->not->toHaveKey('nfs-data')
+            ->and($parsed['volumes'][$name])->toBe(['name' => $name])
+            ->and(LocalPersistentVolume::where('resource_id', $application->id)->where('name', $name)->exists())->toBeTrue();
+    })->with([
+        'nfs' => ['nfs', ':/exports/data'],
+        'cifs' => ['cifs', '//10.0.0.1/share'],
+    ]);
 });
 
 describe('serviceParser', function () {

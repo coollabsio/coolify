@@ -1003,7 +1003,6 @@ it('shows an inherited internal port badge from the coolify service env port', f
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSet('domainRows.0.internal_port', 3000)
         ->assertSet('domainRows.0.has_port_override', false)
-        ->set('dnsValidationEnabled', false)
         ->call('startEdit', 0)
         ->assertSet('editingDomainParts.port', '3000')
         ->call('updateDomain')
@@ -1213,4 +1212,21 @@ it('restarts a service dns check when the domain already has a completed result'
     expect($this->apiApp->fresh()->domain_dns_statuses[$domain]['status'])->toBe('checking');
 
     Queue::assertPushed(CheckDomainDnsJob::class);
+});
+
+it('does not suggest a www counterpart for bare IP hosts', function (string $url) {
+    $wwwCounterpartUrl = new ReflectionMethod(Domains::class, 'wwwCounterpartUrl');
+
+    expect($wwwCounterpartUrl->invoke(new Domains, $url))->toBeNull()
+        ->and($wwwCounterpartUrl->invoke(new Domains, $url, true))->toBeNull();
+})->with([
+    'IPv4' => 'http://192.0.2.10:3000',
+    'IPv6' => 'http://[2a01:4f8::1]',
+    'IPv6 with port' => 'http://[2a01:4f8::1]:8080/app',
+]);
+
+it('still suggests a www counterpart for a hostname', function () {
+    $wwwCounterpartUrl = new ReflectionMethod(Domains::class, 'wwwCounterpartUrl');
+
+    expect($wwwCounterpartUrl->invoke(new Domains, 'https://example.com:8443/app'))->toBe('https://www.example.com:8443/app');
 });

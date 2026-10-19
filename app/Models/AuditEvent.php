@@ -41,6 +41,8 @@ class AuditEvent extends Model
         'configuration_snapshot', 'configuration_diff', 'content', 'file_storage_content',
     ];
 
+    private const PRUNE_BATCH_SIZE = 1000;
+
     protected $fillable = [
         'team_id',
         'event',
@@ -228,11 +230,23 @@ class AuditEvent extends Model
             ->first()?->team()?->id;
     }
 
+    /**
+     * Deletes in batches, so a large table is not locked by one long DELETE.
+     */
     public static function pruneExpired(): int
     {
-        return self::query()
-            ->where('created_at', '<', now()->subDays(90))
-            ->delete();
+        $olderThan = now()->subDays(90);
+        $total = 0;
+
+        do {
+            $deleted = self::query()
+                ->where('created_at', '<', $olderThan)
+                ->limit(self::PRUNE_BATCH_SIZE)
+                ->delete();
+            $total += $deleted;
+        } while ($deleted > 0);
+
+        return $total;
     }
 
     /**
@@ -269,6 +283,10 @@ class AuditEvent extends Model
             $value = (array) $value;
         }
 
+        if (is_string($value)) {
+            return self::stripUrlCredentials($value);
+        }
+
         if (! is_array($value)) {
             return $value;
         }
@@ -278,6 +296,14 @@ class AuditEvent extends Model
                 $itemKey => self::redact($item, (string) $itemKey),
             ])
             ->all();
+    }
+
+    /**
+     * Removes the user info of URLs (https://user:token@host), so the audit keeps the URL without credentials.
+     */
+    private static function stripUrlCredentials(string $value): string
+    {
+        return preg_replace('#\b([a-z][a-z0-9+.-]*://)[^/?\#\s]+@#i', '$1', $value) ?? $value;
     }
 
     private static function isSensitiveKey(string $key): bool

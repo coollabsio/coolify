@@ -96,3 +96,22 @@ describe('GitLab source setup view', function () {
             ->toBe('http://100.75.155.70:8000/webhooks/source/gitlab/redirect');
     });
 });
+
+describe('GitLab webhook endpoint options for IPv6 instance addresses', function () {
+    test('brackets the public IPv6 address and keeps IPv4 unchanged', function (string $ipv6) {
+        config(['app.port' => 8000]);
+
+        InstanceSettings::findOrFail(0)->update([
+            'public_ipv4' => '203.0.113.10',
+            'public_ipv6' => $ipv6,
+        ]);
+
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->assertSet('ipv4', 'http://203.0.113.10:8000')
+            ->assertSet('ipv6', 'http://[2a01:4f8::1]:8000');
+    })->with([
+        'raw' => '2a01:4f8::1',
+        'bracketed' => '[2a01:4f8::1]',
+    ]);
+});

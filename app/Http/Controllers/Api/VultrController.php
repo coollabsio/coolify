@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\RateLimitException;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -21,6 +22,8 @@ use OpenApi\Attributes as OA;
 
 class VultrController extends Controller
 {
+    use RequiresDeployAbility;
+
     private function getCloudProviderTokenUuid(Request $request): ?string
     {
         return $request->cloud_provider_token_uuid ?? $request->cloud_provider_token_id;
@@ -177,7 +180,7 @@ class VultrController extends Controller
 
     #[OA\Post(
         summary: 'Create Vultr Server',
-        description: 'Create a Vultr instance and link it as a Coolify server.',
+        description: 'Create a Vultr instance and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.',
         path: '/servers/vultr',
         operationId: 'create-vultr-server',
         security: [
@@ -187,6 +190,7 @@ class VultrController extends Controller
         responses: [
             new OA\Response(response: 201, description: 'Vultr server created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'Vultr API rate limit exceeded.'),
         ]
@@ -245,6 +249,13 @@ class VultrController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+
+        if (! empty($request->cloud_init_script) || ! empty($request->vultr_ssh_key_ids)) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A cloud-init script or extra SSH keys run as root on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
         }
 
         $team = Team::find($teamId);

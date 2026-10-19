@@ -9,6 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class CheckHelperImageJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -20,20 +21,18 @@ class CheckHelperImageJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        try {
-            $response = Http::retry(3, 1000)->get(config('constants.coolify.versions_url'));
-            if ($response->successful()) {
-                $versions = $response->json();
-                $settings = instanceSettings();
-                $latest_version = data_get($versions, 'coolify.helper.version');
-                $current_version = $settings->helper_version;
-                if (version_compare($latest_version, $current_version, '>')) {
-                    $settings->update(['helper_version' => $latest_version]);
-                }
-            }
-        } catch (\Throwable $e) {
-            send_internal_notification('CheckHelperImageJob failed with: '.$e->getMessage());
-            throw $e;
+        $response = Http::retry(3, 1000, throw: false)->get(config('constants.coolify.versions_url'));
+        if ($response->failed()) {
+            // The CDN can be briefly unavailable. The next scheduled run tries again, so do not notify.
+            Log::warning('CheckHelperImageJob could not fetch versions', ['status' => $response->status()]);
+
+            return;
+        }
+
+        $latest_version = data_get($response->json(), 'coolify.helper.version');
+        $settings = instanceSettings();
+        if (version_compare($latest_version, $settings->helper_version, '>')) {
+            $settings->update(['helper_version' => $latest_version]);
         }
     }
 }

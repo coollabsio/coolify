@@ -193,11 +193,12 @@ Choose the branch based on the type of change:
 | --- | --- | --- |
 | Fixes and small improvements | `main` | `main` |
 | Security fixes | `main` | `main` |
-| New features and larger changes | `next` | `next` |
+| New features and larger changes | `release/v4.x` | `release/v4.x` |
 
 - For a fix, branch from `main` and target `main`.
-- For a feature, branch from `next` and target `next`.
-- If a fix is discovered while developing a feature, submit it separately to `main`. Maintainers will merge `main` into `next` so the fix is included there too.
+- For a feature, branch from `release/v4.x` and target `release/v4.x`.
+- `x` is the number of the next minor release. For example, when the production version is `4.4.x`, use `release/v4.5`. There is no `next` branch.
+- If a fix is discovered while developing a feature, submit it separately to `main`. Maintainers will merge `main` into `release/v4.x` so the fix is included there too.
 - Pull requests targeting the wrong branch may be closed or asked to retarget.
 
 

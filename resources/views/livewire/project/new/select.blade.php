@@ -92,8 +92,8 @@
                 </div>
             </x-application.settings-section>
 
-            <div x-show="loading" class="flex items-center justify-center py-8">
-                <x-loading text="Loading resources..." />
+            <div x-show="loading" class="mt-6">
+                <x-skeleton.cards :count="6" label="Loading resources" />
             </div>
             <div x-show="!loading" class="mt-6 flex flex-col gap-6">
                 <section
@@ -317,7 +317,7 @@
                                             class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
                                             Docs
                                         </a>
-                                        <a x-show="serviceWebsiteUrl(service)" :href="serviceWebsiteUrl(service)"
+                                        <a x-show="service.website" :href="service.website"
                                             target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
@@ -470,16 +470,6 @@
                         },
                         databaseWebsiteUrl(database) {
                             return this.databaseLinks[database.id]?.website;
-                        },
-                        serviceWebsiteUrl(service) {
-                            const source = service.website || service.homepage || service.documentation;
-                            if (!source) return null;
-
-                            try {
-                                return new URL(source).origin;
-                            } catch (error) {
-                                return null;
-                            }
                         },
                         async checkUrlExists(url) {
                             if (!url) return false;

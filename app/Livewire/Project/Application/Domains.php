@@ -77,9 +77,11 @@ class Domains extends Component
     public ?string $editingGeneratedHost = null;
 
     /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool}> */
+    #[Locked]
     public array $domainRows = [];
 
     /** When set, the next addSuggestedDomain call for this index skips the DNS block. */
+    #[Locked]
     public ?int $forceAddSuggestedIndex = null;
 
     /** @var array<int, string> */
@@ -122,6 +124,7 @@ class Domains extends Component
 
     public bool $isCheckingDns = false;
 
+    #[Locked]
     public bool $dnsValidationEnabled = true;
 
     /** Resolved or literal IP users should point DNS at. */
@@ -175,11 +178,11 @@ class Domains extends Component
         $this->loadDomainState();
     }
 
-    public function refreshDomains(): void
+    public function refreshDomains(bool $parseCompose = true): void
     {
         $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
 
-        $this->loadDomainState();
+        $this->loadDomainState($parseCompose);
 
         if ($editingRow !== null) {
             $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
@@ -196,7 +199,9 @@ class Domains extends Component
             ->where('dns_status', 'checking')
             ->values();
 
-        $this->refreshDomains();
+        // The poll only refreshes DNS results. Parsing the compose file here would
+        // queue file sync jobs on every tick and starve the DNS check jobs.
+        $this->refreshDomains(parseCompose: false);
 
         foreach ($checkingRows as $checkingRow) {
             $row = collect($this->domainRows)->first(fn (array $row): bool => $row['url'] === $checkingRow['url']
@@ -255,7 +260,7 @@ class Domains extends Component
         $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
     }
 
-    public function loadDomainState(): void
+    public function loadDomainState(bool $parseCompose = true): void
     {
         $this->application->refresh();
         $this->application->loadMissing(['destination.server', 'settings', 'additional_servers']);
@@ -290,23 +295,27 @@ class Domains extends Component
             $this->serverIpConfigured = null;
         }
 
-        $this->composeServices = [];
         $pendingRedirect = $this->pendingRedirectService !== null
             ? ($this->serviceRedirects[$this->serviceRedirectWireKey($this->pendingRedirectService)] ?? null)
             : null;
         $this->serviceRedirects = [];
-        if ($this->isCompose) {
+        if (! $this->isCompose) {
+            $this->composeServices = [];
+        } elseif ($parseCompose) {
             try {
                 $parsed = $this->application->parse() ?? [];
             } catch (\Throwable) {
                 $parsed = [];
             }
+            $this->composeServices = [];
             $services = data_get($parsed, 'services', []);
             foreach ($services as $serviceName => $service) {
                 if (! isDatabaseImage(data_get($service, 'image'))) {
                     $this->composeServices[] = $serviceName;
                 }
             }
+        }
+        if ($this->isCompose) {
             if ($this->newDomainService === null && count($this->composeServices) > 0) {
                 $this->newDomainService = $this->composeServices[0];
             }
@@ -2055,7 +2064,7 @@ class Domains extends Component
         $lowerHost = strtolower($host);
 
         // Always skip bare IPs and localhost.
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
             return null;
         }
 

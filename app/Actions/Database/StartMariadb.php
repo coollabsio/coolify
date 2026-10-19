@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -82,6 +83,7 @@ class StartMariadb
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mysql();
@@ -251,22 +253,22 @@ class StartMariadb
             $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_ROOT_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_ROOT_PASSWORD')) {
             $environment_variables->push("MARIADB_ROOT_PASSWORD={$this->database->mariadb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_DATABASE'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_DATABASE')) {
             $environment_variables->push("MARIADB_DATABASE={$this->database->mariadb_database}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_USER'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_USER')) {
             $environment_variables->push("MARIADB_USER={$this->database->mariadb_user}");
         }
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MARIADB_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MARIADB_PASSWORD')) {
             $environment_variables->push("MARIADB_PASSWORD={$this->database->mariadb_password}");
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -280,5 +282,7 @@ class StartMariadb
         $content = $this->database->mariadb_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
     }
 }

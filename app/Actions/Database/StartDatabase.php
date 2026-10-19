@@ -267,6 +267,10 @@ class StartDatabase
      */
     public static function prerequisiteError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?string
     {
+        if ($database instanceof StandaloneClickhouse && ($volumeName = $database->anonymousDataVolume()) !== null) {
+            return DatabaseStartException::clickhouseDataInAnonymousVolume($volumeName)->getMessage();
+        }
+
         if (! $database->enable_ssl) {
             return null;
         }

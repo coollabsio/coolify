@@ -104,18 +104,19 @@ function remoteSecretLifecyclePostgres(): StandalonePostgresql
  */
 function remoteSecretLifecycleWrittenEnvFile(Service $service): string
 {
-    $commands = collect();
-    Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+    $envFileContent = '';
+    Process::fake(function ($process) use (&$envFileContent) {
+        // The .env content goes to `tee <workdir>/<id>.env.tmp` over SSH stdin.
+        if (preg_match('/tee \S+\.env\.tmp/', $process->command)) {
+            $envFileContent = (string) $process->input;
+        }
 
         return Process::result(output: '');
     });
 
     $service->saveComposeConfigs();
 
-    preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d \| tee [^ ]+\.env\.tmp/", $commands->implode("\n"), $matches);
-
-    return base64_decode($matches[1] ?? '');
+    return $envFileContent;
 }
 
 /*
@@ -148,11 +149,11 @@ test('literal service variables with remote secrets are written as valid dotenv 
     expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('API_KEY="it\'s"');
 });
 
-test('service variables without remote secrets keep their .env format', function () {
+test('service variables without remote secrets use exact .env escaping', function () {
     $service = remoteSecretLifecycleService();
     $service->environment_variables()->create(['key' => 'PLAIN', 'value' => 'say "hi"']);
 
-    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('PLAIN=say \"hi\"');
+    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('PLAIN="say \"hi\""');
     Http::assertNothingSent();
 });
 
@@ -198,7 +199,7 @@ test('redis remote passwords are escaped the same way in the environment and the
     $startCommand = (new ReflectionMethod($action, 'buildStartCommand'))->invoke($action);
 
     expect($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
-        ->and($startCommand)->toContain('--requirepass p4$$word');
+        ->and($startCommand)->toContain("--requirepass 'p4\$\$word'");
 });
 
 test('a service restart keeps the service running when remote secrets cannot be fetched', function () {
@@ -219,7 +220,7 @@ test('a literal service variable keeps reference text when no secret manager sou
 
     $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
 
-    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain("TEMPLATE='Hello {{vault.NAME}}'");
+    expect(remoteSecretLifecycleWrittenEnvFile($service))->toContain('TEMPLATE="Hello {{vault.NAME}}"');
     Http::assertNothingSent();
 });
 

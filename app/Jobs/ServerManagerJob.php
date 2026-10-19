@@ -184,7 +184,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         // Unreachable servers are skipped: the SSH check would only fail. The connection check recovers them.
         if ($server->isSentinelEnabled()
             && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
-            && shouldRunCronNow(self::sentinelVersionCheckCron($server), $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
+            && shouldRunCronNow(self::sentinelVersionCheckCron($server), $serverTimezone, "sentinel-version-check-v2:{$server->id}", $this->executionTime)
             && $server->isFunctional()
         ) {
             CheckAndStartSentinelJob::dispatch($server);
@@ -204,8 +204,10 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Dispatch ServerPatchCheckJob if due (weekly, staggered per server on Sunday)
-        $shouldRunPatchCheck = shouldRunCronNow(self::patchCheckCron($server), $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
+        // Dispatch ServerPatchCheckJob if due (weekly, staggered per server on Sunday).
+        // The "-v2" keys start fresh: v4.3.23 stored its old run times under the unversioned keys, which
+        // would make every server run these checks at once on the first run after the upgrade.
+        $shouldRunPatchCheck = shouldRunCronNow(self::patchCheckCron($server), $serverTimezone, "server-patch-check-v2:{$server->id}", $this->executionTime);
 
         if ($shouldRunPatchCheck) {
             ServerPatchCheckJob::dispatch($server);

@@ -128,7 +128,7 @@ class ServerTransferImporter
         $serverIp = (string) data_get($bundle, 'server.ip');
 
         $uuidConflict = Server::withTrashed()->where('uuid', $serverUuid)->exists() && $preserveUuids;
-        $existingIp = Server::where('ip', $serverIp)->first();
+        $existingIp = Server::where('ip', Server::normalizeIp($serverIp))->first();
         $ipConflict = $existingIp !== null;
 
         if (! $dryRun && $uuidConflict) {
@@ -814,7 +814,7 @@ class ServerTransferImporter
         $this->importFileStorages(data_get($payload, 'file_storages', []), $application);
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $application, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $application, $teamId);
-        $this->importPreviews(data_get($payload, 'previews', []), $application, $preserveUuids, $adoptMode);
+        $this->importPreviews(data_get($payload, 'previews', []), $application, $preserveUuids, $adoptMode, $teamId);
 
         return $application;
     }
@@ -1031,6 +1031,8 @@ class ServerTransferImporter
                     'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
                     'is_shared' => (bool) data_get($variable, 'is_shared', false),
                     'is_required' => (bool) data_get($variable, 'is_required', false),
+                    // Exports from older versions have no flag; their values use the old escaping.
+                    'uses_legacy_escaping' => (bool) data_get($variable, 'uses_legacy_escaping', true),
                     'comment' => data_get($variable, 'comment'),
                     'order' => data_get($variable, 'order'),
                     'resourceable_type' => $resource->getMorphClass(),
@@ -1451,7 +1453,7 @@ class ServerTransferImporter
     /**
      * @param  list<array<string, mixed>>  $previews
      */
-    private function importPreviews(array $previews, Application $application, bool $preserveUuids, bool $adoptMode): void
+    private function importPreviews(array $previews, Application $application, bool $preserveUuids, bool $adoptMode, int $teamId): void
     {
         foreach ($previews as $previewPayload) {
             $uuid = $preserveUuids && filled(data_get($previewPayload, 'uuid'))
@@ -1459,6 +1461,11 @@ class ServerTransferImporter
                 : new_public_id();
 
             $preview = ApplicationPreview::withTrashed()->where('uuid', $uuid)->first();
+            if ($preview && ! $this->previewBelongsToTeam($preview, $teamId)) {
+                throw ValidationException::withMessages([
+                    'previews' => ['An imported preview UUID conflicts with a preview outside the target team.'],
+                ]);
+            }
             if (! $preview) {
                 $pullRequestId = data_get($previewPayload, 'pull_request_id');
                 if ($pullRequestId !== null) {
@@ -1475,17 +1482,24 @@ class ServerTransferImporter
             }
 
             $fqdn = data_get($previewPayload, 'fqdn');
-            // FQDN is globally unique; free it from other rows (including soft-deleted leftovers).
+            // FQDN is globally unique; only release conflicts owned by the target team.
             if (filled($fqdn)) {
-                ApplicationPreview::withoutEvents(function () use ($fqdn, $preview) {
-                    ApplicationPreview::withTrashed()
-                        ->where('fqdn', $fqdn)
-                        ->when($preview, fn ($q) => $q->where('id', '!=', $preview->id))
-                        ->get()
-                        ->each(function (ApplicationPreview $conflict) {
-                            $conflict->fqdn = null;
-                            $conflict->saveQuietly();
-                        });
+                $conflicts = ApplicationPreview::withTrashed()
+                    ->where('fqdn', $fqdn)
+                    ->when($preview, fn ($q) => $q->where('id', '!=', $preview->id))
+                    ->get();
+                foreach ($conflicts as $conflict) {
+                    if (! $this->previewBelongsToTeam($conflict, $teamId)) {
+                        throw ValidationException::withMessages([
+                            'previews' => ['An imported preview domain conflicts with a preview outside the target team.'],
+                        ]);
+                    }
+                }
+                ApplicationPreview::withoutEvents(function () use ($conflicts) {
+                    $conflicts->each(function (ApplicationPreview $conflict) {
+                        $conflict->fqdn = null;
+                        $conflict->saveQuietly();
+                    });
                 });
             }
 
@@ -1528,6 +1542,14 @@ class ServerTransferImporter
                 $this->importPersistentStorages(data_get($previewPayload, 'persistent_storages', []), $preview);
             }
         }
+    }
+
+    private function previewBelongsToTeam(ApplicationPreview $preview, int $teamId): bool
+    {
+        return Application::withTrashed()
+            ->whereKey($preview->application_id)
+            ->whereRelation('environment.project', 'team_id', $teamId)
+            ->exists();
     }
 
     /**

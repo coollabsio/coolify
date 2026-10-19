@@ -1,8 +1,11 @@
 <?php
 
+use App\Actions\Service\StartService;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
+use App\Models\Service;
+use App\Models\StandaloneDocker;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 
@@ -937,8 +940,15 @@ describe('service application lifecycle command escaping', function () {
         expect($source)->toContain('escapeshellarg($workdir)')
             ->and($source)->toContain('escapeshellarg($composeFile)')
             ->and($source)->toContain('escapeshellarg($service->uuid)')
-            ->and($source)->toContain('escapeshellarg($composeServiceName)')
-            ->and($source)->toContain('escapeshellarg($service->destination->network)');
+            ->and($source)->toContain('escapeshellarg($composeServiceName)');
+    });
+
+    test('predefined network connect command escapes the container name', function () {
+        $service = (new Service)->forceFill(['uuid' => 'svc-uuid']);
+        $service->setRelation('destination', (new StandaloneDocker)->forceFill(['network' => 'coolify']));
+
+        expect(StartService::predefinedNetworkConnectCommand($service, 'app$(id)', []))
+            ->toContain(" 'app$(id)-svc-uuid' | grep -qxF 'coolify' || docker network connect --alias 'app$(id)-svc-uuid' 'coolify' 'app$(id)-svc-uuid' || echo 'Warning: Could not connect app$(id) to the coolify network.'");
     });
 
     test('service application restart and stop actions escape container names', function (string $path) {

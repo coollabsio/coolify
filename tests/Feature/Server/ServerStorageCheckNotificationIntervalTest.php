@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\PushServerUpdateJob;
 use App\Jobs\ServerStorageCheckJob;
 use App\Livewire\Server\Advanced;
 use App\Models\InstanceSettings;
@@ -67,6 +68,25 @@ it('sends one high disk usage notification per configured interval', function ()
     Notification::assertSentToTimes($server->team, HighDiskUsage::class, 2);
 });
 
+it('notifies again on a new spike after disk usage recovered within the interval', function () {
+    $server = diskUsageIntervalServer(intervalHours: 24);
+
+    runDiskUsageCheck($server, 93);
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 1);
+
+    Carbon::setTestNow(now()->addMinutes(10));
+    runDiskUsageCheck($server, 95);
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 1);
+
+    Carbon::setTestNow(now()->addHour());
+    runDiskUsageCheck($server, 40);
+    expect(NotificationThrottle::wasSent($server, HighDiskUsage::class))->toBeFalse();
+
+    Carbon::setTestNow(now()->addHour());
+    runDiskUsageCheck($server, 92);
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 2);
+});
+
 it('defaults to one notification per 24 hours', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
@@ -119,4 +139,46 @@ it('does not let a member change the notification interval', function () {
         ->call('submit');
 
     expect($server->settings->fresh()->server_disk_usage_notification_interval_hours)->toBe(24);
+});
+
+function pushDiskUsage(Server $server, int $percentage): void
+{
+    (new PushServerUpdateJob($server->fresh(), [
+        'containers' => [],
+        'filesystem_usage_root' => ['used_percentage' => $percentage],
+    ]))->handle();
+}
+
+it('notifies again on a new spike after disk usage recovered on a Sentinel server', function () {
+    $server = diskUsageIntervalServer(intervalHours: 24);
+
+    pushDiskUsage($server, 93);
+    Carbon::setTestNow(now()->addHour());
+    pushDiskUsage($server, 40);
+    Carbon::setTestNow(now()->addHour());
+    pushDiskUsage($server, 92);
+
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 2);
+});
+
+it('does not notify again while Sentinel disk usage moves around the threshold', function () {
+    $server = diskUsageIntervalServer(intervalHours: 24);
+
+    foreach ([81, 80, 81, 80, 79, 81, 78, 82] as $percentage) {
+        pushDiskUsage($server, $percentage);
+        Carbon::setTestNow(now()->addMinutes(2));
+    }
+
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 1);
+});
+
+it('does not notify again while checked disk usage moves around the threshold', function () {
+    $server = diskUsageIntervalServer(intervalHours: 24);
+
+    foreach ([81, 80, 81, 76, 82] as $percentage) {
+        runDiskUsageCheck($server, $percentage);
+        Carbon::setTestNow(now()->addMinutes(2));
+    }
+
+    Notification::assertSentToTimes($server->team, HighDiskUsage::class, 1);
 });

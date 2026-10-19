@@ -247,7 +247,7 @@ describe('webhook signature failure logging', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 
     test('GitLab manual webhook with bad token logs to audit channel', function () {
@@ -275,7 +275,7 @@ describe('webhook signature failure logging', function () {
         ]);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 
     test('Bitbucket manual webhook with malformed signature logs to audit channel', function () {
@@ -304,7 +304,7 @@ describe('webhook signature failure logging', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 
     test('Gitea manual webhook with bad signature logs to audit channel', function () {
@@ -335,7 +335,7 @@ describe('webhook signature failure logging', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 });
 

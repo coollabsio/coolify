@@ -356,7 +356,7 @@ class General extends Component
         }
 
         try {
-            validateDockerComposeForInjection($this->dockerComposeRaw, composeResourceDirectory($this->application));
+            validateDockerComposeForInjection($this->dockerComposeRaw);
         } catch (Exception $e) {
             throw new Exception(e($e->getMessage()), 0, $e);
         }
@@ -923,7 +923,7 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
-            $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, currentTeam()->id);
+            $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
             $this->syncData();
             if ($oldPortsExposes !== $this->portsExposes) {
                 $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);

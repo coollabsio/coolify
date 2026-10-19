@@ -253,12 +253,15 @@ class SecurityController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update a private key.',
-        path: '/security/keys',
+        path: '/security/keys/{uuid}',
         operationId: 'update-private-key',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Private Keys'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: [
@@ -299,6 +302,10 @@ class SecurityController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Private Key not found.',
             ),
             new OA\Response(
                 response: 422,

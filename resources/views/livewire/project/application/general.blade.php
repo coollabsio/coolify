@@ -109,7 +109,7 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="buildPack" label="Build strategy" live :options="[
                             ['value' => 'railpack', 'label' => 'Railpack'],
-                            ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                            ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Compose'],
@@ -121,6 +121,9 @@
                             ]" x-bind:disabled="!canUpdate" />
                         @endif
                     </div>
+                    @if ($buildPack === 'nixpacks')
+                        <x-nixpacks-deprecated-callout class="mt-4" />
+                    @endif
                 </div>
             @endif
             @if ($application->could_set_build_commands() || ($isStatic && $buildPack !== 'static'))
@@ -207,7 +210,7 @@
                                 @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                     <div class="pt-4">
                                         <x-forms.textarea
-                                            helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
+                                            helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
                                             placeholder="services/api/**" id="watchPaths" label="Watch paths"
                                             x-bind:disabled="shouldDisable()" />
                                     </div>
@@ -263,7 +266,7 @@
                             @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                 <div class="pb-4">
                                     <x-forms.textarea
-                                        helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
+                                        helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
                                         placeholder="src/pages/**" id="watchPaths" label="Watch paths"
                                         x-bind:disabled="!canUpdate" />
                                 </div>
@@ -280,7 +283,7 @@
                             @endif
                             @if ($buildPack !== 'dockercompose')
                                 @php
-                                    $hasBuildServers = \App\Models\Server::buildServers(currentTeam()->id)->exists();
+                                    $hasBuildServers = \App\Models\Server::buildServers($application->team()?->id)->exists();
                                     $buildServerOptions = [
                                         ['value' => false, 'label' => 'Deployment server'],
                                         $hasBuildServers

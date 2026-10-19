@@ -179,11 +179,10 @@ class Show extends Component
             $this->task->delete();
             auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());
 
-            if ($this->type === 'application') {
-                return redirectRoute($this, 'project.application.scheduled-tasks.show', $this->parameters);
-            } else {
-                return redirectRoute($this, 'project.service.scheduled-tasks.show', $this->parameters);
-            }
+            redirectRoute($this, "project.{$this->type}.scheduled-tasks.show", $this->parameters);
+
+            // Without true, the confirmation modal refreshes this deleted task while wire:navigate loads the list.
+            return true;
         } catch (\Exception $e) {
             return handleError($e);
         }

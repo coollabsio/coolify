@@ -94,7 +94,7 @@ test('non-root token cannot disable MCP server', function () {
 });
 
 test('root token can enable MCP server when the REST API is disabled', function () {
-    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10']);
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false]);
     $token = makeRootMcpToken($this->user);
 
     test()->withHeaders(['Authorization' => 'Bearer '.$token])
@@ -102,6 +102,17 @@ test('root token can enable MCP server when the REST API is disabled', function 
         ->assertOk();
 
     expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeTrue();
+});
+
+test('root token cannot enable MCP server from an IP outside the allow-list', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10']);
+    $token = makeRootMcpToken($this->user);
+
+    test()->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson('/api/v1/mcp/enable')
+        ->assertForbidden();
+
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeFalse();
 });
 
 test('unauthenticated request to /api/v1/mcp/enable returns 401', function () {

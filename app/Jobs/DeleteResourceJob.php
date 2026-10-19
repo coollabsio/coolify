@@ -79,7 +79,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
                 case 'standalone-sqlite':
-                    StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup);
+                    StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup, keepAnonymousDataVolume: false);
                     break;
                 case 'service':
                     StopService::run($this->resource, $this->deleteConnectedNetworks, $this->dockerCleanup);
@@ -260,7 +260,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($cancelledDeployments > 0) {
             try {
-                next_after_cancel($server);
+                next_after_cancel($server, $application);
             } catch (\Throwable $e) {
                 \Log::warning("Failed to advance deployment queue after deleting preview {$this->resource->id}: {$e->getMessage()}");
             }

@@ -188,12 +188,15 @@ class Sentinel extends Component
         try {
             $this->authorize('update', $this->server);
             $changedFields = $this->syncData(true);
-            if ($changedFields !== []) {
-                auditLog('ui.server.sentinel.updated', $this->auditContext([
-                    'changed_fields' => $changedFields,
-                ]));
+            if ($changedFields === []) {
+                return;
             }
-            $this->restartSentinel();
+            auditLog('ui.server.sentinel.updated', $this->auditContext([
+                'changed_fields' => $changedFields,
+            ]));
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
+            $this->setSentinelRestarting();
+            $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

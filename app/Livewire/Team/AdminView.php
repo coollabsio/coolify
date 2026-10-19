@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Team;
 
+use App\Enums\Role;
 use App\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -79,6 +80,10 @@ class AdminView extends Component
             return $this->dispatch('error', 'User not found');
         }
 
+        if ($error = $this->deletionError(auth()->user(), $user)) {
+            return $this->dispatch('error', $error);
+        }
+
         try {
             $user->delete();
             auditLog('ui.user.deleted', [
@@ -94,6 +99,38 @@ class AdminView extends Component
         } catch (\Exception $e) {
             return $this->dispatch('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Instance admins may delete other users, but never the root user, their
+     * own account (use the profile instead), or a user whose role in the root
+     * team is higher than their own.
+     */
+    private function deletionError(User $actor, User $target): ?string
+    {
+        if ($target->id === 0) {
+            return 'The root user cannot be deleted.';
+        }
+
+        if ($target->id === $actor->id) {
+            return 'Delete your own account from your profile.';
+        }
+
+        $actorRole = $this->rootTeamRole($actor);
+        $targetRole = $this->rootTeamRole($target);
+
+        if (! $actorRole || ($targetRole && $targetRole->gt($actorRole))) {
+            return 'You cannot delete a user with a higher role in the root team.';
+        }
+
+        return null;
+    }
+
+    private function rootTeamRole(User $user): ?Role
+    {
+        $role = $user->teams()->where('teams.id', 0)->first()?->pivot?->role;
+
+        return $role ? Role::tryFrom($role) : null;
     }
 
     public function render()

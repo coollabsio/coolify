@@ -6,6 +6,7 @@ use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
+use App\Rules\ValidFluentBitConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -108,7 +109,7 @@ class ServerLogDrainsController extends Controller
 
     #[OA\Patch(
         summary: 'Update log drain settings',
-        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team.',
+        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
         path: '/servers/{uuid}/log-drains',
         operationId: 'update-server-log-drains',
         security: [['bearerAuth' => []]],
@@ -137,6 +138,7 @@ class ServerLogDrainsController extends Controller
             new OA\Response(response: 200, description: 'Updated log drain settings.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -168,8 +170,8 @@ class ServerLogDrainsController extends Controller
             'logdrain_axiom_dataset_name' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
             'logdrain_axiom_api_key' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
             'is_logdrain_custom_enabled' => 'boolean',
-            'logdrain_custom_config' => 'nullable|string',
-            'logdrain_custom_config_parser' => 'nullable|string',
+            'logdrain_custom_config' => ['nullable', 'string', new ValidFluentBitConfig],
+            'logdrain_custom_config_parser' => ['nullable', 'string', new ValidFluentBitConfig(parsersOnly: true)],
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
@@ -186,6 +188,7 @@ class ServerLogDrainsController extends Controller
         }
 
         $settings = $server->settings;
+
         foreach (self::ALLOWED_FIELDS as $field) {
             if ($request->has($field)) {
                 $settings->{$field} = $request->input($field);

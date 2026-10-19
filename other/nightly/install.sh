@@ -7,7 +7,7 @@
 ## ROOT_USER_PASSWORD - Predefined root user password
 ## DOCKER_ADDRESS_POOL_BASE - Custom Docker address pool base (default: 10.0.0.0/8)
 ## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
-## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
+## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration, also when Docker must restart with running containers (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 ## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
 
@@ -31,14 +31,21 @@ fi
 
 # Resource directories hold data whose owner and mode the resource images or a non-root SSH user need.
 # Set their owner and mode only when they are created, never on an upgrade (#11945).
-for COOLIFY_DIRECTORY in /data/coolify /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
-    if [ ! -d "$COOLIFY_DIRECTORY" ]; then
-        mkdir -p "$COOLIFY_DIRECTORY"
-        chown 9999:root "$COOLIFY_DIRECTORY"
-        chmod 700 "$COOLIFY_DIRECTORY"
+create_data_directory() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        chown 9999:root "$1"
+        chmod 700 "$1"
     fi
-done
-mkdir -p /data/coolify/source /data/coolify/images /data/coolify/ssh/{keys,mux}
+}
+
+# Run only after the checks and downloads succeed, so a failed run does not change the data directories (#11973).
+create_coolify_directories() {
+    for COOLIFY_DIRECTORY in /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
+        create_data_directory "$COOLIFY_DIRECTORY"
+    done
+    mkdir -p /data/coolify/images /data/coolify/ssh/{keys,mux}
+}
 
 # Coolify's own directories, used by the coolify container (UID 9999)
 set_coolify_directory_permissions() {
@@ -46,7 +53,9 @@ set_coolify_directory_permissions() {
     chmod -R 700 /data/coolify/{source,ssh,images}
 }
 
-set_coolify_directory_permissions
+# The installation log and the downloaded files go to /data/coolify/source, so only it is created before the checks.
+create_data_directory /data/coolify
+mkdir -p /data/coolify/source
 
 INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 
@@ -828,131 +837,39 @@ step_done "${DOCKER_SERVER_VERSION:+v$DOCKER_SERVER_VERSION}"
 
 step_start "Configuring Docker daemon" "log rotation · address pools"
 
-echo " - Network pool configuration: ${DOCKER_ADDRESS_POOL_BASE}/${DOCKER_ADDRESS_POOL_SIZE}"
-echo " - To override existing configuration: DOCKER_POOL_FORCE_OVERRIDE=true"
-
-mkdir -p /etc/docker
-
-# Backup original daemon.json if it exists
-if [ -f /etc/docker/daemon.json ]; then
-    cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE"
-fi
-
-# Create coolify configuration with or without address pools based on whether they were explicitly provided
+# Changing daemon.json needs a Docker restart, which stops every running container.
+# Coolify sets log rotation and the network pool only when no pool is configured or DOCKER_POOL_FORCE_OVERRIDE=true,
+# keeps all other keys, and does not restart a Docker daemon with running containers unless DOCKER_POOL_FORCE_OVERRIDE=true.
 if [ "$DOCKER_POOL_FORCE_OVERRIDE" = true ] || [ "$EXISTING_POOL_CONFIGURED" = false ]; then
-    # First check if the configuration would actually change anything
-    if [ -f /etc/docker/daemon.json ]; then
-        CURRENT_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null)
-        CURRENT_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null)
-
-        if [ "$CURRENT_POOL_BASE" = "$DOCKER_ADDRESS_POOL_BASE" ] && [ "$CURRENT_POOL_SIZE" = "$DOCKER_ADDRESS_POOL_SIZE" ]; then
-            echo " - Network pool configuration unchanged, skipping update"
-            NEED_MERGE=false
+    mkdir -p /etc/docker
+    CURRENT_DAEMON_CONFIG='{}'
+    if [ -s /etc/docker/daemon.json ] && ! CURRENT_DAEMON_CONFIG=$(jq -S . /etc/docker/daemon.json 2>/dev/null); then
+        CURRENT_DAEMON_CONFIG=""
+    fi
+    if [ -z "$CURRENT_DAEMON_CONFIG" ]; then
+        warn "Docker daemon configuration not changed: /etc/docker/daemon.json is not valid JSON."
+    else
+        NEW_DAEMON_CONFIG=$(jq -S --arg base "$DOCKER_ADDRESS_POOL_BASE" --argjson size "$DOCKER_ADDRESS_POOL_SIZE" \
+            '. * {"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}, "default-address-pools": [{"base": $base, "size": $size}]}' <<<"$CURRENT_DAEMON_CONFIG")
+        RUNNING_CONTAINERS=$({ docker ps -q 2>/dev/null || true; } | wc -l)
+        if [ "$NEW_DAEMON_CONFIG" = "$CURRENT_DAEMON_CONFIG" ]; then
+            echo " - Configuration is up to date"
+        elif [ "$RUNNING_CONTAINERS" -gt 0 ] && [ "$DOCKER_POOL_FORCE_OVERRIDE" != true ]; then
+            warn "Docker daemon configuration not changed: log rotation and the ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE}) network pool need a Docker restart, which stops ${RUNNING_CONTAINERS} running container(s) and can change the docker0 bridge IP. To apply it, run the installer again with DOCKER_POOL_FORCE_OVERRIDE=true."
+            UI_STEP_DETAIL="skipped · containers running"
         else
-            # If force override is enabled or no existing configuration exists,
-            # create a new configuration with the specified address pools
-            echo " - Creating new Docker configuration with network pool: ${DOCKER_ADDRESS_POOL_BASE}/${DOCKER_ADDRESS_POOL_SIZE}"
-            cat >/etc/docker/daemon.json <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-address-pools": [
-    {"base":"${DOCKER_ADDRESS_POOL_BASE}","size":${DOCKER_ADDRESS_POOL_SIZE}}
-  ]
-}
-EOL
-            NEED_MERGE=true
-        fi
-    else
-        # No existing configuration, create new one
-        echo " - Creating new Docker configuration with network pool: ${DOCKER_ADDRESS_POOL_BASE}/${DOCKER_ADDRESS_POOL_SIZE}"
-        cat >/etc/docker/daemon.json <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-address-pools": [
-    {"base":"${DOCKER_ADDRESS_POOL_BASE}","size":${DOCKER_ADDRESS_POOL_SIZE}}
-  ]
-}
-EOL
-        NEED_MERGE=true
-    fi
-else
-    # Check if we need to update log settings
-    if [ -f /etc/docker/daemon.json ] && jq -e '.["log-driver"] == "json-file" and .["log-opts"]["max-size"] == "10m" and .["log-opts"]["max-file"] == "3"' /etc/docker/daemon.json >/dev/null 2>&1; then
-        echo " - Log configuration is up to date"
-        NEED_MERGE=false
-    else
-        # Create a configuration without address pools to preserve existing ones
-        cat >/etc/docker/daemon.json.coolify <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-EOL
-        NEED_MERGE=true
-    fi
-fi
-
-# Remove the duplicate daemon.json creation since we handle it above
-if ! [ -f /etc/docker/daemon.json ]; then
-    # If no daemon.json exists, create it with default settings
-    cat >/etc/docker/daemon.json <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-address-pools": [
-    {"base":"${DOCKER_ADDRESS_POOL_BASE}","size":${DOCKER_ADDRESS_POOL_SIZE}}
-  ]
-}
-EOL
-    NEED_MERGE=false
-fi
-
-if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
-    DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-"$DATE") || true)
-    if [ "$DIFF" != "" ]; then
-        echo " - Checking configuration changes..."
-
-        # Check if address pools were changed
-        if echo "$DIFF" | grep -q "default-address-pools"; then
-            if [ "$DOCKER_POOL_BASE_PROVIDED" = true ] || [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
-                echo " - Network pool updated per user request"
-            else
-                echo " - Warning: Network pool modified without explicit request"
+            if [ -f /etc/docker/daemon.json ]; then
+                cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE"
             fi
-        fi
-
-        # Remove this redundant restart since we already restarted when writing the config
-        echo " - Configuration changes confirmed"
-        if [ "$NEED_MERGE" = true ]; then
+            printf '%s\n' "$NEW_DAEMON_CONFIG" >/etc/docker/daemon.json
+            echo " - Network pool configuration: ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE})"
             echo " - Configuration updated - restarting Docker daemon..."
             restart_docker_service
-        else
-            echo " - Configuration is up to date"
         fi
-    else
-        echo " - Configuration is up to date"
     fi
 else
-    if [ "$NEED_MERGE" = true ]; then
-        echo " - Configuration updated - restarting Docker daemon..."
-        restart_docker_service
-    else
-        echo " - Configuration is up to date"
-    fi
+    echo " - Using the existing network pool ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE})"
+    echo " - To override it: DOCKER_POOL_FORCE_OVERRIDE=true"
 fi
 
 step_done
@@ -1070,6 +987,7 @@ step_done
 
 step_start "Checking SSH key for localhost access"
 SSH_KEY_DETAIL="existing key"
+create_coolify_directories
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh

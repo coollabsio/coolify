@@ -231,9 +231,12 @@ class Show extends Component
     {
         if ($toModel) {
             $this->validate();
-            $foundServer = Server::where('ip', $this->ip)
+            $this->ip = Server::normalizeIp($this->ip);
+            // Check only a changed IP, so that an old duplicate does not block saving other fields.
+            $ipChanged = $this->ip !== Server::normalizeIp($this->server->getRawOriginal('ip'));
+            $foundServer = $ipChanged ? Server::where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
-                ->first();
+                ->first() : null;
             if ($foundServer) {
                 $this->ip = $this->server->ip;
                 throw new \Exception('A server with this IP/Domain already exists.');
@@ -249,9 +252,8 @@ class Show extends Component
 
             $this->server->settings->connection_timeout = $this->connectionTimeout;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
-            $role = ServerRole::from($this->serverRole);
-            $this->server->settings->server_role = $role;
-            $this->server->settings->is_build_server = $role === ServerRole::BUILD;
+            // The role is only changed through requestServerRoleChange()/confirmServerRoleChange().
+            $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
@@ -453,8 +455,8 @@ class Show extends Component
     public function updatedIsSentinelDebugEnabled($value)
     {
         try {
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
             $this->submit();
-            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -463,8 +465,8 @@ class Show extends Component
     public function updatedIsMetricsEnabled($value)
     {
         try {
+            // Saving the setting restarts Sentinel (ServerSetting::booted()).
             $this->submit();
-            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -477,9 +479,9 @@ class Show extends Component
             $newRole = ServerRole::from($this->serverRole);
             $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
 
-            if ($newRole !== ServerRole::BUILD && $this->server->hasEnabledGithubRunners()) {
+            if ($newRole === ServerRole::DEPLOYMENT && $this->server->hasEnabledGithubRunners()) {
                 $this->serverRole = $currentRole->value;
-                $this->dispatch('error', 'Disable the GitHub runners before you change the role of this server.');
+                $this->dispatch('error', 'Disable the GitHub runners before you set this server to deployments only.');
 
                 return;
             }
@@ -527,6 +529,8 @@ class Show extends Component
     private function saveServerRole(ServerRole $role): void
     {
         $this->serverRole = $role->value;
+        $this->server->settings->server_role = $role;
+        $this->server->settings->is_build_server = $role === ServerRole::BUILD;
         if ($role === ServerRole::BUILD && $this->server->isSentinelEnabled()) {
             $this->isMetricsEnabled = false;
             $this->isSentinelDebugEnabled = false;
@@ -585,7 +589,7 @@ class Show extends Component
                 $this->server->update(['hetzner_server_status' => $this->hetznerServerStatus]);
             }
 
-            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? data_get($serverData, 'public_net.ipv6.ip');
+            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? hetznerServerIpv6(data_get($serverData, 'public_net.ipv6.ip'));
             if ($this->server->backfillPlaceholderIp($assignedIp)) {
                 $this->ip = $this->server->ip;
             }
@@ -784,21 +788,21 @@ class Show extends Component
 
     public function loadHetznerTokens(): void
     {
-        $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableHetznerTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'hetzner')
             ->get();
     }
 
     public function loadVultrTokens(): void
     {
-        $this->availableVultrTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableVultrTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'vultr')
             ->get();
     }
 
     public function loadDigitalOceanTokens(): void
     {
-        $this->availableDigitalOceanTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableDigitalOceanTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'digitalocean')
             ->get();
     }

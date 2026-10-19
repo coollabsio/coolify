@@ -50,6 +50,13 @@
                     Create DNS records automatically when a new domain has one unambiguous matching credential.
                 </p>
             </div>
+            <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                <x-forms.checkbox id="edit-proxied-dns" label="Proxy DNS records through Cloudflare" fullWidth
+                    wire:model.live="proxiedDns" canGate="update" :canResource="$integrationToken" />
+                <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                    Create new DNS records with the Cloudflare proxy on (orange cloud), so the server IP is not public. Existing records keep their proxy status.
+                </p>
+            </div>
         @else
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Capability: Secrets (read-only)</div>

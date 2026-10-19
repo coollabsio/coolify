@@ -100,6 +100,17 @@ test('export bundle streams download from livewire', function () {
         ->assertFileDownloaded('server-transfer-'.$this->server->uuid.'.json');
 });
 
+test('team members cannot export a transfer bundle', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->call('exportBundle')
+        ->assertNoFileDownloaded();
+});
+
 test('transfer page badge shows the management state of the server', function (string $state, string $label, array $hidden) {
     $claimer = app(ServerTransferClaimer::class);
     match ($state) {

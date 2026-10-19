@@ -372,6 +372,7 @@ class FileStorage extends Component
         return view('livewire.project.service.file-storage', [
             'deletionCheckboxes' => $deletionCheckboxes,
             'deletionActions' => $deletionActions,
+            'isYamlFile' => str($this->fileStorage->fs_path)->lower()->endsWith(['.yml', '.yaml']),
         ]);
     }
 }

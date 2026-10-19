@@ -18,6 +18,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
+use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -27,6 +28,9 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\VolumeBackup\BackupFailed;
+use App\Notifications\VolumeBackup\BackupSuccess;
+use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,7 +40,9 @@ use Illuminate\Routing\Redirector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -44,6 +50,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 uses(RefreshDatabase::class);
 
@@ -742,16 +749,21 @@ it('renders volume backup executions like database backup executions', function 
         'team_id' => $team->id,
         'frequency' => 'daily',
     ]);
+    $this->travelTo(Carbon::parse('2026-10-16 14:00:00', 'UTC'));
     ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         'status' => 'success',
         'filename' => '/data/coolify/backups/volumes/test/archive.tar.gz',
         'size' => 1024,
-        'finished_at' => now(),
+        'finished_at' => Carbon::parse('2026-10-16 14:30:05', 'UTC'),
     ]);
+    $this->travelTo(Carbon::parse('2026-10-16 18:00:00', 'UTC'));
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application, 'section' => 'executions'])
         ->assertSet('timezone', 'Europe/Budapest')
+        ->assertSee('2026-10-16 16:30:05 CEST')
+        ->assertSee('Started: 2026-10-16 16:00:00 CEST', false)
+        ->assertSee('3 hours ago')
         ->assertSeeInOrder([
             'Executions',
             'Status',
@@ -1139,6 +1151,19 @@ it('does not change S3 storage when another volume backup setting is invalid', f
         ->and($backup->frequency)->toBe('daily');
 });
 
+it('rejects a missing volume backup alert period above one year', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('missingBackupNotificationDays', 366)
+        ->call('save')
+        ->assertHasErrors(['missingBackupNotificationDays' => 'max']);
+
+    expect(ScheduledVolumeBackup::query()->exists())->toBeFalse();
+});
+
 function createVolumeBackupApplication(Team $team): array
 {
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
@@ -1205,12 +1230,14 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->set('retentionDaysLocally', 14)
         ->set('retentionMaxStorageLocally', 1.5)
         ->set('stopDuringBackup', true)
+        ->set('missingBackupNotificationDays', 3)
         ->call('save')
         ->assertDispatched('success');
 
     $backup = ScheduledVolumeBackup::query()->sole();
 
     expect($backup->backupable->is($volume))->toBeTrue()
+        ->and($backup->missing_backup_notification_days)->toBe(3)
         ->and($backup->team_id)->toBe($team->id)
         ->and($backup->frequency)->toBe('daily')
         ->and($backup->retention_amount_locally)->toBe(5)
@@ -1219,6 +1246,43 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->and($backup->stop_during_backup)->toBeTrue()
         ->and($backup->save_s3)->toBeFalse();
 });
+
+it('lists and accepts only S3 storages of the resource team when the session team differs', function (bool $rootTeam) {
+    $team = $rootTeam ? Team::factory()->create(['id' => 0]) : Team::factory()->create();
+    $user = signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $otherTeam = Team::factory()->create();
+    $user->teams()->attach($otherTeam, ['role' => 'owner']);
+    $s3Attributes = ['region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret', 'bucket' => 'bucket', 'endpoint' => 'https://s3.example.com', 'is_usable' => true];
+    $resourceTeamStorage = S3Storage::create([...$s3Attributes, 'name' => 'Resource team S3', 'team_id' => $team->id]);
+    $otherTeamStorage = S3Storage::create([...$s3Attributes, 'name' => 'Other team S3', 'team_id' => $otherTeam->id]);
+    session(['currentTeam' => $otherTeam]);
+
+    $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application]);
+
+    expect($component->get('availableS3Storages')->pluck('id')->all())->toBe([$resourceTeamStorage->id])
+        ->and($component->get('s3StorageId'))->toBe($resourceTeamStorage->id);
+
+    $component->set('frequency', 'daily')
+        ->set('saveToS3', true)
+        ->set('s3StorageId', $otherTeamStorage->id)
+        ->assertHasErrors('s3StorageId')
+        ->call('save')
+        ->assertHasErrors('s3StorageId');
+
+    expect(ScheduledVolumeBackup::query()->count())->toBe(0);
+
+    $component->set('s3StorageId', $resourceTeamStorage->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(ScheduledVolumeBackup::query()->sole())
+        ->s3_storage_id->toBe($resourceTeamStorage->id)
+        ->save_s3->toBeTrue();
+})->with([
+    'team' => [false],
+    'root team' => [true],
+]);
 
 it('only accepts a usable S3 storage owned by the current team', function () {
     $team = Team::factory()->create();
@@ -1964,8 +2028,10 @@ it('streams S3-only volume backups without creating or copying a local archive',
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
+        && ! str_contains($process->command, '--quiet')
         && str_contains($process->command, '>/dev/null && (compressor=')
-        && str_contains($process->command, '>/dev/null) && mc stat')
+        && str_contains($process->command, '>/dev/null 2>/tmp/mc-pipe.log || {')
+        && str_contains($process->command, '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
         && str_contains($process->command, 'temporary/bucket/')
         && str_contains($process->command, $expectedFilename)
         && substr_count($process->command, '--resolve') === 3
@@ -2065,7 +2131,7 @@ it('keeps local-first archive creation and mc copy when retaining a local volume
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, '>')
         && ! str_contains($process->command, 'mc pipe'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp')
+    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp --resolve ')
         && ! str_contains($process->command, 'mc pipe'));
 });
 
@@ -2297,8 +2363,67 @@ it('stops and restarts containers that use the volume when requested', function 
         && str_contains($process->command, 'state_file='));
     Process::assertRan(fn ($process) => str_contains($process->command, '{{println .Source}}{{println .Name}}')
         && str_contains($process->command, "grep -Fqx -- 'app-data'")
-        && str_contains($process->command, '{{.State.Paused}}')
+        && str_contains($process->command, '{{if not .State.Paused}}')
         && str_contains($process->command, 'continue'));
+});
+
+/**
+ * Runs the recorded container scan script in a local shell with a fake `docker` binary.
+ *
+ * @return array{exit_code: int, output: string}
+ */
+function runVolumeContainerScan(string $fakeDocker): array
+{
+    $scan = '';
+    Process::assertRan(function ($process) use (&$scan): bool {
+        if (! str_contains($process->command, 'docker ps -q')) {
+            return false;
+        }
+        $scan = $process->command;
+
+        return true;
+    });
+    $script = implode("\n", array_slice(explode("\n", $scan), 1, -1));
+
+    $bin = sys_get_temp_dir().'/volume-scan-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/docker", "#!/bin/sh\n{$fakeDocker}");
+    chmod("{$bin}/docker", 0755);
+
+    $result = new SymfonyProcess(['sh', '-c', $script], env: ['PATH' => $bin.':'.getenv('PATH')]);
+    $result->run();
+    File::deleteDirectory($bin);
+
+    return ['exit_code' => $result->getExitCode(), 'output' => trim($result->getOutput())];
+}
+
+it('skips containers that are removed while scanning for volume users', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'stop_during_backup' => true,
+    ]);
+
+    Process::fake(['*du -b*' => '128', '*' => '']);
+    (new VolumeBackupJob($backup))->handle();
+
+    $docker = <<<'SH'
+case "$*" in
+  "ps -q") printf 'aaa111\nbbb222\nccc333\n' ;;
+  "ps -aq --filter id=aaa111") ;;
+  "ps -aq --filter id=ccc333") echo ccc333 ;;
+  *aaa111*) echo 'error: no such object: aaa111' >&2; exit 1 ;;
+  *bbb222*) printf '/var/lib/docker/volumes/app-data/_data\napp-data\n' ;;
+  *ccc333*) [ "$CCC_BROKEN" = 1 ] && { echo 'daemon error' >&2; exit 1; }; printf 'other\n' ;;
+esac
+SH;
+
+    expect(runVolumeContainerScan($docker))->toBe(['exit_code' => 0, 'output' => 'bbb222'])
+        ->and(runVolumeContainerScan("CCC_BROKEN=1\n".$docker)['exit_code'])->not->toBe(0);
 });
 
 it('finds containers using a bind mounted host path before stopping', function () {
@@ -2749,3 +2874,117 @@ it('stops S3 upload cleanup when the S3 storage no longer exists', function () {
         ->and($execution->fresh()->s3_storage_deleted)->toBeFalsy()
         ->and($execution->fresh()->message)->toContain('S3 upload cleanup was skipped');
 });
+
+it('notifies the team when a volume backup succeeds', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    Process::fake([
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    Notification::assertSentToTimes($team, BackupSuccess::class, 1);
+    Notification::assertSentTo($team, BackupSuccess::class, fn (BackupSuccess $notification) => $notification->warning === null
+        && $notification->resourceName === $application->name
+        && $notification->target === 'Volume '.$volume->name
+        && str_contains((string) $notification->toMail()->render(), 'was successful'));
+    Notification::assertNotSentTo($team, BackupFailed::class);
+});
+
+it('notifies the team once when a volume backup fails', function () {
+    Process::fake();
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    (new VolumeBackupJob($backup))->failed(new RuntimeException('Archive command failed'));
+
+    Notification::assertSentToTimes($team, BackupFailed::class, 1);
+    Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Archive command failed'
+        && str_contains((string) $notification->toMail()->render(), 'Archive command failed'));
+    Notification::assertNotSentTo($team, BackupSuccess::class);
+});
+
+it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $notifiable = Mockery::mock();
+    $notifiable->shouldReceive('getEnabledChannels')->once()->with($event)->andReturn([]);
+
+    (new BackupSuccess($backup, $warning))->via($notifiable);
+})->with([
+    'without warning' => [null, 'backup_success'],
+    'with warning' => ['S3 upload failed: denied', 'backup_failure'],
+]);
+
+it('records a missed volume backup that is too old to run late as a failed execution and notifies the team once', function () {
+    config(['broadcasting.default' => 'null']);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_failure_discord_notifications' => true]);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-volume-backup:{$backup->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 16, 0, 0, 0, 'UTC'),
+        'job_type' => 'volume-backup',
+        'resource_id' => $backup->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1),
+    ]);
+
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($execution->status)->toBe('failed')
+        ->and($execution->message)->toBe('Skipped: the queued job did not start within 60 minutes.')
+        ->and($execution->finished_at)->not->toBeNull()
+        ->and($occurrence->fresh()->status)->toBe('failed');
+    Queue::assertNotPushed(VolumeBackupJob::class);
+    Notification::assertSentToTimes($team, BackupFailed::class, 1);
+    Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
+});
+
+it('fails the volume archive only on fatal tar errors', function (int $tarExitCode, int $expectedExitCode) {
+    $bin = sys_get_temp_dir().'/volume-backup-tar-'.uniqid();
+    mkdir($bin);
+    file_put_contents($bin.'/tar', "#!/bin/sh\nexit {$tarExitCode}\n");
+    chmod($bin.'/tar', 0755);
+
+    $result = Process::env(['PATH' => $bin.':/usr/bin:/bin'])
+        ->run(['sh', '-c', VolumeBackupJob::archiveScript(50)]);
+
+    unlink($bin.'/tar');
+    rmdir($bin);
+
+    expect($result->exitCode())->toBe($expectedExitCode);
+})->with([
+    'success' => [0, 0],
+    'file changed as we read it' => [1, 0],
+    'fatal error' => [2, 2],
+]);

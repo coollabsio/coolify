@@ -411,10 +411,10 @@ test('a write token creates mounts inside the resource directory', function (str
         ->postJson($url, [...$payload, 'type' => 'file', 'is_directory' => true, 'fs_path' => 'data/zz', 'mount_path' => '/data'])
         ->assertCreated();
     $this->withHeaders(['Authorization' => 'Bearer '.$token])
-        ->postJson($url, [...$payload, 'type' => 'file', 'fs_path' => $workdir.'/config/app.conf', 'mount_path' => '/etc/app.conf', 'content' => 'listen 8080;'])
+        ->postJson($url, [...$payload, 'type' => 'file', 'fs_path' => $workdir.'/config/app.conf', 'mount_path' => '/etc/app.conf'])
         ->assertCreated();
     $this->withHeaders(['Authorization' => 'Bearer '.$token])
-        ->postJson($url, [...$payload, 'type' => 'file', 'mount_path' => '/etc/other.conf', 'content' => 'listen 8081;'])
+        ->postJson($url, [...$payload, 'type' => 'file', 'mount_path' => '/etc/other.conf'])
         ->assertCreated();
     $this->withHeaders(['Authorization' => 'Bearer '.$token])
         ->postJson($url, [...$payload, 'type' => 'file', 'is_host_file' => true, 'fs_path' => '/etc/hosts', 'mount_path' => '/etc/hosts'])

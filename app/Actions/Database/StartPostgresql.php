@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -88,6 +89,7 @@ class StartPostgresql
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
@@ -274,22 +276,22 @@ class StartPostgresql
             }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_USER')) {
             $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
         }
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('PGUSER'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'PGUSER')) {
             $environment_variables->push("PGUSER={$this->database->postgres_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_PASSWORD')) {
             $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_DB'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_DB')) {
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -340,5 +342,7 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $config_file_path";
     }
 }

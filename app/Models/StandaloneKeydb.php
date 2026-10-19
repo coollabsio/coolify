@@ -70,6 +70,7 @@ class StandaloneKeydb extends BaseModel
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
@@ -313,7 +314,7 @@ class StandaloneKeydb extends BaseModel
             get: function () {
                 $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                 $port = $this->enable_ssl ? 6380 : 6379;
-                $encodedPass = rawurlencode($this->keydb_password);
+                $encodedPass = rawurlencode($this->connectionPassword());
                 $url = "{$scheme}://:{$encodedPass}@{$this->uuid}:{$port}/0";
 
                 if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
@@ -334,9 +335,10 @@ class StandaloneKeydb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
-                    $encodedPass = rawurlencode($this->keydb_password);
-                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $encodedPass = rawurlencode($this->connectionPassword());
+                    $url = "{$scheme}://:{$encodedPass}@{$serverHost}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
@@ -368,6 +370,60 @@ class StandaloneKeydb extends BaseModel
     public function runtime_environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
+    /**
+     * Uses the loaded runtime_environment_variables relation when present, so lists that eager
+     * load it do not run a query per database.
+     */
+    private function runtimeEnvironmentVariable(string $key): ?EnvironmentVariable
+    {
+        if ($this->relationLoaded('runtime_environment_variables')) {
+            return $this->runtime_environment_variables->firstWhere('key', $key);
+        }
+
+        return $this->runtime_environment_variables()->where('key', $key)->first();
+    }
+
+    /**
+     * The REDIS_PASSWORD variable that sets the server password instead of the stored password.
+     * Databases created before this release (legacy_password_quoting) keep their v4.3.23 server
+     * password, the stored one, unless the variable reads a remote secret.
+     */
+    public function serverPasswordEnvironmentVariable(): ?EnvironmentVariable
+    {
+        $environmentVariable = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
+
+        if (! $environmentVariable) {
+            return null;
+        }
+
+        if ($this->legacy_password_quoting && ! $this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return null;
+        }
+
+        return $environmentVariable;
+    }
+
+    /**
+     * The server password for connection URLs. A remote secret is not fetched here, so the URL
+     * shows its reference instead of a stale or wrong password.
+     */
+    public function connectionPassword(): string
+    {
+        $environmentVariable = $this->serverPasswordEnvironmentVariable();
+
+        if ($environmentVariable) {
+            $password = $this->environmentVariableUsesSecretManager($environmentVariable)
+                ? (string) $environmentVariable->value
+                : (string) $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+            if ($password !== '') {
+                return $password;
+            }
+        }
+
+        return (string) $this->keydb_password;
     }
 
     public function persistentStorages()

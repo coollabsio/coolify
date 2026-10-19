@@ -3,6 +3,7 @@
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 
 /**
@@ -589,6 +590,47 @@ function findServiceApplicationForEnvName(Service $resource, string $envServiceN
     }
 
     return $resource->applications()->where('name', $resolved)->first();
+}
+
+/**
+ * Check if a service copies a SERVICE_FQDN_ / SERVICE_URL_ declaration of the application named in it.
+ * The copy (same name, port and value; URL or FQDN) must not generate a domain or overwrite the variable (#11924).
+ * Declarations with another port or path share the host on purpose (for example Appwrite).
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $services  Parsed compose services
+ */
+function isCopiedServiceUrlDeclaration(
+    Service $resource,
+    array|Collection $services,
+    ServiceApplication|ServiceDatabase $current,
+    string $key,
+): bool {
+    $owner = findServiceApplicationForEnvName($resource, parseServiceEnvironmentVariable($key)['service_name']);
+    if (! $owner || $owner->name === $current->name) {
+        return false;
+    }
+
+    // Same declaration sources as serviceParser: environment and build arguments.
+    $declarationsOf = fn (string $serviceName) => convertToKeyValueCollection(
+        collect(data_get($services, [$serviceName, 'environment'], []))
+            ->merge(data_get($services, [$serviceName, 'build', 'args'], []))
+    );
+    $ownerDeclarations = $declarationsOf($owner->name);
+    $currentDeclarations = $declarationsOf($current->name);
+
+    if (! $currentDeclarations->has($key)) {
+        return false;
+    }
+
+    // SERVICE_URL_X_3000 and SERVICE_FQDN_X_3000 write the same variable pair, so either one counts.
+    $twinKey = str_starts_with($key, 'SERVICE_URL_')
+        ? 'SERVICE_FQDN_'.substr($key, strlen('SERVICE_URL_'))
+        : 'SERVICE_URL_'.substr($key, strlen('SERVICE_FQDN_'));
+    $value = (string) $currentDeclarations->get($key);
+
+    return collect([$key, $twinKey])->contains(
+        fn (string $ownerKey) => $ownerDeclarations->has($ownerKey) && (string) $ownerDeclarations->get($ownerKey) === $value
+    );
 }
 
 /**

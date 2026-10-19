@@ -10,6 +10,7 @@ use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class General extends Component
@@ -45,6 +46,10 @@ class General extends Component
 
     public bool $isPasswordHiddenForMember = false;
 
+    /** Unnamed Docker volume that holds the current data; shown as a warning. */
+    #[Locked]
+    public ?string $anonymousDataVolume = null;
+
     public function getListeners(): array
     {
         return $this->teamChannelListeners([
@@ -63,6 +68,7 @@ class General extends Component
 
                 return;
             }
+            $this->anonymousDataVolume = $this->database->anonymousDataVolume();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -116,8 +122,11 @@ class General extends Component
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->clickhouse_admin_user = $this->clickhouseAdminUser;
-            $this->database->clickhouse_admin_password = $this->clickhouseAdminPassword;
+            // After the first start the credentials are read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->clickhouse_admin_user = $this->clickhouseAdminUser;
+                $this->database->clickhouse_admin_password = $this->clickhouseAdminPassword;
+            }
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
@@ -194,6 +203,27 @@ class General extends Component
             $this->syncData(true);
 
             return handleError($e, $this);
+        }
+    }
+
+    public function keepCurrentDataVolume(): void
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            $volumeName = $this->database->anonymousDataVolume();
+            if ($volumeName === null) {
+                $this->anonymousDataVolume = null;
+                $this->dispatch('info', 'This database already uses its data volume.');
+
+                return;
+            }
+
+            $this->database->keepAnonymousDataVolume($volumeName);
+            $this->anonymousDataVolume = null;
+            $this->dispatch('success', 'The current data volume is now the data volume of this database. You can restart it safely.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

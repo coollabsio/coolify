@@ -14,6 +14,7 @@ use App\Actions\Shared\ComplexStatusCheck;
 use App\Events\ServiceChecked;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -30,6 +31,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Notifications\Container\ContainerRestarted;
+use App\Notifications\Server\HighDiskUsage;
 use App\Services\ContainerStatusAggregator;
 use App\Services\RestartCountTracker;
 use App\Traits\CalculatesExcludedStatus;
@@ -197,14 +199,22 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // it is wasted work — and most servers sit well below the threshold.
         $diskThreshold = data_get($this->server, 'settings.server_disk_usage_notification_threshold', 80);
         $storageCacheKey = 'storage-check:'.$this->server->id;
+        // Set while usage was high, so the throttle is released only once when usage recovers.
+        $highUsageCacheKey = 'storage-high:'.$this->server->id;
         $lastPercentage = Cache::get($storageCacheKey);
         if ($filesystemUsageRoot !== null
             && $filesystemUsageRoot >= $diskThreshold
             && (string) $lastPercentage !== (string) $filesystemUsageRoot) {
             Cache::put($storageCacheKey, $filesystemUsageRoot, 600);
+            Cache::forever($highUsageCacheKey, true);
             ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
         } elseif ($filesystemUsageRoot !== null && $filesystemUsageRoot < $diskThreshold) {
             Cache::forget($storageCacheKey);
+            // The storage check does not run below the threshold, so the next spike alerts again only
+            // when the throttle is released here.
+            if (HighDiskUsage::hasRecovered($filesystemUsageRoot, $diskThreshold) && Cache::pull($highUsageCacheKey)) {
+                NotificationThrottle::release($this->server, HighDiskUsage::class);
+            }
         }
 
         if ($this->containers->isEmpty() && ! $this->isCompleteSnapshot()) {

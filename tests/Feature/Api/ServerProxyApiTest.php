@@ -152,6 +152,37 @@ test('PATCH /api/v1/servers/{uuid}/proxy updates redirect and label settings wit
         ->and((bool) $server->settings->generate_exact_labels)->toBeTrue();
 });
 
+test('PATCH /api/v1/servers/{uuid}/proxy updates the Traefik certificate resolver', function (?string $input, ?string $expected) {
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/servers/{$this->server->uuid}/proxy")
+        ->assertOk()
+        ->assertJsonPath('traefik_certificate_resolver', 'letsencrypt');
+
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
+            'traefik_certificate_resolver' => $input,
+        ])
+        ->assertOk()
+        ->assertJsonPath('traefik_certificate_resolver', $expected);
+
+    expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBe($expected);
+})->with([
+    'custom resolver' => ['cloudflare', 'cloudflare'],
+    'no resolver' => [null, null],
+    'empty resolver' => ['', null],
+]);
+
+test('PATCH /api/v1/servers/{uuid}/proxy rejects unsafe certificate resolver names', function () {
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
+            'traefik_certificate_resolver' => 'letsencrypt.acme=x',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect($this->server->settings->fresh()->traefik_certificate_resolver)->toBe('letsencrypt');
+});
+
 test('PATCH /api/v1/servers/{uuid}/proxy rejects unknown fields', function () {
     $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/servers/{$this->server->uuid}/proxy", [
@@ -235,6 +266,66 @@ test('PUT /api/v1/servers/{uuid}/proxy/configuration forbids normal members', fu
             'configuration' => base64_encode("services:\n  traefik:\n    ports: ['80:80']\n"),
         ])
         ->assertForbidden();
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration requires the deploy permission', function () {
+    $writeOnlyToken = serverProxyApiToken($this->user, $this->team, ['write']);
+    $configuration = "services:\n  traefik:\n    image: traefik:v3.5\n";
+
+    SaveProxyConfiguration::shouldNotRun();
+
+    $this->withHeaders(serverProxyApiHeaders($writeOnlyToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode($configuration),
+        ])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Missing required permissions: deploy. Coolify applies the proxy configuration on the server, so it needs a token with the deploy permission.');
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration saves with write and deploy permissions', function () {
+    $deployToken = serverProxyApiToken($this->user, $this->team, ['write', 'deploy']);
+
+    SaveProxyConfiguration::shouldRun()->once();
+
+    $this->withHeaders(serverProxyApiHeaders($deployToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode("services:\n  traefik:\n    image: traefik:v3.5\n"),
+        ])
+        ->assertOk();
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration requires the write permission', function () {
+    $deployOnlyToken = serverProxyApiToken($this->user, $this->team, ['deploy']);
+
+    SaveProxyConfiguration::shouldNotRun();
+
+    $this->withHeaders(serverProxyApiHeaders($deployOnlyToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode("services:\n  traefik:\n    image: traefik:v3.5\n"),
+        ])
+        ->assertForbidden();
+});
+
+test('POST /api/v1/servers/{uuid}/proxy/restart requires the deploy permission', function () {
+    Queue::fake();
+    $writeOnlyToken = serverProxyApiToken($this->user, $this->team, ['write']);
+
+    $this->withHeaders(serverProxyApiHeaders($writeOnlyToken))
+        ->postJson("/api/v1/servers/{$this->server->uuid}/proxy/restart")
+        ->assertForbidden();
+
+    Queue::assertNotPushed(RestartProxyJob::class);
+});
+
+test('POST /api/v1/servers/{uuid}/proxy/restart works with the deploy permission', function () {
+    Queue::fake();
+    $deployToken = serverProxyApiToken($this->user, $this->team, ['deploy']);
+
+    $this->withHeaders(serverProxyApiHeaders($deployToken))
+        ->postJson("/api/v1/servers/{$this->server->uuid}/proxy/restart")
+        ->assertOk();
+
+    Queue::assertPushed(RestartProxyJob::class);
 });
 
 test('POST /api/v1/servers/{uuid}/proxy/restart queues RestartProxyJob', function () {

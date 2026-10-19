@@ -74,8 +74,7 @@ class DeployController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = Server::whereTeamId($teamId)->get();
-        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get()->sortBy('id');
+        $deployments_per_server = ApplicationDeploymentQueue::ownedByTeam((int) $teamId)->whereIn('status', ['in_progress', 'queued'])->get()->sortBy('id');
         $deployments_per_server = $deployments_per_server->map(function ($deployment) {
             return $this->removeSensitiveData($deployment);
         });
@@ -228,9 +227,9 @@ class DeployController extends Controller
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
 
-        // Check if the deployment belongs to the user's team
-        $servers = Server::whereTeamId($teamId)->pluck('id');
-        if (! $servers->contains($deployment->server_id)) {
+        // Include soft-deleted apps so in-flight deploys stay cancellable.
+        $application = $deployment->application()->withTrashed()->first();
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
             return response()->json(['message' => 'You do not have permission to cancel this deployment.'], 403);
         }
 
@@ -278,7 +277,7 @@ class DeployController extends Controller
                 'team_id' => $teamId,
                 'deployment_uuid' => $deployment->deployment_uuid,
                 'application_id' => $deployment->application_id,
-                'application_uuid' => $deployment->application?->uuid,
+                'application_uuid' => $application->uuid,
                 'server_id' => $deployment->server_id,
             ]);
 
@@ -294,7 +293,7 @@ class DeployController extends Controller
         } finally {
             if ($cancelled) {
                 try {
-                    next_after_cancel($deploymentServer);
+                    next_after_cancel($deploymentServer, $application);
                 } catch (\Throwable $e) {
                     \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
                 }
@@ -315,8 +314,8 @@ class DeployController extends Controller
             new OA\Parameter(name: 'tag', in: 'query', description: 'Tag name(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer', maximum: 2147483647)),
+            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer', maximum: 2147483647)),
             new OA\Parameter(name: 'docker_tag', in: 'query', description: 'Docker image tag for Docker Image preview deployments. Requires pull_request_id.', schema: new OA\Schema(type: 'string')),
         ],
 
@@ -372,6 +371,9 @@ class DeployController extends Controller
         $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
         $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
 
+        if ($pr > 2147483647) {
+            return response()->json(['message' => 'pull_request_id must be between 1 and 2147483647.'], 400);
+        }
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
         }
@@ -459,8 +461,8 @@ class DeployController extends Controller
                 // $message->push("Tag {$tag} not found.");
                 continue;
             }
-            $applications = $found_tag->applications()->get();
-            $services = $found_tag->services()->get();
+            $applications = $found_tag->applications()->whereRelation('environment.project', 'team_id', $team_id)->get();
+            $services = $found_tag->services()->whereRelation('environment.project', 'team_id', $team_id)->get();
             if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
 
@@ -558,6 +560,11 @@ class DeployController extends Controller
                     $this->authorize('manage', $resource);
                 } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to start this database.', 'deployment_uuid' => null];
+                }
+                $prerequisiteError = StartDatabase::prerequisiteError($resource);
+                if ($prerequisiteError !== null) {
+                    $message = $prerequisiteError;
+                    break;
                 }
                 $reservation = StartDatabase::reserveOperation($resource);
                 if ($reservation === null) {
@@ -690,8 +697,6 @@ class DeployController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = Server::whereTeamId($teamId)->get();
-
         if (is_null($app_uuid)) {
             return response()->json(['message' => 'Application uuid is required'], 400);
         }

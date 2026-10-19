@@ -11,7 +11,9 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Support\RemoteProcessCommand;
 use Carbon\Carbon;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Process;
@@ -137,6 +139,48 @@ function instant_scp_from_server(string $remoteSource, string $localDest, Server
     );
 }
 
+/**
+ * Runs an SSH command. The timeout error of the process contains the complete command line, and with it
+ * the secrets of the remote script (database passwords, S3 keys), so it is replaced with a generic error.
+ * Exit code 124 (as from `timeout`) marks it as a remote command failure, so the batch is not run again.
+ */
+function runSshProcess(string $sshCommand, int $timeout, ?string $input = null): ProcessResult
+{
+    try {
+        return Process::timeout($timeout)->input($input)->run($sshCommand);
+    } catch (ProcessTimedOutException) {
+        throw new RuntimeException("The command on the server timed out after {$timeout} seconds.", 124);
+    }
+}
+
+/**
+ * Write content to a file on a server through SSH stdin. The content never becomes part of a command
+ * line, so it is not limited by the 128 KiB per-argument limit of Linux. A non-root SSH user writes
+ * with `sudo tee` because Coolify directories such as /data/coolify are root-only.
+ */
+function instant_remote_write_file(Server $server, string $path, string $content, bool $throwError = true): void
+{
+    $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null';
+    $timeout = (int) config('constants.ssh.command_timeout');
+
+    SshRetryHandler::retry(
+        function () use ($server, $remoteCommand, $content, $timeout) {
+            $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
+            $process = runSshProcess($sshCommand, $timeout, $content);
+
+            if ($process->exitCode() !== 0) {
+                excludeCertainErrors($process->errorOutput(), $process->exitCode());
+            }
+        },
+        [
+            'server' => $server->ip,
+            'dest' => $path,
+            'function' => 'instant_remote_write_file',
+        ],
+        $throwError
+    );
+}
+
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -148,7 +192,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     return SshRetryHandler::retry(
         function () use ($server, $command_string) {
             $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = Process::timeout(30)->run($sshCommand);
+            $process = runSshProcess($sshCommand, 30);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -184,7 +228,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
             $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
-            $process = Process::timeout($effectiveTimeout)->run($sshCommand);
+            $process = runSshProcess($sshCommand, (int) $effectiveTimeout);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -231,8 +275,11 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     $serverTimezone = getServerTimezone(data_get($application, 'destination.server'));
 
     // Members should never see debug logs, even if an admin enabled debug mode
-    if ($is_debug_enabled && auth()->check() && auth()->user()->isMember()) {
-        $is_debug_enabled = false;
+    if ($is_debug_enabled && auth()->check()) {
+        $teamId = $application?->team()?->id;
+        if (is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId)) {
+            $is_debug_enabled = false;
+        }
     }
 
     $logs = data_get($application_deployment_queue, 'logs');

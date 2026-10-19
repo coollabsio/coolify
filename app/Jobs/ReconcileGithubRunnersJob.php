@@ -10,13 +10,14 @@ use App\Services\GithubRunner\GithubRunnerContainer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 
 /**
- * Compares runner executions with the runner containers on each build server. It cleans up
+ * Compares runner executions with the runner containers on each runner server. It cleans up
  * stopped and orphaned runners, applies the wait, idle, and job timeouts, and restarts
  * provisioning for queued executions whose dispatch was lost.
  */
@@ -42,8 +43,11 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+        // Disabling keeps running jobs, so a disabled server is reconciled until its last runner is done.
         Server::query()
-            ->whereHas('githubRunnerConfig')
+            ->where(fn (Builder $query) => $query
+                ->whereHas('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true))
+                ->orWhereHas('githubRunnerExecutions', fn (Builder $execution) => $execution->whereIn('status', GithubRunnerStatus::occupying())))
             ->with('settings')
             ->get()
             ->filter(fn (Server $server) => $server->isFunctional())
@@ -54,7 +58,8 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Older versions left occupying executions of a deleted server active, which blocked deleting the App.
+     * Removes executions that still occupy a runner of a deleted server (for example a server deleted
+     * without model events), because they block deleting the GitHub App.
      */
     private function removeRunnersOfDeletedServers(): void
     {
@@ -156,7 +161,7 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
             foreach ($executions as $execution) {
                 if (($execution->queued_at ?? $execution->created_at)->lt(now()->subMinutes($timeout))) {
-                    $execution->finish(GithubRunnerStatus::TimedOut, "No build server had free capacity within {$timeout} minutes.");
+                    $execution->finish(GithubRunnerStatus::TimedOut, "No runner server had free capacity within {$timeout} minutes.");
                 }
             }
 

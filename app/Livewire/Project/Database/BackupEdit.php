@@ -6,6 +6,7 @@ use App\Jobs\DatabaseBackupJob;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Models\StandalonePostgresql;
 use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -400,22 +401,16 @@ class BackupEdit extends Component
 
     private function availableS3StorageIds(): Collection
     {
-        $storages = collect($this->availableS3Storages);
-        $storageIds = $storages->pluck('id')->filter()->all();
+        $database = $this->backup->database;
+        // The instance database (id 0) has no project and belongs to the root team.
+        $teamId = $database instanceof StandalonePostgresql && $database->id === 0 ? 0 : $database?->team()?->id;
 
-        if (empty($storageIds)) {
-            return collect();
-        }
-
-        $teamIds = $storages->pluck('team_id')->reject(fn ($teamId) => $teamId === null)->unique()->values()->all();
-
-        if (empty($teamIds)) {
+        if ($teamId === null) {
             return collect();
         }
 
         return S3Storage::query()
-            ->whereKey($storageIds)
-            ->whereIn('team_id', $teamIds)
+            ->where('team_id', $teamId)
             ->where('is_usable', true)
             ->pluck('id');
     }

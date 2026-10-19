@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Stringable;
-use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
 {
@@ -106,6 +105,11 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             if ($fileVolume->is_host_file) {
+                return;
+            }
+            // A token with only the write permission can save a Compose file. A mount outside the resource
+            // directory is written when the resource is deployed or started, not when it is saved.
+            if ($fileVolume->isOutsideResourceDirectory()) {
                 return;
             }
 
@@ -306,21 +310,14 @@ class LocalFileVolume extends BaseModel
 
         $path = $this->resolvedFsPath($workdir);
         $content = data_get($this, 'content');
-        $writesContent = $this->writesContentOnServer();
 
-        if ($this->isAdminControlledComposeMount()) {
-            // Compose `content:` stays in the resource directory: the Compose file can come from a Git repository.
-            if ($writesContent) {
-                $path = str($this->confinedContentPath($path->value(), $server));
-            }
-        } else {
+        // A Compose bind mount (also with `content:`) uses the host path that the administrator wrote.
+        if (! $this->isAdminControlledComposeMount()) {
             [$hostPath, $resourceDirectory] = $this->hostPathAndResourceDirectory();
             if ($resourceDirectory === null) {
                 if (! $this->is_directory) {
                     self::assertRemotePathIsNotSymlink($hostPath, $server);
                 }
-            } elseif ($writesContent) {
-                $hostPath = $this->confinedContentPath($hostPath, $server);
             } else {
                 $this->assertRemotePathIsConfined($resourceDirectory, $hostPath, $server);
             }
@@ -434,21 +431,17 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
-     * The absolute path where Coolify writes the content of this file on the server. This check is
-     * only on the Coolify side; saveStorageOnServer() checks the path on the server again.
+     * The path where saveStorageOnServer() writes the content of this file on the server.
      *
-     * @throws \RuntimeException If the path is not inside the resource directory
+     * @throws \Exception If the path is not allowed
      */
     public function contentPathOnServer(): string
     {
-        if (! $this->isAdminControlledComposeMount()) {
-            [$hostPath, $resourceDirectory] = $this->hostPathAndResourceDirectory();
-            if ($resourceDirectory === null) {
-                return $hostPath;
-            }
+        if ($this->isAdminControlledComposeMount()) {
+            return $this->resolvedFsPath($this->ownerResource()->workdir())->value();
         }
 
-        return $this->localConfinedContentPath($this->resolvedFsPath($this->ownerResource()->workdir())->value())[1];
+        return $this->hostPathAndResourceDirectory()[0];
     }
 
     /**
@@ -615,67 +608,6 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
-     * Coolify writes file content (from Compose `content:`, the UI or the API) to the server.
-     */
-    public function writesContentOnServer(): bool
-    {
-        return ! $this->is_directory && (string) $this->content !== '';
-    }
-
-    /**
-     * Coolify writes file content only inside the resource directory, also for Compose bind mounts
-     * that an administrator can point anywhere. The path must be below the directory (not the
-     * directory itself), and it must stay inside it after the server resolves symlinks.
-     *
-     * @throws \RuntimeException If the path is not inside the resource directory
-     */
-    public function confinedContentPath(string $path, Server $server): string
-    {
-        [$baseDirectory, $confinedPath] = $this->localConfinedContentPath($path);
-
-        try {
-            self::assertRemotePathIsConfined($baseDirectory, $confinedPath, $server);
-        } catch (\RuntimeException) {
-            throw $this->contentOutsideResourceDirectoryException($path);
-        }
-
-        return $confinedPath;
-    }
-
-    /**
-     * The first resource base directory that contains the path (not the directory itself), and the
-     * normalized path. This check is only on the Coolify side.
-     *
-     * @return array{0: string, 1: string}
-     *
-     * @throws \RuntimeException If the path is not inside the resource directory
-     */
-    protected function localConfinedContentPath(string $path): array
-    {
-        foreach ($this->contentBaseDirectories() as $baseDirectory) {
-            try {
-                $confinedPath = confinePathToBase($baseDirectory, $path, 'storage path');
-            } catch (\Exception) {
-                continue;
-            }
-            if ($confinedPath === normalizeUnixPath($baseDirectory)) {
-                continue;
-            }
-
-            return [$baseDirectory, $confinedPath];
-        }
-
-        throw $this->contentOutsideResourceDirectoryException($path);
-    }
-
-    protected function contentOutsideResourceDirectoryException(string $path): \RuntimeException
-    {
-        return new \RuntimeException(
-            "Coolify writes file content only inside the resource directory. The path {$path} is outside of it. Use a relative source such as ./config/app.conf."
-        );
-    }
-
-    /**
      * The resource workdir, and the directory where the Compose parser resolves `./` sources. They
      * differ only for services that use parser version 3.
      *
@@ -763,7 +695,7 @@ class LocalFileVolume extends BaseModel
         }
 
         try {
-            $services = data_get(Yaml::parse($compose), 'services', []);
+            $services = data_get(parseDockerComposeYaml($compose), 'services', []);
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     if (is_string($volume)) {
@@ -849,7 +781,7 @@ class LocalFileVolume extends BaseModel
             }
 
             // Parse the docker-compose content
-            $compose = Yaml::parse($actualService->docker_compose_raw);
+            $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
             if (! isset($compose['services'])) {
                 return false;
             }

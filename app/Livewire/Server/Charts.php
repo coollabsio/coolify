@@ -69,7 +69,8 @@ class Charts extends Component
         try {
             $this->authorize('update', $this->server);
             $this->server->settings->is_metrics_enabled = ! $this->server->settings->is_metrics_enabled;
-            $this->server->settings->save();
+            // Saved quietly: Sentinel is started below, so the settings hook must not start it a second time.
+            $this->server->settings->saveQuietly();
             $this->auditSentinelUpdate(['is_metrics_enabled']);
             $this->server->refresh();
 

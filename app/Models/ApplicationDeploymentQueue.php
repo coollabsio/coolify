@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -149,6 +150,20 @@ class ApplicationDeploymentQueue extends Model
         return $this->belongsTo(Application::class);
     }
 
+    /**
+     * Scope to deployments of the team's applications.
+     */
+    public function scopeOwnedByTeam(Builder $query, int $teamId): Builder
+    {
+        // application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
+        $applicationIds = Application::withTrashed()
+            ->whereRelation('environment.project.team', 'id', $teamId)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id);
+
+        return $query->whereIn('application_id', $applicationIds);
+    }
+
     public function server(): Attribute
     {
         return Attribute::make(
@@ -175,6 +190,19 @@ class ApplicationDeploymentQueue extends Model
     public function getHorizonJobStatus()
     {
         return getJobStatus($this->horizon_job_id);
+    }
+
+    /**
+     * Horizon drops its job record 'trim.pending' minutes after the push, also while the job runs,
+     * so a missing record counts as running only until the deployment timeout has passed.
+     */
+    public function isHorizonJobActive(): bool
+    {
+        return match ($this->getHorizonJobStatus()) {
+            'reserved' => true,
+            'unknown' => $this->updated_at?->gt(now()->subSeconds($this->server?->settings?->dynamic_timeout ?? 3600)) ?? false,
+            default => false,
+        };
     }
 
     public function commitMessage()

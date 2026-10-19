@@ -81,6 +81,8 @@ const SPECIFIC_SERVICES = [
     'minio/minio',
     'ghcr.io/coollabsio/minio',
     'coollabsio/minio',
+    'pgsty/silo',
+    'docker.io/pgsty/silo',
     'svhd/logto',
     'dxflrs/garage',
 ];

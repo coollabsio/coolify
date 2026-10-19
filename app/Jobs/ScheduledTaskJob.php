@@ -80,6 +80,17 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         $this->executionUuid = new_public_id();
     }
 
+    /**
+     * The lock outlives the worker timeout, so a run killed at the timeout still blocks a new run
+     * while its remote command can still be running.
+     */
+    public function middleware(): array
+    {
+        $expireAfter = ($this->task->timeout ?? 300) + 300;
+
+        return [ScheduledJobDeliveryService::withoutOverlapping('scheduled-task-'.$this->task->id, $this->occurrenceUuid)->expireAfter($expireAfter)->dontRelease()];
+    }
+
     private function initializeExecutionContext(): void
     {
         $this->task->loadMissing([

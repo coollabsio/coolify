@@ -22,6 +22,9 @@ is_tar() { [ "$(stream | head -c 262 | tail -c 5)" = ustar ]; }
 is_text() { [ "$(stream | head -c 65536 | tr -d '\000' | wc -c | tr -d ' ')" = "$(stream | head -c 65536 | wc -c | tr -d ' ')" ]; }
 extract_tar() { work=$(mktemp -d) && trap 'rm -rf "$work"' EXIT && stream | tar -xf - -C "$work" || fail 'The tar backup cannot be extracted.'; }
 use_single_tar_member() { [ "$(find "$work" -type f | wc -l | tr -d ' ')" = 1 ] && backup=$(find "$work" -type f); }
+if is_gzip; then
+  gunzip -t "$backup" || fail 'The gzip backup is corrupt or incomplete. Nothing was changed.'
+fi
 
 SH;
 

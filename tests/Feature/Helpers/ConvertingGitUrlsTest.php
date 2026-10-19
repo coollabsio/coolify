@@ -128,3 +128,11 @@ test('convertGitUrlsForDeployKeyAndGithubAppWithCustomPortAndIpv6Host', function
         'port' => '22222',
     ]);
 });
+
+test('convertGitUrlsForDeployKeyAndIpv6SshUrlWithPort', function () {
+    $result = convertGitUrl('git@[fd00::5]:2222/organization/repository.git', 'deploy_key', null);
+    expect($result)->toBe([
+        'repository' => 'git@[fd00::5]:organization/repository.git',
+        'port' => '2222',
+    ]);
+});

@@ -66,6 +66,22 @@ npm run dev                     # vite dev server
 npm run build                   # production build
 ```
 
+## Testing the Service Parser
+
+`tests/Feature/ServiceParserReferenceTest.php` is a golden test for both compose parsers (`serviceParser` with `updateCompose`, and `applicationParser`) and the proxy label and magic-variable helpers. It parses `tests/Fixtures/parser/service-reference.yaml` and `application-reference.yaml` (one service per parser feature, with setting variations and error fixtures) and every template in `templates/compose`, then compares the output with `tests/Fixtures/parser/expected/`. Only the reference expected files are committed. Template expected files are gitignored, so CI checks only that each template parses.
+
+```bash
+./scripts/parser-snapshot-diff save       # before a parser change: save the output of all cases (~90 s)
+./scripts/parser-snapshot-diff baseline   # after the change: one line per changed case, full diff in storage/framework/testing/parser-snapshot-diff.diff
+php artisan test --compact tests/Feature/ServiceParserReferenceTest.php    # before you commit
+UPDATE_PARSER_SNAPSHOTS=1 php artisan test --compact tests/Feature/ServiceParserReferenceTest.php   # accept an intended change, then review git diff tests/Fixtures/parser/
+```
+
+- A refactor must give "No differences". For an intended change, check every changed line in the diff file.
+- When you add a parser feature, add a small service that uses it to `service-reference.yaml` or `application-reference.yaml` and regenerate the expected files.
+- `./scripts/parser-snapshot-diff <git-ref>` compares with a commit instead of a saved baseline.
+- It covers only the latest compose parsing version. Older parsing versions are not covered.
+
 ## Browser Tests (Pest Browser Plugin)
 
 Uses `pestphp/pest-plugin-browser` (Playwright). Browser tests go in `tests/v4/Browser/`.
@@ -150,6 +166,12 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - Multi-tenancy via Teams — team auto-initializes notification settings on creation
 - Authorize every server-side read and mutation where access can vary by user, role, team, or resource. Use policies, gates, or `$this->authorize(...)`; never rely on hidden Blade/Livewire controls such as `@can` for security.
 - Scope queries to the current team before returning records. Treat route and model identifiers as untrusted, and prevent users from reading or changing resources owned by another team.
+- Use the session team (`currentTeam()`, `Model::ownedByCurrentTeam()`) only to find or open records, for "my team" lists, to create new top-level records, and on team pages. A user can switch teams in another tab while a page stays open, and every user owns a personal team.
+- Once a component, action, or controller works on a loaded resource, use that resource's team for everything after it:
+  - Roles and redaction: use the policy (`$this->authorize('update', $resource)`) or `auth()->user()->isAdminOfTeam($resource->team()->id)`. Never use `isMember()`, `isAdmin()`, or `role()` for resource permissions; they read the role in the session team.
+  - Related records the user can pick (S3 storages, keys, servers, sources, tags, tokens): query with `->where('team_id', $resource->team()->id)` and validate submitted IDs against that team.
+  - New rows that belong to the resource: set `team_id` from the resource's team, not `currentTeam()->id`.
+- Test this with a user who is a member of the resource's team and the owner of another team, with the session switched to the other team after mount.
 - Apply authorization consistently across Livewire actions, API and web controllers, actions, downloads, exports, search, event listeners, and any other path that exposes or changes protected data.
 - Default to denying access when a policy or ownership relationship is missing or ambiguous. Members must not gain access to administrative, credential, security, billing, or instance-wide data merely because they belong to the team.
 - Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
@@ -229,8 +251,8 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 ## Git Workflow
 
 - Production branch: `main`
-- Development branch: `next`
-- Fix PRs should target the current production branch; feature PRs should target `next`
+- Development branch: `release/v4.x`, where `x` is the next minor release (for example, `release/v4.5` while production is `4.4.x`). Do not use `next`.
+- Fix PRs should target the current production branch; feature PRs should target the current `release/v4.x` branch
 
 <laravel-boost-guidelines>
 === foundation rules ===

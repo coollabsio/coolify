@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\WebhookNotificationSettings;
 use App\Rules\SafeWebhookUrl;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +17,7 @@ use Illuminate\Support\Facades\Validator;
 
 class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -33,7 +35,8 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public array $payload,
-        public string $webhookUrl
+        public string $webhookUrl,
+        public ?WebhookNotificationSettings $settings = null,
     ) {
         $this->onQueue('high');
     }
@@ -68,6 +71,9 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload);
+        $response = Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload);
+
+        // 401/403: the endpoint rejects us, 404/410: the endpoint does not exist anymore.
+        $this->handleNotificationResponse($response, 'Webhook', in_array($response->status(), [401, 403, 404, 410], true));
     }
 }

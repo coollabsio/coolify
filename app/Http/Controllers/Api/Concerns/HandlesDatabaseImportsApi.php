@@ -20,6 +20,8 @@ use Spatie\Activitylog\Models\Activity;
 
 trait HandlesDatabaseImportsApi
 {
+    use RequiresDeployAbility;
+
     protected function uploadDatabaseImport(Request $request, Model $resource, int $teamId): JsonResponse
     {
         $this->authorize('uploadBackup', $resource);
@@ -81,6 +83,9 @@ trait HandlesDatabaseImportsApi
             }
 
             return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
+        }
+        if ($response = $this->deployAbilityForbiddenResponse($request, 'An import runs the dump in the database container, so it needs a token with the deploy permission.')) {
+            return $response;
         }
 
         try {

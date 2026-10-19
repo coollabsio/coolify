@@ -122,12 +122,14 @@ class BackupExecutions extends Component
             ->whereIn('id', $rows->where('type', 'storage')->pluck('id'))
             ->get()->keyBy('id');
 
-        return $rows->map(function (object $row) use ($databaseExecutions, $volumeExecutions): array {
+        $serviceTeamId = $this->service->team()?->id;
+
+        return $rows->map(function (object $row) use ($databaseExecutions, $volumeExecutions, $serviceTeamId): array {
             $isDatabase = $row->type === 'database';
             $execution = $isDatabase ? $databaseExecutions->get($row->id) : $volumeExecutions->get($row->id);
             $schedule = $isDatabase ? $execution->scheduledDatabaseBackup : $execution->scheduledVolumeBackup;
             $storage = $isDatabase ? ($schedule->save_s3 ? $schedule->s3 : null) : $execution->s3;
-            if ($storage?->team_id !== currentTeam()->id) {
+            if ($storage?->team_id !== $serviceTeamId) {
                 $storage = null;
             }
             $storageLabel = $storage ? $storage->name.' (bucket: '.$storage->bucket.')' : 'Unavailable';

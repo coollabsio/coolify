@@ -60,7 +60,7 @@ trait MatchesManualWebhookApplications
     {
         return [
             'status' => 'failed',
-            'message' => 'Invalid signature.',
+            'message' => 'No matching application or invalid signature.',
         ];
     }
 

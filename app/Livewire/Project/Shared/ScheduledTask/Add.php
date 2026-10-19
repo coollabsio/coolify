@@ -111,7 +111,7 @@ class Add extends Component
             $task->frequency = $this->frequency;
             $task->container = $this->container;
             $task->timeout = $this->timeout;
-            $task->team_id = currentTeam()->id;
+            $task->team_id = $this->resource->team()->id;
 
             switch ($this->type) {
                 case 'application':

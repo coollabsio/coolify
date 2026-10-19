@@ -61,6 +61,8 @@ class VolumeBackups extends Component
 
     public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
 
+    public int $missingBackupNotificationDays = 0;
+
     public int $perPage = 10;
 
     public function updatedPerPage(): void
@@ -94,14 +96,17 @@ class VolumeBackups extends Component
             'retentionDaysS3' => ['required', 'integer', 'min:0'],
             'retentionMaxStorageS3' => ['required', 'numeric', 'min:0'],
             'timeout' => ['required', 'integer', 'min:60', 'max:36000'],
+            'missingBackupNotificationDays' => ['required', 'integer', 'min:0', 'max:365'],
         ];
     }
 
     public function mount(): void
     {
         $this->authorize('view', $this->resource);
-        $this->availableS3Storages = S3Storage::ownedByCurrentTeam()
+        $this->availableS3Storages = S3Storage::query()
+            ->where('team_id', $this->resourceTeamId())
             ->where('is_usable', true)
+            ->orderBy('name')
             ->get();
         $this->backup = $this->storage->scheduledBackups()->first();
         $server = $this->backup?->server() ?? data_get($this->resource, 'destination.server');
@@ -121,6 +126,7 @@ class VolumeBackups extends Component
             $this->retentionDaysS3 = $this->backup->retention_days_s3;
             $this->retentionMaxStorageS3 = $this->backup->retention_max_storage_s3;
             $this->timeout = $this->backup->timeout;
+            $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
         } else {
             $this->s3StorageId = $this->availableS3Storages->first()?->id;
         }
@@ -419,7 +425,7 @@ class VolumeBackups extends Component
     {
         $backup = $this->storage->scheduledBackups()->firstOrNew();
         $backup->fill([
-            'team_id' => $this->resource->environment->project->team_id,
+            'team_id' => $this->resourceTeamId(),
             'frequency' => $this->frequency,
             'enabled' => $enabled,
             'save_s3' => $this->saveToS3,
@@ -433,6 +439,7 @@ class VolumeBackups extends Component
             'retention_days_s3' => $this->retentionDaysS3,
             'retention_max_storage_s3' => $this->retentionMaxStorageS3,
             'timeout' => $this->timeout,
+            'missing_backup_notification_days' => $this->missingBackupNotificationDays,
         ]);
         $changedFields = auditChangedFields($backup);
         $backup->save();
@@ -483,9 +490,14 @@ class VolumeBackups extends Component
         return $this->s3StorageId !== null
             && S3Storage::query()
                 ->whereKey($this->s3StorageId)
-                ->where('team_id', currentTeam()->id)
+                ->where('team_id', $this->resourceTeamId())
                 ->where('is_usable', true)
                 ->exists();
+    }
+
+    private function resourceTeamId(): int
+    {
+        return $this->resource->environment->project->team_id;
     }
 
     private function routeName(string $section): string

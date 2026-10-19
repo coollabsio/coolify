@@ -56,7 +56,7 @@ class CleanupPreviewDeployment
 
         if ($result['cancelled_deployments'] > 0) {
             try {
-                next_after_cancel($server);
+                next_after_cancel($server, $application);
             } catch (\Throwable $e) {
                 \Log::warning("Failed to advance deployment queue after cleaning up preview for application {$application->id}: {$e->getMessage()}");
             }

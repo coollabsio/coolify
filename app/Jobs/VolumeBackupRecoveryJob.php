@@ -276,10 +276,13 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
         $execution->update(['stop_container_ids' => $containers]);
 
         $remainingFile = $stateFile.'.remaining';
+        // A container that no longer exists (for example after a redeploy) has nothing to restart; only
+        // other inspect or start failures keep the container for another recovery attempt.
         $script = 'status=0; : > '.escapeshellarg($remainingFile).'; '
             .'if [ -f '.escapeshellarg($stateFile).' ]; then while IFS= read -r container; do '
-            .'[ -z "$container" ] && continue; running=$(docker inspect --format \'{{.State.Running}}\' "$container" 2>/dev/null) '
-            .'|| { echo "$container" >> '.escapeshellarg($remainingFile).'; status=1; continue; }; '
+            .'[ -z "$container" ] && continue; running=$(docker inspect --format \'{{.State.Running}}\' "$container" 2>&1) '
+            .'|| { case "$running" in *"o such object"*|*"o such container"*) continue ;; esac; '
+            .'echo "$container" >> '.escapeshellarg($remainingFile).'; status=1; continue; }; '
             .'if [ "$running" != true ] && ! docker start "$container" >/dev/null; then echo "$container" >> '
             .escapeshellarg($remainingFile).'; status=1; fi; done < '.escapeshellarg($stateFile).'; fi; '
             .'if [ -s '.escapeshellarg($remainingFile).' ]; then mv '.escapeshellarg($remainingFile).' '.escapeshellarg($stateFile)

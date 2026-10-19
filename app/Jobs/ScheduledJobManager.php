@@ -65,14 +65,22 @@ class ScheduledJobManager implements ShouldQueue
     private int $skippedCount = 0;
 
     /**
+     * One key of TYPES, or null for all types.
+     *
+     * Declared with a default instead of promoted, so jobs queued by older versions without this property still run.
+     */
+    public ?string $type = null;
+
+    /**
      * @param  string|null  $type  One key of TYPES, or null for all types.
      */
-    public function __construct(public ?string $type = null)
+    public function __construct(?string $type = null)
     {
         if ($type !== null && ! array_key_exists($type, self::TYPES)) {
             throw new \InvalidArgumentException("Unknown scheduled job type [{$type}].");
         }
 
+        $this->type = $type;
         $this->onQueue(crons_queue());
     }
 
@@ -183,6 +191,7 @@ class ScheduledJobManager implements ShouldQueue
         // Process Docker cleanups - don't let failures stop the job manager
         try {
             if ($this->includes('docker-cleanups')) {
+                DockerCleanupJob::failInterruptedExecutions();
                 $this->processDockerCleanups();
             }
         } catch (\Throwable $e) {

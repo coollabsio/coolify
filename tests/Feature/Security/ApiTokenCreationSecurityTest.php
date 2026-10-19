@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Middleware\ApiAbility;
 use App\Livewire\Security\ApiTokens;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
@@ -199,6 +201,19 @@ describe('ApiAbility middleware — member with elevated token blocked', functio
         $this->withToken($token->plainTextToken)
             ->getJson('/api/v1/projects')
             ->assertStatus(403);
+    });
+
+    test('ApiAbility evaluates member token abilities through the token', function () {
+        session(['currentTeam' => $this->team]);
+        $token = $this->member->createToken('token', ['*']);
+        $this->member->withAccessToken($token->accessToken);
+
+        $request = Request::create('/api/v1/projects');
+        $request->setUserResolver(fn () => $this->member);
+
+        $response = (new ApiAbility)->handle($request, fn () => response('ok'), 'read');
+
+        expect($response->getStatusCode())->toBe(403);
     });
 
     test('member read token passes on non-zero team', function () {

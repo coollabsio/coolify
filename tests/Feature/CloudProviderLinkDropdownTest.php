@@ -190,3 +190,20 @@ it('shows Vultr search errors in the modal', function () {
         ->assertSee('Failed to search Vultr instances:')
         ->assertSee('invalid token');
 });
+
+it('reloads only cloud provider tokens of the server team after the session team changes', function () {
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    $sameTeamToken = CloudProviderToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'hetzner']);
+    CloudProviderToken::factory()->create(['team_id' => $otherTeam->id, 'provider' => 'hetzner']);
+    CloudProviderToken::factory()->create(['team_id' => $otherTeam->id, 'provider' => 'vultr']);
+    CloudProviderToken::factory()->create(['team_id' => $otherTeam->id, 'provider' => 'digitalocean']);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid]);
+    session(['currentTeam' => $otherTeam]);
+    $component->call('handleServerValidated');
+
+    expect($component->get('availableHetznerTokens')->pluck('id')->all())->toBe([$sameTeamToken->id])
+        ->and($component->get('availableVultrTokens'))->toBeEmpty()
+        ->and($component->get('availableDigitalOceanTokens'))->toBeEmpty();
+});

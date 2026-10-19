@@ -31,20 +31,8 @@ class SettingsBackup extends Component
     #[Locked]
     public $executions = [];
 
-    #[Validate(['required'])]
-    public string $uuid;
-
-    #[Validate(['required'])]
-    public string $name;
-
     #[Validate(['nullable'])]
     public ?string $description = null;
-
-    #[Validate(['required'])]
-    public string $postgres_user;
-
-    #[Validate(['required'])]
-    public string $postgres_password;
 
     public function mount()
     {
@@ -57,11 +45,7 @@ class SettingsBackup extends Component
         $this->database = StandalonePostgresql::find(0);
         $s3s = S3Storage::whereTeamId(0)->get() ?? [];
         if ($this->database) {
-            $this->uuid = $this->database->uuid;
-            $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->postgres_user = $this->database->postgres_user;
-            $this->postgres_password = $this->database->postgres_password;
 
             if ($this->database->status !== 'running') {
                 $this->database->status = 'running';
@@ -124,11 +108,7 @@ class SettingsBackup extends Component
             }
             $this->s3s = S3Storage::whereTeamId(0)->get();
 
-            $this->uuid = $this->database->uuid;
-            $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->postgres_user = $this->database->postgres_user;
-            $this->postgres_password = $this->database->postgres_password;
             $this->executions = $this->backup->executions;
 
         } catch (\Exception $e) {
@@ -142,11 +122,9 @@ class SettingsBackup extends Component
             $this->authorize('update', $this->settings);
             $this->validate();
 
+            // Credentials come from the coolify-db container and are display-only, so only the description is saved.
             $this->database->update([
-                'name' => $this->name,
                 'description' => $this->description,
-                'postgres_user' => $this->postgres_user,
-                'postgres_password' => $this->postgres_password,
             ]);
             $this->dispatch('success', 'Backup updated.');
         } catch (\Throwable $e) {

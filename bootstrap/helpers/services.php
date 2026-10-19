@@ -204,15 +204,15 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
-            $path = str(data_get($fileVolume, 'fs_path'));
             $content = data_get($fileVolume, 'content');
-            if ($path->startsWith('.')) {
-                $path = $path->after('.');
-                $fileLocation = $workdir.$path;
-            } else {
-                $fileLocation = $path;
-            }
+            // A relative path is inside the resource directory, never in the SSH user's working
+            // directory. A persisted Compose expression (`${VAR:-/path}`) stays as it is.
+            $fsPath = trim((string) $fileVolume->fs_path);
+            $fileLocation = str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
             $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
+            // A token with only the write permission can save a Compose file, so Coolify does not
+            // write outside the resource directory here. A deployment or start writes those paths.
+            $isOutsideResourceDirectory = fn (): bool => $fileVolume->isOutsideResourceDirectory();
             // Exists and is a file
             $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
             // Exists and is a directory
@@ -228,7 +228,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 // A configured file must not lose its content because a directory is at its path.
                 // Docker leaves an empty directory when it starts before the file exists: replace it.
                 // A directory with files stays; the start or deployment shows a warning for it.
-                if (LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
+                if (! $isOutsideResourceDirectory() && LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
                     $fileVolume->saveStorageOnServer();
                 }
             } elseif ($isDir === 'OK') {
@@ -237,29 +237,34 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
-                // Does not exists (no dir or file), not flagged as directory, is init, has content.
-                // Content is written only inside the resource directory, as a literal path.
-                $escapedContentLocation = escapeshellarg($fileVolume->confinedContentPath((string) $fileLocation, $server));
+                // Does not exists (no dir or file), not flagged as directory, is init, has content
+                if ($isOutsideResourceDirectory()) {
+                    continue;
+                }
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedContentLocation.')"',
-                    "echo '$content' | base64 -d | tee -- {$escapedContentLocation}",
+                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
+                    "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-                instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                if (! $isOutsideResourceDirectory()) {
+                    instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                }
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-                instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                if (! $isOutsideResourceDirectory()) {
+                    instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                }
             }
         }
     } catch (Throwable $e) {
@@ -274,7 +279,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         if (! $dockerComposeRaw) {
             throw new Exception('No compose file found or not a valid YAML file.');
         }
-        $dockerCompose = Yaml::parse($dockerComposeRaw);
+        $dockerCompose = parseDockerComposeYaml($dockerComposeRaw);
 
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');
@@ -318,8 +323,16 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             // Those belong to other services and will be updated when THOSE services are updated
         }
 
-        // Remove duplicates
-        $templateVariableNames = array_unique($templateVariableNames);
+        // Remove duplicates and copies of another application's declaration
+        $templateVariableNames = array_filter(
+            array_unique($templateVariableNames),
+            fn ($variableName) => ! isCopiedServiceUrlDeclaration(
+                $resource->service,
+                collect(data_get($dockerCompose, 'services', [])),
+                $resource,
+                $variableName,
+            ),
+        );
 
         // Extract unique service names to process (preserving the original case from template)
         // This allows us to create both URL and FQDN pairs regardless of which one is in the template
