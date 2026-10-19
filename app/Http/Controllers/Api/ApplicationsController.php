@@ -239,6 +239,11 @@ class ApplicationsController extends Controller
         }
     }
 
+    private function extraApplicationFieldMessage(string $field): string
+    {
+        return $field === 'fqdn' ? 'Use the domains field to set application URLs.' : 'This field is not allowed.';
+    }
+
     /**
      * Expose sensitive fields on eager-loaded nested Server + ServerSetting
      * relations for callers with the `read:sensitive` or `root` token ability.
@@ -1315,7 +1320,7 @@ class ApplicationsController extends Controller
             $errors = $validator->errors();
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
+                    $errors->add($field, $this->extraApplicationFieldMessage($field));
                 }
             }
 
@@ -3394,7 +3399,7 @@ class ApplicationsController extends Controller
             $errors = $validator->errors();
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
+                    $errors->add($field, $this->extraApplicationFieldMessage($field));
                 }
             }
 
