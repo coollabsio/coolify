@@ -22,7 +22,7 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $webhookEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:webhookEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $webhookUrl = null;
 
     #[Validate(['boolean'])]
