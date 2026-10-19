@@ -153,6 +153,10 @@ class ServerSetting extends Model
         'docker_version_checked_at',
         'compose_version',
         'compose_version_checked_at',
+        'patch_check_frequency',
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
     ];
 
     /**
@@ -190,6 +194,8 @@ class ServerSetting extends Model
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
         'server_disk_usage_notification_interval_hours' => 'integer',
+        'patch_check_result' => 'array',
+        'patch_checked_at' => 'datetime',
     ];
 
     /**

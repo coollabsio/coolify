@@ -390,6 +390,31 @@ test('the Cloudflare tunnel token moves with the server by uuid and the raw toke
         ->and($imported->token)->toBe('cf-tunnel-token');
 });
 
+test('the patch check frequency moves with the server and the last patch check result stays on the source', function () {
+    $this->server->settings->forceFill([
+        'patch_check_frequency' => 'daily',
+        'patch_check_result' => ['osId' => 'ubuntu', 'package_manager' => 'apt', 'total_updates' => 0, 'updates' => []],
+        'patch_check_error' => 'old error',
+        'patch_checked_at' => now(),
+    ])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+    expect(data_get($bundle, 'server.settings'))->not->toHaveKeys(['patch_check_result', 'patch_check_error', 'patch_checked_at']);
+
+    $bundle['server']['settings']['patch_check_result'] = ['osId' => 'tampered'];
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->first()->settings;
+    expect($settings->patch_check_frequency)->toBe('daily')
+        ->and($settings->patch_check_result)->toBeNull()
+        ->and($settings->patch_checked_at)->toBeNull();
+});
+
 test('a transfer back replaces the archive of the same team in the import transaction', function () {
     $bundle = $this->exporter->export($this->server);
     $bundle['server']['name'] = 'changed-on-the-other-instance';

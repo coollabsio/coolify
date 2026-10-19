@@ -146,12 +146,12 @@ class CheckUpdates
                     ];
             }
         } catch (\Throwable $e) {
+            Log::warning('Server patch check failed', ['server_uuid' => $server->uuid, 'error' => $e->getMessage()]);
 
             return [
                 'osId' => $osId,
                 'package_manager' => $packageManager,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ];
         }
     }

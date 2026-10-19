@@ -698,6 +698,7 @@ class ServerTransferImporter
                     // A foreign key of the source instance; older bundles still contain it.
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
+                    'patch_check_result', 'patch_check_error', 'patch_checked_at',
                 ])
                 ->all();
             $server->settings->fill($safe);

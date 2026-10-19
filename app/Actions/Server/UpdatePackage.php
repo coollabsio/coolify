@@ -54,7 +54,10 @@ class UpdatePackage
                 ];
             }
 
-            return remote_process($commands, $server);
+            return remote_process($commands, $server, callEventOnFinish: 'ServerPackagesUpdateFinished', callEventData: [
+                'server_uuid' => $server->uuid,
+                'packages' => $all ? [] : [$package],
+            ]);
         } catch (\Exception $e) {
             return [
                 'error' => $e->getMessage(),

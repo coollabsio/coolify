@@ -63,6 +63,10 @@ class ServerTransferExporter
         'is_sentinel_debug_enabled',
         // Exported as cloudflare_tunnel_integration_token_uuid.
         'cloudflare_tunnel_integration_token_id',
+        // The last patch check of the source; the target runs its own.
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
     ];
 
     /**
