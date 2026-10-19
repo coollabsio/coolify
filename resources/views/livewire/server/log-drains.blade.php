@@ -35,10 +35,10 @@
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
                                 :disabled="$isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
-                            <x-forms.input canGate="update" :canResource="$server" type="password" required
+                            <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainNewRelicEnabled"
                                 id="logDrainNewRelicLicenseKey" label="License key"
                                 :disabled="$server->isLogDrainEnabled()" />
-                            <x-forms.input canGate="update" :canResource="$server" required
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainNewRelicEnabled"
                                 id="logDrainNewRelicBaseUri" label="Endpoint"
                                 placeholder="https://log-api.eu.newrelic.com/log/v1"
                                 helper="Use the EU or US New Relic Log API endpoint."
@@ -54,10 +54,10 @@
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
                                 :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
-                            <x-forms.input canGate="update" :canResource="$server" type="password" required
+                            <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainAxiomEnabled"
                                 id="logDrainAxiomApiKey" label="API key"
                                 :disabled="$server->isLogDrainEnabled()" />
-                            <x-forms.input canGate="update" :canResource="$server" required
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
                                 id="logDrainAxiomDatasetName" label="Dataset name"
                                 :disabled="$server->isLogDrainEnabled()" />
                         </div>
@@ -73,7 +73,7 @@
                                 :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || !auth()->user()->can('update', $server)" />
                         </div>
                         <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.textarea canGate="update" :canResource="$server" rows="8" required
+                            <x-forms.textarea canGate="update" :canResource="$server" rows="8" :required="$isLogDrainCustomEnabled"
                                 id="logDrainCustomConfig" label="Fluent Bit configuration"
                                 :disabled="$server->isLogDrainEnabled()" />
                             <x-forms.textarea canGate="update" :canResource="$server" rows="8"

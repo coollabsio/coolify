@@ -26,10 +26,10 @@ class Telegram extends Component
     #[Validate(['boolean'])]
     public bool $telegramEnabled = false;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:telegramEnabled,true', 'nullable', 'string'])]
     public ?string $telegramToken = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:telegramEnabled,true', 'nullable', 'string'])]
     public ?string $telegramChatId = null;
 
     #[Validate(['boolean'])]
