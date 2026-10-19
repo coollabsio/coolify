@@ -230,6 +230,37 @@ function resolveComposeVolumeSourceDefault(string $source): string
 }
 
 /**
+ * Resolves a long-syntax bind source as Docker Compose does with the `.env` file that Coolify writes:
+ * `${VAR:-default}` is the value of VAR when the resource sets it to a non-empty value, else the default.
+ *
+ * @throws Exception If the value of the variable is not a shell-safe path
+ */
+function resolveComposeLongBindSource(string $source, Application|Service $resource, bool $isPreview = false): string
+{
+    if (! preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}$/', $source, $matches)) {
+        return resolveComposeVolumeSourceDefault($source);
+    }
+
+    $variables = match (true) {
+        $resource instanceof Service => $resource->environment_variables(),
+        $isPreview => $resource->runtime_environment_variables_preview()->where('is_runtime', true),
+        default => $resource->runtime_environment_variables()->where('is_runtime', true),
+    };
+    $value = $variables->where('key', $matches[1])->first()?->real_value;
+    if (blank($value)) {
+        return resolveComposeVolumeSourceDefault($source);
+    }
+
+    try {
+        validateShellSafePath($value, 'volume source');
+    } catch (Exception $e) {
+        throw new Exception("Invalid Docker volume definition (array syntax): the value of {$matches[1]} is not a safe path. ".$e->getMessage(), 0, $e);
+    }
+
+    return $value;
+}
+
+/**
  * Keep the existing array-source forms, but inspect the default that was previously skipped.
  */
 function validateComposeArrayVolumeSource(string $source): void
@@ -1475,7 +1506,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         validateComposeArrayVolumeSource($source->value());
                         // A named volume keeps its source as written, so its volume name does not change.
                         if ($type->value() === 'bind') {
-                            $source = str(resolveComposeVolumeSourceDefault($source->value()));
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource, $isPullRequest));
                         }
                     }
                     validateComposeContentVolumeSource($volume);
@@ -2895,7 +2926,7 @@ function serviceParser(Service $resource): Collection
                         validateComposeArrayVolumeSource($source->value());
                         // A named volume keeps its source as written, so its volume name does not change.
                         if ($type->value() === 'bind') {
-                            $source = str(resolveComposeVolumeSourceDefault($source->value()));
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource));
                         }
                     }
                     validateComposeContentVolumeSource($volume);
