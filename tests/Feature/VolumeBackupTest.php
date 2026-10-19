@@ -1987,7 +1987,7 @@ it('keeps the upload destination on the volume backup execution', function () {
         ->and($execution->s3->is($s3Storage))->toBeTrue();
 });
 
-it('streams S3-only volume backups without creating or copying a local archive', function () {
+it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and without a local archive', function () {
     config(['broadcasting.default' => 'null']);
     defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
     Carbon::setTestNow('2026-08-15 12:00:00');
@@ -2029,12 +2029,14 @@ it('streams S3-only volume backups without creating or copying a local archive',
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
         && ! str_contains($process->command, '--quiet')
-        && str_contains($process->command, '>/dev/null && (compressor=')
+        && str_contains($process->command, 'lock=$(mc retention info --default --json --resolve')
+        && str_contains($process->command, '*) checksum=--checksum=MD5 ;; *) checksum= ;; esac && (compressor=')
+        && str_contains($process->command, ' $checksum ')
         && str_contains($process->command, '>/dev/null 2>/tmp/mc-pipe.log || {')
         && str_contains($process->command, '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
         && str_contains($process->command, 'temporary/bucket/')
         && str_contains($process->command, $expectedFilename)
-        && substr_count($process->command, '--resolve') === 3
+        && substr_count($process->command, '--resolve') === 4
         && substr_count($process->command, '>/dev/null') >= 2
         && ! str_contains($process->command, ' > ')
         && ! str_contains($process->command, 'mc cp'));
