@@ -914,6 +914,10 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
+                                    },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
                                         "nullable": true,
@@ -1512,6 +1516,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -2112,6 +2120,10 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
+                                    },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
                                         "nullable": true,
@@ -2606,6 +2618,10 @@
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
                                     },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
+                                    },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
                                         "nullable": true,
@@ -3079,6 +3095,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -3785,6 +3805,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -18175,6 +18199,13 @@
                                             "null"
                                         ]
                                     },
+                                    "is_permanent_redirect_enabled": {
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false.",
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
                                     "max_restart_count": {
                                         "description": "Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.",
                                         "type": [
@@ -24104,6 +24135,10 @@
                     },
                     "is_stripprefix_enabled": {
                         "type": "boolean"
+                    },
+                    "is_permanent_redirect_enabled": {
+                        "type": "boolean",
+                        "description": "Use permanent (301\/308) instead of temporary (302\/307) proxy redirects."
                     },
                     "connect_to_docker_network": {
                         "type": "boolean"

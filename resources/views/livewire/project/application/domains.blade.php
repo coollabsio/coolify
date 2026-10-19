@@ -166,16 +166,28 @@
         </div>
     </div>
 
-    @if ($hasHttpsDomains && ! $labelsAreWritable)
+    @if ($hasRows && ! $labelsAreWritable)
         <div class="flex flex-wrap items-center justify-end gap-2 service-domains-https">
-            <label for="isForceHttpsEnabled-trigger" class="mb-0! text-[12px]!">Redirect HTTP to HTTPS</label>
-            <x-helper helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL." />
-            <div class="w-28 shrink-0">
-                <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled"
-                    onChange="updateForceHttps" portal
+            @if ($hasHttpsDomains)
+                <label for="isForceHttpsEnabled-trigger" class="mb-0! text-[12px]!">Redirect HTTP to HTTPS</label>
+                <x-helper helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL." />
+                <div class="w-28 shrink-0">
+                    <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled"
+                        onChange="updateForceHttps" portal
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" :disabled="! auth()->user()->can('update', $application)" />
+                </div>
+            @endif
+            <label for="isPermanentRedirectEnabled-trigger" class="mb-0! text-[12px]!">Redirect type</label>
+            <x-helper helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect." />
+            <div class="w-32 shrink-0">
+                <x-forms.listbox canGate="update" :canResource="$application" id="isPermanentRedirectEnabled"
+                    onChange="updatePermanentRedirect" portal
                     :options="[
-                        ['value' => true, 'label' => 'Enabled'],
-                        ['value' => false, 'label' => 'Disabled'],
+                        ['value' => false, 'label' => 'Temporary'],
+                        ['value' => true, 'label' => 'Permanent'],
                     ]" :disabled="! auth()->user()->can('update', $application)" />
             </div>
         </div>

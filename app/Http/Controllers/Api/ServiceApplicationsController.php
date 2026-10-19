@@ -261,6 +261,7 @@ class ServiceApplicationsController extends Controller
                         'traefik_certificate_resolver' => new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
                         'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
+                        'is_permanent_redirect_enabled' => new OA\Property(property: 'is_permanent_redirect_enabled', type: 'boolean', nullable: true, description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'),
                         'max_restart_count' => new OA\Property(property: 'max_restart_count', type: 'integer', minimum: 0, nullable: true, description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'),
                     ]
                 )
@@ -336,6 +337,7 @@ class ServiceApplicationsController extends Controller
             'traefik_certificate_resolver',
             'is_stripprefix_enabled',
             'is_force_https_enabled',
+            'is_permanent_redirect_enabled',
             'max_restart_count',
         ];
 
@@ -352,6 +354,7 @@ class ServiceApplicationsController extends Controller
             'traefik_certificate_resolver' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
             'is_stripprefix_enabled' => 'sometimes|boolean',
             'is_force_https_enabled' => 'sometimes|boolean',
+            'is_permanent_redirect_enabled' => 'sometimes|boolean',
             'max_restart_count' => 'sometimes|integer|min:0',
         ];
 
