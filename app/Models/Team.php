@@ -119,7 +119,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
                 $sharedVariable->delete();
             }
 
-            foreach ($team->s3s as $s3) {
+            // Also unusable storages, which the s3s relation hides.
+            foreach (S3Storage::query()->where('team_id', $team->id)->get() as $s3) {
                 $s3->delete();
             }
         });

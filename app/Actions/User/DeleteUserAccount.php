@@ -3,13 +3,9 @@
 namespace App\Actions\User;
 
 use App\Actions\Stripe\CancelSubscription;
-use App\Models\GithubApp;
-use App\Models\GithubRunnerConfig;
-use App\Models\GithubRunnerExecution;
-use App\Models\Subscription;
+use App\Actions\Team\DeleteTeamData;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\AvatarStorageService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -84,12 +80,6 @@ class DeleteUserAccount
             }
         }
 
-        try {
-            app(AvatarStorageService::class)->delete($user);
-        } catch (\Throwable $e) {
-            report($e);
-        }
-
         DB::transaction(function () use ($user, $removeTeamResources): void {
             $user = User::query()->lockForUpdate()->findOrFail($user->id);
 
@@ -97,25 +87,18 @@ class DeleteUserAccount
                 throw new RuntimeException(implode(' ', $blockers));
             }
 
-            if ($removeTeamResources) {
-                $this->singleMemberTeams($user)->each(fn (Team $team) => $this->removeTeamResources($team));
-            }
+            // Without $removeTeamResources the blockers above guarantee these teams hold no
+            // projects, servers, or sources.
+            $this->singleMemberTeams($user)->each(fn (Team $team) => app(DeleteTeamData::class)->handle($team));
 
-            // The subscription row of a deleted team would point to a missing
-            // team, and later Stripe webhooks for its customer would fail.
-            Subscription::query()->whereIn('team_id', $this->singleMemberTeams($user)->pluck('id'))->delete();
-
-            // Deletes the user's single-member teams, promotes an admin where
-            // the user was the only owner, and removes the user from the rest.
+            // Promotes an admin where the user was the only owner, and removes
+            // the user from the remaining teams.
             (new DeleteUserTeams($user))->execute();
 
-            // team_user has no foreign keys, so also remove the root team
-            // membership and the rows of teams deleted above.
+            // team_user has no foreign keys, so also remove the root team membership.
             $user->teams()->detach();
 
-            $user->fresh()->delete();
-
-            DB::table('sessions')->where('user_id', $user->id)->delete();
+            app(DeleteTeamlessUser::class)->handle($user->fresh());
         });
     }
 
@@ -139,42 +122,6 @@ class DeleteUserAccount
             ->withCount('members')
             ->get()
             ->filter(fn (Team $team): bool => $team->members_count === 1);
-    }
-
-    /**
-     * Removes the team's data from Coolify. Git sources are removed when the
-     * team itself is deleted.
-     */
-    private function removeTeamResources(Team $team): void
-    {
-        $this->forgetGithubRunners($team);
-
-        foreach ($team->servers()->get() as $server) {
-            foreach ($server->definedResources() as $resource) {
-                $resource->forceDelete();
-            }
-            $server->forceDelete();
-        }
-
-        foreach ($team->projects()->get() as $project) {
-            $project->delete();
-        }
-    }
-
-    /**
-     * Removes the team's GitHub Actions runner records so that busy runners do
-     * not block the removal of its servers and Git sources. The runners keep
-     * running on the servers; Coolify only stops tracking them.
-     */
-    private function forgetGithubRunners(Team $team): void
-    {
-        $githubAppIds = GithubApp::query()->where('team_id', $team->id)->where('is_system_wide', false)->pluck('id');
-        $serverIds = $team->servers()->pluck('id');
-
-        $belongsToTeam = fn ($query) => $query->whereIn('github_app_id', $githubAppIds)->orWhereIn('server_id', $serverIds);
-
-        GithubRunnerExecution::query()->where($belongsToTeam)->delete();
-        GithubRunnerConfig::query()->where($belongsToTeam)->delete();
     }
 
     private function subscriptionTeams(User $user): Collection
