@@ -202,20 +202,21 @@ class DeleteUserAccount
             return collect();
         }
 
-        try {
-            $actions = Cache::remember("account-deletion-subscriptions:{$user->id}", 60, fn (): array => $this->subscriptionsToCancel($user)
-                ->map(fn (?Team $team, string $subscriptionId): string => $team
-                    ? "The subscription of the team \"{$team->name}\" will be cancelled immediately. This is required."
-                    : "The Stripe subscription {$subscriptionId} of your email, which is not linked to a team, will be cancelled immediately. This is required.")
-                ->unique()
-                ->values()
-                ->all());
-        } catch (\Throwable $e) {
-            report($e);
+        return collect(Cache::remember("account-deletion-subscriptions:{$user->id}", 60, function () use ($user): array {
+            try {
+                return $this->subscriptionsToCancel($user)
+                    ->map(fn (?Team $team, string $subscriptionId): string => $team
+                        ? "The subscription of the team \"{$team->name}\" will be cancelled immediately. This is required."
+                        : "The Stripe subscription {$subscriptionId} of your email, which is not linked to a team, will be cancelled immediately. This is required.")
+                    ->unique()
+                    ->values()
+                    ->all();
+            } catch (\Throwable $e) {
+                // Cached too, so a Stripe outage does not call Stripe and report on every render.
+                report($e);
 
-            $actions = ['Every subscription of your teams and your email will be cancelled immediately. This is required.'];
-        }
-
-        return collect($actions);
+                return ['Every subscription of your teams and your email will be cancelled immediately. This is required.'];
+            }
+        }));
     }
 }

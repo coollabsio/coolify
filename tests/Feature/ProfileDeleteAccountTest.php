@@ -408,11 +408,15 @@ it('cancels the Stripe subscriptions of the email that Coolify does not record, 
 it('keeps the account when the Stripe lookup fails', function () {
     config(['constants.coolify.self_hosted' => false]);
     $user = deleteAccountUser();
-    fakeOpenStripeSubscriptions()->shouldReceive('handle')->andThrow(new RuntimeException('Stripe unavailable'));
+    $lookup = fakeOpenStripeSubscriptions();
+    $lookup->shouldReceive('handle')->andThrow(new RuntimeException('Stripe unavailable'));
 
     Livewire::test(ProfileIndex::class)
         ->assertSee('Every subscription of your teams and your email will be cancelled immediately.')
         ->call('deleteAccount', 'password', []);
+
+    // The render after the failed delete reads the cached fallback; only handle() called Stripe again.
+    $lookup->shouldHaveReceived('handle')->twice();
 
     expect(User::find($user->id))->not->toBeNull();
 });

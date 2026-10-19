@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Stripe\Service\SubscriptionService;
+use Stripe\StripeClient;
+use Stripe\Subscription as StripeSubscription;
 
 uses(RefreshDatabase::class);
 
@@ -332,7 +335,7 @@ test('a team that fails to delete does not stop the others, and its users are de
     $this->assertModelExists($failingTeam);
     $this->assertModelExists($failingOwner);
     expect($failingOwner->teams()->whereKey($failingTeam->id)->exists())->toBeTrue();
-    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "could not delete team {$failingTeam->id}: S3 is down"));
+    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "Could not delete 1 team:\n- team {$failingTeam->id}: S3 is down"));
 
     $this->forgetMock(DeleteTeamData::class);
 
@@ -361,7 +364,7 @@ test('it keeps a team while Stripe has a paying subscription of its owner that C
     $this->assertModelExists($team);
     $this->assertModelExists($owner);
     $lookup->shouldHaveReceived('handle')->with(Mockery::on(fn ($emails) => $emails->all() === [$owner->email]), Mockery::on(fn ($customerIds) => $customerIds->all() === ['cus_old']));
-    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "skipped team {$team->id}: keep: Stripe subscription sub_orphan is active"));
+    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "Skipped 1 team:\n- team {$team->id}: keep: Stripe subscription sub_orphan is active"));
 })->with([
     'without a team' => [null],
     'of this team' => ['this'],
@@ -380,6 +383,11 @@ test('it deletes a team when the paying Stripe subscription of its owner belongs
         ['id' => 'sub_metadata', 'status' => 'active', 'metadata' => ['team_id' => (string) $payingTeam->id]],
         ['id' => 'sub_ended', 'status' => 'unpaid'],
     ]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_ended')->andReturn(StripeSubscription::constructFrom(['id' => 'sub_ended', 'status' => 'unpaid']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_ended', []);
+    app()->instance(StripeClient::class, $stripe);
 
     $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
 
@@ -402,4 +410,77 @@ test('it keeps a team when the Stripe check fails', function () {
     $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
 
     $this->assertModelExists($team);
+});
+
+test('it cancels the open Stripe subscriptions of a team that do not pay before it deletes the team', function () {
+    $owner = User::factory()->create();
+    $team = $owner->teams()->first();
+    $row = endedSubscription($team, ['stripe_customer_id' => 'cus_unpaid', 'stripe_subscription_id' => 'sub_unpaid']);
+    $otherTeam = Team::factory()->create();
+    fakeOpenStripeSubscriptions([
+        ['id' => 'sub_unpaid', 'status' => 'unpaid'],
+        ['id' => 'sub_paused', 'status' => 'paused', 'metadata' => ['team_id' => (string) $team->id]],
+        ['id' => 'sub_other_team', 'status' => 'unpaid', 'metadata' => ['team_id' => (string) $otherTeam->id]],
+    ]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->andReturnUsing(fn (string $id) => StripeSubscription::constructFrom(['id' => $id, 'status' => 'unpaid']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_unpaid', []);
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_paused', []);
+    $stripe->subscriptions->shouldNotReceive('cancel')->with('sub_other_team', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams')
+        ->expectsTable(
+            ['Team', 'Name', 'Action', 'Servers', 'Projects', 'Members', 'Subscription ended', 'Created'],
+            [[$team->id, $team->name, 'delete team, cancel sub_unpaid, sub_paused', 0, 0, 1, now()->subDays(31)->toDateString(), $team->created_at->toDateString()]],
+        )
+        ->assertSuccessful();
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 1 team and 1 user.')
+        ->assertSuccessful();
+
+    $this->assertModelMissing($team);
+    $this->assertModelMissing($row);
+    $this->assertModelExists($otherTeam);
+});
+
+test('it keeps a team when Stripe does not cancel its open subscription', function () {
+    Notification::fake();
+    $rootTeam = Team::forceCreate(['id' => 0, 'name' => 'Root Team', 'created_at' => now()->subYear()]);
+    $rootTeam->webhookNotificationSettings()->update(['webhook_enabled' => true, 'webhook_url' => 'https://example.com/webhook']);
+    $team = Team::factory()->create();
+    endedSubscription($team, ['stripe_customer_id' => 'cus_unpaid']);
+    fakeOpenStripeSubscriptions([['id' => 'sub_unpaid', 'status' => 'unpaid', 'metadata' => ['team_id' => (string) $team->id]]]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->andReturn(StripeSubscription::constructFrom(['id' => 'sub_unpaid', 'status' => 'unpaid']));
+    $stripe->subscriptions->shouldReceive('cancel')->andThrow(new RuntimeException('Stripe is down'));
+    app()->instance(StripeClient::class, $stripe);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Could not delete 1 team. See the log for details.')
+        ->assertFailed();
+
+    $this->assertModelExists($team);
+    Notification::assertSentToTimes($rootTeam, GeneralNotification::class, 1);
+    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "- team {$team->id}: Could not cancel the Stripe subscription sub_unpaid."));
+});
+
+test('it sends one notification for all skipped teams', function () {
+    Notification::fake();
+    $rootTeam = Team::forceCreate(['id' => 0, 'name' => 'Root Team', 'created_at' => now()->subYear()]);
+    $rootTeam->webhookNotificationSettings()->update(['webhook_enabled' => true, 'webhook_url' => 'https://example.com/webhook']);
+    $teams = Team::factory()->count(22)->create();
+    $teams->each(fn (Team $team) => endedSubscription($team));
+    fakeOpenStripeSubscriptions()->shouldReceive('handle')->andThrow(new RuntimeException('Stripe is down'));
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Skipped 22 teams because of Stripe. See the log for details.')
+        ->assertSuccessful();
+
+    Notification::assertSentToTimes($rootTeam, GeneralNotification::class, 1);
+    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, 'Skipped 22 teams:')
+        && str_contains($notification->message, '- and 2 more. See the log.'));
 });

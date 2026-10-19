@@ -4,6 +4,7 @@ namespace App\Actions\Stripe;
 
 use App\Models\Subscription;
 use Illuminate\Support\Collection;
+use Stripe\Stripe;
 use Stripe\StripeClient;
 use Stripe\Subscription as StripeSubscription;
 
@@ -14,6 +15,9 @@ use Stripe\Subscription as StripeSubscription;
  */
 class FindOpenStripeSubscriptions
 {
+    /** Pause after each list request, so a long cleanup run stays under the Stripe rate limit. */
+    private const REQUEST_DELAY_MICROSECONDS = 50_000;
+
     public const PAYING_STATUSES = [
         StripeSubscription::STATUS_ACTIVE,
         StripeSubscription::STATUS_TRIALING,
@@ -27,15 +31,30 @@ class FindOpenStripeSubscriptions
      */
     public function handle(iterable $emails, iterable $customerIds = []): Collection
     {
-        $stripe = app(StripeClient::class);
-        $customerIds = collect($customerIds)->filter()->values();
+        $previousMaxNetworkRetries = Stripe::getMaxNetworkRetries();
+        Stripe::setMaxNetworkRetries(2);
 
+        try {
+            return $this->find(app(StripeClient::class), $emails, collect($customerIds)->filter()->values());
+        } finally {
+            Stripe::setMaxNetworkRetries($previousMaxNetworkRetries);
+        }
+    }
+
+    /**
+     * @param  iterable<?string>  $emails
+     * @param  Collection<int, string>  $customerIds
+     * @return Collection<string, StripeSubscription>
+     */
+    private function find(StripeClient $stripe, iterable $emails, Collection $customerIds): Collection
+    {
         // The email filter of Stripe is case-sensitive.
         $emails = collect($emails)->filter()->flatMap(fn (string $email): array => [$email, strtolower($email)])->unique();
         foreach ($emails as $email) {
             foreach ($stripe->customers->all(['email' => $email, 'limit' => 100])->autoPagingIterator() as $customer) {
                 $customerIds->push($customer->id);
             }
+            usleep(self::REQUEST_DELAY_MICROSECONDS);
         }
 
         $subscriptions = collect();
@@ -46,6 +65,7 @@ class FindOpenStripeSubscriptions
                     $subscriptions->put($subscription->id, $subscription);
                 }
             }
+            usleep(self::REQUEST_DELAY_MICROSECONDS);
         }
 
         return $subscriptions;

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Cloud;
 
+use App\Actions\Stripe\CancelSubscription;
 use App\Actions\Stripe\FindOpenStripeSubscriptions;
 use App\Actions\Team\DeleteTeamData;
 use App\Actions\User\DeleteTeamlessUser;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Stripe\Subscription as StripeSubscription;
 use Throwable;
 
@@ -48,9 +50,7 @@ class CleanupUnsubscribedTeams extends Command
             ->orderBy('id')
             ->get();
 
-        // A subscription at Stripe that Coolify has no paying row for, for example after a second
-        // checkout replaced the subscription id of the row, keeps the team.
-        $stripeHolds = $teams->mapWithKeys(fn (Team $team): array => [$team->id => $this->stripeHold($team)]);
+        $stripeChecks = $teams->mapWithKeys(fn (Team $team): array => [$team->id => $this->stripeCheck($team)]);
 
         $this->info("Found {$teams->count()} ".Str::plural('team', $teams->count())." that stopped paying or never paid before {$cutoff->toDateString()}.");
 
@@ -60,7 +60,7 @@ class CleanupUnsubscribedTeams extends Command
                 $teams->map(fn (Team $team) => [
                     $team->id,
                     $team->name,
-                    $stripeHolds[$team->id] ?? ($this->keepsTeam($team) ? 'remove data, keep team' : 'delete team'),
+                    $this->action($team, $stripeChecks[$team->id]),
                     $team->servers_count,
                     $team->projects_count,
                     $team->members_count,
@@ -79,24 +79,32 @@ class CleanupUnsubscribedTeams extends Command
         $deletedTeamCount = 0;
         $keptTeamCount = 0;
         $deletedUserCount = 0;
-        $failedTeamCount = 0;
-        $skippedTeamCount = 0;
+        /** @var array<int, string> $skippedTeams team id => reason */
+        $skippedTeams = [];
+        /** @var array<int, string> $failedTeams team id => error */
+        $failedTeams = [];
 
         foreach ($teams as $team) {
-            if ($hold = $stripeHolds[$team->id]) {
-                $skippedTeamCount++;
+            ['hold' => $hold, 'cancel' => $subscriptionIds] = $stripeChecks[$team->id];
+            if ($hold) {
+                $skippedTeams[$team->id] = $hold;
                 Log::warning('Skipped an unsubscribed team.', ['team_id' => $team->id, 'reason' => $hold]);
-                send_internal_notification("cloud:cleanup-unsubscribed-teams skipped team {$team->id}: {$hold}. Check the subscription in Stripe.");
 
                 continue;
             }
 
             try {
+                // Cancel first, so a failed cancel keeps the team for the next run.
+                foreach ($subscriptionIds as $subscriptionId) {
+                    if (! CancelSubscription::cancelById($subscriptionId)) {
+                        throw new RuntimeException("Could not cancel the Stripe subscription {$subscriptionId}.");
+                    }
+                }
+
                 $result = $this->deleteTeam($team, $cutoff);
             } catch (Throwable $e) {
-                $failedTeamCount++;
+                $failedTeams[$team->id] = $e->getMessage();
                 Log::error('Could not delete an unsubscribed team.', ['team_id' => $team->id, 'error' => $e->getMessage()]);
-                send_internal_notification("cloud:cleanup-unsubscribed-teams could not delete team {$team->id}: {$e->getMessage()}");
 
                 continue;
             }
@@ -115,6 +123,7 @@ class CleanupUnsubscribedTeams extends Command
                 'team_id' => $team->id,
                 'subscription_ended_at' => $team->subscriptions_max_ended_at,
                 'team_created_at' => $team->created_at?->toDateTimeString(),
+                'cancelled_stripe_subscriptions' => $subscriptionIds,
                 ...$result,
             ]);
         }
@@ -124,15 +133,19 @@ class CleanupUnsubscribedTeams extends Command
             $this->info("Removed the data of {$keptTeamCount} personal ".Str::plural('team', $keptTeamCount).' and kept '.($keptTeamCount === 1 ? 'the team' : 'the teams').'.');
         }
 
-        if ($skippedTeamCount > 0) {
-            $this->warn("Skipped {$skippedTeamCount} ".Str::plural('team', $skippedTeamCount).' because of Stripe. See the log for details.');
+        if ($skippedTeams) {
+            $this->warn('Skipped '.count($skippedTeams).' '.Str::plural('team', count($skippedTeams)).' because of Stripe. See the log for details.');
         }
 
-        if ($failedTeamCount > 0) {
-            $this->error("Could not delete {$failedTeamCount} ".Str::plural('team', $failedTeamCount).'. See the log for details.');
-
-            return self::FAILURE;
+        if ($failedTeams) {
+            $this->error('Could not delete '.count($failedTeams).' '.Str::plural('team', count($failedTeams)).'. See the log for details.');
         }
+
+        if ($skippedTeams || $failedTeams) {
+            send_internal_notification($this->summary($skippedTeams, $failedTeams));
+        }
+
+        return $failedTeams ? self::FAILURE : self::SUCCESS;
 
         return self::SUCCESS;
     }
@@ -169,29 +182,74 @@ class CleanupUnsubscribedTeams extends Command
     }
 
     /**
-     * Why Stripe keeps the team, or null. Checks the team's Stripe customers and every customer with
-     * the email of an owner or admin. A paying subscription keeps the team unless it belongs to
-     * another team that exists. A failed check also keeps the team.
+     * Checks the Stripe subscriptions of the team's customers and of every customer with the email of
+     * an owner or admin. A subscription counts for the team unless it belongs to another team that
+     * exists. A paying one, or a failed check, keeps the team ('hold'). The others that did not end,
+     * for example unpaid or paused ones, are cancelled before the team is deleted ('cancel').
+     *
+     * @return array{hold: ?string, cancel: list<string>}
      */
-    private function stripeHold(Team $team): ?string
+    private function stripeCheck(Team $team): array
     {
         try {
-            $subscription = app(FindOpenStripeSubscriptions::class)
+            $subscriptions = app(FindOpenStripeSubscriptions::class)
                 ->handle(
                     $team->members()->wherePivotIn('role', ['owner', 'admin'])->pluck('email'),
                     $team->subscriptions()->pluck('stripe_customer_id'),
                 )
-                ->filter(fn (StripeSubscription $subscription): bool => in_array($subscription->status, FindOpenStripeSubscriptions::PAYING_STATUSES, true))
-                ->first(function (StripeSubscription $subscription) use ($team): bool {
+                ->filter(function (StripeSubscription $subscription) use ($team): bool {
                     $teamId = FindOpenStripeSubscriptions::teamId($subscription);
 
                     return $teamId === null || $teamId === $team->id || Team::query()->whereKey($teamId)->doesntExist();
                 });
         } catch (Throwable $e) {
-            return "keep: Stripe check failed ({$e->getMessage()})";
+            return ['hold' => "keep: Stripe check failed ({$e->getMessage()})", 'cancel' => []];
         }
 
-        return $subscription ? "keep: Stripe subscription {$subscription->id} is {$subscription->status}" : null;
+        $paying = $subscriptions->first(fn (StripeSubscription $subscription): bool => in_array($subscription->status, FindOpenStripeSubscriptions::PAYING_STATUSES, true));
+
+        return [
+            'hold' => $paying ? "keep: Stripe subscription {$paying->id} is {$paying->status}" : null,
+            'cancel' => $paying ? [] : $subscriptions->keys()->all(),
+        ];
+    }
+
+    /**
+     * @param  array{hold: ?string, cancel: list<string>}  $stripeCheck
+     */
+    private function action(Team $team, array $stripeCheck): string
+    {
+        if ($stripeCheck['hold']) {
+            return $stripeCheck['hold'];
+        }
+
+        $action = $this->keepsTeam($team) ? 'remove data, keep team' : 'delete team';
+
+        return $stripeCheck['cancel'] ? "{$action}, cancel ".implode(', ', $stripeCheck['cancel']) : $action;
+    }
+
+    /**
+     * One notification per run, so a large run or a Stripe outage does not send one per team.
+     *
+     * @param  array<int, string>  $skippedTeams
+     * @param  array<int, string>  $failedTeams
+     */
+    private function summary(array $skippedTeams, array $failedTeams): string
+    {
+        $lines = ['cloud:cleanup-unsubscribed-teams:'];
+        foreach (['Skipped' => $skippedTeams, 'Could not delete' => $failedTeams] as $label => $teams) {
+            if ($teams) {
+                $lines[] = "{$label} ".count($teams).' '.Str::plural('team', count($teams)).':';
+                foreach (array_slice($teams, 0, 20, true) as $teamId => $reason) {
+                    $lines[] = "- team {$teamId}: {$reason}";
+                }
+                if (count($teams) > 20) {
+                    $lines[] = '- and '.(count($teams) - 20).' more. See the log.';
+                }
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
