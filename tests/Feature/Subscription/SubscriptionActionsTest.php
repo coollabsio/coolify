@@ -113,6 +113,7 @@ describe('password confirmation', function () {
 
 describe('cancelImmediately with account deletion', function () {
     beforeEach(function () {
+        fakeOpenStripeSubscriptions();
         $this->stripe = Mockery::mock(StripeClient::class);
         $this->stripe->subscriptions = Mockery::mock(SubscriptionService::class);
         $this->instance(StripeClient::class, $this->stripe);
@@ -156,7 +157,7 @@ describe('cancelImmediately with account deletion', function () {
     test('refunds, cancels, and deletes the account when both options are selected', function () {
         $refund = Mockery::mock(RefundSubscription::class);
         $refund->shouldReceive('execute')->once()->andReturnUsing(function (Team $team) {
-            $team->subscriptionEnded();
+            $team->subscriptionEnded($team->subscription);
 
             return ['success' => true, 'error' => null];
         });
