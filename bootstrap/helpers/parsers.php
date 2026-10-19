@@ -26,6 +26,9 @@ use Symfony\Component\Yaml\Yaml;
  */
 function parseDockerComposeYaml(string $compose): mixed
 {
+    // Editors on Windows can save files with a UTF-8 BOM, which Symfony YAML keeps in the first key.
+    $compose = preg_replace('/^\xEF\xBB\xBF/', '', $compose);
+
     return Yaml::parse($compose, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
 }
 
