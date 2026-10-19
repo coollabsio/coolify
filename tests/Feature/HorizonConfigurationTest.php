@@ -185,7 +185,6 @@ test('webhook jobs run on the webhooks queue on cloud and on high on self-hosted
         beforeSha: null,
         afterSha: null,
         commitSha: 'abc123',
-        authorAssociation: null,
         fullName: 'coollabsio/coolify',
     );
 

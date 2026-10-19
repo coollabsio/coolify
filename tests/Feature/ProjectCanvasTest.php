@@ -73,9 +73,12 @@ test('the project canvas shows the resources of every environment, grouped by en
         ->assertOk()
         ->assertJsonPath('title', 'Shop')
         ->assertJsonPath('can_edit', true)
+        ->assertJsonPath('can_move', false)
+        ->assertJsonPath('can_move_groups', true)
         ->assertJsonPath('layout', 'server')
         ->assertJsonPath('links.0.id', $link->uuid)
-        ->assertJsonPath('positions', [$live->uuid => ['x' => 40, 'y' => 80]]);
+        // Auto-placed: a position saved on one environment canvas does not fit next to the other environments.
+        ->assertJsonPath('positions', []);
 
     expect(collect($response->json('zones'))->pluck('name')->all())->toBe(['web-server'])
         ->and(collect($response->json('nodes'))->mapWithKeys(fn ($node) => [$node['name'] => $node['context']])->sortKeys()->all())->toBe([
@@ -98,7 +101,14 @@ test('members see the project canvases but cannot edit them', function () {
     projectCanvasSession($this, $member, $this->team)
         ->getJson('/canvas/api/projects/canvas')
         ->assertOk()
-        ->assertJsonPath('can_edit', false);
+        ->assertJsonPath('can_edit', false)
+        ->assertJsonPath('can_move_groups', false);
+    projectCanvasSession($this, $member, $this->team)
+        ->getJson("/canvas/api/projects/{$this->project->uuid}/canvas")
+        ->assertJsonPath('can_move_groups', false);
+    projectCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/projects/canvas')
+        ->assertJsonPath('can_move_groups', true);
 });
 
 test('the project canvas is out of reach from another team', function () {
@@ -159,9 +169,61 @@ test('the projects canvas shows every project of the team as a zone, grouped by 
 
     expect(collect($response->json('zones'))->pluck('name')->all())->toBe(['Blog', 'Shop'])
         ->and(collect($response->json('nodes'))->mapWithKeys(fn ($node) => [$node['name'] => [$node['zone'], $node['context']]])->sortKeys()->all())->toBe([
+            'No resources yet' => [$this->project->uuid, 'production'],
             'storefront' => [$this->project->uuid, 'staging'],
             'wordpress' => [$blog->uuid, 'production'],
         ]);
+});
+
+test('the project canvases show empty environments and projects as placeholder cards', function () {
+    projectCanvasApp($this->staging, $this->server, 'storefront');
+    $bare = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Bare']);
+    $bare->environments()->delete();
+
+    $project = projectCanvasSession($this, $this->admin, $this->team)
+        ->getJson("/canvas/api/projects/{$this->project->uuid}/canvas")
+        ->assertOk();
+    $placeholder = collect($project->json('nodes'))->firstWhere('type', 'empty');
+
+    // Next to the other environments: on the server of the project's resources.
+    expect(collect($project->json('zones'))->pluck('name')->all())->toBe(['web-server'])
+        ->and($placeholder)->toMatchArray([
+            'id' => "empty:{$this->production->uuid}",
+            'zone' => $this->server->uuid,
+            'context' => 'production',
+            // Admins add the first resource on the deploy canvas, with the environment chosen.
+            'link' => route('deploy-canvas', ['project' => $this->project->uuid, 'environment' => $this->production->uuid]),
+            'context_link' => route('project.resource.index', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->production->uuid]),
+            'environment' => ['uuid' => $this->production->uuid, 'name' => 'production'],
+        ]);
+
+    // Members cannot add resources: the card opens the environment page.
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $memberView = projectCanvasSession($this, $member, $this->team)
+        ->getJson("/canvas/api/projects/{$this->project->uuid}/canvas")
+        ->assertOk();
+    expect(collect($memberView->json('nodes'))->firstWhere('type', 'empty')['link'])
+        ->toBe(route('project.resource.index', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->production->uuid]));
+
+    // A project without resources has no server: its environments get their own zone.
+    $alone = projectCanvasSession($this, $this->admin, $this->team)
+        ->getJson("/canvas/api/projects/{$bare->uuid}/canvas")
+        ->assertOk();
+    expect(collect($alone->json('zones'))->pluck('name')->all())->toBe(['Empty environments'])
+        ->and($alone->json('nodes.0.name'))->toBe('No environments yet');
+
+    $team = projectCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/projects/canvas')
+        ->assertOk();
+
+    // A project without environments gets one placeholder in its zone.
+    expect(collect($team->json('nodes'))->firstWhere('zone', $bare->uuid))->toMatchArray([
+        'type' => 'empty',
+        'name' => 'No environments yet',
+        'link' => route('project.show', ['project_uuid' => $bare->uuid]),
+        'environment' => null,
+    ]);
 });
 
 test('the projects page reopens the canvas when the user left it on the canvas view', function () {

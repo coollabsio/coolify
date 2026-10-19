@@ -246,14 +246,6 @@
       {/snippet}
       {@render section('Containers', containers)}
     {/if}
-    {#if node.volumes?.length}
-      {#snippet volumes()}
-        <div class="flex flex-wrap gap-1">
-          {#each node.volumes as v, i (i)}<span class="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] text-neutral-600 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-fg-dim">{v}</span>{/each}
-        </div>
-      {/snippet}
-      {@render section('Volumes', volumes)}
-    {/if}
     {#snippet linkList()}
       <ul class="flex flex-col gap-0.5">
         {#if !nodeLinks.length}<li class={faint}>{canEdit ? 'No links. Drag the dot on the right edge of a card to another card.' : 'No links.'}</li>{/if}

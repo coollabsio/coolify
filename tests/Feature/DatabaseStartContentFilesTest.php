@@ -97,3 +97,23 @@ it('writes the MongoDB server.pem before the certificate owner change mounts it'
     expect($commands)->toContain('Writing 1 missing configuration file.')
         ->and(strpos($commands, 'Writing 1 missing configuration file.'))->toBeLessThan(strpos($commands, '--entrypoint chown'));
 });
+
+dataset('database-start-actions-with-custom-config-files', [
+    'postgresql' => ['create_standalone_postgresql', StartPostgresql::class, 'postgres_conf', 'custom-postgres.conf'],
+    'mysql' => ['create_standalone_mysql', StartMysql::class, 'mysql_conf', 'custom-config.cnf'],
+    'mariadb' => ['create_standalone_mariadb', StartMariadb::class, 'mariadb_conf', 'custom-config.cnf'],
+    'mongodb' => ['create_standalone_mongodb', StartMongodb::class, 'mongo_conf', 'mongod.conf'],
+]);
+
+it('makes the custom config file readable by the container user before the container starts', function (string $createDatabase, string $startAction, string $column, string $file) {
+    $database = $createDatabase($this->environment->id, $this->destination);
+    $database->update([$column => "# custom\n"]);
+
+    $startAction::run($database->fresh(), new Activity);
+
+    $path = $database->workdir()."/{$file}";
+    $commands = implode("\n", $this->executor->commands);
+    expect($commands)->toContain("chmod 644 {$path}")
+        ->and(strpos($commands, "tee {$path}"))->toBeLessThan(strpos($commands, "chmod 644 {$path}"))
+        ->and(strpos($commands, "chmod 644 {$path}"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
+})->with('database-start-actions-with-custom-config-files');

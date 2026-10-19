@@ -110,7 +110,10 @@ class General extends Component
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->dragonfly_password = $this->dragonflyPassword;
+            // After the first start the password is read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->dragonfly_password = $this->dragonflyPassword;
+            }
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;

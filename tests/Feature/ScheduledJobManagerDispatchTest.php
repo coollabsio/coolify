@@ -1060,6 +1060,33 @@ it('does not run a scheduled task again when Redis hands it out after its worker
     expect(ScheduledTaskExecution::query()->where('scheduled_task_id', $task->id)->exists())->toBeFalse();
 });
 
+it('drops a scheduled task job while an earlier run of the same task holds the overlap lock', function () {
+    $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['timeout' => 4200]);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-task:{$task->id}",
+        'scheduled_for' => now(),
+        'job_type' => 'scheduled-task',
+        'resource_id' => $task->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now(),
+    ]);
+    $job = (new ScheduledTaskJob($task, $occurrence->uuid))->withFakeQueueInteractions();
+    $middleware = $job->middleware()[0];
+    $runningLock = Cache::lock($middleware->getLockKey($job), 60);
+    $runningLock->get();
+
+    $middleware->handle($job, fn (ScheduledTaskJob $job) => $job->handle());
+    $otherTaskJob = new ScheduledTaskJob(createScheduledApplicationTask(createScheduledTaskApplication()));
+
+    $job->assertNotReleased();
+    expect($middleware->expiresAfter)->toBe(4200 + 300)
+        ->and($occurrence->fresh()->status)->toBe('skipped')
+        ->and(ScheduledTaskExecution::query()->where('scheduled_task_id', $task->id)->exists())->toBeFalse()
+        ->and($otherTaskJob->middleware()[0]->getLockKey($otherTaskJob))->not->toBe($middleware->getLockKey($job));
+
+    $runningLock->release();
+});
+
 it('fails only its own execution and notifies the team when the worker timeout stops a scheduled task job', function () {
     InstanceSettings::forceCreate(['id' => 0]);
     Notification::fake();

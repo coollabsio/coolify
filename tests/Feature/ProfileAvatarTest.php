@@ -100,7 +100,7 @@ it('loads an S3 profile picture from the configured CDN', function () {
     expect(profile_avatar_url($user))->toBe("https://avatars.example.com/media/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
 });
 
-it('loads an S3 profile picture directly from S3 when the CDN is not configured', function () {
+it('falls back to the authenticated proxy route for an S3 profile picture when the CDN is not configured', function () {
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -118,7 +118,9 @@ it('loads an S3 profile picture directly from S3 when the CDN is not configured'
         'avatar_s3_storage_id' => $storage->id,
     ]);
 
-    expect(profile_avatar_url($user))->toBe("https://s3.example.com/avatars/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
+    // Direct S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests,
+    // so without a CDN the browser must use the app's authenticated proxy route.
+    expect(profile_avatar_url($user))->toBe(route('profile.avatar', ['v' => $user->updated_at->timestamp]));
 });
 
 it('does not use an unrelated S3 storage URL for a profile picture', function () {

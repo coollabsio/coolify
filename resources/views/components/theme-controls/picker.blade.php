@@ -19,7 +19,9 @@
     <label class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-neutral-200 p-2 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:hover:border-white/[0.14]">
         <span class="relative size-8 shrink-0 overflow-hidden rounded-md border border-black/10 shadow-sm dark:border-white/15">
             <span class="absolute inset-0" :style="`background: ${themeColor}`"></span>
-            <input type="color" :value="themeColor" @input="previewThemeColor($event.target.value)"
+            {{-- autocomplete="off": Firefox session restore otherwise replays this
+                 value with an input event and switches the theme to custom (#11813). --}}
+            <input type="color" autocomplete="off" :value="themeColor" @input="previewThemeColor($event.target.value)"
                 @change="saveThemeColor($event.target.value)" aria-label="Custom theme color"
                 class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
         </span>

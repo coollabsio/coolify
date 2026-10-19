@@ -269,6 +269,8 @@ class StartDragonfly
             $environment_variables->push("REDIS_PASSWORD={$this->database->dragonfly_password}");
         }
 
+        $this->addCoolifyEnvironmentVariables($environment_variables);
+
         return $environment_variables->all();
     }
 

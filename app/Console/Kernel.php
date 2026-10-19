@@ -25,6 +25,8 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
+    private const CDN_JITTER_SECONDS = 600;
+
     private Schedule $scheduleInstance;
 
     private InstanceSettings $settings;
@@ -91,8 +93,8 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->command('horizon:snapshot')->everyFiveMinutes();
             $this->scheduleInstance->command('cleanup:unreachable-servers')->daily()->onOneServer();
 
-            $this->scheduleInstance->job(new PullTemplatesFromCDN)->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
-            $this->scheduleInstance->job(new PullChangelog)->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job($this->withCdnJitter(new PullTemplatesFromCDN))->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job($this->withCdnJitter(new PullChangelog))->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->scheduleUpdates();
@@ -117,7 +119,7 @@ class Kernel extends ConsoleKernel
 
     private function pullImages(): void
     {
-        $this->scheduleInstance->job(new CheckHelperImageJob)
+        $this->scheduleInstance->job($this->withCdnJitter(new CheckHelperImageJob))
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
@@ -162,18 +164,27 @@ class Kernel extends ConsoleKernel
 
     private function scheduleUpdates(): void
     {
-        $this->scheduleInstance->job(new CheckForUpdatesJob)
+        $this->scheduleInstance->job($this->withCdnJitter(new CheckForUpdatesJob))
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
 
         if ($this->settings->is_auto_update_enabled) {
             $autoUpdateFrequency = $this->settings->auto_update_frequency;
-            $this->scheduleInstance->job(new UpdateCoolifyJob)
+            $this->scheduleInstance->job($this->withCdnJitter(new UpdateCoolifyJob))
                 ->cron($autoUpdateFrequency)
                 ->timezone($this->instanceTimezone)
                 ->onOneServer();
         }
+    }
+
+    /**
+     * All instances share the same default cron, so without a random delay they all request the CDN
+     * at the same second and Cloudflare rejects the burst (error 1200).
+     */
+    private function withCdnJitter(object $job): object
+    {
+        return $job->delay(random_int(0, self::CDN_JITTER_SECONDS));
     }
 
     protected function commands(): void

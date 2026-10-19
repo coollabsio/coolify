@@ -1,20 +1,29 @@
 <script>
   // A resource card (or, connect view, a shared variable / tag card).
-  import { isSource, MAX_CHILDREN, MAX_VOLUMES, statusLabel, TYPE_LABELS } from '../../environment-canvas.js';
+  import { isSource, MAX_CHILDREN, statusLabel, statusTone, statusWord, TYPE_LABELS } from '../../environment-canvas.js';
   import NodeIcon from './NodeIcon.svelte';
   import StatusDot from './StatusDot.svelte';
 
-  let { node, position, selected, dropTarget, movable, port, linkCount, zoneNames, onpress, onconnect, onselect, onhover } = $props();
+  let { node, position, selected, dropTarget, movable, port, linkCount, zoneNames, serverDown = false, statusText = false, onpress, onconnect, onselect, onhover } = $props();
   let card;
   let portDot = $state();
   // Same as the deploy canvas drop target: accent border and a soft 4px ring.
   const DROP_TARGET = 'border-coollabs! dark:border-warning! ring-4 ring-coollabs/15 dark:ring-warning/15';
 
   const extra = $derived(node.extra_zones?.length || 0);
-  const volumes = $derived(node.volumes || []);
   const children = $derived(node.children || []);
   const chip = 'inline-flex h-5 max-w-[9rem] items-center truncate rounded-full border border-neutral-200 bg-neutral-50 px-1.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-fg-dim';
   const stop = e => e.stopPropagation();
+  // The server is not reachable, so the saved status is stale: show it as unknown, not as a failure.
+  const DOWN = 'Unknown (server not reachable)';
+  const status = $derived(serverDown ? 'unknown' : node.status);
+  const TONE_TEXT = {
+    ok: 'text-emerald-600 dark:text-emerald-400',
+    warn: 'text-warning-700 dark:text-warning',
+    busy: 'text-warning-700 dark:text-warning',
+    bad: 'text-red-600 dark:text-red-400',
+    idle: 'text-neutral-500 dark:text-fg-faint',
+  };
 </script>
 
 <!-- data-ec-open: its page opens on double-click (see the root's pointerdown capture listener). -->
@@ -35,7 +44,7 @@
   tabindex="0"
   aria-label={isSource(node)
     ? `${node.name} (${node.missing ? 'deleted ' : ''}${TYPE_LABELS[node.type].toLowerCase()})`
-    : `${node.name} (${TYPE_LABELS[node.type] || node.type}), ${statusLabel(node.status)}`}
+    : `${node.name} (${TYPE_LABELS[node.type] || node.type}), ${serverDown ? DOWN : statusLabel(node.status)}`}
   onpointerdown={e => onpress(e, card)}
   onkeydown={e => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -64,7 +73,27 @@
         title={node.missing ? 'This shared variable was deleted, but resources still reference it' : `Used by ${linkCount} ${linkCount === 1 ? 'resource' : 'resources'}`}
       >{node.missing ? 'Deleted' : String(linkCount)}</span>
     {:else}
-      <div class="pt-1"><StatusDot status={node.status} /></div>
+      {#if node.deployment}
+        <!-- Dashboard canvas: the running or queued deployment of the application. -->
+        <a
+          class="relative mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-1.5 text-[10px] leading-4 font-medium text-neutral-600 hover:border-neutral-300 hover:text-black dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-fg-dim dark:hover:border-white/[0.2] dark:hover:text-fg"
+          href={node.deployment.link}
+          title={node.deployment.pull_request_id ? `Pull request #${node.deployment.pull_request_id}` : 'Open the deployment'}
+          onpointerdown={stop}
+          onclick={stop}
+        >
+          <StatusDot status={node.deployment.status} size="size-1.5" />
+          {node.deployment.status === 'queued' ? 'Queued' : 'Deploying'}
+        </a>
+      {/if}
+      {#if statusText}
+        <!-- Server view: the status in words, so a stopped resource reads as stopped at a glance. -->
+        <span class="mt-0.5 inline-flex shrink-0 items-center gap-1.5 text-[11px] leading-4 font-medium {TONE_TEXT[statusTone(status)]}" title={serverDown ? DOWN : statusLabel(status)}>
+          {statusWord(status)}<StatusDot {status} size="size-1.5" title={serverDown ? DOWN : null} />
+        </span>
+      {:else}
+        <div class="pt-1"><StatusDot {status} title={serverDown ? DOWN : null} /></div>
+      {/if}
     {/if}
   </div>
 
@@ -80,11 +109,9 @@
     >{node.urls[0].replace(/^https?:\/\//, '')}</a>
   {/if}
 
-  {#if extra || volumes.length}
+  {#if extra}
     <div class="mt-2 flex min-w-0 flex-wrap gap-1 overflow-hidden h-5">
-      {#if extra}<span class={chip} title={zoneNames.join(', ')}>+{extra} {extra === 1 ? 'server' : 'servers'}</span>{/if}
-      {#each volumes.slice(0, MAX_VOLUMES) as v, i (i)}<span class={chip} title="Volume {v}">{v}</span>{/each}
-      {#if volumes.length > MAX_VOLUMES}<span class={chip} title={volumes.slice(MAX_VOLUMES).join(', ')}>+{volumes.length - MAX_VOLUMES}</span>{/if}
+      <span class={chip} title={zoneNames.join(', ')}>+{extra} {extra === 1 ? 'server' : 'servers'}</span>
     </div>
   {/if}
 
@@ -92,7 +119,7 @@
     <ul class="mt-2 border-t border-neutral-100 pt-1.5 dark:border-white/[0.06]">
       {#each children.slice(0, MAX_CHILDREN) as child, i (i)}
         <li class="flex h-5 items-center gap-2 text-[12px] leading-5">
-          <StatusDot status={child.status} size="size-1.5" />
+          <StatusDot status={serverDown ? 'unknown' : child.status} size="size-1.5" title={serverDown ? DOWN : null} />
           <span class="min-w-0 truncate">{child.name}</span>
         </li>
       {/each}

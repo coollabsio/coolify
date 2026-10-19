@@ -29,6 +29,9 @@ class Metrics extends Component
     /** @var array<string, string> uuid => name */
     public array $serverOptions = [];
 
+    /** @var array<int, string> Names of the servers where the user can turn metrics on; filled only when no server has metrics. */
+    public array $enableableServers = [];
+
     #[Url(as: 'range')]
     public string $range = '24h';
 
@@ -87,9 +90,13 @@ class Metrics extends Component
     private function refreshServers(): void
     {
         abort_unless(currentTeam() !== null, 403);
-        $this->servers = Server::ownedByCurrentTeam()->get()
+        $teamServers = Server::ownedByCurrentTeam()->get();
+        $this->servers = $teamServers
             ->filter(fn (Server $server) => $server->isMetricsEnabled())
             ->values();
+        $this->enableableServers = $this->servers->isEmpty()
+            ? $this->serversWithoutMetrics($teamServers)->pluck('name')->all()
+            : [];
 
         foreach ($this->servers as $server) {
             $this->authorize('view', $server);
@@ -101,6 +108,65 @@ class Metrics extends Component
 
         if ($this->serverUuid !== '' && ! array_key_exists($this->serverUuid, $this->serverOptions)) {
             $this->serverUuid = '';
+        }
+    }
+
+    /**
+     * Servers that can report metrics, have them off, are reachable, and that the user can change.
+     * An unreachable server cannot start Sentinel, so it stays out.
+     *
+     * @param  Collection<int, Server>  $teamServers
+     * @return Collection<int, Server>
+     */
+    private function serversWithoutMetrics(Collection $teamServers): Collection
+    {
+        return $teamServers
+            ->filter(fn (Server $server) => ! $server->isMetricsEnabled()
+                && $server->isSentinelEnabled()
+                && auth()->user()->can('update', $server)
+                && $server->isFunctional())
+            ->values();
+    }
+
+    public function enableMetrics(): void
+    {
+        try {
+            abort_unless(currentTeam() !== null, 403);
+            $servers = $this->serversWithoutMetrics(Server::ownedByCurrentTeam()->get());
+            if ($servers->isEmpty()) {
+                return;
+            }
+
+            // One failed server must not stop the others, so each server has its own try.
+            $failed = [];
+            foreach ($servers as $server) {
+                try {
+                    $server->settings->is_metrics_enabled = true;
+                    // Saved quietly: Sentinel is started below, so the settings hook must not start it a second time.
+                    $server->settings->saveQuietly();
+                    auditLog('ui.server.sentinel.updated', [
+                        'team_id' => $server->team_id,
+                        'server_uuid' => $server->uuid,
+                        'server_name' => $server->name,
+                        'changed_fields' => ['is_metrics_enabled'],
+                    ]);
+                    $server->restartSentinel();
+                } catch (\Throwable $e) {
+                    report($e);
+                    $failed[] = $server->name;
+                }
+            }
+
+            $this->loadData();
+            $enabled = $servers->count() - count($failed);
+            if ($enabled > 0) {
+                $this->dispatch('success', 'Metrics enabled on '.$enabled.' '.str('server')->plural($enabled).'. Sentinel is starting, data shows in about one minute.');
+            }
+            if ($failed !== []) {
+                $this->dispatch('error', 'Could not enable metrics on '.implode(', ', $failed).'. Check the server settings and try again.');
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

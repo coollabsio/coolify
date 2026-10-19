@@ -6,16 +6,6 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         <div class="flex flex-wrap items-center gap-2">
-            @if (isDev())
-                @can('create', App\Models\Server::class)
-                    <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
-                        class="button w-fit shrink-0 whitespace-nowrap">
-                        <x-reicon name="upload" class="size-3.5" />
-                        Import server
-                        <x-status-badge label="Dev" />
-                    </a>
-                @endcan
-            @endif
             @can('createAnyResource')
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
@@ -28,7 +18,7 @@
 
     @php
         $serverRows = $servers->map(function ($server) {
-            $isTransferredAway = isDev() && $server->isTransferredAway();
+            $isTransferredAway = $server->isTransferredAway();
             $isReady = $server->settings->is_reachable
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
@@ -38,7 +28,6 @@
             $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
-                $isTransferredAway && $server->isManagementDisabled() => 'Transferable',
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
@@ -100,14 +89,8 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
-                        <span x-text="filteredServers.length"></span>
-                        <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
-                    </span>
-                    <x-canvas-view-toggle :list-url="route('server.index')"
-                        :canvas-url="route('server.canvas.index')" />
-                </div>
+                <x-canvas-view-toggle :list-url="route('server.index')"
+                    :canvas-url="route('server.canvas.index')" />
             </div>
 
             <div x-cloak x-show="viewMode === 'grid'"

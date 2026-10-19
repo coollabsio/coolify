@@ -2,18 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CARD_WIDTH,
+  GROUP_GAP,
   MAX_ROWS,
   COLUMN_GAP,
   ROW_GAP,
   ZONE_HEADER,
   ZONE_PADDING,
+  ZONE_GAP,
   canConnect,
   canLink,
   dragRules,
   filterGraph,
   groupByUse,
   filterOptions,
+  fitView,
+  formatMemory,
+  formatUptime,
+  SERVER_ZONE_HEADER,
+  statusSummary,
+  statusWord,
+  READABLE_ZOOM,
   groupFrames,
+  groupKey,
   layoutBlock,
   estimateNodeHeight,
   layoutGraph,
@@ -23,10 +33,11 @@ import {
   statusTone,
   zoneBoxes,
   readView,
+  unreachableZones,
 } from './environment-canvas.js';
 import { freeSpot } from './canvas-core.js';
 
-const node = (id, type, zone, extra = {}) => ({ id, type, zone, name: id, status: 'running:healthy', extra_zones: [], urls: [], children: [], volumes: [], ...extra });
+const node = (id, type, zone, extra = {}) => ({ id, type, zone, name: id, status: 'running:healthy', extra_zones: [], urls: [], children: [], ...extra });
 const graph = (nodes, extra = {}) => ({
   zones: [{ id: 's1', name: 'One' }, { id: 's2', name: 'Two' }],
   nodes,
@@ -101,7 +112,7 @@ test('auto-placed zones go below zones with stored cards', () => {
 
 test('estimates taller cards for urls, chips, and children', () => {
   const plain = estimateNodeHeight(node('a', 'service', 's1'));
-  const rich = estimateNodeHeight(node('b', 'service', 's1', { urls: ['https://x'], volumes: ['v'], children: [{ name: 'c' }, { name: 'd' }] }));
+  const rich = estimateNodeHeight(node('b', 'service', 's1', { urls: ['https://x'], extra_zones: ['s2'], children: [{ name: 'c' }, { name: 'd' }] }));
   assert.ok(rich > plain);
   const capped = estimateNodeHeight(node('c', 'service', 's1', { children: Array.from({ length: 20 }, (_, i) => ({ name: `c${i}` })) }));
   const six = estimateNodeHeight(node('d', 'service', 's1', { children: Array.from({ length: 6 }, (_, i) => ({ name: `c${i}` })) }));
@@ -239,20 +250,6 @@ test('server view: one frame per project / environment, and the frames do not ov
   assert.equal(positions.a.y, positions.b.y);
 });
 
-test('server view: a group keeps the arrangement saved on its environment canvas', () => {
-  const graph = {
-    layout: 'server',
-    zones: [{ id: 'z1', name: 'web' }],
-    nodes: [srv('a', 'application', 'Shop / prod'), srv('b', 'database', 'Shop / prod'), srv('c', 'service', 'Shop / prod')],
-    links: [],
-    positions: { a: { x: 900, y: 500 }, b: { x: 600, y: 800 } },
-  };
-  const positions = layoutGraph(graph);
-  assert.equal(positions.a.x - positions.b.x, 300);
-  assert.equal(positions.b.y - positions.a.y, 300);
-  assert.ok(positions.c.y >= positions.b.y + estimateNodeHeight(graph.nodes[1]), 'a card without a saved position goes below');
-});
-
 const envNode = (id, type, zone, environment, extra = {}) => srv(id, type, `Shop / ${environment}`, { zone, project: { uuid: 'p' }, environment: { uuid: environment }, ...extra });
 
 test('server view: cards link only to cards of the same environment', () => {
@@ -267,26 +264,180 @@ test('server view: cards link only to cards of the same environment', () => {
   assert.equal(canConnect(g, 'container:1', 'a'), false);
 });
 
-test('server view: a moved group saved on its environment canvas keeps its arrangement', () => {
+test('server view: positions saved on an environment canvas are ignored', () => {
   const g = {
     layout: 'server',
-    zones: [{ id: 'z1', name: 'web' }, { id: 'z2', name: 'db' }],
-    nodes: [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'database', 'z1', 'prod'), envNode('c', 'service', 'z2', 'prod'), envNode('d', 'application', 'z1', 'dev')],
-    links: [{ id: 'l', source: 'a', target: 'b' }],
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'database', 'z1', 'prod')],
+    links: [],
     positions: {},
   };
-  const offsets = {};
-  const positions = layoutServerView(g, offsets);
-  // The user drags b 100px down; the canvas saves its group (a, b) in environment canvas coordinates.
-  positions.b = { x: positions.b.x, y: positions.b.y + 100 };
-  const saved = Object.fromEntries(['a', 'b'].map(id => [id, { x: positions[id].x - offsets[id].x, y: positions[id].y - offsets[id].y }]));
-  const again = layoutServerView({ ...g, positions: saved });
-  assert.deepEqual(again.a, positions.a);
-  assert.deepEqual(again.b, positions.b);
-  // On the environment canvas the saved cards do not cover the card of the same environment on the other server.
-  const environment = layoutGraph({ zones: g.zones, nodes: g.nodes.filter(n => n.environment.uuid === 'prod'), positions: saved });
-  const bottom = Math.max(...['a', 'b'].map(id => environment[id].y + estimateNodeHeight(g.nodes.find(n => n.id === id))));
-  assert.ok(environment.c.y > bottom);
+  const auto = layoutServerView(g);
+  assert.deepEqual(layoutServerView({ ...g, positions: { a: { x: 900, y: 700 } } }), auto);
+});
+
+test('server view: cards keep the arrangement saved on their environment canvas, new cards go below', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [
+      envNode('a', 'application', 'z1', 'prod', { saved: { x: 900, y: 700 } }),
+      envNode('b', 'database', 'z1', 'prod', { saved: { x: 600, y: 900 } }),
+      envNode('c', 'service', 'z1', 'prod'),
+    ],
+    links: [],
+  };
+  const p = layoutServerView(g);
+  assert.equal(p.a.x - p.b.x, 300);
+  assert.equal(p.b.y - p.a.y, 200);
+  assert.equal(p.c.x, p.b.x);
+  assert.ok(p.c.y >= p.b.y + estimateNodeHeight(g.nodes[1]) + ROW_GAP);
+});
+
+test('server view: a group with one saved card matches the environment canvas arrangement', () => {
+  const apps = Array.from({ length: MAX_ROWS + 1 }, (_, i) => envNode(`n${i}`, 'application', 'z1', 'prod'));
+  const nodes = [envNode('a', 'application', 'z1', 'prod', { saved: { x: 1000, y: 697 } }), ...apps, envNode('d', 'database', 'z1', 'prod')];
+  const env = layoutGraph({ zones: [{ id: 'z1', name: 'web' }], nodes, links: [], positions: { a: { x: 1000, y: 697 } } });
+  const server = layoutServerView({ layout: 'server', zones: [{ id: 'z1', name: 'web' }], nodes, links: [{ source: 'n0', target: 'd' }] });
+  for (const n of nodes) {
+    assert.deepEqual({ x: server[n.id].x - server.a.x, y: server[n.id].y - server.a.y }, { x: env[n.id].x - env.a.x, y: env[n.id].y - env.a.y }, n.id);
+  }
+});
+
+test('server view: a moved card saved with its group on the environment canvas stays where it was dropped', () => {
+  const nodes = [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'service', 'z1', 'prod'), envNode('d', 'database', 'z1', 'prod')];
+  const g = { layout: 'server', zones: [{ id: 'z1', name: 'web' }], nodes, links: [] };
+  const groups = {};
+  const before = layoutServerView(g, groups);
+  const { shift } = groups['prod:z1'];
+  const dropped = { ...before, b: { x: before.b.x + 120, y: before.b.y + 400 } };
+  const saved = Object.fromEntries(nodes.map(n => [n.id, { x: dropped[n.id].x - shift.x, y: dropped[n.id].y - shift.y }]));
+  const after = layoutServerView({ ...g, nodes: nodes.map(n => ({ ...n, saved: saved[n.id] })) });
+  assert.deepEqual(after, dropped);
+});
+
+test('server view: zones with server details get the taller header', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web', details: { os: 'Ubuntu' } }],
+    nodes: [envNode('a', 'application', 'z1', 'prod')],
+    links: [],
+    positions: {},
+  };
+  const positions = layoutServerView(g);
+  const [box] = zoneBoxes(g, positions);
+  assert.equal(box.y, 0);
+  assert.ok(positions.a.y > SERVER_ZONE_HEADER);
+});
+
+test('server view: groups sit where their cards are saved on the environment canvas', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [
+      envNode('a', 'application', 'z1', 'prod', { saved: { x: 0, y: ZONE_HEADER + ZONE_PADDING } }),
+      envNode('b', 'application', 'z1', 'stage', { saved: { x: 600, y: ZONE_HEADER + ZONE_PADDING } }),
+      envNode('c', 'application', 'z1', 'dev'),
+    ],
+    links: [],
+    positions: {},
+  };
+  const groups = {};
+  const positions = layoutServerView(g, groups);
+  // A card at the start of the environment canvas sits at the zone's top-left.
+  assert.equal(groups['prod:z1'].x, 0);
+  assert.equal(groups['prod:z1'].y, groups['prod:z1'].inner.y);
+  assert.equal(positions.b.x - positions.a.x, 600);
+  // The environment canvas position comes back from the server view position.
+  const { shift } = groups['prod:z1'];
+  assert.deepEqual({ x: positions.b.x - shift.x, y: positions.b.y - shift.y }, { x: 600, y: ZONE_HEADER + ZONE_PADDING });
+  // A group without saved cards goes below.
+  assert.ok(positions.c.y > positions.a.y + estimateNodeHeight(g.nodes[0]));
+});
+
+test('server view: a group saved left of the zone stays inside it', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [envNode('a', 'application', 'z1', 'prod', { saved: { x: -236, y: 251 } })],
+    links: [],
+    positions: {},
+  };
+  const groups = {};
+  layoutServerView(g, groups);
+  assert.equal(groups['prod:z1'].x, groups['prod:z1'].inner.x);
+});
+
+test('server view: saved groups of different environments that would overlap are moved apart', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [
+      envNode('a', 'application', 'z1', 'prod', { saved: { x: 0, y: 0 } }),
+      envNode('b', 'application', 'z1', 'stage', { saved: { x: 0, y: 0 } }),
+    ],
+    links: [],
+    positions: {},
+  };
+  const groups = {};
+  layoutServerView(g, groups);
+  const [p, s] = [groups['prod:z1'], groups['stage:z1']];
+  assert.ok(Math.abs(p.x - s.x) >= CARD_WIDTH || Math.abs(p.y - s.y) >= estimateNodeHeight(g.nodes[0]), 'the groups do not cover each other');
+});
+
+test('status summary counts resources by tone, without unmanaged containers', () => {
+  const nodes = [
+    node('a', 'application', 'z', { status: 'running:healthy' }),
+    node('b', 'database', 'z', { status: 'exited:unhealthy' }),
+    node('c', 'service', 'z', { status: 'exited' }),
+    node('container:1', 'container', 'z', { status: 'exited' }),
+  ];
+  assert.deepEqual(statusSummary(nodes), { ok: 1, warn: 0, bad: 2, busy: 0, idle: 0 });
+  assert.equal(statusWord('exited:unhealthy'), 'Exited');
+});
+
+test('server details: memory and uptime formats', () => {
+  assert.equal(formatMemory(1007820800), '0.9 GB');
+  assert.equal(formatMemory(17179869184), '16 GB');
+  assert.equal(formatMemory(null), null);
+  const now = Date.parse('2026-10-14T12:00:00Z');
+  assert.equal(formatUptime('2026-10-14 11:15:00', now), '45m');
+  assert.equal(formatUptime('2026-10-14 07:00:00', now), '5h');
+  assert.equal(formatUptime('2026-10-02T12:00:00+00:00', now), '12d');
+  assert.equal(formatUptime('nonsense', now), null);
+});
+
+test('unreachable server zones: only server zones whose server is not reachable', () => {
+  const zones = [
+    { id: 'up', is_reachable: true },
+    { id: 'down', is_reachable: false },
+    { id: 'project', icon: 'projects' },
+  ];
+  assert.deepEqual([...unreachableZones({ zones })], ['down']);
+  assert.equal(unreachableZones(null).size, 0);
+});
+
+test('fit: shows everything when it stays readable, centered', () => {
+  const v = fitView({ minX: 0, minY: 0, maxX: 400, maxY: 200 }, { left: 0, top: 0, width: 1000, height: 600 }, true);
+  assert.equal(v.z, 1.1);
+  assert.equal(v.x, (1000 - 440) / 2);
+});
+
+test('fit: the first fit of a large canvas keeps the cards readable and starts at the top-left', () => {
+  const bounds = { minX: 100, minY: 50, maxX: 3100, maxY: 4050 };
+  const area = { left: 0, top: 0, width: 1280, height: 520 };
+  assert.ok(fitView(bounds, area).z < READABLE_ZOOM, 'the fit button still shows everything');
+  const v = fitView(bounds, area, true);
+  assert.equal(v.z, READABLE_ZOOM);
+  assert.equal(v.x + bounds.minX * v.z, 48);
+  assert.equal(v.y + bounds.minY * v.z, 48);
+});
+
+test('fit: a tall, narrow canvas keeps its column centered', () => {
+  const v = fitView({ minX: 0, minY: 0, maxX: 300, maxY: 5000 }, { left: 0, top: 0, width: 1280, height: 520 }, true);
+  assert.equal(v.z, READABLE_ZOOM);
+  assert.equal(v.x, (1280 - 300 * READABLE_ZOOM) / 2);
+  assert.equal(v.y, 48);
 });
 
 test('variables view: variables stack on the left by name, resources sit to their right', () => {
@@ -434,4 +585,77 @@ test('server view: a dragged card stops before its group covers another group', 
   const positions = dragOnto(g, layoutGraph(g), 'a', 'c');
   const [f1, f2] = groupFrames(g.nodes, positions);
   assert.ok(apart(f1, f2), 'the project / environment frames do not overlap');
+});
+
+test('server view: a group dropped as close to another group as a drag allows stays there after a reload', () => {
+  const nodes = [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'application', 'z1', 'staging')];
+  const g = { layout: 'server', zones: [{ id: 'z1', name: 'web' }], nodes, links: [] };
+  const groups = {};
+  const before = layoutServerView(g, groups);
+  const [prod, staging] = groupFrames(nodes, before);
+  // Drag the staging group to the left of the prod group: it stops at the gap the drag keeps.
+  const box = { x: staging.x, y: staging.y, w: staging.width, h: staging.height };
+  const others = [{ x: prod.x, y: prod.y, w: prod.width, h: prod.height }];
+  const { inner } = groups[groupKey([nodes[1]], 'z1')];
+  const spot = freeSpot({ ...box, x: prod.x + 40 }, others, GROUP_GAP, b => b.x >= inner.x && b.y >= inner.y);
+  const dropped = { ...before, b: { x: before.b.x + spot.x - box.x, y: before.b.y + spot.y - box.y } };
+  const shift = id => groups[groupKey([nodes.find(n => n.id === id)], 'z1')].shift;
+  const saved = Object.fromEntries(nodes.map(n => [n.id, { x: dropped[n.id].x - shift(n.id).x, y: dropped[n.id].y - shift(n.id).y }]));
+  const after = layoutServerView({ ...g, nodes: nodes.map(n => ({ ...n, saved: saved[n.id] })) });
+  assert.deepEqual(after, dropped);
+});
+
+test('server view: a dragged card keeps its group as far from another group as the layout does', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [srv('a', 'application', 'Shop / prod'), srv('c', 'application', 'Blog / prod')],
+    links: [],
+    positions: {},
+  };
+  const before = layoutServerView(g);
+  const { others, fits } = dragRules(g, before, {}, 'a');
+  const start = { ...before.a, w: CARD_WIDTH, h: estimateNodeHeight(g.nodes[0]) };
+  // The layout puts the groups GROUP_GAP apart: a card cannot move its group closer to the other one.
+  assert.equal(freeSpot({ ...start, x: start.x - 10 }, others, undefined, fits), null);
+});
+
+test('groupKey: a group with only an empty-environment placeholder has no key, so it cannot be moved', () => {
+  const environment = { uuid: 'env', name: 'production' };
+  assert.equal(groupKey([{ id: 'empty:env', type: 'empty', environment }], 'empty'), null);
+  assert.equal(groupKey([{ id: 'a', type: 'application', environment }], 'srv'), 'env:srv');
+});
+
+test('layoutServerView: an empty environment sits right of the other groups of its project, not below them', () => {
+  const shop = { uuid: 'shop', name: 'Shop' };
+  const node = (id, context, extra = {}) => ({ id, type: 'application', zone: 'srv', context, project: shop, environment: { uuid: context }, ...extra });
+  const graph = {
+    layout: 'server',
+    zones: [{ id: 'srv', name: 'srv' }],
+    nodes: [
+      node('a', 'Shop / staging', { saved: { x: 0, y: 0 } }),
+      node('empty:prod', 'Shop / production', { type: 'empty' }),
+    ],
+    links: [],
+  };
+  const out = layoutServerView(graph);
+  assert.equal(out['empty:prod'].y, out.a.y);
+  assert.ok(out['empty:prod'].x >= out.a.x + CARD_WIDTH);
+});
+
+test('variables view: saved environment canvas positions do not push resources away from the variables', () => {
+  const g = {
+    layout: 'connect',
+    zones: [{ id: 'sources', name: 'Server variables', icon: 'variable' }, { id: 'resources', name: 'Other resources', icon: 'service' }],
+    nodes: [
+      node('variable:1', 'variable', 'sources', { name: 'COOLIFY_SERVER_NAME' }),
+      node('app', 'application', 'resources', { context: 'Shop / prod', environment: { uuid: 'e1' }, saved: { x: 900, y: 1200 } }),
+    ],
+    links: [],
+    positions: {},
+  };
+  const [variables, resources] = zoneBoxes(g, layoutGraph(g));
+
+  assert.equal(resources.y, variables.y, 'both zones start at the top');
+  assert.ok(resources.x - (variables.x + variables.width) <= ZONE_GAP * 2, 'resources sit next to the variables');
 });

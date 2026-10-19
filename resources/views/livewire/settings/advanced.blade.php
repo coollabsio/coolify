@@ -95,8 +95,8 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]" />
                     <div class="lg:col-span-2">
-                        <x-forms.input id="allowed_ips" label="Allowed API IPs"
-                            helper="Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
+                        <x-forms.input id="allowed_ips" label="Allowed IPs"
+                            helper="Applies to the REST API and the MCP endpoint. Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
                             placeholder="192.168.1.100, 10.0.0.0/8" />
                     </div>
                 </div>
@@ -107,9 +107,12 @@
                 @endif
                 @if ($is_mcp_server_enabled)
                     <x-callout type="info" title="MCP endpoint" class="mt-4">
-                        <span class="inline-flex items-center gap-1 align-middle"><code>{{ url('/mcp') }}</code><x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" /></span>
-                        uses bearer tokens from
-                        <a href="{{ route('security.api-tokens') }}" class="underline" {{ wireNavigate() }}>Security → API Tokens</a>.
+                        <div class="flex items-center gap-1">
+                            <code>{{ url('/mcp') }}</code>
+                            <x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" />
+                        </div>
+                        Authenticate with a bearer token from
+                        <a href="{{ route('security.api-tokens') }}" class="font-medium underline" {{ wireNavigate() }}>Security → API Tokens</a>.
                     </x-callout>
                 @endif
             </x-application.settings-section>
@@ -163,13 +166,29 @@
                     <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
                         :options="$avatar_storage_options" />
                     <x-forms.input id="image_cdn_url" label="Image CDN URL"
-                        helper="Optional public CDN URL for profile pictures and project icons stored on S3. Leave empty to use the S3 endpoint." placeholder="https://images.example.com" />
+                        helper="Optional public URL (for example a CDN or public bucket domain) that serves profile pictures and project icons stored on S3. Leave empty to serve them through Coolify." placeholder="https://images.example.com" />
                 </div>
                 @if (count($avatar_storage_options) === 1)
                     <x-callout type="info" title="No usable S3 storage configured" class="mt-4">
                         Add and test an S3-compatible storage under Storages before selecting it here.
                     </x-callout>
                 @endif
+            </x-application.settings-section>
+
+            <x-application.settings-section id="file-download-storage-section" title="File downloads"
+                helper="Choose how files from the container file browser and backups are downloaded. Streaming sends each file through this Coolify instance (file browser: up to 1 GB). With S3, the server uploads the file to the bucket and the browser downloads it from S3, up to 5 GB; larger backups are streamed. S3 download links expire after 15 minutes, and the files are deleted after 6 hours.">
+                <div class="flex max-w-md flex-col gap-4">
+                    <x-forms.listbox id="file_download_storage" label="Download method" onChange="instantSave"
+                        :options="[
+                            ['value' => 'stream', 'label' => 'Stream through Coolify'],
+                            ...array_values(array_filter($avatar_storage_options, fn ($option) => $option['value'] !== 'local')),
+                        ]" />
+                </div>
+                <x-callout type="info" title="Bucket auto-delete rule" class="mt-4">
+                    When you select an S3 storage, Coolify adds a lifecycle rule that deletes objects under
+                    <span class="font-mono">coolify-file-downloads/</span> after 1 day, as a safety net. The selected
+                    storage must be reachable from your servers, and the S3 provider must support lifecycle rules.
+                </x-callout>
             </x-application.settings-section>
         </form>
     </x-settings.layout>

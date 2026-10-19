@@ -107,7 +107,7 @@ test('root token can enable MCP server when the REST API is disabled', function 
 });
 
 test('MCP switch routes enforce the allowed API IPs', function (string $path) {
-    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '192.0.2.10']);
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10']);
     Once::flush();
     $token = makeRootMcpToken($this->user);
 

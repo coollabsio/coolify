@@ -1,0 +1,2 @@
+1_deploy:
+  error: "Exception: Invalid Docker Compose service name: Invalid service name: contains forbidden character ';' (command separator). Shell metacharacters are not allowed for security reasons. Service names must not contain shell metacharacters."

@@ -2,10 +2,6 @@
                     <x-unsaved-bar action="submit" />
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Operating system and hardware details for the server running this Coolify instance.">
-                        <x-slot:badges>
-                            <x-status-badge :status="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                :type="$server->isFunctional() ? 'success' : 'warning'" />
-                        </x-slot:badges>
                         <x-slot:actions>
                             @if ($server->server_metadata)
                                 <x-forms.button type="button" wire:click="refreshServerMetadata"

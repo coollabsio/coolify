@@ -11,6 +11,7 @@ use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
 
@@ -84,7 +85,11 @@ class Bitbucket extends Controller
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_name, $branch);
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_bitbucket_token);
-            $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
+            $applications = Application::query();
+            if ($x_bitbucket_event !== 'pullrequest:rejected' && $x_bitbucket_event !== 'pullrequest:fulfilled') {
+                $applications->where('git_branch', $branch);
+            }
+            $applications = $this->manualWebhookApplications($applications, $full_name);
             if ($applications->isEmpty()) {
                 return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
             }
@@ -128,6 +133,7 @@ class Bitbucket extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([

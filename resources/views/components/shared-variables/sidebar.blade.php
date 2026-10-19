@@ -8,17 +8,6 @@
     ];
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start"
-    data-settings-search-items="{{ json_encode(settingsSearchItems(['Shared variables' => $sharedVariablesMenuItems], [])) }}">
-    <nav aria-label="Shared variables"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-        @foreach ($sharedVariablesMenuItems as $menuItem)
-            <a wire:key="shared-variables-{{ str($menuItem['label'])->slug() }}"
-                @class(['menu-item', 'menu-item-active' => $menuItem['active']])
-                {{ wireNavigate() }} href="{{ route($menuItem['route']) }}">
-                <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-            </a>
-        @endforeach
-    </nav>
-</aside>
+{{-- The pages are in the Shared Variables submenu of the main sidebar (components/navbar.blade.php);
+     this only feeds the page search. --}}
+<div hidden data-settings-search-items="{{ json_encode(settingsSearchItems(['Shared variables' => $sharedVariablesMenuItems], [])) }}"></div>

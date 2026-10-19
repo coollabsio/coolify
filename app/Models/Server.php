@@ -11,6 +11,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckTraefikVersionForServerJob;
@@ -189,6 +190,9 @@ class Server extends BaseModel
         static::saved(function ($server) {
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
+            } elseif ($server->wasChanged(['user', 'ip', 'port'])) {
+                // An open multiplexed connection keeps the old user and host until it is closed.
+                SshMultiplexingHelper::removeMuxFile($server);
             }
         });
         static::created(function ($server) {
@@ -252,7 +256,13 @@ class Server extends BaseModel
                 $destination->delete();
             });
             // Leftover active runner rows would block deleting the GitHub App.
-            GithubRunnerExecution::deleteAndDeregister(GithubRunnerExecution::query()->where('server_id', $server->id));
+            // The runners of a transferred server now belong to the other instance, so keep them registered at GitHub.
+            $executions = GithubRunnerExecution::query()->where('server_id', $server->id);
+            if ($server->isTransferredAway()) {
+                $executions->delete();
+            } else {
+                GithubRunnerExecution::deleteAndDeregister($executions);
+            }
             $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
             $server->sslCertificates()->delete();
@@ -1377,15 +1387,6 @@ $siteAddress {
     }
 
     /**
-     * Management was disabled manually on this instance; the server is ready to be transferred.
-     */
-    public function isManagementDisabled(): bool
-    {
-        return $this->isTransferredAway()
-            && (bool) data_get($this->server_metadata, 'transfer.management_disabled', false);
-    }
-
-    /**
      * Whether this server may be validated / installed against from this instance.
      */
     public function canBeValidated(): bool
@@ -2071,25 +2072,34 @@ $siteAddress {
     public function validateOS(): bool|Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $releaseLines = collect(explode("\n", $os_release));
-        $collectedData = collect([]);
-        foreach ($releaseLines as $line) {
-            $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
-        }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
+
+        return self::supportedOsFromOsRelease($os_release);
+    }
+
+    /**
+     * Match /etc/os-release against SUPPORTED_OS: ID first, then each ID_LIKE token (e.g. Manjaro: ID=manjaro, ID_LIKE=arch).
+     */
+    public static function supportedOsFromOsRelease(?string $osRelease): bool|Stringable
+    {
+        $collectedData = collect(explode("\n", (string) $osRelease))
+            ->mapWithKeys(function ($line) {
+                $item = str($line)->trim();
+
+                return [$item->before('=')->value() => $item->after('=')->lower()->replace(['"', "'"], '')->value()];
+            });
+
+        $candidates = collect([data_get($collectedData, 'ID')])
+            ->merge(explode(' ', (string) data_get($collectedData, 'ID_LIKE')))
+            ->filter();
+
+        foreach ($candidates as $candidate) {
+            $supported = collect(SUPPORTED_OS)->filter(fn ($supportedOs) => str($supportedOs)->contains($candidate));
+            if ($supported->count() === 1) {
+                return str($supported->first());
             }
-        });
-        if ($supported->count() === 1) {
-            return str($supported->first());
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     public function gatherServerMetadata(): ?array
@@ -2128,7 +2138,13 @@ $siteAddress {
                 'collected_at' => now()->toIso8601String(),
             ];
 
-            $this->update(['server_metadata' => $metadata]);
+            // Merge into the saved row: server_metadata also holds the transfer and migration state.
+            DB::transaction(function () use ($metadata) {
+                $locked = self::query()->lockForUpdate()->findOrFail($this->id);
+                $locked->update(['server_metadata' => array_merge($locked->server_metadata ?? [], $metadata)]);
+                $this->server_metadata = $locked->server_metadata;
+                $this->syncOriginalAttribute('server_metadata');
+            });
 
             try {
                 $detectedDockerVersion = parseDockerEngineVersion($sections['DOCKER'] ?? null);

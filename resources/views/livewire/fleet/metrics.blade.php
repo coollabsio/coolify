@@ -81,12 +81,21 @@ $serverListboxOptions = array_merge(
 
     @if ($servers->isEmpty())
         <x-empty size="sm" title="No server metrics yet"
-            description="Enable metrics on a server to see fleet resource usage here."
+            description="{{ empty($enableableServers) ? 'Enable metrics on a server to see fleet resource usage here.' : 'Enable metrics to collect CPU, memory, disk, and network history. This starts Sentinel; your applications keep running.' }}"
             icon-name="graph">
             <x-slot:contents>
-                <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
-                    View servers
-                </a>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    @if (! empty($enableableServers))
+                        <x-forms.button isHighlighted wire:click="enableMetrics">
+                            {{ count($enableableServers) === 1
+                                ? 'Enable metrics on '.\Illuminate\Support\Str::limit($enableableServers[0], 24)
+                                : 'Enable metrics on '.count($enableableServers).' servers' }}
+                        </x-forms.button>
+                    @endif
+                    <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
+                        View servers
+                    </a>
+                </div>
             </x-slot:contents>
         </x-empty>
     @else
@@ -226,41 +235,55 @@ $serverListboxOptions = array_merge(
         </div>
 
         {{-- Servers table --}}
-        <x-application.settings-section title="Servers" flush
-            helper="Per-server resource pressure. Sorted by CPU, highest first.">
-            <div class="data-table">
-                <div class="data-table-header fleet-servers-table-grid">
-                    <span>Server</span>
-                    <span>CPU</span>
-                    <span>Memory</span>
-                    <span>Disk</span>
-                    <span>Load</span>
-                    <span>Network</span>
-                    <span class="text-right">Containers</span>
+        <x-application.settings-section id="metrics-servers-section" title="Servers" flush
+            helper="Per-server resource pressure. Select a column header to sort.">
+            <div class="data-table" x-data="trafficTable({ per: Number.MAX_SAFE_INTEGER, key: 'cpu' })">
+                <div class="data-table-header fleet-servers-table-grid border-b-0!">
+                    @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Server', 'text' => true, 'class' => 'justify-self-start'])
+                    @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'load' => 'Load', 'network' => 'Network'] as $column => $label)
+                        @include('livewire.traffic._sort-header', ['column' => $column, 'label' => $label, 'text' => true, 'dir' => 'desc', 'class' => 'justify-self-start'])
+                    @endforeach
+                    @include('livewire.traffic._sort-header', ['column' => 'containers', 'label' => 'Containers', 'class' => 'justify-self-end'])
                 </div>
-                @foreach (collect($serverRows)->sortByDesc(fn ($r) => $r['cpu'] ?? -1) as $row)
-                    <div wire:key="fleet-server-{{ $row['uuid'] }}"
-                        class="data-table-row fleet-servers-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                        <div class="flex min-w-0 items-center gap-2">
-                            <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}"
-                                class="min-w-0 truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $row['name'] }}</a>
-                            @unless ($row['online'])
-                                <span class="table-badge table-badge-warning shrink-0">Offline</span>
-                            @endunless
+                <div class="flex flex-col">
+                    @foreach (collect($serverRows)->sortByDesc(fn ($r) => $r['cpu'] ?? -1) as $row)
+                        @php
+                            $memPercent = ($row['memTotal'] ?? 0) ? round($row['memUsed'] / $row['memTotal'] * 100, 1) : null;
+                            $sortValues = [
+                                'name' => $row['name'],
+                                'cpu' => $row['cpu'],
+                                'memory' => $memPercent,
+                                'disk' => $row['diskPercent'],
+                                'load' => $row['load1'],
+                                'network' => $row['netRx'] === null ? null : $row['netRx'] + $row['netTx'],
+                                'containers' => $row['containers'],
+                            ];
+                        @endphp
+                        {{-- Offline servers have no values, so they stay last in each sort. --}}
+                        <div wire:key="fleet-server-{{ $row['uuid'] }}" data-row="{{ json_encode($sortValues) }}" @unless ($row['online']) data-pinned @endunless
+                            x-show="shown($el)"
+                            class="data-table-row fleet-servers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}"
+                                    class="min-w-0 truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $row['name'] }}</a>
+                                @unless ($row['online'])
+                                    <span class="table-badge table-badge-warning shrink-0">Offline</span>
+                                @endunless
+                            </div>
+                            <div>@include('livewire.fleet._usage-cell', ['percent' => $row['cpu'], 'kind' => 'cpu'])</div>
+                            <div>@include('livewire.fleet._usage-cell', ['percent' => $memPercent, 'kind' => 'memory'])</div>
+                            <div>@include('livewire.fleet._usage-cell', ['percent' => $row['diskPercent'], 'kind' => 'disk'])</div>
+                            <div class="text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['load1'] === null ? '-' : number_format($row['load1'], 2) }}</div>
+                            <div class="text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['netRx'] === null ? '-' : formatBytes($row['netRx'] + $row['netTx']).'/s' }}</div>
+                            <div class="text-right text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['containers'] ?? '-' }}</div>
                         </div>
-                        <div>@include('livewire.fleet._usage-cell', ['percent' => $row['cpu'], 'kind' => 'cpu'])</div>
-                        <div>@include('livewire.fleet._usage-cell', ['percent' => ($row['memTotal'] ?? 0) ? round($row['memUsed'] / $row['memTotal'] * 100, 1) : null, 'kind' => 'memory'])</div>
-                        <div>@include('livewire.fleet._usage-cell', ['percent' => $row['diskPercent'], 'kind' => 'disk'])</div>
-                        <div class="text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['load1'] === null ? '-' : number_format($row['load1'], 2) }}</div>
-                        <div class="text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['netRx'] === null ? '-' : formatBytes($row['netRx'] + $row['netTx']).'/s' }}</div>
-                        <div class="text-right text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['containers'] ?? '-' }}</div>
-                    </div>
-                @endforeach
+                    @endforeach
+                </div>
             </div>
         </x-application.settings-section>
 
         {{-- Hottest containers --}}
-        <x-application.settings-section title="Hottest containers" flush
+        <x-application.settings-section id="metrics-containers-section" title="Hottest containers" flush
             helper="{{ $scoped ? 'Busiest containers on this server, ranked by the selected metric.' : 'Busiest containers across the fleet, ranked by the selected metric.' }}">
             <x-slot:actions>
                 <div class="flex items-center gap-2">
@@ -294,47 +317,51 @@ $serverListboxOptions = array_merge(
                     $maxMetric = max(1, collect($topContainers)->map($metricOf)->max());
                 @endphp
                 <div class="data-table transition-opacity" wire:loading.class="pointer-events-none opacity-50"
-                    wire:target="containerMetric">
-                    <div class="data-table-header fleet-containers-table-grid">
+                    wire:target="containerMetric" x-data="trafficTable({ per: Number.MAX_SAFE_INTEGER, key: 'value' })">
+                    <div class="data-table-header fleet-containers-table-grid border-b-0!">
                         <span class="text-center">#</span>
-                        <span>Container</span>
-                        <span>Server</span>
-                        <span class="text-right">{{ ['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'][$containerMetric] }}</span>
+                        @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Container', 'text' => true, 'class' => 'justify-self-start'])
+                        @include('livewire.traffic._sort-header', ['column' => 'server', 'label' => 'Server', 'text' => true, 'class' => 'justify-self-start'])
+                        @include('livewire.traffic._sort-header', ['column' => 'value', 'label' => ['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'][$containerMetric], 'class' => 'justify-self-end'])
                     </div>
-                    @foreach ($topContainers as $c)
-                        @php
-                            $meta = $this->containerMeta($c['id']);
-                            $pct = min(100, round($metricOf($c) / $maxMetric * 100, 1));
-                            $display = match ($containerMetric) {
-                                'memory' => formatBytes($c['memUsed'] ?? 0),
-                                'disk' => formatBytes($c['diskBytes'] ?? 0),
-                                'network' => formatBytes($c['net'] ?? 0).'/s',
-                                default => round($c['cpu'] ?? 0).'%',
-                            };
-                        @endphp
-                        <div wire:key="fleet-container-{{ $c['serverUuid'] ?? $c['server'] }}-{{ $c['id'] }}"
-                            class="data-table-row fleet-containers-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                            <div class="self-center text-center text-[12px] tabular-nums text-neutral-400 dark:text-fg-faint">{{ $loop->iteration }}</div>
-                            <div class="flex min-w-0 flex-col">
-                                @if ($meta['link'])
-                                    <a href="{{ $meta['link'] }}" class="truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $meta['name'] }}</a>
-                                @else
-                                    <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $meta['name'] }}</span>
-                                @endif
-                                @if ($meta['image'])
-                                    <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-fg-faint">{{ $meta['image'] }}</span>
-                                @endif
-                            </div>
-                            <div class="min-w-0 self-center truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
-                            <div class="flex items-center justify-end gap-2.5 self-center">
-                                <div class="hidden h-1.5 w-full max-w-[6rem] overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]"
-                                    title="{{ $pct }}% of the busiest">
-                                    <div class="h-full rounded-full bg-[var(--chart-status-3xx)] transition-[width] duration-700 ease-out" style="width: {{ $pct }}%"></div>
+                    <div class="flex flex-col">
+                        @foreach ($topContainers as $c)
+                            @php
+                                $meta = $this->containerMeta($c['id']);
+                                $pct = min(100, round($metricOf($c) / $maxMetric * 100, 1));
+                                $display = match ($containerMetric) {
+                                    'memory' => formatBytes($c['memUsed'] ?? 0),
+                                    'disk' => formatBytes($c['diskBytes'] ?? 0),
+                                    'network' => formatBytes($c['net'] ?? 0).'/s',
+                                    default => round($c['cpu'] ?? 0).'%',
+                                };
+                            @endphp
+                            <div wire:key="fleet-container-{{ $c['serverUuid'] ?? $c['server'] }}-{{ $c['id'] }}"
+                                data-row="{{ json_encode(['name' => $meta['name'], 'server' => $c['server'], 'value' => $metricOf($c)]) }}"
+                                x-show="shown($el)"
+                                class="data-table-row fleet-containers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
+                                <div class="self-center text-center text-[12px] tabular-nums text-neutral-400 dark:text-fg-faint">{{ $loop->iteration }}</div>
+                                <div class="flex min-w-0 flex-col">
+                                    @if ($meta['link'])
+                                        <a href="{{ $meta['link'] }}" class="truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $meta['name'] }}</a>
+                                    @else
+                                        <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $meta['name'] }}</span>
+                                    @endif
+                                    @if ($meta['image'])
+                                        <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-fg-faint">{{ $meta['image'] }}</span>
+                                    @endif
                                 </div>
-                                <span class="w-20 shrink-0 whitespace-nowrap text-right text-[13px] tabular-nums text-black dark:text-fg">{{ $display }}</span>
+                                <div class="min-w-0 self-center truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
+                                <div class="flex items-center justify-end gap-2.5 self-center">
+                                    <div class="hidden h-1.5 w-full max-w-[6rem] overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]"
+                                        title="{{ $pct }}% of the busiest">
+                                        <div class="h-full rounded-full bg-[var(--chart-status-3xx)] transition-[width] duration-700 ease-out" style="width: {{ $pct }}%"></div>
+                                    </div>
+                                    <span class="w-20 shrink-0 whitespace-nowrap text-right text-[13px] tabular-nums text-black dark:text-fg">{{ $display }}</span>
+                                </div>
                             </div>
-                        </div>
-                    @endforeach
+                        @endforeach
+                    </div>
                 </div>
             @endif
         </x-application.settings-section>

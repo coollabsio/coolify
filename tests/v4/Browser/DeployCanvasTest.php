@@ -114,7 +114,7 @@ it('zooms around the fingers with a two-finger pinch', function () {
 
     // Two touch pointers 100px apart move to 200px apart: the zoom doubles from 100% to the 200% maximum.
     $zoom = $page->script(<<<'JS'
-        (() => {
+        (async () => {
             const viewport = document.querySelector('.cv-viewport');
             const r = viewport.getBoundingClientRect();
             const y = r.top + r.height / 2;
@@ -127,6 +127,8 @@ it('zooms around the fingers with a two-finger pinch', function () {
             fire('pointermove', 2, cx + 100);
             fire('pointerup', 1, cx - 100);
             fire('pointerup', 2, cx + 100);
+            // The label is reactive: wait for Svelte to write it.
+            await new Promise(resolve => requestAnimationFrame(resolve));
             return document.querySelector('button[title="Reset zoom to 100%"]').textContent;
         })()
     JS);

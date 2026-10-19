@@ -11,6 +11,7 @@ use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -84,7 +85,10 @@ class Gitea extends Controller
                 }
             }
             if ($x_gitea_event === 'pull_request') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
+                if ($action !== 'closed') {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
                     return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
@@ -114,6 +118,7 @@ class Gitea extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([

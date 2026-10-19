@@ -56,7 +56,7 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <x-table.dropdown panel-class="w-52!">
                         <x-slot:trigger>
                             <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
@@ -280,10 +280,44 @@
             <x-application.settings-section :title="$tag->name"
                 description="Use this webhook to deploy every resource with this tag.">
                 <x-slot:actions>
-                    <a href="{{ app(App\Services\TagCanvas::class)->connectLink($tag) }}" class="button whitespace-nowrap"
-                        title="Add this tag to resources, and see which resources have it">
-                        <x-reicon name="link" class="size-3.5" />
-                        Connect to resources
+                    {{-- Two ways to connect: a list in a modal, or the canvas (wide screens only). --}}
+                    <x-modal-input title="Connect to resources" subtitle="Add this tag to resources, or remove it."
+                        wireOpen="connectResourcesOpen" :wireIgnore="false" :contentClicks="false">
+                        <x-slot:content>
+                            <button type="button" class="button whitespace-nowrap" wire:click="openConnectResources">
+                                <x-reicon name="link" class="size-3.5" />
+                                Connect to resources
+                            </button>
+                        </x-slot:content>
+                        @forelse ($connectableResources as $context => $resources)
+                            <div wire:key="connect-group-{{ $context }}" class="mb-4 last:mb-0">
+                                <p class="mb-1.5 truncate text-[11px] font-medium text-neutral-500 dark:text-fg-faint">{{ $context }}</p>
+                                <div class="flex flex-col gap-1">
+                                    @foreach ($resources as $resource)
+                                        <label wire:key="connect-resource-{{ $resource['uuid'] }}" @class([
+                                            'flex items-center gap-2.5 rounded-md border border-neutral-200 px-3 py-2 text-[13px] dark:border-white/[0.08]',
+                                            'cursor-pointer' => $resource['can_update'],
+                                            'opacity-60' => ! $resource['can_update'],
+                                        ])>
+                                            <input type="checkbox" @checked($resource['tagged']) @disabled(! $resource['can_update'])
+                                                wire:click="toggleResource(@js($resource['uuid']))" wire:loading.attr="disabled"
+                                                class="size-4 shrink-0 rounded-sm border-neutral-300 text-accent focus:ring-accent dark:border-white/20 dark:bg-transparent" />
+                                            <span class="min-w-0 truncate">{{ $resource['name'] }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <div wire:loading.remove wire:target="openConnectResources">
+                                <x-empty title="No resources yet" description="Create a resource in a project first." icon-name="tags" size="sm" />
+                            </div>
+                        @endforelse
+                    </x-modal-input>
+                    <a href="{{ app(App\Services\TagCanvas::class)->connectLink($tag) }}"
+                        class="button hidden whitespace-nowrap md:inline-flex"
+                        title="Add this tag to resources on the canvas, and see which resources have it">
+                        <x-reicon name="deploy-canvas" class="size-3.5" />
+                        Connect in canvas
                     </a>
                     @can('delete', $tag)
                         <x-modal-confirmation title="Delete this tag?" isErrorButton buttonTitle="Delete"

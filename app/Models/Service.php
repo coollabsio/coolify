@@ -71,6 +71,7 @@ class Service extends BaseModel
     protected $appends = ['server_status', 'status'];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
     ];
 
@@ -753,7 +754,7 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Supabase', $data->toArray());
-                case $image->contains('minio'):
+                case $image->contains(['minio', 'pgsty/silo']):
                     $data = collect([]);
                     $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
                     $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();

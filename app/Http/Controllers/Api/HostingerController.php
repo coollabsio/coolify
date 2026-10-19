@@ -122,6 +122,7 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 201, description: 'Hostinger VPS purchased and linked to a Coolify server.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability to set post_install_script_id or public_key_ids.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
@@ -180,6 +181,10 @@ class HostingerController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+
+        if ($request->filled('post_install_script_id') || $request->array('public_key_ids')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
         }
 
         $team = Team::find($teamId);

@@ -77,7 +77,7 @@
         [
             'label' => 'Sentinel',
             'route' => 'server.sentinel',
-            'active' => request()->routeIs('server.sentinel', 'server.sentinel.*'),
+            'active' => $activeMenu === 'sentinel',
             'icon' => 'shield-star',
             'group' => 'Platform',
             'visible' => ! $server->isSwarm() && $server->canHostResources() && auth()->user()?->can('viewSentinel', $server),
@@ -85,8 +85,8 @@
             'warning' => $server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
             'tracks_sentinel_status' => true,
             'children' => [
-                ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
-                ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],
+                ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
+                ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => $activeSubMenu === 'logs', 'icon' => 'file-content'],
             ],
         ],
         [
@@ -182,13 +182,13 @@
         [
             'label' => 'Security',
             'route' => 'server.security.patches',
-            'active' => request()->routeIs('server.security.*'),
+            'active' => $activeMenu === 'security',
             'icon' => 'shield-alert',
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
             'children' => [
-                ['label' => 'Server Patching', 'route' => 'server.security.patches', 'active' => request()->routeIs('server.security.patches'), 'icon' => 'bandage'],
-                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => request()->routeIs('server.security.terminal-access'), 'icon' => 'browser-terminal', 'navigate' => false],
+                ['label' => 'Server Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage'],
+                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
             ],
         ],
         [
@@ -196,15 +196,16 @@
             'route' => 'server.transfer',
             'active' => $activeMenu === 'transfer',
             'icon' => 'arrow-right',
+            'beta' => true,
             'group' => 'Operations',
-            'visible' => isDev() && ! $server->isLocalhost() && auth()->user()?->can('view', $server),
+            'visible' => ! $server->isLocalhost() && auth()->user()?->can('update', $server),
         ],
         [
-            'label' => 'Danger',
+            'label' => 'Danger Zone',
             'route' => 'server.delete',
             'active' => $activeMenu === 'danger',
-            'icon' => 'shield-alert',
-            'group' => 'Danger zone',
+            'icon' => 'danger',
+            'group' => 'Danger Zone',
             // Coolify host (id 0) cannot be deleted. Other servers may still use
             // host.docker.internal (e.g. Lima VMs) and must keep the Danger menu.
             'visible' => ! $server->is_coolify_host,
@@ -215,16 +216,44 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
-
-    // Group that holds the current page (item or nested child) — always kept
-    // open, even if collapsed before.
-    $activeGroup = (string) $groupedServerMenuItems->search(fn ($items) => $items->contains(
-        fn ($item) => ($item['active'] ?? false)
-            || collect($item['children'] ?? [])->contains(fn ($child) => $child['active'] ?? false)
-    ));
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start"
+@php
+    // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
+    registerMainNavContext(0, 'Servers', 'Back to the main menu');
+@endphp
+
+{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
+     Both copies keep their own warning state (proxy, Sentinel). --}}
+@foreach (['page', 'main-nav'] as $placement)
+@if ($placement === 'main-nav')
+@teleport('#main-nav-context-0')
+<div class="nav-context-menu"
+    x-data="{
+        proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
+        traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),
+        proxyNotRunning: @js($proxyNotRunning),
+        sentinelOutOfSync: @js($server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync'),
+        sentinelExpiryTimer: null,
+        scheduleSentinelExpiry(delay) {
+            clearTimeout(this.sentinelExpiryTimer);
+            if (!this.sentinelOutOfSync) {
+                this.sentinelExpiryTimer = setTimeout(() => this.sentinelOutOfSync = true, delay);
+            }
+        }
+    }"
+    x-init="scheduleSentinelExpiry(@js($sentinelExpiresInMilliseconds))"
+    @proxy-configuration-state-changed.window="
+        proxyConfigurationPending = $event.detail.pending;
+        traefikOutdated = $event.detail.traefikOutdated;
+        proxyNotRunning = $event.detail.proxyNotRunning;
+    "
+    @sentinel-status-changed.window="
+        sentinelOutOfSync = $event.detail.outOfSync;
+        scheduleSentinelExpiry($event.detail.expiresInMilliseconds);
+    ">
+@else
+<aside class="application-settings-navigation in-main-nav min-w-0 xl:self-start"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedServerMenuItems, $serverRouteParameters)) }}"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
@@ -249,27 +278,21 @@
         sentinelOutOfSync = $event.detail.outOfSync;
         scheduleSentinelExpiry($event.detail.expiresInMilliseconds);
     ">
+@endif
     <nav aria-label="Server configuration sections"
-        x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.server' })"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        @class([
+            'grid gap-0.5',
+            'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
+            'grid-cols-1' => $placement === 'main-nav',
+        ])>
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                     aria-hidden="true"></div>
             @endunless
-            <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
-                :aria-expanded="isOpen(@js($groupLabel))">
-                <span>{{ $groupLabel }}</span>
-                <svg class="size-3 shrink-0 opacity-60 transition-transform"
-                    :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-                </svg>
-            </button>
-            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
             @foreach ($groupItems as $menuItem)
                 @if ($menuItem['disabled'] ?? false)
-                    <span wire:key="server-settings-link-{{ str($menuItem['label'])->slug() }}"
+                    <span wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
                         class="menu-item cursor-not-allowed opacity-40" aria-disabled="true"
                         title="Validate the server connection first.">
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
@@ -277,7 +300,7 @@
                     </span>
                     @continue
                 @endif
-                <a wire:key="server-settings-link-{{ str($menuItem['label'])->slug() }}"
+                <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
                     @class([
                         'menu-item',
                         'menu-item-active' => $menuItem['active'],
@@ -303,7 +326,7 @@
                 @if ($menuItem['active'] && isset($menuItem['children']))
                     <div class="col-span-full grid grid-cols-2 gap-0.5 border-l border-neutral-200 pl-2 sm:grid-cols-3 xl:grid-cols-1 dark:border-white/[0.08]">
                         @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
-                            <a wire:key="server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
+                            <a wire:key="{{ $placement }}-server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
                                 @class(['menu-item', 'menu-item-active' => $child['active']])
                                 @if ($child['navigate'] ?? true) {{ wireNavigate() }} @endif
                                 href="{{ route($child['route'], $serverRouteParameters) }}">
@@ -314,7 +337,12 @@
                     </div>
                 @endif
             @endforeach
-            </div>
         @endforeach
     </nav>
+@if ($placement === 'main-nav')
+</div>
+@endteleport
+@else
 </aside>
+@endif
+@endforeach

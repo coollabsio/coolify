@@ -4,6 +4,8 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -195,13 +197,20 @@ function generateGithubToken(GithubApp $source, string $type)
     return match ($type) {
         'jwt' => $jwt,
         'installation' => (function () use ($source, $jwt) {
+            // GitHub sometimes answers with a 5xx page or drops the connection; a new token request is harmless.
             $response = Http::GitSource($source->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
-            ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+            ])->retry(
+                3,
+                fn (int $attempt) => $attempt * 1000,
+                fn (Throwable $exception) => $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->serverError()),
+                throw: false,
+            )->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
-                $error = data_get($response->json(), 'message', 'no error message found');
+                $error = data_get($response->json(), 'message', "HTTP {$response->status()}");
                 if ($error === 'Not Found') {
                     $error = 'Repository not found. Is it moved or deleted?';
                 }
@@ -216,7 +225,7 @@ function generateGithubToken(GithubApp $source, string $type)
 
 function generateGithubInstallationToken(GithubApp $source)
 {
-    return generateGithubToken($source, 'installation');
+    return $source->installationToken();
 }
 
 function generateGithubJwt(GithubApp $source)
@@ -397,28 +406,34 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         'repositories' => $json['repositories'],
     ];
 }
-function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): array
+/**
+ * Returns null when the full list of changed files is unknown (API error or truncated list).
+ */
+function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): ?array
 {
     try {
         if (! $source) {
             // Manual webhooks don't have GitHub App authentication
-            // Return empty array so watch paths are ignored (current behavior)
             return [];
         }
 
         $endpoint = "/repos/{$owner}/{$repo}/compare/{$beforeSha}...{$afterSha}";
-        $response = githubApi($source, $endpoint, 'get', null, false);
-
-        if (! $response) {
-            return [];
-        }
-
+        $response = githubApi($source, $endpoint);
         $files = collect(data_get($response, 'data.files', []));
 
-        return $files->pluck('filename')->filter()->values()->toArray();
-    } catch (Exception $e) {
+        // The compare API returns at most 300 files and cannot paginate them.
+        if ($files->count() >= 300) {
+            return null;
+        }
 
-        return [];
+        // A renamed file also changes its previous path.
+        return $files->flatMap(fn (mixed $file): array => [data_get($file, 'filename'), data_get($file, 'previous_filename')])
+            ->filter(fn (mixed $filename): bool => is_string($filename) && $filename !== '')
+            ->unique()
+            ->values()
+            ->toArray();
+    } catch (Exception $e) {
+        return null;
     }
 }
 
@@ -444,27 +459,34 @@ function getGithubCommitMessage(?GithubApp $source, string $owner, string $repo,
     }
 }
 
-function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $repo, int $pullRequestId): array
+/**
+ * Returns null when the full list of changed files is unknown (API error or truncated list).
+ */
+function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $repo, int $pullRequestId): ?array
 {
     try {
         if (! $source) {
             // Manual webhooks don't have GitHub App authentication
-            // Return empty array so watch paths are ignored (current behavior)
             return [];
         }
 
-        $endpoint = "/repos/{$owner}/{$repo}/pulls/{$pullRequestId}/files";
-        $response = githubApi($source, $endpoint, 'get', null, false);
+        // GitHub returns at most 100 files per page and 3000 files per pull request.
+        $perPage = 100;
+        $maxPages = 30;
+        $files = collect();
 
-        if (! $response) {
-            return [];
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $endpoint = "/repos/{$owner}/{$repo}/pulls/{$pullRequestId}/files?per_page={$perPage}&page={$page}";
+            $pageFiles = collect(data_get(githubApi($source, $endpoint), 'data', []));
+            $files = $files->merge($pageFiles->pluck('filename'));
+
+            if ($pageFiles->count() < $perPage) {
+                return $files->filter()->values()->toArray();
+            }
         }
 
-        $files = collect(data_get($response, 'data', []));
-
-        return $files->pluck('filename')->filter()->values()->toArray();
+        return null;
     } catch (Exception $e) {
-
-        return [];
+        return null;
     }
 }

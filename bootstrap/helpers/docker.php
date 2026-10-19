@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -675,7 +676,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
     $variables = collect($environment_variables);
     $payload = collect([]);
     switch ($type) {
-        case $type?->contains('minio'):
+        case $type?->contains(['minio', 'pgsty/silo']):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
 
@@ -765,9 +766,12 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         return false;
     }
 
+    // Flags are stored without a port, so compare portless: https://app.example.com:3000 matches https://app.example.com.
+    $normalize = fn (string $url) => DomainPortOverrides::withoutPort(ValidationPatterns::normalizeApplicationDomainUrl($url));
+
     return $noindex_domains
-        ->map(fn (string $noindex_domain) => ValidationPatterns::normalizeApplicationDomainUrl($noindex_domain))
-        ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
+        ->map($normalize)
+        ->contains($normalize($domain));
 }
 
 /**

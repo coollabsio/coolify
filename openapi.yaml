@@ -542,7 +542,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -958,7 +958,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1374,7 +1374,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -2369,15 +2369,6 @@ paths:
           application/json:
             schema:
               properties:
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name.'
                 github_app_uuid:
                   type: string
                   description: 'The Github App UUID.'
@@ -2390,9 +2381,6 @@ paths:
                 ports_exposes:
                   type: string
                   description: 'The ports to expose.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, railpack, static, dockerfile, dockercompose]
@@ -2572,7 +2560,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -4715,6 +4703,9 @@ paths:
                 limits_cpu_shares:
                   type: integer
                   description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Restart the database after the update. Requires the deploy ability.'
                 postgres_user:
                   type: string
                   description: 'PostgreSQL user'
@@ -8411,6 +8402,8 @@ paths:
           description: 'Hostinger VPS purchased and linked to a Coolify server.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set post_install_script_id or public_key_ids.'
         '422':
           description: 'Validation failed.'
         '429':
@@ -11144,6 +11137,204 @@ paths:
       security:
         -
           bearerAuth: []
+  '/servers/{uuid}/migrate':
+    post:
+      tags:
+        - Servers
+      summary: 'Migrate server to another Coolify instance'
+      description: 'Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. Follow the progress with GET /servers/{uuid}/transfer. The target URL must use https. Requires read:sensitive and write.'
+      operationId: migrate-server-between-instances
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - target_url
+                - target_token
+              properties:
+                target_url:
+                  type: string
+                  example: 'https://coolify-b.example.com'
+                target_token:
+                  description: 'API token on the target instance (root or write)'
+                  type: string
+              type: object
+      responses:
+        '202':
+          description: 'Transfer started'
+        '403':
+          description: 'Missing sensitive permission'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          description: 'Validation or remote import failed'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/transfer':
+    get:
+      tags:
+        - Servers
+      summary: 'Get server transfer status'
+      description: 'Show the transfer state of a server on this instance: the import/claim state (transfer) and the state of a running or finished transfer to another instance (migration).'
+      operationId: get-server-transfer-status
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Transfer status'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /servers/import/check:
+    get:
+      tags:
+        - Servers
+      summary: 'Check server import'
+      description: 'Check that this instance can import a server, before the source instance starts the transfer. It checks the token, the bundle version, the server limit, servers with the same UUID or IP, and that this instance can reach the SSH port of the server.'
+      operationId: check-server-import
+      parameters:
+        -
+          name: server_uuid
+          in: query
+          required: true
+          schema:
+            type: string
+        -
+          name: ip
+          in: query
+          required: true
+          schema:
+            type: string
+        -
+          name: port
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 22
+        -
+          name: schema_version
+          in: query
+          required: false
+          schema:
+            type: integer
+        -
+          name: 'system_github_apps[]'
+          in: query
+          description: 'UUIDs of system-wide GitHub Apps that the server uses. The response lists the ones this instance does not have.'
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        -
+          name: 'system_gitlab_apps[]'
+          in: query
+          description: 'UUIDs of system-wide GitLab Apps that the server uses. The response lists the ones this instance does not have.'
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: 'The server can be imported. Lists every check with its result.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'One or more checks failed. Lists every check with its result.'
+      security:
+        -
+          bearerAuth: []
+  /servers/import:
+    post:
+      tags:
+        - Servers
+      summary: 'Import server transfer bundle'
+      description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it.'
+      operationId: import-server-transfer-bundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                bundle:
+                  description: 'Transfer bundle'
+                  type: object
+                dry_run:
+                  type: boolean
+                  default: false
+                preserve_uuids:
+                  type: boolean
+                  default: true
+                adopt_mode:
+                  description: 'Import without forcing redeploy; keep statuses for adoption'
+                  type: boolean
+                  default: true
+              type: object
+      responses:
+        '200':
+          description: 'Dry-run result'
+        '201':
+          description: Imported
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/transfer/complete':
+    post:
+      tags:
+        - Servers
+      summary: 'Mark server transferred'
+      description: 'Source-instance recovery step: disable automations here when the target already manages the server but the transfer could not finish on this instance.'
+      operationId: complete-server-transfer
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                export_id:
+                  type: [string, 'null']
+                target_instance_url:
+                  type: [string, 'null']
+              type: object
+      responses:
+        '200':
+          description: 'Marked transferred'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /servers:
     get:
       tags:
@@ -12429,6 +12620,10 @@ paths:
                 docker_compose_raw:
                   type: string
                   description: 'The base64 encoded Docker Compose content.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'Connect the service to the predefined docker network.'
                 urls:
                   type: array
                   description: 'Array of URLs to be applied to containers of a service.'

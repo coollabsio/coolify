@@ -9,6 +9,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
@@ -84,3 +85,28 @@ it('rejects wildcard domains on application creation', function (string $proxyTy
 
     expect(Application::count())->toBe($count);
 })->with([ProxyTypes::NONE->value, ProxyTypes::TRAEFIK->value]);
+
+it('honours force_domain_override for conflicting docker_compose_domains on application creation', function (bool $force, int $expectedStatus) {
+    Queue::fake();
+    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $this->application->update(['fqdn' => 'https://shared.example.com']);
+
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coollabsio/coolify-examples',
+            'git_branch' => 'v4.x',
+            'build_pack' => 'dockercompose',
+            'docker_compose_domains' => [
+                ['name' => 'web', 'domain' => 'https://shared.example.com'],
+                ['name' => 'api', 'domain' => 'https://shared.example.com'],
+            ],
+            'force_domain_override' => $force,
+        ])
+        ->assertStatus($expectedStatus);
+})->with([
+    'without override' => [false, 422],
+    'with override' => [true, 201],
+]);

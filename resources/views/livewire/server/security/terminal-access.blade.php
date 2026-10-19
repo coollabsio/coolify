@@ -7,16 +7,11 @@
 
     <div
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        <x-server.sidebar :server="$server" activeMenu="security" />
+        <x-server.sidebar :server="$server" activeMenu="security" activeSubMenu="terminal-access" />
 
         <div class="application-settings-form w-full">
             <x-application.settings-section id="server-terminal-access-section" title="Terminal access"
                 helper="Control dashboard terminal access for this server and its containers.">
-                <x-slot:actions>
-                    <x-status-badge :status="$isTerminalEnabled ? 'Enabled' : 'Disabled'"
-                        :type="$isTerminalEnabled ? 'success' : 'error'" />
-                </x-slot:actions>
-
                 <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div class="flex items-start gap-3">
                         <div

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -16,11 +17,19 @@ use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    // A claim writes the owner marker on the host over SSH.
+    Process::fake();
+    Storage::fake('ssh-keys');
+    // An import validates the claimed server over SSH; the sync test queue would run it.
+    Queue::fake([ValidateAndInstallServerJob::class]);
     Server::flushIdentityMap();
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'fqdn' => 'https://coolify-a.test']);
 

@@ -27,10 +27,11 @@ services:
     environment:
       - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-mautic}'
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: rabbitmq-diagnostics -q check_port_connectivity
       interval: 5s
       timeout: 30s
-      retries: 10
+      retries: 20
+      start_period: 60s
     volumes:
       - 'rabbitmq-data:/var/lib/rabbitmq'
   mautic_web:

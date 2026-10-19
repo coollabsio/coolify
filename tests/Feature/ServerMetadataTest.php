@@ -128,6 +128,35 @@ it('stores a parsed docker version when gathering server metadata', function () 
         ->and($this->server->fresh()->composeVersion())->toBe('2.32.4');
 });
 
+it('keeps transfer and migration state when gathering server metadata', function () {
+    $this->server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+    // Loaded before the transfer state is written, like a validation that runs during a transfer.
+    $staleServer = Server::find($this->server->id);
+
+    $this->server->update(['server_metadata' => [
+        'os' => 'Old OS',
+        'transfer' => ['status' => 'claimed', 'export_id' => 'export-1'],
+        'migration' => ['status' => 'succeeded', 'export_id' => 'export-1'],
+    ]]);
+
+    Process::fake([
+        '*' => Process::result(output: "---PRETTY_NAME---\nDebian GNU/Linux 12 (bookworm)\n---CPUS---\n2", exitCode: 0),
+    ]);
+
+    $staleServer->gatherServerMetadata();
+
+    expect($this->server->fresh()->server_metadata)
+        ->toMatchArray([
+            'os' => 'Debian GNU/Linux 12 (bookworm)',
+            'cpus' => 2,
+            'transfer' => ['status' => 'claimed', 'export_id' => 'export-1'],
+            'migration' => ['status' => 'succeeded', 'export_id' => 'export-1'],
+        ]);
+});
+
 it('shows the stored docker version in remote server details', function () {
     $this->server->update([
         'server_metadata' => [

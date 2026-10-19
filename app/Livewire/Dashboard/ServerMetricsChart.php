@@ -4,14 +4,23 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Isolate;
 use Livewire\Component;
 
+/**
+ * Each chart sends its own request, so one slow server does not delay the charts of the other servers.
+ */
+#[Isolate]
 class ServerMetricsChart extends Component
 {
     public Server $server;
 
     public function loadData(): void
     {
+        if (! $this->server->isFunctional()) {
+            return;
+        }
+
         try {
             $this->dispatch("dashboard-server-metrics-{$this->server->uuid}", [
                 'cpu' => $this->server->getCpuMetrics(10),

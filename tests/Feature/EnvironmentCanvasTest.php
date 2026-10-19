@@ -133,9 +133,9 @@ describe('GET canvas', function () {
                 'kind' => 'nixpacks',
                 'subtitle' => 'Nixpacks · main',
                 'children' => [],
-                'volumes' => ['web-data'],
                 'link' => $application->link(),
                 'logo' => ['src' => resource_logo_url('public-repo'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => 'https://web.example.com/favicon.ico'],
+                'saved' => ['x' => 10, 'y' => -20],
             ])
             ->and($nodes[$service->uuid])->toEqual([
                 'id' => $service->uuid,
@@ -151,9 +151,9 @@ describe('GET canvas', function () {
                     ['name' => 'ghost', 'type' => 'application', 'status' => 'running:healthy'],
                     ['name' => 'mysql', 'type' => 'database', 'status' => 'running:healthy'],
                 ],
-                'volumes' => [],
                 'link' => $service->link(),
                 'logo' => null,
+                'saved' => null,
             ])
             ->and($nodes[$database->uuid])->toMatchArray([
                 'type' => 'database',
@@ -162,8 +162,8 @@ describe('GET canvas', function () {
                 'urls' => [],
                 'kind' => 'postgresql',
                 'subtitle' => 'PostgreSQL · postgres:17-alpine',
-                'volumes' => ["postgres-data-{$database->uuid}"],
                 'logo' => ['src' => resource_logo_url('postgres'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => null],
+                'saved' => null,
             ])
             ->and($response->getContent())->not->toContain('canvas-secret-password');
     });
@@ -414,6 +414,18 @@ describe('canvas authorization', function () {
 });
 
 describe('canvas page', function () {
+    test('add resource opens the deploy canvas for this environment', function () {
+        $deployCanvasUrl = route('deploy-canvas', ['project' => $this->project->uuid, 'environment' => $this->environment->uuid]);
+
+        $this->actingAs($this->admin)->withSession(['currentTeam' => $this->team])
+            ->withoutVite()
+            ->get(route('project.environment.canvas', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]))
+            ->assertOk()
+            ->assertSee('data-new="'.e($deployCanvasUrl).'"', false)
+            ->assertSee('href="'.e($deployCanvasUrl).'"', false)
+            ->assertDontSee(route('project.resource.create', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]), false);
+    });
+
     test('a team member can open the canvas page', function () {
         $member = User::factory()->create();
         $this->team->members()->attach($member->id, ['role' => 'member']);

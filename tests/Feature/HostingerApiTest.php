@@ -192,6 +192,57 @@ it('turns paid Hostinger backups off when the API request does not enable them',
         && $request['setup']['enable_backups'] === false);
 });
 
+it('requires the deploy ability to run a post-install script or add SSH keys on a Hostinger VPS', function (array $extra) {
+    Http::fake();
+    $writeToken = $this->user->createToken('write-token', ['read', 'write'])->plainTextToken;
+
+    $this->withToken($writeToken)
+        ->postJson('/api/v1/servers/hostinger', [
+            'cloud_provider_token_uuid' => $this->hostingerToken->uuid,
+            'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+            'data_center_id' => 19,
+            'template_id' => 1130,
+            'private_key_uuid' => $this->privateKey->uuid,
+            ...$extra,
+        ])
+        ->assertForbidden()
+        ->assertJsonFragment(['message' => 'Missing required permissions: deploy']);
+
+    Http::assertNothingSent();
+    $this->assertDatabaseMissing('servers', ['team_id' => $this->team->id]);
+})->with([
+    'post-install script' => [['post_install_script_id' => 73]],
+    'extra SSH keys' => [['public_key_ids' => [42]]],
+]);
+
+it('lets a deploy token run a post-install script on a Hostinger VPS', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'virtual_machine' => [
+                'id' => 17923,
+                'state' => 'creating',
+                'ipv4' => [['address' => '203.0.113.10']],
+            ],
+        ]),
+    ]);
+    $deployToken = $this->user->createToken('deploy-token', ['read', 'write', 'deploy'])->plainTextToken;
+
+    $this->withToken($deployToken)
+        ->postJson('/api/v1/servers/hostinger', [
+            'cloud_provider_token_uuid' => $this->hostingerToken->uuid,
+            'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+            'data_center_id' => 19,
+            'template_id' => 1130,
+            'private_key_uuid' => $this->privateKey->uuid,
+            'post_install_script_id' => 73,
+        ])
+        ->assertCreated();
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
+        && $request['setup']['post_install_script_id'] === 73);
+});
+
 it('keeps a charged Hostinger VPS when the purchase returns an error through the API', function () {
     $listRequests = 0;
     Http::fake([

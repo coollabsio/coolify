@@ -78,19 +78,16 @@ it('does not show the API notice on the webhooks page when the API is enabled', 
         ->assertDontSee('API access is turned off');
 });
 
-it('lets users create API tokens for MCP when only the REST API is disabled', function () {
-    InstanceSettings::query()->whereKey(0)->update(['is_mcp_server_enabled' => true]);
-    Once::flush();
+it('lets users create API tokens for MCP while the REST API is disabled', function () {
     $this->actingAs($this->teamAdmin);
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->assertDontSee('API access is turned off')
-        ->assertSee('REST API disabled')
-        ->set('description', 'mcp-token')
-        ->set('permissions', ['read'])
+        ->assertSee('API access is turned off')
+        ->assertSee('Create token')
+        ->set('description', 'MCP client')
         ->call('addNewToken')
         ->assertHasNoErrors();
 
-    expect($this->teamAdmin->tokens()->where('name', 'mcp-token')->where('team_id', $this->team->id)->exists())->toBeTrue();
+    expect($this->teamAdmin->tokens()->where('name', 'MCP client')->exists())->toBeTrue();
 });

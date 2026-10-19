@@ -76,7 +76,7 @@
 
                 <x-backup-tabs context="service-schedule" :parameters="$parameters" section="general" />
 
-                @foreach (['general', 's3', 'retention', 'danger'] as $modalSection)
+                @foreach (['general', 'danger'] as $modalSection)
                     <div x-show="activeSection === '{{ $modalSection }}'" x-cloak>
                         @if ($selectedDatabaseBackup)
                             <livewire:project.database.backup-edit :backup="$selectedDatabaseBackup"
@@ -240,7 +240,7 @@
 
             @if ($backups->isNotEmpty() || $databaseBackups->isNotEmpty())
                 <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
-                    <div class="min-w-[64rem]">
+                    <div class="flex min-w-[64rem] flex-col">
                     <div class="data-table-header backup-table-grid service-backup-table-grid">
                         <span>Target</span>
                         <span>Type</span>

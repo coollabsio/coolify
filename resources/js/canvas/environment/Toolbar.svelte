@@ -1,9 +1,8 @@
 <script>
-  // Title, filters, refresh and zoom. The root docks it (use:dock) into the app top bar on desktop,
-  // or in a rounded box above the canvas on small screens.
-  import Icon from './Icon.svelte';
+  // Filters and view toggles. The root docks it (use:dock) into the zoom controls bar
+  // (CanvasControls, bottom left) on desktop, or in a rounded box above the canvas on small screens.
 
-  let { title, viewOnly, viewOnlyTitle, filter, projects, environments, loading, zoom, views, dock, onfilter, onrefresh, onzoom, onfit } = $props();
+  let { viewOnly, viewOnlyTitle, filter, projects, environments, views, dock, onfilter } = $props();
 
   const select = 'select h-8! w-44 py-0! text-[12px]! max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:basis-32';
   const value = (options, wanted) => (options.some(o => o.uuid === wanted) ? wanted : '');
@@ -18,7 +17,6 @@
 
 <div use:dock data-ec-toolbar>
   <div class="flex min-w-0 items-center gap-2">
-    {#if title}<b class="shrink-0 text-[14px] font-semibold text-black dark:text-fg">{title}</b>{/if}
     <span class="inline-flex items-center">
       <span class="px-2 py-0.5 text-xs font-medium leading-normal rounded-full bg-coollabs/10 text-coollabs border border-coollabs/30 dark:bg-warning/15 dark:text-warning dark:border-warning/30">Beta</span>
     </span>
@@ -37,15 +35,5 @@
       <option value="">All environments</option>
       {#each environments as o (o.uuid)}<option value={o.uuid}>{o.name}</option>{/each}
     </select>
-    <button type="button" class="button" title="Load the latest status" disabled={loading} onclick={onrefresh}>
-      <Icon name="refresh" class="size-3.5 {loading ? 'animate-spin' : ''}" />
-      <span class="hidden sm:inline">Refresh</span>
-    </button>
-    <div class="flex items-center">
-      <button type="button" class="button px-2! rounded-r-none!" title="Zoom out" aria-label="Zoom out" onclick={() => onzoom(zoom / 1.2)}><Icon name="minus" /></button>
-      <button type="button" class="button rounded-none! border-x-0! w-14 tabular-nums" title="Reset zoom to 100%" onclick={() => onzoom(1)}>{Math.round(zoom * 100)}%</button>
-      <button type="button" class="button px-2! rounded-l-none!" title="Zoom in" aria-label="Zoom in" onclick={() => onzoom(zoom * 1.2)}><Icon name="plus" /></button>
-    </div>
-    <button type="button" class="button px-2!" title="Fit to screen" aria-label="Fit to screen" onclick={onfit}><Icon name="fit" />Fit</button>
   </div>
 </div>

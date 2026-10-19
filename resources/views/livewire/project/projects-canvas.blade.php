@@ -2,7 +2,7 @@
     <x-slot:title>
         Projects > Canvas | Coolify
     </x-slot>
-    <div data-environment-canvas data-title="Projects canvas" data-endpoint="/projects/canvas"
+    <div data-environment-canvas data-endpoint="/projects/canvas"
         data-empty="No resources in your projects yet"
         data-view-only="Only team admins can move cards and edit links."
         data-team="{{ $teamId }}" data-user="{{ auth()->id() }}"

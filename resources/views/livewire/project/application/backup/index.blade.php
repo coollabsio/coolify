@@ -167,7 +167,7 @@
                 </div>
 
                 @if ($backups->isNotEmpty())
-                    <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
+                    <div class="data-table flex w-full flex-col overflow-x-auto" x-show="filteredBackups.length > 0">
                         <div class="data-table-header backup-table-grid">
                             <span>Target</span>
                             <span>Type</span>

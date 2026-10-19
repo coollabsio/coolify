@@ -85,7 +85,8 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->stopIfFinished($execution)) {
                 return;
             }
-            instant_remote_process($container->startCommands($runner['encoded_jit_config']), $server);
+            // stopIfFinished() reloaded the server, so a transfer that just finished stops the start command.
+            instant_remote_process($container->startCommands($runner['encoded_jit_config']), $execution->server);
 
             if ($this->stopIfFinished($execution)) {
                 return;
@@ -159,11 +160,15 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             return true;
         }
 
+        // Reloads the server too: a transfer to another instance can finish while this job runs.
         $execution->refresh();
-        if ($execution->isActive()) {
+        if ($execution->isActive() && ! $execution->server?->isTransferredAway()) {
             return false;
         }
 
+        if ($execution->isActive()) {
+            $execution->finish(GithubRunnerStatus::Cancelled, 'The server was transferred to another Coolify instance.');
+        }
         CleanupGithubRunnerJob::dispatch($execution->id);
 
         return true;

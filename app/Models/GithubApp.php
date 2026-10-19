@@ -57,6 +57,34 @@ class GithubApp extends BaseModel
         'webhook_secret',
     ];
 
+    /**
+     * Installation token kept in memory, so one job does not request a new token for each GitHub call.
+     *
+     * @var array{credentials: string, token: string, expires_at: int}|null
+     */
+    private ?array $installationTokenInMemory = null;
+
+    public function installationToken(): string
+    {
+        $credentials = implode('|', [$this->api_url, $this->app_id, $this->installation_id, $this->private_key_id]);
+        $cached = $this->installationTokenInMemory;
+
+        if ($cached && $cached['credentials'] === $credentials && $cached['expires_at'] > now()->getTimestamp()) {
+            return $cached['token'];
+        }
+
+        $token = generateGithubToken($this, 'installation');
+
+        // GitHub installation tokens expire after one hour; renew them well before that.
+        $this->installationTokenInMemory = [
+            'credentials' => $credentials,
+            'token' => $token,
+            'expires_at' => now()->addMinutes(50)->getTimestamp(),
+        ];
+
+        return $token;
+    }
+
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {
@@ -164,5 +192,20 @@ class GithubApp extends BaseModel
         }
 
         return filled($this->app_id) && filled($this->installation_id);
+    }
+
+    /**
+     * The settings page of this App at GitHub.
+     */
+    public function settingsUrl(): string
+    {
+        $name = encodeGithubPathSegment($this->name);
+        $organization = normalizeGithubOrganization($this->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
+        }
+
+        return rtrim($this->html_url, '/')."/settings/apps/{$name}";
     }
 }

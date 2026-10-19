@@ -86,7 +86,7 @@
 
             <div class="w-full">
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
-                    helper="When public, anyone can trigger PR deployments. Otherwise fork PRs are blocked and only repository owners, members, and collaborators can trigger them."
+                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked."
                     :options="[
                         ['value' => false, 'label' => 'Repository members only'],
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],

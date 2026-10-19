@@ -48,14 +48,20 @@
             </x-application.settings-section>
 
             <x-application.settings-section title="Network addresses">
+                <x-slot:actions>
+                    <x-forms.button canGate="update" :canResource="$settings" type="button"
+                        wire:click="detectPublicIps">
+                        Detect
+                    </x-forms.button>
+                </x-slot:actions>
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password"
                         label="Instance public IPv4"
-                        helper="Set this when Coolify cannot detect the correct public IPv4 address."
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Detect looks it up again and saves it."
                         placeholder="1.2.3.4" autocomplete="new-password" />
                     <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password"
                         label="Instance public IPv6"
-                        helper="Set this when Coolify cannot detect the correct public IPv6 address."
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Detect looks it up again and saves it."
                         placeholder="2001:db8::1" autocomplete="new-password" />
                 </div>
             </x-application.settings-section>

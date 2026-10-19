@@ -11,6 +11,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -117,4 +118,49 @@ it('continues removing preview volumes when an earlier volume is already absent'
     Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'already-removed-pr-42'"));
     Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'app-data-pr-42'"));
     expect(ApplicationPreview::find($this->preview->id))->toBeNull();
+});
+
+it('deletes the persistent storage records of a docker compose preview', function () {
+    Queue::fake();
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '5',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx:alpine
+    volumes:
+      - files:/app/files
+      - db:/var/lib/mysql
+volumes:
+  files:
+  db:
+YAML,
+    ]);
+    $this->application->refresh();
+    $uuid = $this->application->uuid;
+
+    // Deploying the application, this preview and another preview creates the storage records
+    $this->application->parse();
+    $this->application->parse(pull_request_id: 42);
+    $this->application->parse(pull_request_id: 43);
+    expect($this->application->persistentStorages()->pluck('name')->sort()->values()->all())->toBe([
+        "{$uuid}_db",
+        "{$uuid}_db-pr-42",
+        "{$uuid}_db-pr-43",
+        "{$uuid}_files",
+        "{$uuid}_files-pr-42",
+        "{$uuid}_files-pr-43",
+    ]);
+    Process::fake(['*' => Process::result(output: '')]);
+
+    $this->preview->forceDelete();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f '{$uuid}_db-pr-42'"));
+    expect($this->application->persistentStorages()->pluck('name')->sort()->values()->all())->toBe([
+        "{$uuid}_db",
+        "{$uuid}_db-pr-43",
+        "{$uuid}_files",
+        "{$uuid}_files-pr-43",
+    ]);
 });
