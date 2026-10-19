@@ -1580,9 +1580,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     $options = [];
     $compose_options = collect([]);
     // A value is one shell word: double-quoted (with escapes), single-quoted, and unquoted parts, as in key="a b".
-    // It cannot start with "-", so the next flag is not taken as a value.
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?((?!-)(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    // It cannot start with "-" (except a negative number, as in --pids-limit -1), so the next flag is not taken as a value.
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?((?!-(?!\d))(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
+        '--add-host',
         '--cap-add',
         '--cap-drop',
         '--security-opt',
@@ -1591,24 +1592,9 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--device',
         '--shm-size',
         '--dns',
+        '--tmpfs',
     ]);
-    $mapping = collect([
-        '--cap-add' => 'cap_add',
-        '--cap-drop' => 'cap_drop',
-        '--security-opt' => 'security_opt',
-        '--sysctl' => 'sysctls',
-        '--device' => 'devices',
-        '--init' => 'init',
-        '--ulimit' => 'ulimits',
-        '--privileged' => 'privileged',
-        '--ip' => 'ip',
-        '--ip6' => 'ip6',
-        '--shm-size' => 'shm_size',
-        '--dns' => 'dns',
-        '--gpus' => 'gpus',
-        '--hostname' => 'hostname',
-        '--entrypoint' => 'entrypoint',
-    ]);
+    $mapping = collect(DOCKER_RUN_OPTION_MAPPING);
     foreach ($matches as $match) {
         $option = $match[1];
         // Remove the quotes like a shell: unescape \" \$ \` \\ in double quotes, keep single-quoted text as is
@@ -1665,7 +1651,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
             continue;
         }
-        if ($option === '--init' || $option === '--privileged') {
+        if (in_array($option, ['--init', '--privileged', '--read-only'], true)) {
             // Boolean flags only take a value with "=" (--privileged=false); a space-separated word is not their value
             $hasInlineValue = str_starts_with(substr($match[0], strlen($option)), '=');
             $options[$option] = ! ($hasInlineValue && strtolower($value) === 'false');
@@ -1708,9 +1694,13 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             if ($ulimits->isNotEmpty()) {
                 $compose_options->put($mapping[$option], $ulimits);
             }
-        } elseif ($option === '--shm-size' || $option === '--hostname') {
+        } elseif (in_array($option, ['--shm-size', '--hostname', '--runtime'], true)) {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--pids-limit') {
+            if (is_numeric($value[0])) {
+                $compose_options->put($mapping[$option], (int) $value[0]);
             }
         } elseif ($option === '--entrypoint') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
@@ -1744,6 +1734,29 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     }
 
     return $compose_options->toArray();
+}
+
+/**
+ * Returns the options (--network, -e, ...) that convertDockerRunToCompose() does not apply.
+ *
+ * @return array<int, string>
+ */
+function unsupportedDockerRunOptions(?string $custom_docker_run_options): array
+{
+    // Split into shell words, so text inside a quoted value is not taken as an option
+    preg_match_all('/(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+/', $custom_docker_run_options ?? '', $words);
+    $unsupported = [];
+    foreach ($words[0] as $word) {
+        if (! str_starts_with($word, '-') || preg_match('/^-\d/', $word)) {
+            continue;
+        }
+        $option = str_starts_with($word, '--') ? '--'.ltrim(strtok($word, '='), '-') : strtok($word, '=');
+        if (! array_key_exists($option, DOCKER_RUN_OPTION_MAPPING)) {
+            $unsupported[] = $option;
+        }
+    }
+
+    return array_values(array_unique($unsupported));
 }
 
 function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $network)

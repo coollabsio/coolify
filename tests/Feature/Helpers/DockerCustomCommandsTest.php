@@ -430,3 +430,34 @@ test('ConvertGpusCount', function () {
         ],
     ]);
 });
+
+test('ConvertRuntimeHardeningOptions', function () {
+    $input = '--add-host host.docker.internal:host-gateway --add-host=db:10.0.0.5 --pids-limit 100 --runtime runc --read-only --tmpfs /run:rw,size=64m --tmpfs /tmp';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'extra_hosts' => ['host.docker.internal:host-gateway', 'db:10.0.0.5'],
+        'pids_limit' => 100,
+        'runtime' => 'runc',
+        'read_only' => true,
+        'tmpfs' => ['/run:rw,size=64m', '/tmp'],
+    ]);
+});
+
+test('ConvertNegativePidsLimitAndDisabledReadOnly', function () {
+    $input = '--pids-limit -1 --read-only=false';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'pids_limit' => -1,
+        'read_only' => false,
+    ]);
+});
+
+test('UnsupportedDockerRunOptions', function () {
+    $input = '--network=host --name app -e FOO=bar -v /a:/b --entrypoint "sh -c \'run --verbose\'" --cap-add NET_ADMIN --pids-limit -1 ---privileged --network bridge';
+    expect(unsupportedDockerRunOptions($input))->toBe(['--network', '--name', '-e', '-v']);
+});
+
+test('UnsupportedDockerRunOptionsIsEmptyForSupportedOptions', function () {
+    expect(unsupportedDockerRunOptions('--cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp'))->toBe([])
+        ->and(unsupportedDockerRunOptions(null))->toBe([]);
+});
