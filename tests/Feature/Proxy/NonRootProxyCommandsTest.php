@@ -112,8 +112,8 @@ it('deploys the swarm proxy stack with an absolute compose file path', function 
 it('builds restart commands without entering proxy directories as the SSH user', function (string $proxyType, string $proxyPath) {
     useNonRootProxy($this->server, $proxyType);
     $configuration = $this->server->proxyType() === ProxyTypes::CADDY->value
-        ? "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n"
-        : "services:\n  traefik:\n    image: traefik:v3.6\n";
+        ? "services:\n  caddy:\n    container_name: coolify-proxy\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n"
+        : "services:\n  traefik:\n    container_name: coolify-proxy\n    image: traefik:v3.6\n";
 
     $method = new ReflectionMethod(RestartProxyJob::class, 'buildRestartCommands');
     $commands = $method->invoke(new RestartProxyJob($this->server), $configuration);
@@ -133,7 +133,7 @@ it('backs up and prunes proxy configurations through sudo without bash', functio
     $this->server->proxy->last_saved_settings = 'a1b2c3d4e5f6';
     $this->server->save();
 
-    SaveProxyConfiguration::run($this->server, "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n");
+    SaveProxyConfiguration::run($this->server, "services:\n  caddy:\n    container_name: coolify-proxy\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n");
 
     $lines = nonRootProxyScriptLines();
     $backups = '/data/coolify/proxy/caddy/backups';
