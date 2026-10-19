@@ -127,8 +127,9 @@ class StartDatabaseProxy
                 "mkdir -p $configuration_dir",
                 "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
                 "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
-                "docker compose --project-directory {$configuration_dir} pull",
-                "docker compose --project-directory {$configuration_dir} up -d",
+                // Pass -f so Compose uses only the file that Coolify wrote.
+                "docker compose --project-directory {$configuration_dir} -f {$configuration_dir}/docker-compose.yaml pull",
+                "docker compose --project-directory {$configuration_dir} -f {$configuration_dir}/docker-compose.yaml up -d",
             ], $server);
         } catch (\RuntimeException $e) {
             if ($this->isNonTransientError($e->getMessage())) {

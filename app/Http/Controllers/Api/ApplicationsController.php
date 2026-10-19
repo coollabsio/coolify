@@ -40,6 +40,7 @@ use Spatie\Url\Url;
 class ApplicationsController extends Controller
 {
     use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployAbility;
     use Concerns\RequiresDeployForOutsideHostPaths;
 
     private const APPLICATION_SETTING_FIELDS = [
@@ -144,6 +145,21 @@ class ApplicationsController extends Controller
         }
 
         return serializeApiResponse($application);
+    }
+
+    /**
+     * Setting or changing a manual webhook secret needs the deploy ability. Sending the stored value
+     * again or clearing it does not.
+     */
+    private function manualWebhookSecretForbiddenResponse(Request $request, ?Application $application = null): ?JsonResponse
+    {
+        foreach (['manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea'] as $field) {
+            if ($request->filled($field) && $request->input($field) !== $application?->{$field}) {
+                return $this->deployAbilityForbiddenResponse($request, 'A manual webhook secret lets anyone who knows it start a deployment, so it needs a token with the deploy permission.');
+            }
+        }
+
+        return null;
     }
 
     private function applicationSettingsFromRequest(Request $request): array
@@ -397,10 +413,10 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             // 'github_app_uuid' => ['type' => 'string', 'description' => 'The Github App UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
@@ -485,6 +501,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -599,10 +619,10 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
@@ -686,6 +706,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -800,10 +824,10 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
@@ -887,6 +911,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -988,10 +1016,10 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
@@ -1058,6 +1086,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -1156,10 +1188,10 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
@@ -1226,6 +1258,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -1358,6 +1394,7 @@ class ApplicationsController extends Controller
         }
         // A Docker Compose application uses per-service domains; a top-level domain is never routed.
         $autogenerateDomain = $request->boolean('autogenerate_domain', true) && $request->build_pack !== 'dockercompose';
+        $forceDomainOverride = $request->boolean('force_domain_override');
         $instantDeploy = $request->instant_deploy;
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
@@ -1453,6 +1490,9 @@ class ApplicationsController extends Controller
         }
         if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
             return $internalNameValidation;
+        }
+        if ($forbidden = $this->manualWebhookSecretForbiddenResponse($request)) {
+            return $forbidden;
         }
         if ($type === 'public') {
             $validationRules = [
@@ -2975,7 +3015,7 @@ class ApplicationsController extends Controller
 
     #[OA\Delete(
         summary: 'Delete',
-        description: 'Delete application by UUID.',
+        description: 'Delete application by UUID. Needs a token with the write and deploy permissions.',
         path: '/applications/{uuid}',
         operationId: 'delete-application-by-uuid',
         security: [
@@ -3025,6 +3065,7 @@ class ApplicationsController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
         ]
     )]
     public function delete_by_uuid(Request $request)
@@ -3144,10 +3185,10 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
@@ -3228,6 +3269,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -3404,6 +3449,27 @@ class ApplicationsController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+        if ($forbidden = $this->manualWebhookSecretForbiddenResponse($request, $application)) {
+            return $forbidden;
+        }
+
+        $githubApp = null;
+        if ($request->has('github_app_uuid')) {
+            if ($application->build_pack === 'dockerimage' || filled($application->dockerfile) || $application->deploymentType() === 'deploy_key') {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'github_app_uuid' => 'The github_app_uuid can only be changed for applications deployed from a GitHub App or public repository.',
+                    ],
+                ], 422);
+            }
+            $githubApp = GithubApp::where('uuid', $request->github_app_uuid)
+                ->where(fn ($query) => $query->where('team_id', $teamId)->orWhere('is_system_wide', true))
+                ->first();
+            if (! $githubApp?->isConnected()) {
+                return response()->json(['message' => 'Github App not found.'], 404);
+            }
         }
 
         $githubApp = null;
@@ -5395,7 +5461,7 @@ class ApplicationsController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional). Needs the deploy ability when set.'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
                         ],
@@ -5413,7 +5479,7 @@ class ApplicationsController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
-            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory.'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -5614,6 +5680,13 @@ class ApplicationsController extends Controller
                 ], 422);
             }
 
+            if ($request->filled('content')) {
+                $forbidden = $this->deployAbilityForbiddenResponse($request, 'Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
+                if ($forbidden) {
+                    return $forbidden;
+                }
+            }
+
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,
                 'mount_path' => $mountPath,
@@ -5725,7 +5798,7 @@ class ApplicationsController extends Controller
 
     #[OA\Delete(
         summary: 'Delete Preview Deployment',
-        description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.',
+        description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record. Needs a token with the write and deploy permissions.',
         path: '/applications/{uuid}/previews/{pull_request_id}',
         operationId: 'delete-preview-deployment-by-pull-request-id',
         security: [
@@ -5756,6 +5829,7 @@ class ApplicationsController extends Controller
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
         ]
     )]
     public function delete_preview_by_pull_request_id(Request $request): JsonResponse
@@ -5959,7 +6033,7 @@ class ApplicationsController extends Controller
                 properties: [
                     new OA\Property(property: 'destination_uuid', type: 'string', description: 'UUID of the destination to clone into.'),
                     new OA\Property(property: 'name', type: 'string', nullable: true, description: 'Optional name for the cloned application.'),
-                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false, description: 'Whether to clone volume data.'),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false, description: 'Whether to clone volume data. Needs the deploy ability.'),
                 ]
             )
         ),
@@ -5976,6 +6050,7 @@ class ApplicationsController extends Controller
             ),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability to clone volume data.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -6017,6 +6092,10 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+
+        if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
+            return $response;
+        }
 
         $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
             ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();

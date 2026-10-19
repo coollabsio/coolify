@@ -68,7 +68,7 @@
                                     <div class="listbox-option p-0!">
                                         <x-forms.checkbox id="permission-deploy" label="Deploy" fullWidth
                                             wire:model.live="permissions" domValue="deploy"
-                                            helper="Trigger deployments through webhooks."
+                                            helper="Deploy, start, stop, and restart resources. With Write, also apply changes that run on servers immediately, such as scheduled tasks, proxy configuration, and imports."
                                             :checked="in_array('deploy', $permissions)"
                                             :disabled="in_array('root', $permissions) || !$canUseDeployPermissions" />
                                     </div>

@@ -103,8 +103,6 @@ class ApiTokens extends Component
             $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
             $this->permissions[] = 'read';
-        } elseif ($permissionToUpdate == 'deploy' && in_array('deploy', $this->permissions, true)) {
-            $this->permissions = ['deploy'];
         } else {
             if (count($this->permissions) == 0) {
                 $this->permissions = ['read'];

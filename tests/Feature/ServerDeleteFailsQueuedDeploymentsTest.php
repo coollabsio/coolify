@@ -59,7 +59,7 @@ afterEach(function () {
 
 test('deleting a server fails its queued deployments', function (string $path) {
     if ($path === 'api') {
-        $token = $this->user->createToken('server-delete', ['write'])->plainTextToken;
+        $token = $this->user->createToken('server-delete', ['write', 'deploy'])->plainTextToken;
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->deleteJson("/api/v1/servers/{$this->server->uuid}?force=true")
             ->assertOk();

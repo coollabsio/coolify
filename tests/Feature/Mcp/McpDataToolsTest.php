@@ -258,7 +258,7 @@ test('manage_database updates a database of the token team', function () {
 test('manage_database cannot touch a database of another team', function (string $action, array $data) {
     $foreign = $this->theirs['database'];
 
-    $response = mcpDataCall(mcpDataToken($this->user), 'manage_database', ['action' => $action, 'uuid' => $foreign->uuid, 'confirm' => true, 'data' => $data]);
+    $response = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_database', ['action' => $action, 'uuid' => $foreign->uuid, 'confirm' => true, 'data' => $data]);
 
     expect(mcpDataIsError($response))->toBeTrue();
     $fresh = StandalonePostgresql::withTrashed()->find($foreign->id);
@@ -276,7 +276,7 @@ test('manage_database cannot touch a database of another team', function (string
 
 test('manage_database rejects a destination, environment, or S3 storage of another team', function () {
     $own = $this->mine['database'];
-    $token = mcpDataToken($this->user);
+    $token = mcpDataToken($this->user, ['write', 'deploy']);
     $foreignS3 = mcpDataS3($this->otherTeam);
 
     $clone = mcpDataCall($token, 'manage_database', ['action' => 'clone', 'uuid' => $own->uuid, 'confirm' => true, 'data' => ['destination_uuid' => $this->theirs['destination']->uuid]]);
@@ -308,7 +308,7 @@ test('manage_database clones to an own destination and moves to an own environme
 test('manage_database destructive actions need confirm=true', function (string $action, array $data) {
     $own = $this->mine['database'];
 
-    $denied = mcpDataCall(mcpDataToken($this->user), 'manage_database', ['action' => $action, 'uuid' => $own->uuid, 'data' => $data]);
+    $denied = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_database', ['action' => $action, 'uuid' => $own->uuid, 'data' => $data]);
 
     expect(mcpDataIsError($denied))->toBeTrue()
         ->and(mcpDataText($denied))->toContain('confirm=true')
@@ -324,23 +324,30 @@ test('manage_database destructive actions need confirm=true', function (string $
 test('manage_database delete with confirm=true deletes an own database', function () {
     $own = $this->mine['database'];
 
-    $response = mcpDataCall(mcpDataToken($this->user), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
+    $writeOnly = mcpDataCall(mcpDataToken($this->user), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
+    expect(mcpDataIsError($writeOnly))->toBeTrue()
+        ->and(mcpDataText($writeOnly))->toContain('Missing required permissions: deploy')
+        ->and(StandalonePostgresql::find($own->id))->not->toBeNull();
+
+    $response = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
 
     expect(mcpDataIsError($response))->toBeFalse()
         ->and(StandalonePostgresql::find($own->id))->toBeNull();
 });
 
-test('manage_database import runs REST validation and needs deploy for a server path', function () {
+test('manage_database import needs deploy and runs REST validation', function () {
     $own = $this->mine['database'];
-    $token = mcpDataToken($this->user);
+    $writeOnly = mcpDataToken($this->user);
 
-    $invalid = mcpDataCall($token, 'manage_database', ['action' => 'import', 'uuid' => $own->uuid, 'confirm' => true, 'data' => ['source' => 's3']]);
-    $serverPath = mcpDataCall($token, 'manage_database', ['action' => 'import', 'uuid' => $own->uuid, 'confirm' => true, 'data' => ['source' => 'server', 'path' => '/etc/passwd']]);
+    foreach ([['source' => 's3', 's3_storage_uuid' => 'x', 'path' => '/a.sql'], ['source' => 'server', 'path' => '/etc/passwd']] as $data) {
+        $denied = mcpDataCall($writeOnly, 'manage_database', ['action' => 'import', 'uuid' => $own->uuid, 'confirm' => true, 'data' => $data]);
+        expect(mcpDataIsError($denied))->toBeTrue()
+            ->and(mcpDataText($denied))->toContain('Missing required permissions: deploy');
+    }
 
+    $invalid = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_database', ['action' => 'import', 'uuid' => $own->uuid, 'confirm' => true, 'data' => ['source' => 's3']]);
     expect(mcpDataIsError($invalid))->toBeTrue()
-        ->and(mcpDataText($invalid))->toContain('s3_storage_uuid')
-        ->and(mcpDataIsError($serverPath))->toBeTrue()
-        ->and(mcpDataText($serverPath))->toContain('deploy');
+        ->and(mcpDataText($invalid))->toContain('s3_storage_uuid');
 });
 
 test('manage_database rejects read-only and member tokens', function () {
@@ -500,7 +507,7 @@ test('manage_service updates a service, its application, and its database', func
 test('manage_service cannot touch a service of another team', function (string $action, array $data) {
     $foreign = $this->theirs;
 
-    $response = mcpDataCall(mcpDataToken($this->user), 'manage_service', [
+    $response = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_service', [
         'action' => $action,
         'uuid' => $foreign['service']->uuid,
         'app_uuid' => $foreign['service_app']->uuid,
@@ -541,7 +548,7 @@ test('manage_service cannot reach an application or database of another team thr
 
 test('manage_service rejects a destination, environment, or S3 storage of another team', function () {
     $own = $this->mine;
-    $token = mcpDataToken($this->user);
+    $token = mcpDataToken($this->user, ['write', 'deploy']);
     $foreignS3 = mcpDataS3($this->otherTeam);
 
     $clone = mcpDataCall($token, 'manage_service', ['action' => 'clone', 'uuid' => $own['service']->uuid, 'confirm' => true, 'data' => ['destination_uuid' => $this->theirs['destination']->uuid]]);
@@ -558,7 +565,7 @@ test('manage_service rejects a destination, environment, or S3 storage of anothe
 test('manage_service destructive actions need confirm=true', function (string $action) {
     $own = $this->mine;
 
-    $denied = mcpDataCall(mcpDataToken($this->user), 'manage_service', ['action' => $action, 'uuid' => $own['service']->uuid, 'database_uuid' => $own['service_db']->uuid, 'data' => ['destination_uuid' => 'x']]);
+    $denied = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_service', ['action' => $action, 'uuid' => $own['service']->uuid, 'database_uuid' => $own['service_db']->uuid, 'data' => ['destination_uuid' => 'x']]);
 
     expect(mcpDataIsError($denied))->toBeTrue()
         ->and(mcpDataText($denied))->toContain('confirm=true')
@@ -566,7 +573,12 @@ test('manage_service destructive actions need confirm=true', function (string $a
 })->with(['delete', 'clone', 'move', 'import_database']);
 
 test('manage_service delete with confirm=true deletes an own service', function () {
-    $response = mcpDataCall(mcpDataToken($this->user), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
+    $writeOnly = mcpDataCall(mcpDataToken($this->user), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
+    expect(mcpDataIsError($writeOnly))->toBeTrue()
+        ->and(mcpDataText($writeOnly))->toContain('Missing required permissions: deploy')
+        ->and(Service::find($this->mine['service']->id))->not->toBeNull();
+
+    $response = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
 
     expect(mcpDataIsError($response))->toBeFalse()
         ->and(Service::find($this->mine['service']->id))->toBeNull();

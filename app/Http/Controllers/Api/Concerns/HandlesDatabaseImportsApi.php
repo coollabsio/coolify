@@ -20,6 +20,8 @@ use Spatie\Activitylog\Models\Activity;
 
 trait HandlesDatabaseImportsApi
 {
+    use RequiresDeployAbility;
+
     protected function uploadDatabaseImport(Request $request, Model $resource, int $teamId): JsonResponse
     {
         $this->authorize('uploadBackup', $resource);
@@ -82,11 +84,8 @@ trait HandlesDatabaseImportsApi
 
             return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
         }
-        // A server import reads any absolute path on the host, so it needs the same permission as host mounts outside the resource directory.
-        if ($payload['source'] === 'server' && ! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
-            return response()->json([
-                'message' => 'Missing required permissions: deploy. An import from a server path needs a token with the deploy permission.',
-            ], 403);
+        if ($response = $this->deployAbilityForbiddenResponse($request, 'An import runs the dump in the database container, so it needs a token with the deploy permission.')) {
+            return $response;
         }
 
         try {
