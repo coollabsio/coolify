@@ -187,7 +187,7 @@
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
             'children' => [
-                ['label' => 'Server Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage'],
+                ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage', 'beta' => true],
                 ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
             ],
         ],
@@ -332,6 +332,9 @@
                                 href="{{ route($child['route'], $serverRouteParameters) }}">
                                 <x-reicon :name="$child['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $child['label'] }}</span>
+                                @if ($child['beta'] ?? false)
+                                    <x-beta-badge class="ml-auto shrink-0" />
+                                @endif
                             </a>
                         @endforeach
                     </div>
