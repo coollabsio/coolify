@@ -91,6 +91,26 @@ it('does not add a Postgres default when the user sets the exact key', function 
     expect($postgresDbEntries)->toBe(['POSTGRES_DB=customdb']);
 });
 
+it('sets PGPASSWORD to the Postgres password so psql works when pg_hba.conf requires a password', function (array $userEnvironment, string $expected) {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, ['postgres_password' => 'model-secret']);
+    foreach ($userEnvironment as $key => $value) {
+        $database->runtime_environment_variables()->create(['key' => $key, 'value' => $value]);
+    }
+
+    StartPostgresql::run($database->fresh(), new Activity);
+
+    $pgPasswordEntries = collect(databaseStartComposeEnvironment($this->executor, $database->uuid))
+        ->filter(fn (string $entry) => str($entry)->startsWith('PGPASSWORD='))
+        ->values()
+        ->all();
+
+    expect($pgPasswordEntries)->toBe([$expected]);
+})->with([
+    'model password' => [[], 'PGPASSWORD=model-secret'],
+    'user POSTGRES_PASSWORD' => [['POSTGRES_PASSWORD' => 'user-secret'], 'PGPASSWORD=user-secret'],
+    'user PGPASSWORD' => [['PGPASSWORD' => 'own-secret'], 'PGPASSWORD=own-secret'],
+]);
+
 it('adds the password default when the user only sets a *_FILE variant', function (string $action, string $factory, array $data, string $userKey, string $expected) {
     $database = $factory($this->environment->id, $this->destination, $data);
     $database->runtime_environment_variables()->create(['key' => $userKey, 'value' => '/run/secrets/x']);
