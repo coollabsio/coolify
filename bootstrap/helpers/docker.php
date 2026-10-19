@@ -1579,7 +1579,8 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    // Values can be double-quoted (with escapes), single-quoted, or unquoted; quoted values may contain spaces and "--"
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?("(?:\\\\.|[^"])*"|\'[^\']*\'|(?!--)\S+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
         '--cap-drop',
@@ -1616,16 +1617,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $options[$option][] = $value;
             $options[$option] = array_unique($options[$option]);
         }
-        if ($option === '--hostname') {
-            // Match --hostname=value or --hostname value
-            $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
-            preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
-            $value = $hostname_matches[1] ?? null;
-            if ($value && ! empty(trim($value))) {
-                $options[$option][] = $value;
-                $options[$option] = array_unique($options[$option]);
-            }
-        }
         if ($option === '--entrypoint') {
             $value = null;
             // Match --entrypoint=value or --entrypoint value
@@ -1660,6 +1651,12 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
+            if (strlen($value) >= 2 && in_array($value[0], ['"', "'"], true) && str_ends_with($value, $value[0])) {
+                $value = substr($value, 1, -1);
+            }
+            if (trim($value) === '') {
+                continue;
+            }
             $options[$option][] = $value;
             $options[$option] = array_unique($options[$option]);
         } else {

@@ -233,3 +233,56 @@ test('ConvertIpAndIp6Together', function () {
         'ip6' => ['2001:db8::1'],
     ]);
 });
+
+test('ConvertSecurityOptWithHyphenatedValue', function () {
+    $input = '--cap-drop ALL --security-opt no-new-privileges:true --security-opt=apparmor:unconfined';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_drop' => ['ALL'],
+        'security_opt' => ['no-new-privileges:true', 'apparmor:unconfined'],
+    ]);
+});
+
+test('ConvertQuotedSecurityOpt', function (string $input) {
+    expect(convertDockerRunToCompose($input))->toBe([
+        'security_opt' => ['no-new-privileges:true'],
+    ]);
+})->with([
+    '--security-opt="no-new-privileges:true"',
+    "--security-opt='no-new-privileges:true'",
+    '--security-opt "no-new-privileges:true"',
+    "--security-opt 'no-new-privileges:true'",
+]);
+
+test('ConvertQuotedValuesForListAndScalarOptions', function () {
+    $input = '--cap-add "NET_ADMIN" --cap-drop \'ALL\' --sysctl "net.core.somaxconn=1024" --device "/dev/snd" --dns "8.8.8.8" --ip="10.0.0.5" --shm-size "2g" --hostname \'my-host\' --security-opt "label=type:my type"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_add' => ['NET_ADMIN'],
+        'cap_drop' => ['ALL'],
+        'sysctls' => ['net.core.somaxconn=1024'],
+        'devices' => ['/dev/snd'],
+        'dns' => ['8.8.8.8'],
+        'ip' => ['10.0.0.5'],
+        'shm_size' => '2g',
+        'hostname' => 'my-host',
+        'security_opt' => ['label=type:my type'],
+    ]);
+});
+
+test('ConvertIgnoresEmptyQuotedValue', function () {
+    $input = '--security-opt="" --init';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'init' => true,
+    ]);
+});
+
+test('ConvertDoesNotParseOptionsInsideQuotedEntrypoint', function () {
+    $input = '--entrypoint "sh -c \'exec app --privileged --cap-add=SYS_ADMIN\'" --init';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => "sh -c 'exec app --privileged --cap-add=SYS_ADMIN'",
+        'init' => true,
+    ]);
+});
