@@ -50,10 +50,10 @@ services:
         - curl
         - '-f'
         - 'http://127.0.0.1:3000/healthz'
-      interval: 2s
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 30
+      start_period: 120s
     depends_on:
       postgres:
         condition: service_healthy
