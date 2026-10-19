@@ -258,14 +258,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
-    public function subscriptionEnded(?Subscription $subscription = null): void
+    /**
+     * Ends one subscription row. The servers stay usable while another row of the team still pays.
+     */
+    public function subscriptionEnded(Subscription $subscription): void
     {
-        $subscription ??= $this->subscription;
-
-        if (! $subscription) {
-            return;
-        }
-
         $subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
@@ -273,6 +270,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'stripe_trial_already_ended' => false,
             'stripe_past_due' => false,
         ]);
+        if ($this->subscriptions()->get()->contains(fn (Subscription $other): bool => $other->isPaying())) {
+            return;
+        }
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => false,

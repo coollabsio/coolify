@@ -166,7 +166,7 @@ class CancelSubscription
 
         // Call the team's subscription ended method to handle cleanup
         if ($subscription->team) {
-            $subscription->team->subscriptionEnded();
+            $subscription->team->subscriptionEnded($subscription);
         }
 
         \Log::info("Cancelled Stripe subscription: {$subscriptionId} for team: {$subscription->team->name}");
@@ -196,7 +196,7 @@ class CancelSubscription
                 ]);
 
                 if ($subscription->team) {
-                    $subscription->team->subscriptionEnded();
+                    $subscription->team->subscriptionEnded($subscription);
                 }
             }
 

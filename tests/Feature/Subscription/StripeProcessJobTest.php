@@ -4,6 +4,7 @@ use App\Jobs\ServerLimitCheckJob;
 use App\Jobs\StripeProcessJob;
 use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Jobs\VerifyStripeSubscriptionStatusJob;
+use App\Models\Server;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
@@ -408,4 +409,35 @@ test('created event fills a pending customer record without granting access', fu
     ]]]))->handle();
     expect($this->team->subscription()->first()->stripe_subscription_id)->toBe('sub_pending')
         ->and($this->team->subscription()->first()->stripe_invoice_paid)->toBeFalsy();
+});
+
+test('customer.subscription.deleted ends only the deleted row of a team with duplicate rows', function () {
+    Server::flushIdentityMap();
+    $active = Subscription::create([
+        'team_id' => $this->team->id,
+        'stripe_customer_id' => 'cus_dup',
+        'stripe_subscription_id' => 'sub_active',
+        'stripe_invoice_paid' => true,
+    ]);
+    $deleted = Subscription::create([
+        'team_id' => $this->team->id,
+        'stripe_customer_id' => 'cus_dup',
+        'stripe_subscription_id' => 'sub_deleted',
+        'stripe_invoice_paid' => true,
+    ]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings()->update(['is_usable' => true, 'is_reachable' => true]);
+
+    (new StripeProcessJob(['type' => 'customer.subscription.deleted', 'data' => ['object' => [
+        'customer' => 'cus_dup',
+        'id' => 'sub_deleted',
+    ]]]))->handle();
+
+    expect($active->fresh()->stripe_subscription_id)->toBe('sub_active')
+        ->and($active->fresh()->stripe_invoice_paid)->toBeTruthy()
+        ->and($active->fresh()->ended_at)->toBeNull()
+        ->and($deleted->fresh()->stripe_subscription_id)->toBeNull()
+        ->and($deleted->fresh()->ended_at)->not->toBeNull()
+        ->and($server->settings()->first()->is_usable)->toBeTruthy()
+        ->and($server->settings()->first()->is_reachable)->toBeTruthy();
 });

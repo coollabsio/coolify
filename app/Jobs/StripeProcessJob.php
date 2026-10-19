@@ -313,7 +313,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         }
                         $team = data_get($subscription, 'team');
                         if ($team) {
-                            $team->subscriptionEnded();
+                            $team->subscriptionEnded($subscription);
                         } else {
                             // send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
@@ -342,7 +342,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     if ($subscription) {
                         $team = data_get($subscription, 'team');
                         if ($team) {
-                            $team->subscriptionEnded();
+                            $team->subscriptionEnded($subscription);
                         } else {
                             // send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");

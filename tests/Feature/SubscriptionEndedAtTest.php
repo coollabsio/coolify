@@ -22,11 +22,11 @@ test('ending a subscription sets ended_at once and later ends do not move it', f
     expect($subscription->ended_at)->toBeNull();
 
     Carbon::setTestNow('2026-01-10 12:00:00');
-    $team->subscriptionEnded();
+    $team->subscriptionEnded($subscription);
     expect($subscription->fresh()->ended_at->toDateTimeString())->toBe('2026-01-10 12:00:00');
 
     Carbon::setTestNow('2026-02-20 12:00:00');
-    $team->fresh()->subscriptionEnded();
+    $team->fresh()->subscriptionEnded($subscription->fresh());
     $subscription->fresh()->update(['stripe_customer_id' => 'cus_new']);
 
     expect($subscription->fresh()->ended_at->toDateTimeString())->toBe('2026-01-10 12:00:00');
