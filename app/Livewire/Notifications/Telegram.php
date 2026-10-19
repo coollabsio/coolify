@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Jobs\SendMessageToTelegramJob;
 use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
@@ -306,7 +307,23 @@ class Telegram extends Component
     {
         try {
             $this->authorize('sendTest', $this->settings);
-            $this->team->notify(new Test(channel: 'telegram'));
+
+            // Send synchronously so that the user sees the error from Telegram (a queued test always "succeeds").
+            $message = (new Test(channel: 'telegram'))->toTelegram();
+            $response = (new SendMessageToTelegramJob(
+                text: $message['message'],
+                buttons: $message['buttons'],
+                token: (string) $this->settings->telegram_token,
+                chatId: (string) $this->settings->telegram_chat_id,
+            ))->sendMessage();
+
+            if ($response->failed()) {
+                $reason = $response->json('description') ?? "HTTP {$response->status()}";
+                $this->dispatch('error', 'Telegram rejected the test notification.', e($reason));
+
+                return;
+            }
+
             $this->dispatch('success', 'Test notification sent.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
