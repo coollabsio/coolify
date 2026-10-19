@@ -76,8 +76,10 @@ class DeleteUserAccount
         }
 
         foreach ($this->subscriptionTeams($user) as $team) {
-            if (! CancelSubscription::cancelById($team->subscription->stripe_subscription_id)) {
-                throw new RuntimeException("Could not cancel the subscription of the team \"{$team->name}\". Your account was not deleted. Please try again.");
+            foreach ($team->subscriptions as $subscription) {
+                if (! CancelSubscription::cancelById($subscription->stripe_subscription_id)) {
+                    throw new RuntimeException("Could not cancel the subscription of the team \"{$team->name}\". Your account was not deleted. Please try again.");
+                }
             }
         }
 
@@ -151,8 +153,8 @@ class DeleteUserAccount
         return $user->teams()
             ->where('teams.id', '!=', 0)
             ->wherePivot('role', 'owner')
-            ->with('subscription')
+            ->with(['subscriptions' => fn ($query) => $query->whereNotNull('stripe_subscription_id')])
             ->get()
-            ->filter(fn (Team $team): bool => filled($team->subscription?->stripe_subscription_id));
+            ->filter(fn (Team $team): bool => $team->subscriptions->isNotEmpty());
     }
 }

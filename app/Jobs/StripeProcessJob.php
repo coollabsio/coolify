@@ -49,9 +49,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     if ($subscription) {
                         $subscriptionId = data_get($subscription, 'stripe_subscription_id');
                         $stripe->subscriptions->cancel($subscriptionId, []);
-                        $subscription->update([
-                            'stripe_invoice_paid' => false,
-                        ]);
+                        $subscription->team->subscriptionEnded($subscription);
                         send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
                     } else {
                         send_internal_notification("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
