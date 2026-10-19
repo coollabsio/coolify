@@ -351,3 +351,47 @@ test('ConvertDoesNotParseOptionsInsideQuotedEntrypoint', function () {
         'init' => true,
     ]);
 });
+
+test('ConvertValueAfterMultipleWhitespace', function () {
+    $input = "--cap-add  NET_ADMIN --security-opt \t no-new-privileges:true --dns\t\t1.1.1.1";
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_add' => ['NET_ADMIN'],
+        'security_opt' => ['no-new-privileges:true'],
+        'dns' => ['1.1.1.1'],
+    ]);
+});
+
+test('DatabaseCustomUlimitReplacesDefaultOfSameType', function () {
+    $dockerCompose = [
+        'services' => [
+            'db' => [
+                'image' => 'clickhouse/clickhouse-server',
+                'ulimits' => ['nofile' => ['soft' => 262144, 'hard' => 262144]],
+            ],
+        ],
+    ];
+    $options = convertDockerRunToCompose('--ulimit nofile=1024:2048 --ulimit nproc=512');
+    $output = generateCustomDockerRunOptionsForDatabases($options, $dockerCompose, 'db', 'coolify');
+    expect($output['services']['db']['ulimits'])->toBe([
+        'nofile' => ['soft' => '1024', 'hard' => '2048'],
+        'nproc' => '512',
+    ]);
+});
+
+test('DatabaseDefaultUlimitIsKeptWhenNotOverridden', function () {
+    $dockerCompose = [
+        'services' => [
+            'db' => [
+                'image' => 'clickhouse/clickhouse-server',
+                'ulimits' => ['nofile' => ['soft' => 262144, 'hard' => 262144]],
+            ],
+        ],
+    ];
+    $options = convertDockerRunToCompose('--ulimit nproc=512');
+    $output = generateCustomDockerRunOptionsForDatabases($options, $dockerCompose, 'db', 'coolify');
+    expect($output['services']['db']['ulimits'])->toBe([
+        'nofile' => ['soft' => 262144, 'hard' => 262144],
+        'nproc' => '512',
+    ]);
+});

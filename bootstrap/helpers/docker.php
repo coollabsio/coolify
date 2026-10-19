@@ -1580,7 +1580,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     $options = [];
     $compose_options = collect([]);
     // Values can be double-quoted (with escapes), single-quoted, or unquoted; unquoted values cannot start with "-", so the next flag is not taken as a value
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?("(?:\\\\.|[^"])*"|\'[^\']*\'|(?!-)\S+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?("(?:\\\\.|[^"])*"|\'[^\']*\'|(?!-)\S+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
         '--cap-drop',
@@ -1763,6 +1763,10 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
     }
     if ($ipv6) {
         $docker_compose['services'][$container_name]['networks'][$network]['ipv6_address'] = $ipv6;
+    }
+    // A custom ulimit replaces the default of the same type; a recursive merge would combine both into an invalid value
+    foreach (array_keys(data_get($docker_run_options, 'ulimits', [])) as $type) {
+        unset($docker_compose['services'][$container_name]['ulimits'][$type]);
     }
     $docker_compose['services'][$container_name] = array_merge_recursive($docker_compose['services'][$container_name], $docker_run_options);
 
