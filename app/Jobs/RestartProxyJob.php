@@ -144,7 +144,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                "docker compose -f $compose_file pull",
+                serverDockerConfigPrefix($this->server)."docker compose -f $compose_file pull",
             ]);
             // Ensure required networks exist BEFORE docker compose up
             $commands = $commands->merge(ensureProxyNetworksExist($this->server));
