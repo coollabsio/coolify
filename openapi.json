@@ -16973,6 +16973,28 @@
                                         "logdrain_custom_config_parser": {
                                             "description": "Only present with read:sensitive.",
                                             "type": "string"
+                                        },
+                                        "is_logdrain_cloudwatch_enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "logdrain_cloudwatch_region": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "logdrain_cloudwatch_group": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "logdrain_cloudwatch_stream_prefix": {
+                                            "description": "Prepended to the container name to form the log stream name.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
                                         }
                                     },
                                     "type": "object"
@@ -17046,6 +17068,28 @@
                                     },
                                     "logdrain_custom_config_parser": {
                                         "type": "string"
+                                    },
+                                    "is_logdrain_cloudwatch_enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "logdrain_cloudwatch_region": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "logdrain_cloudwatch_group": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "logdrain_cloudwatch_stream_prefix": {
+                                        "description": "Prepended to the container name to form the log stream name.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -25252,6 +25296,9 @@
                     "is_logdrain_axiom_enabled": {
                         "type": "boolean"
                     },
+                    "is_logdrain_cloudwatch_enabled": {
+                        "type": "boolean"
+                    },
                     "is_logdrain_custom_enabled": {
                         "type": "boolean"
                     },
@@ -25320,6 +25367,15 @@
                         "type": "string"
                     },
                     "logdrain_axiom_dataset_name": {
+                        "type": "string"
+                    },
+                    "logdrain_cloudwatch_region": {
+                        "type": "string"
+                    },
+                    "logdrain_cloudwatch_group": {
+                        "type": "string"
+                    },
+                    "logdrain_cloudwatch_stream_prefix": {
                         "type": "string"
                     },
                     "logdrain_custom_config": {

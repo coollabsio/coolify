@@ -14,7 +14,10 @@ class TerminalSessionService
 {
     private const TOKEN_TTL_SECONDS = 60;
 
-    public function issue(User $user, Server $server, ?string $container = null): string
+    /**
+     * @param  'shell'|'attach'  $mode  Container terminal mode: docker exec or docker attach.
+     */
+    public function issue(User $user, Server $server, ?string $container = null, string $mode = 'shell'): string
     {
         $token = Str::random(64);
 
@@ -23,6 +26,7 @@ class TerminalSessionService
             'team_id' => $user->currentTeam()->id,
             'server_uuid' => $server->uuid,
             'container' => $container,
+            'mode' => $mode === 'attach' ? 'attach' : 'shell',
         ], now()->addSeconds(self::TOKEN_TTL_SECONDS));
 
         return $token;
@@ -63,8 +67,7 @@ class TerminalSessionService
                 throw new AccessDeniedHttpException('Terminal container is not authorized.');
             }
 
-            $dockerCommand = 'docker exec -it '.escapeshellarg($container).' sh -c '.escapeshellarg($command);
-            $command = $server->isNonRoot() ? "sudo {$dockerCommand}" : $dockerCommand;
+            $command = $this->containerCommand($server, $container, data_get($payload, 'mode') === 'attach' ? 'attach' : 'shell');
         }
 
         return SshMultiplexingHelper::generateSshCommand(
@@ -72,6 +75,34 @@ class TerminalSessionService
             $command,
             commandTimeout: (int) config('constants.terminal.command_timeout')
         );
+    }
+
+    /**
+     * Build the docker command that runs on the remote server for the given mode.
+     *
+     * @param  'shell'|'attach'  $mode
+     */
+    public function containerCommand(Server $server, string $container, string $mode): string
+    {
+        $escapedContainer = escapeshellarg($container);
+        // Add sudo for non-root users to access the Docker socket.
+        $sudo = $server->isNonRoot() ? 'sudo ' : '';
+
+        if ($mode === 'attach') {
+            $detachKeys = config('constants.terminal.detach_keys');
+            $historyLines = (int) config('constants.terminal.console_history_lines');
+
+            // Print recent output first so the console is not blank, then attach for live output.
+            $primeHistory = $historyLines > 0
+                ? "{$sudo}docker logs --tail {$historyLines} {$escapedContainer} 2>&1; "
+                : '';
+
+            // Attach to the container's main process. --detach-keys lets the user leave with
+            // Ctrl-P, Ctrl-Q and --sig-proxy=false stops the client forwarding signals to the app.
+            return "{$primeHistory}exec {$sudo}docker attach --detach-keys=\"{$detachKeys}\" --sig-proxy=false {$escapedContainer}";
+        }
+
+        return "{$sudo}docker exec -it {$escapedContainer} sh -c ".escapeshellarg($this->shellCommand());
     }
 
     private function shellCommand(): string
