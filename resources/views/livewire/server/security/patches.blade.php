@@ -99,26 +99,35 @@
                             @if ($autoUpdatesSupported)
                                 <div class="w-full">
                                 <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
-                                    <span class="flex items-center gap-1 text-sm font-medium leading-4">Automatic security updates</span>
+                                    <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Automatic security updates</label>
                                     <x-helper helper="{{ $packageManager === 'apt' ? 'Uses unattended-upgrades for the security origins only.' : 'Uses dnf-automatic with upgrade_type = security.' }} Turning it off removes the Coolify configuration and keeps the operating system default." />
                                 </div>
-                                <div class="flex min-h-8 items-center justify-between gap-2">
-                                    <x-status-badge :status="$autoSecurityUpdates ? 'On, daily' : 'Off'" :type="$autoSecurityUpdates ? 'success' : 'neutral'" />
+                                <div class="input flex items-center justify-between gap-2 pr-1!">
+                                    <span class="flex min-w-0 items-center gap-2 truncate text-neutral-700 dark:text-fg-dim">
+                                        <span @class(['size-1.5 shrink-0 rounded-full', 'bg-emerald-500' => $autoSecurityUpdates, 'bg-neutral-400 dark:bg-neutral-500' => ! $autoSecurityUpdates])></span>
+                                        {{ $autoSecurityUpdates ? 'On, every day' : 'Off' }}
+                                    </span>
                                     @can('update', $server)
-                                        <div wire:key="auto-security-updates-{{ $autoSecurityUpdates ? 'on' : 'off' }}">
+                                        <div class="flex shrink-0" wire:key="auto-security-updates-{{ $autoSecurityUpdates ? 'on' : 'off' }}">
                                             @if ($autoSecurityUpdates)
                                                 <x-modal-confirmation title="Turn off automatic security updates?"
-                                                    buttonTitle="Turn off" submitAction="toggleAutomaticSecurityUpdates"
+                                                    submitAction="toggleAutomaticSecurityUpdates"
                                                     warningMessage="Security fixes are then not installed automatically by Coolify."
                                                     temporaryDisableTwoStepConfirmation :confirmWithText="false"
                                                     :confirmWithPassword="false" :actions="[
                                                         'Coolify removes its configuration from the server.',
                                                         'The server uses the default of the operating system again. Check it if you want no automatic updates at all.',
                                                     ]"
-                                                    step2ButtonText="Turn off" />
+                                                    step2ButtonText="Turn off">
+                                                    <x-slot:trigger>
+                                                        <button type="button"
+                                                            class="h-6 shrink-0 rounded-md border border-neutral-200 bg-white px-2 text-[12px] font-medium text-neutral-800 hover:bg-neutral-50 dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-fg dark:hover:bg-white/[0.1]">
+                                                            Turn off
+                                                        </button>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
                                             @else
                                                 <x-modal-confirmation title="Turn on automatic security updates?"
-                                                    buttonTitle="Turn on" isHighlightedButton
                                                     warningMessage="Updates run without you. Your resources can stop for a short time during an update. You can turn this off at any time."
                                                     submitAction="toggleAutomaticSecurityUpdates"
                                                     temporaryDisableTwoStepConfirmation :confirmWithText="false"
@@ -128,7 +137,14 @@
                                                         'Services that use an updated library (for example OpenSSL or glibc) can restart.',
                                                         'A new kernel is installed, but the server is not rebooted. Coolify then shows Reboot required.',
                                                     ]"
-                                                    step2ButtonText="Turn on" />
+                                                    step2ButtonText="Turn on">
+                                                    <x-slot:trigger>
+                                                        <button type="button"
+                                                            class="h-6 shrink-0 rounded-md border border-neutral-200 bg-white px-2 text-[12px] font-medium text-neutral-800 hover:bg-neutral-50 dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-fg dark:hover:bg-white/[0.1]">
+                                                            Turn on
+                                                        </button>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
                                             @endif
                                         </div>
                                     @endcan
