@@ -228,3 +228,14 @@ test('it runs nothing on the team servers and leaves the DNS records at the prov
     Process::assertNothingRan();
     Bus::assertNotDispatched(ReleaseManagedDnsRecordsJob::class);
 });
+
+test('it never purges or deletes the root team', function (string $method) {
+    $rootTeam = Team::find(0) ?? Team::forceCreate(['id' => 0, 'name' => 'Root Team', 'personal_team' => false]);
+    $server = Server::factory()->create(['team_id' => 0]);
+
+    expect(fn () => app(DeleteTeamData::class)->{$method}($rootTeam))
+        ->toThrow(LogicException::class, 'The root team (id 0) is never deleted or purged.');
+
+    expect(Team::find(0))->not->toBeNull()
+        ->and(Server::find($server->id))->not->toBeNull();
+})->with(['purge', 'handle']);

@@ -50,6 +50,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
  * Removes every record Coolify keeps for a team: servers, resources (also soft-deleted ones and
@@ -103,6 +104,10 @@ class DeleteTeamData
      */
     public function purge(Team $team): array
     {
+        if ($team->id === 0) {
+            throw new LogicException('The root team (id 0) is never deleted or purged.');
+        }
+
         return DB::transaction(function () use ($team): array {
             $projects = Project::query()->where('team_id', $team->id)->get();
             $environmentIds = Environment::query()->whereIn('project_id', $projects->modelKeys())->pluck('id');
