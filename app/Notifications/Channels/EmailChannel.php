@@ -156,7 +156,7 @@ class EmailChannel
                 json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             ));
 
-            // Don't report expected errors (invalid keys, validation) to Sentry
+            // Don't report expected errors (invalid keys, validation) to error tracking
             if (in_array($statusCode, [403, 401, 400, 422], true)) {
                 throw NonReportableException::fromException(new Exception($userMessage, $e->getCode(), $e));
             }
@@ -177,7 +177,7 @@ class EmailChannel
         } catch (\Throwable $e) {
             // Check if this is a Resend domain verification error on cloud instances
             if (isCloud() && str_contains($e->getMessage(), 'domain is not verified')) {
-                // Throw as NonReportableException so it won't go to Sentry
+                // Throw as NonReportableException so it won't go to error tracking
                 throw NonReportableException::fromException($e);
             }
             throw $e;

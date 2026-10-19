@@ -252,8 +252,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 }
 
 /**
- * Throws the remote command error. Handler::register() never sends RuntimeException to Sentry,
- * so SSH key, DNS, and timeout failures on user servers are not reported.
+ * Throws the remote command error.
  */
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
 {

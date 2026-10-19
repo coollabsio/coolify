@@ -98,10 +98,6 @@ return [
         'verification_code_expiry_minutes' => 10,
     ],
 
-    'sentry' => [
-        'sentry_dsn' => env('SENTRY_DSN'),
-    ],
-
     'sentinel' => [
         'dev_url' => env('DEV_SENTINEL_URL'),
         // How often (seconds) PushServerUpdateJob is force-dispatched even when
