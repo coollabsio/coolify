@@ -79,8 +79,6 @@
                             @if ($checkedAt && ! $error)
                                 @if ($totalUpdates === 0)
                                     <x-status-badge status="Up to date" type="success" />
-                                @else
-                                    <x-status-badge :status="$totalUpdates . ' ' . Str::plural('update', $totalUpdates)" type="warning" />
                                 @endif
                                 @if ($securityUpdates > 0)
                                     <x-status-badge :status="$securityUpdates . ' ' . Str::plural('security update', $securityUpdates)" type="error" />
