@@ -395,3 +395,38 @@ test('DatabaseDefaultUlimitIsKeptWhenNotOverridden', function () {
         'nproc' => '512',
     ]);
 });
+
+test('ConvertValueWithQuotedPart', function () {
+    $input = '--sysctl net.ipv4.ping_group_range="0 2147483647" --ulimit nofile="1024:2048" --security-opt label="type:svirt_apache_t"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'sysctls' => ['net.ipv4.ping_group_range=0 2147483647'],
+        'ulimits' => [
+            'nofile' => [
+                'soft' => '1024',
+                'hard' => '2048',
+            ],
+        ],
+        'security_opt' => ['label=type:svirt_apache_t'],
+    ]);
+});
+
+test('ConvertGpusCount', function () {
+    $input = '--gpus 2';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'deploy' => [
+            'resources' => [
+                'reservations' => [
+                    'devices' => [
+                        [
+                            'driver' => 'nvidia',
+                            'capabilities' => ['gpu'],
+                            'count' => 2,
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+});

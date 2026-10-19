@@ -1579,8 +1579,9 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    // Values can be double-quoted (with escapes), single-quoted, or unquoted; unquoted values cannot start with "-", so the next flag is not taken as a value
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?("(?:\\\\.|[^"])*"|\'[^\']*\'|(?!-)\S+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    // A value is one shell word: double-quoted (with escapes), single-quoted, and unquoted parts, as in key="a b".
+    // It cannot start with "-", so the next flag is not taken as a value.
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?((?!-)(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
         '--cap-drop',
@@ -1610,12 +1611,27 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
+        // Remove the quotes like a shell: unescape \" \$ \` \\ in double quotes, keep single-quoted text as is
+        $value = preg_replace_callback(
+            '/"((?:\\\\.|[^"])*)"|\'([^\']*)\'/',
+            fn ($quoted) => isset($quoted[2]) ? $quoted[2] : preg_replace('/\\\\(["$`\\\\])/', '$1', $quoted[1]),
+            $match[2] ?? ''
+        );
         if ($option === '--gpus') {
-            $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
-            preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
-            $value = $device_matches[1] ?? 'all';
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
+            // all, a count (2), or device IDs ("device=0,1"; the inner quotes are part of the Docker syntax)
+            $gpus = trim($value, '"');
+            $payload = [
+                'driver' => 'nvidia',
+                'capabilities' => ['gpu'],
+            ];
+            if (preg_match('/^device=([0-9A-Za-z-,]+)$/', $gpus, $device_matches)) {
+                $payload['device_ids'] = explode(',', $device_matches[1]);
+            } elseif (ctype_digit($gpus)) {
+                $payload['count'] = (int) $gpus;
+            }
+            $options[$option] = $payload;
+
+            continue;
         }
         if ($option === '--entrypoint') {
             $value = null;
@@ -1648,12 +1664,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             }
 
             continue;
-        }
-        $value = $match[2] ?? '';
-        if (strlen($value) >= 2 && $value[0] === '"' && str_ends_with($value, '"')) {
-            $value = preg_replace('/\\\\(["$`\\\\])/', '$1', substr($value, 1, -1));
-        } elseif (strlen($value) >= 2 && $value[0] === "'" && str_ends_with($value, "'")) {
-            $value = substr($value, 1, -1);
         }
         if ($option === '--init' || $option === '--privileged') {
             // Boolean flags only take a value with "=" (--privileged=false); a space-separated word is not their value
@@ -1709,23 +1719,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
-            $payload = [
-                'driver' => 'nvidia',
-                'capabilities' => ['gpu'],
-            ];
-            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
-                if (str($value[0]) != 'all') {
-                    if (str($value[0])->contains(',')) {
-                        $payload['device_ids'] = str($value[0])->explode(',')->toArray();
-                    } else {
-                        $payload['device_ids'] = [$value[0]];
-                    }
-                }
-            }
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
-                        'devices' => [$payload],
+                        'devices' => [$value],
                     ],
                 ],
             ]);
