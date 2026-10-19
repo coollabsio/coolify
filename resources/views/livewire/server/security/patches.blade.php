@@ -15,11 +15,17 @@
     </x-process-dialog>
 
     @php
-        $updates = data_get($result, 'updates', []);
+        $updates = collect(data_get($result, 'updates', []))
+            ->sortBy(fn ($update) => [data_get($update, 'security') ? 0 : 1, filled(data_get($update, 'risk')) ? 0 : 1, data_get($update, 'package')])
+            ->values()
+            ->all();
         $totalUpdates = count($updates);
         $packageManager = data_get($result, 'package_manager');
         $checkedAt = $server->settings->patch_checked_at;
         $fullUpgradeOnly = in_array($packageManager, \App\Actions\Server\CheckUpdates::FULL_UPGRADE_ONLY, true);
+        $securityUpdates = data_get($result, 'security_updates');
+        $rebootRequired = data_get($result, 'reboot_required') === true;
+        $riskyUpdates = collect($updates)->filter(fn ($update) => filled(data_get($update, 'risk')))->count();
     @endphp
 
     <div
@@ -37,6 +43,18 @@
                         </x-forms.button>
                     @endif
                     @can('update', $server)
+                        @if ($rebootRequired)
+                            <x-modal-confirmation title="Reboot server?" buttonTitle="Reboot server" isErrorButton
+                                submitAction="rebootServer" :actions="[
+                                    'The server reboots in a few seconds.',
+                                    'All containers on this server stop, and the containers with a restart policy start again after the reboot.',
+                                    'The server is not reachable for a few minutes.',
+                                ]"
+                                confirmationText="{{ $server->name }}"
+                                confirmationLabel="Enter the server name to confirm"
+                                shortConfirmationLabel="Server name" :confirmWithPassword="false"
+                                step2ButtonText="Reboot server" />
+                        @endif
                         <x-forms.button type="button" wire:click="checkForUpdates" :disabled="$checking">
                             <x-reicon name="refresh" class="size-3.5" />
                             Check for updates
@@ -58,6 +76,12 @@
                             <x-status-badge status="Up to date" type="success" />
                         @else
                             <x-status-badge :status="$totalUpdates . ' ' . Str::plural('update', $totalUpdates)" type="warning" />
+                        @endif
+                        @if ($securityUpdates > 0)
+                            <x-status-badge :status="$securityUpdates . ' ' . Str::plural('security update', $securityUpdates)" type="error" />
+                        @endif
+                        @if ($rebootRequired)
+                            <x-status-badge status="Reboot required" type="warning" />
                         @endif
                     @endif
                 </div>
@@ -95,14 +119,16 @@
                 </x-application.settings-section>
             @elseif ($totalUpdates > 0)
                 <x-application.settings-section id="server-package-updates-section" title="Package updates"
-                    helper="{{ $totalUpdates }} {{ Str::plural('update', $totalUpdates) }} available."
+                    helper="{{ $totalUpdates }} {{ Str::plural('update', $totalUpdates) }} available{{ $securityUpdates !== null ? ', ' . $securityUpdates . ' of them security ' . Str::plural('update', $securityUpdates) : '' }}."
                     flush>
                     @can('update', $server)
                         <x-slot:actions>
                             <x-modal-confirmation title="Confirm package update?" buttonTitle="Update all packages"
                                 isHighlightedButton submitAction="updateAllPackages" :actions="[
                                     'All packages will be updated to their latest available versions.',
-                                    'Docker or kernel updates may restart running containers.',
+                                    $riskyUpdates > 0
+                                        ? $riskyUpdates . ' ' . Str::plural('update', $riskyUpdates) . ' can restart Docker, the running containers, or core system services, or need a reboot.'
+                                        : 'Some services on the server can restart.',
                                 ]"
                                 confirmationText="Update All Packages"
                                 confirmationLabel="Confirm by entering the text below"
@@ -129,9 +155,18 @@
                             <div wire:key="package-update-{{ data_get($update, 'package') }}-{{ data_get($update, 'architecture') }}"
                                 class="data-table-row package-updates-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
                                 <div class="flex min-w-0 items-center gap-2">
+                                    @if (filled(data_get($update, 'risk')))
+                                        <span class="shrink-0" data-tooltip="{{ \App\Actions\Server\CheckUpdates::RISK_LABELS[data_get($update, 'risk')] ?? '' }}">
+                                            <x-reicon name="alert-triangle" class="size-4 text-red-500" />
+                                            <span class="sr-only">{{ \App\Actions\Server\CheckUpdates::RISK_LABELS[data_get($update, 'risk')] ?? '' }}</span>
+                                        </span>
+                                    @endif
                                     <span class="min-w-0 truncate font-mono text-[12px] text-neutral-950 dark:text-fg">
                                         {{ data_get($update, 'package') }}
                                     </span>
+                                    @if (data_get($update, 'security'))
+                                        <x-status-badge status="Security" type="error" />
+                                    @endif
                                 </div>
                                 <div class="min-w-0">
                                     <p class="truncate font-mono text-[12px] text-neutral-700 dark:text-fg-dim">

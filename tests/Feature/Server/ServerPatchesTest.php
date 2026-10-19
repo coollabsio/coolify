@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\CheckUpdates;
+use App\Actions\Server\RebootServer;
 use App\Events\ServerPackagesUpdateFinished;
 use App\Events\ServerPatchCheckFinished;
 use App\Jobs\ServerManagerJob;
@@ -262,4 +263,74 @@ it('runs a new check when a package update finishes', function () {
 
     Queue::assertPushed(ServerPatchCheckJob::class, fn ($job) => $job->manual && $job->server->is($this->server));
     expect(Cache::has(ServerPatchCheckJob::runningCacheKey($this->server)))->toBeTrue();
+});
+
+describe('security, reboot, and risk', function () {
+    beforeEach(function () {
+        Queue::fake();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+    });
+
+    it('shows security updates, risky packages, and the reboot action', function () {
+        $result = (new CheckUpdates)->addUpdateDetails([
+            'osId' => 'ubuntu', 'package_manager' => 'apt', 'total_updates' => 2,
+            'updates' => [
+                ['package' => 'curl', 'new_version' => '8.5.0-2ubuntu10.6', 'repository' => 'noble-updates'],
+                ['package' => 'docker-ce', 'new_version' => '5:28.0.0-1', 'repository' => 'noble-security'],
+            ],
+        ], 'apt');
+        $result['reboot_required'] = true;
+        $this->server->settings->forceFill(['patch_check_result' => $result, 'patch_checked_at' => now()])->saveQuietly();
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->assertSee('1 security update')
+            ->assertSee('Reboot required')
+            ->assertSee('Reboot server')
+            ->assertSee(CheckUpdates::RISK_LABELS['docker'])
+            ->assertSeeInOrder(['docker-ce', 'curl']);
+    });
+
+    it('reboots the server for an admin and checks it again later', function () {
+        RebootServer::shouldRun()->once()->with(Mockery::on(fn ($server) => $server->is($this->server)));
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->call('rebootServer')
+            ->assertDispatched('success');
+    });
+
+    it('does not let a member of the server team reboot after the session switches to a team the user owns', function () {
+        $user = User::factory()->create();
+        $this->team->members()->attach($user, ['role' => 'admin']);
+        $otherTeam = Team::factory()->create();
+        $user->teams()->attach($otherTeam, ['role' => 'owner']);
+        $this->actingAs($user);
+        $component = Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid]);
+
+        $user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+        $user->unsetRelation('teams');
+        session(['currentTeam' => $otherTeam]);
+        RebootServer::shouldRun()->never();
+
+        $component->call('rebootServer')->assertDispatched('error');
+    });
+
+    it('does not reboot a server that another instance manages', function () {
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+
+        expect(fn () => RebootServer::run($this->server->fresh()))->toThrow(RuntimeException::class, 'managed by another Coolify instance');
+    });
+
+    it('marks the risky packages in the notification', function () {
+        $result = (new CheckUpdates)->addUpdateDetails(['updates' => [
+            ['package' => 'linux-image-6.8.0-45-generic', 'repository' => 'noble-security', 'current_version' => '1', 'new_version' => '2', 'architecture' => 'amd64'],
+            ['package' => 'curl', 'repository' => 'noble-updates', 'current_version' => '1', 'new_version' => '2', 'architecture' => 'amd64'],
+        ]], 'apt');
+
+        $payload = (new ServerPatchCheck($this->server, [...$result, 'total_updates' => 2, 'reboot_required' => true]))->toWebhook();
+
+        expect($payload['critical_packages_count'])->toBe(1)
+            ->and($payload['security_updates'])->toBe(1)
+            ->and($payload['reboot_required'])->toBeTrue();
+    });
 });

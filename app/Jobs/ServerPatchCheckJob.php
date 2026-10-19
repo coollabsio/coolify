@@ -57,7 +57,7 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $team = data_get($this->server, 'team');
-            if (! $team) {
+            if (! $team || $this->server->isTransferredAway()) {
                 return;
             }
 

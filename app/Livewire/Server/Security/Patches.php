@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server\Security;
 
+use App\Actions\Server\RebootServer;
 use App\Actions\Server\UpdatePackage;
 use App\Jobs\ServerPatchCheckJob;
 use App\Models\Server;
@@ -70,6 +71,7 @@ class Patches extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->ensureManagedHere();
             ServerPatchCheckJob::dispatchManual($this->server);
             $this->checking = true;
         } catch (\Throwable $e) {
@@ -98,6 +100,17 @@ class Patches extends Component
                 return;
             }
             $this->runUpdate(package: $package);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function rebootServer()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            RebootServer::run($this->server);
+            $this->dispatch('success', 'Reboot started. The server is back in a few minutes, and Coolify then checks it again.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -139,8 +152,19 @@ class Patches extends Component
         return true;
     }
 
+    /**
+     * A transferred server is an archive: another instance manages the host.
+     */
+    private function ensureManagedHere(): void
+    {
+        if ($this->server->isTransferredAway()) {
+            throw new \RuntimeException('This server is managed by another Coolify instance.');
+        }
+    }
+
     private function runUpdate(bool $all = false, ?string $package = null): void
     {
+        $this->ensureManagedHere();
         $savedResult = $this->server->settings->patch_check_result;
         $packageManager = data_get($savedResult, 'package_manager');
         $osId = data_get($savedResult, 'osId');
