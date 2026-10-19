@@ -180,3 +180,24 @@ YAML);
             'bind' => ['create_host_path' => true],
         ]);
 })->with(['service', 'application']);
+
+it('uses the default of a ${VAR:-default} long-form bind source as the host path', function (string $kind) {
+    $result = parseLongBind($kind, longBindCompose("'\${AO_CONFIG_FILE:-./agent-orchestrator.yaml}'", LONG_BIND_READ_ONLY_OPTIONS));
+
+    expect($result['volume']['source'])->toBe($result['directory'].'/agent-orchestrator.yaml')
+        ->and($result['storages']->pluck('fs_path')->all())->toBe([$result['directory'].'/agent-orchestrator.yaml']);
+})->with(['service', 'application']);
+
+it('keeps the volume name of a long-form named volume with a ${VAR:-default} source', function (string $kind) {
+    $result = parseLongBind($kind, <<<'YAML'
+services:
+  probe:
+    image: alpine:3.22
+    volumes:
+      - type: volume
+        source: '${DATA_VOLUME:-pgdata}'
+        target: /fixture
+YAML);
+
+    expect($result['volume']['source'])->toEndWith('_data-volume-pgdata');
+})->with(['service', 'application']);

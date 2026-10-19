@@ -215,6 +215,21 @@ function validateComposeContentVolumeSource(array $volume): void
 }
 
 /**
+ * Replaces a `${VAR:-default}` volume source with its default, as the short volume syntax does.
+ * An empty default becomes `${VAR}`. Other sources do not change.
+ */
+function resolveComposeVolumeSourceDefault(string $source): string
+{
+    if (! preg_match('/^\$\{([^}]+)\}$/', $source, $matches) || ! str_contains($matches[1], ':-')) {
+        return $source;
+    }
+
+    [$varName, $defaultValue] = explode(':-', $matches[1], 2);
+
+    return $defaultValue !== '' ? $defaultValue : '${'.$varName.'}';
+}
+
+/**
  * Keep the existing array-source forms, but inspect the default that was previously skipped.
  */
 function validateComposeArrayVolumeSource(string $source): void
@@ -909,26 +924,8 @@ function parseDockerVolumeString(string $volumeString): array
         }
     }
 
-    // Handle environment variable expansion in source
-    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
-    if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
-        $varContent = $matches[1];
-
-        // Check if there's a default value with :-
-        if (strpos($varContent, ':-') !== false) {
-            $parts = explode(':-', $varContent, 2);
-            $varName = $parts[0];
-            $defaultValue = isset($parts[1]) ? $parts[1] : '';
-
-            // If there's a non-empty default value, use it for source
-            if ($defaultValue !== '') {
-                $source = $defaultValue;
-            } else {
-                // Empty default value, keep the variable reference for env resolution
-                $source = '${'.$varName.'}';
-            }
-        }
-        // Otherwise keep the variable as-is for later expansion (no default value)
+    if ($source) {
+        $source = resolveComposeVolumeSourceDefault((string) $source);
     }
 
     // Validate source path for command injection attempts
@@ -1476,6 +1473,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeVolumeSourceDefault($source->value()));
+                        }
                     }
                     validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
@@ -2892,6 +2893,10 @@ function serviceParser(Service $resource): Collection
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeVolumeSourceDefault($source->value()));
+                        }
                     }
                     validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
