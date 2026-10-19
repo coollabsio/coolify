@@ -3,15 +3,19 @@
 namespace App\Notifications\Application;
 
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use App\Traits\IncludesDeploymentCommitDetails;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class DeploymentFailed extends CustomEmailNotification
 {
+    use IncludesDeploymentCommitDetails;
+
     public Application $application;
 
     public ?ApplicationPreview $preview = null;
@@ -30,7 +34,7 @@ class DeploymentFailed extends CustomEmailNotification
 
     public ?string $fqdn = null;
 
-    public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
+    public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null, ?ApplicationDeploymentQueue $deployment = null)
     {
         $this->onQueue('high');
         $this->application = $application;
@@ -45,6 +49,7 @@ class DeploymentFailed extends CustomEmailNotification
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
         $this->deployment_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+        $this->resolveDeploymentCommitDetails($application, $deployment, $preview);
     }
 
     public function via(object $notifiable): array
@@ -52,7 +57,7 @@ class DeploymentFailed extends CustomEmailNotification
         return $notifiable->getEnabledChannels('deployment_failure');
     }
 
-    public function toMail(): MailMessage
+    public function toMail(?object $notifiable = null): MailMessage
     {
         $mail = new MailMessage;
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
@@ -64,6 +69,7 @@ class DeploymentFailed extends CustomEmailNotification
             $mail->subject('Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.'.');
         }
         $mail->view('emails.application-deployment-failed', [
+            'commit' => $this->deploymentCommitDetailsForMail($notifiable),
             'name' => $this->application_name,
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,
