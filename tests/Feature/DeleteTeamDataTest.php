@@ -1,10 +1,12 @@
 <?php
 
 use App\Actions\Team\DeleteTeamData;
+use App\Jobs\ReleaseManagedDnsRecordsJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
+use App\Models\DnsProviderZone;
 use App\Models\DockerCleanupExecution;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
@@ -14,6 +16,8 @@ use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\ManagedDnsRecord;
+use App\Models\ManagedDnsRecordReference;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
@@ -37,6 +41,7 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
@@ -73,7 +78,8 @@ function populatedTeam(User $member): array
     GithubApp::forceCreate(['uuid' => (string) Str::uuid(), 'name' => 'gh', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'is_system_wide' => false, 'is_public' => false, 'team_id' => $team->id, 'private_key_id' => $privateKey->id]);
     GitlabApp::forceCreate(['uuid' => (string) Str::uuid(), 'name' => 'gl', 'api_url' => 'https://gitlab.com/api/v4', 'html_url' => 'https://gitlab.com', 'is_system_wide' => false, 'is_public' => false, 'team_id' => $team->id]);
     CloudProviderToken::factory()->create(['team_id' => $team->id]);
-    IntegrationToken::factory()->create(['team_id' => $team->id]);
+    $integrationToken = IntegrationToken::factory()->create(['team_id' => $team->id]);
+    $dnsRecord = ManagedDnsRecord::factory()->create(['dns_provider_zone_id' => DnsProviderZone::factory()->create(['integration_token_id' => $integrationToken->id])->id]);
     $tag = Tag::create(['name' => 'tag-'.Str::random(6), 'team_id' => $team->id]);
 
     $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
@@ -93,6 +99,7 @@ function populatedTeam(User $member): array
 
     $application = Application::factory()->create($onDestination);
     $application->tags()->attach($tag);
+    ManagedDnsRecordReference::create(['managed_dns_record_id' => $dnsRecord->id, 'resource_type' => Application::class, 'resource_id' => $application->id]);
     EnvironmentVariable::create(['key' => 'APP_SECRET', 'value' => 'x', 'resourceable_type' => Application::class, 'resourceable_id' => $application->id]);
     $appVolume = LocalPersistentVolume::create(['name' => 'app-data-'.Str::random(6), 'mount_path' => '/data', 'resource_type' => Application::class, 'resource_id' => $application->id]);
     LocalFileVolume::create(['fs_path' => '/tmp/app.env', 'mount_path' => '/app/.env', 'content' => 'SECRET=1', 'resource_type' => Application::class, 'resource_id' => $application->id]);
@@ -158,10 +165,12 @@ test('it deletes every record of the team and leaves other teams untouched', fun
     $this->assertModelExists($member);
 });
 
-test('it runs nothing on the team servers', function () {
+test('it runs nothing on the team servers and leaves the DNS records at the provider', function () {
+    Bus::fake([ReleaseManagedDnsRecordsJob::class]);
     $doomed = populatedTeam(User::factory()->create());
 
     app(DeleteTeamData::class)->handle($doomed['team']);
 
     Process::assertNothingRan();
+    Bus::assertNotDispatched(ReleaseManagedDnsRecordsJob::class);
 });

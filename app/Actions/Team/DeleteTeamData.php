@@ -110,6 +110,8 @@ class DeleteTeamData
                 ->orWhereIn('server_id', $servers->modelKeys())
                 ->delete();
 
+            // Without references, deleting a resource does not queue the removal of its DNS records at the team's provider.
+            ManagedDnsRecordReference::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resource'))->delete();
             // Volume rows go first, so their backup schedule guards do not block the resource deletion.
             LocalPersistentVolume::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resource'))->delete();
             LocalFileVolume::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resource'))->delete();
@@ -124,7 +126,6 @@ class DeleteTeamData
 
             EnvironmentVariable::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resourceable'))->delete();
             SecretManagerLink::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resourceable'))->delete();
-            ManagedDnsRecordReference::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resource'))->delete();
             SslCertificate::query()->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'resource'))->delete();
             DB::table('taggables')->where(fn (QueryBuilder $query) => $this->whereOwnedBy($query, $owners, 'taggable'))->delete();
 
