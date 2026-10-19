@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
@@ -52,7 +53,7 @@ class PublicGitRepository extends Component
 
     private object $repository_url_parsed;
 
-    public GithubApp|GitlabApp|string $git_source = 'other';
+    public GithubApp|GitlabApp|GiteaApp|string $git_source = 'other';
 
     public string $git_host;
 
@@ -198,7 +199,7 @@ class PublicGitRepository extends Component
         return $this->unsavedApplicationForDetection(
             $this->git_repository,
             $this->git_branch,
-            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp ? $this->git_source : null,
+            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp || $this->git_source instanceof GiteaApp ? $this->git_source : null,
         );
     }
 

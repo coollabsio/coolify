@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
@@ -999,6 +1000,53 @@ test('system-wide gitlab apps are not exported and re-link on import by uuid', f
         ->and($importedTeam->source_id)->toBe($importedGlTeam->id)
         ->and($importedGlTeam->is_system_wide)->toBeFalse()
         ->and(GitlabApp::where('is_system_wide', true)->where('uuid', 'system-gitlab-public')->count())->toBe(1);
+});
+
+test('team gitea apps round-trip and the application re-links to the imported app', function () {
+    $giteaApp = new GiteaApp;
+    $giteaApp->forceFill([
+        'name' => 'Team Gitea App',
+        'api_url' => 'https://gitea.example.com/api/v1',
+        'html_url' => 'https://gitea.example.com',
+        'is_public' => false,
+        'is_system_wide' => false,
+        'team_id' => $this->team->id,
+        'client_id' => 'gitea-client',
+        'client_secret' => 'gitea-secret',
+        'webhook_secret' => 'gitea-webhook-secret',
+    ]);
+    $giteaApp->uuid = 'team-gitea-app';
+    $giteaApp->save();
+
+    $this->application->source_type = GiteaApp::class;
+    $this->application->source_id = $giteaApp->id;
+    $this->application->save();
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect($bundle['gitea_apps'])->toHaveCount(1)
+        ->and($bundle['gitea_apps'][0]['client_secret'])->toBe('gitea-secret')
+        ->and(collect($bundle['post_transfer_checklist'])->implode(' '))->toContain('{target_url}/webhooks/source/gitea/redirect');
+
+    $this->service->forceDelete();
+    Application::query()->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $this->privateKey->delete();
+    $giteaApp->delete();
+
+    $targetTeam = Team::factory()->create();
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id, preserveUuids: true, adoptMode: true);
+
+    $imported = GiteaApp::where('uuid', 'team-gitea-app')->first();
+    $application = Application::where('name', 'my-app')->first();
+
+    expect($result['created']['gitea_apps'])->toBe(1)
+        ->and($imported->team_id)->toBe($targetTeam->id)
+        ->and($imported->client_secret)->toBe('gitea-secret')
+        ->and($imported->webhook_secret)->toBe('gitea-webhook-secret')
+        ->and($application->source_type)->toBe(GiteaApp::class)
+        ->and($application->source_id)->toBe($imported->id);
 });
 
 test('import rejects unsafe host file paths before saving storage', function () {

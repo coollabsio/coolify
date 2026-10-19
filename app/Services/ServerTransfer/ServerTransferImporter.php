@@ -11,6 +11,7 @@ use App\Models\CloudProviderToken;
 use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
@@ -86,6 +87,9 @@ class ServerTransferImporter
 
     /** @var array<string, GitlabApp> */
     private array $gitlabAppMap = [];
+
+    /** @var array<string, GiteaApp> */
+    private array $giteaAppMap = [];
 
     /** @var array<string, S3Storage> */
     private array $s3StorageMap = [];
@@ -221,6 +225,7 @@ class ServerTransferImporter
             'private_keys' => 0,
             'github_apps' => 0,
             'gitlab_apps' => 0,
+            'gitea_apps' => 0,
             's3_storages' => 0,
             'cloud_provider_tokens' => 0,
             'integration_tokens' => 0,
@@ -250,6 +255,7 @@ class ServerTransferImporter
             );
             $created['github_apps'] = count(data_get($bundle, 'github_apps', []));
             $created['gitlab_apps'] = count(data_get($bundle, 'gitlab_apps', []));
+            $created['gitea_apps'] = count(data_get($bundle, 'gitea_apps', []));
             $created['s3_storages'] = count(data_get($bundle, 's3_storages', []));
             $created['cloud_provider_tokens'] = count(data_get($bundle, 'cloud_provider_tokens', []));
             $created['integration_tokens'] = count(data_get($bundle, 'integration_tokens', []));
@@ -281,6 +287,7 @@ class ServerTransferImporter
             $this->privateKeyMap = [];
             $this->githubAppMap = [];
             $this->gitlabAppMap = [];
+            $this->giteaAppMap = [];
             $this->s3StorageMap = [];
             $this->cloudTokenMap = [];
             $this->integrationTokenMap = [];
@@ -329,6 +336,17 @@ class ServerTransferImporter
                 $this->gitlabAppMap[(string) data_get($glPayload, 'uuid', $gl->uuid)] = $gl;
                 $this->gitlabAppMap[$gl->uuid] = $gl;
                 $created['gitlab_apps']++;
+            }
+
+            foreach (data_get($bundle, 'gitea_apps', []) as $gtPayload) {
+                // Defensive: never import system-wide Gitea Apps from a bundle.
+                if ((bool) data_get($gtPayload, 'is_system_wide', false)) {
+                    continue;
+                }
+                $gt = $this->importGiteaApp($gtPayload, $teamId, $preserveUuids);
+                $this->giteaAppMap[(string) data_get($gtPayload, 'uuid', $gt->uuid)] = $gt;
+                $this->giteaAppMap[$gt->uuid] = $gt;
+                $created['gitea_apps']++;
             }
 
             foreach (data_get($bundle, 's3_storages', []) as $s3Payload) {
@@ -1242,6 +1260,14 @@ class ServerTransferImporter
                     $attributes['source_type'] = GitlabApp::class;
                     $attributes['source_id'] = $gl->id;
                 }
+            } elseif ($sourceType === 'gitea_app') {
+                $gt = $this->giteaAppMap[$sourceUuid]
+                    ?? GiteaApp::query()->where('uuid', $sourceUuid)->where('is_system_wide', true)->first()
+                    ?? GiteaApp::query()->where('uuid', $sourceUuid)->where('team_id', $teamId)->first();
+                if ($gt) {
+                    $attributes['source_type'] = GiteaApp::class;
+                    $attributes['source_id'] = $gt->id;
+                }
             }
         }
         $sourceMissing = data_get($payload, 'had_git_source') && ! isset($attributes['source_id']);
@@ -1252,6 +1278,7 @@ class ServerTransferImporter
             $sourceLabel = match (data_get($payload, 'source.type')) {
                 'github_app' => 'GitHub App',
                 'gitlab_app' => 'GitLab App',
+                'gitea_app' => 'Gitea App',
                 default => 'git source',
             };
             $this->importWarnings[] = "Application {$name}: its {$sourceLabel} was not found on this instance; set the source again.";
@@ -1883,6 +1910,55 @@ class ServerTransferImporter
             'public_key' => data_get($payload, 'public_key'),
             'webhook_token' => data_get($payload, 'webhook_token'),
             'deploy_key_id' => data_get($payload, 'deploy_key_id'),
+        ]);
+        $app->uuid = $uuid;
+        $app->save();
+
+        return $app;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function importGiteaApp(array $payload, int $teamId, bool $preserveUuids): GiteaApp
+    {
+        $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
+            ? (string) data_get($payload, 'uuid')
+            : new_public_id();
+
+        $existing = GiteaApp::where('uuid', $uuid)->where('team_id', $teamId)->first();
+        if ($existing) {
+            return $existing;
+        }
+        if (GiteaApp::where('uuid', $uuid)->exists()) {
+            $uuid = new_public_id();
+        }
+
+        $privateKeyId = null;
+        $keyUuid = data_get($payload, 'private_key_uuid');
+        if ($keyUuid && isset($this->privateKeyMap[$keyUuid])) {
+            $privateKeyId = $this->privateKeyMap[$keyUuid]->id;
+        }
+
+        $app = new GiteaApp;
+        $app->forceFill([
+            'team_id' => $teamId,
+            'private_key_id' => $privateKeyId,
+            'name' => data_get($payload, 'name') ?: 'Imported Gitea App',
+            'organization' => data_get($payload, 'organization'),
+            'api_url' => data_get($payload, 'api_url'),
+            'html_url' => data_get($payload, 'html_url'),
+            'custom_port' => data_get($payload, 'custom_port') ?? 22,
+            'custom_user' => data_get($payload, 'custom_user') ?? 'git',
+            'is_system_wide' => false,
+            'is_public' => (bool) data_get($payload, 'is_public', false),
+            'client_id' => data_get($payload, 'client_id'),
+            'client_secret' => data_get($payload, 'client_secret'),
+            'access_token' => data_get($payload, 'access_token'),
+            'refresh_token' => data_get($payload, 'refresh_token'),
+            'expires_at' => data_get($payload, 'expires_at'),
+            'redirect_uri' => data_get($payload, 'redirect_uri'),
+            'webhook_secret' => data_get($payload, 'webhook_secret'),
         ]);
         $app->uuid = $uuid;
         $app->save();

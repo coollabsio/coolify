@@ -781,6 +781,9 @@ class Application extends BaseModel
             get: function () {
                 $base_dir = $this->base_directory ?? '/';
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                    if ($this->source instanceof GiteaApp) {
+                        return "{$this->source->html_url}/{$this->git_repository}/src/branch/{$this->git_branch}{$base_dir}";
+                    }
                     if (str($this->git_repository)->contains('bitbucket')) {
                         return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}{$base_dir}";
                     }
@@ -823,6 +826,10 @@ class Application extends BaseModel
         return Attribute::make(
             get: function () {
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                    if ($this->source instanceof GiteaApp) {
+                        return "{$this->source->html_url}/{$this->git_repository}/commits/branch/{$this->git_branch}";
+                    }
+
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
@@ -1688,14 +1695,15 @@ class Application extends BaseModel
                 ];
             }
 
-            if ($this->source->getMorphClass() === GitlabApp::class) {
-                $gitlabSource = $this->source;
+            if (in_array($this->source->getMorphClass(), [GitlabApp::class, GiteaApp::class], true)) {
+                $oauthSource = $this->source;
+                $isGiteaSource = $oauthSource instanceof GiteaApp;
 
-                if ($gitlabSource->isConnected()) {
+                if ($oauthSource->isConnected()) {
                     $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
                     $source_html_url_host = $this->urlHostWithPort($url);
                     $source_html_url_scheme = $url['scheme'] ?? '';
-                    $token = generateGitlabCloneToken($gitlabSource);
+                    $token = $isGiteaSource ? generateGiteaCloneToken($oauthSource) : generateGitlabCloneToken($oauthSource);
                     $encodedToken = rawurlencode($token);
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
@@ -1716,12 +1724,12 @@ class Application extends BaseModel
                     ];
                 }
 
-                $private_key = gitlabAppPrivateKey($gitlabSource)?->private_key;
+                $private_key = ($isGiteaSource ? giteaAppPrivateKey($oauthSource) : gitlabAppPrivateKey($oauthSource))?->private_key;
 
                 if ($private_key) {
                     $fullRepoUrl = $customRepository;
                     $private_key = base64_encode($private_key);
-                    $gitlabPort = $gitlabSource->custom_port ?? 22;
+                    $gitlabPort = $oauthSource->custom_port ?? 22;
                     $escapedCustomRepository = str_replace("'", "'\\''", $customRepository);
                     $base_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" {$base_command} '{$escapedCustomRepository}'";
 
@@ -1943,11 +1951,13 @@ class Application extends BaseModel
                 ];
             }
 
-            if ($this->source->getMorphClass() === GitlabApp::class) {
-                $gitlabSource = $this->source;
+            if (in_array($this->source->getMorphClass(), [GitlabApp::class, GiteaApp::class], true)) {
+                $oauthSource = $this->source;
+                $isGiteaSource = $oauthSource instanceof GiteaApp;
+                $pullRequestRef = $isGiteaSource ? "pull/{$pull_request_id}/head" : "merge-requests/{$pull_request_id}/head";
 
-                if ($gitlabSource->isConnected()) {
-                    $token = generateGitlabCloneToken($gitlabSource);
+                if ($oauthSource->isConnected()) {
+                    $token = $isGiteaSource ? generateGiteaCloneToken($oauthSource) : generateGitlabCloneToken($oauthSource);
                     $encodedToken = rawurlencode($token);
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
                     $source_html_url_host = $this->urlHostWithPort($url ?: []);
@@ -1967,7 +1977,7 @@ class Application extends BaseModel
                     }
 
                     if ($pull_request_id !== 0) {
-                        $branch = "merge-requests/{$pull_request_id}/head:{$pr_branch_name}";
+                        $branch = "{$pullRequestRef}:{$pr_branch_name}";
                         if ($exec_in_docker) {
                             $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out {$branch}'"));
                         } else {
@@ -1991,12 +2001,12 @@ class Application extends BaseModel
                     ];
                 }
 
-                $private_key = gitlabAppPrivateKey($gitlabSource)?->private_key;
+                $private_key = ($isGiteaSource ? giteaAppPrivateKey($oauthSource) : gitlabAppPrivateKey($oauthSource))?->private_key;
 
                 if ($private_key) {
                     $fullRepoUrl = $customRepository;
                     $private_key = base64_encode($private_key);
-                    $gitlabPort = $gitlabSource->custom_port ?? 22;
+                    $gitlabPort = $oauthSource->custom_port ?? 22;
                     $escapedCustomRepository = escapeshellarg($customRepository);
                     $gitlabSshCommand = "ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes";
                     $gitlabGitSshCommand = "GIT_SSH_COMMAND=\"{$gitlabSshCommand}\"";
@@ -2009,7 +2019,7 @@ class Application extends BaseModel
                     $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
 
                     if ($pull_request_id !== 0) {
-                        $branch = "merge-requests/{$pull_request_id}/head:$pr_branch_name";
+                        $branch = "{$pullRequestRef}:$pr_branch_name";
                         if ($exec_in_docker) {
                             $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
                         } else {

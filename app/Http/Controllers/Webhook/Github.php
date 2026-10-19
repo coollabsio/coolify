@@ -483,6 +483,7 @@ class Github extends Controller
             }
             $applications = Application::where('repository_project_id', $id)
                 ->where('source_id', $github_app->id)
+                ->where('source_type', GithubApp::class)
                 ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();

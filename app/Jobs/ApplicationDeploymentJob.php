@@ -15,6 +15,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
@@ -110,7 +111,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $dockerImagePreviewTag = null;
 
-    private GithubApp|GitlabApp|string $source = 'other';
+    private GithubApp|GitlabApp|GiteaApp|string $source = 'other';
 
     private StandaloneDocker|SwarmDocker $destination;
 

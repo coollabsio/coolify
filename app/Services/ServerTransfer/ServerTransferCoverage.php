@@ -16,6 +16,7 @@ use App\Models\DockerCleanupExecution;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
@@ -109,6 +110,7 @@ final class ServerTransferCoverage
         GithubApp::class => ['github_apps.*'],
         GithubRunnerConfig::class => ['github_runner_config'],
         GitlabApp::class => ['gitlab_apps.*'],
+        GiteaApp::class => ['gitea_apps.*'],
         S3Storage::class => ['s3_storages.*'],
         Project::class => ['projects.*'],
         Environment::class => ['projects.*.environments.*'],
@@ -212,6 +214,7 @@ final class ServerTransferCoverage
             'github_app_id' => 'Exported as github_app_uuid. '.self::LINKED,
         ],
         GitlabApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
+        GiteaApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         S3Storage::class => ['team_id' => self::TEAM, 'unusable_email_sent' => self::RUNTIME],
         Project::class => [
             'team_id' => self::TEAM,

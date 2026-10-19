@@ -65,7 +65,8 @@
     $currentStorage = $storages->firstWhere('uuid', $storageUuid);
     $githubAppUuid = request()->route('github_app_uuid');
     $gitlabAppUuid = request()->route('gitlab_app_uuid');
-    $sourceUuid = $githubAppUuid ?? $gitlabAppUuid;
+    $giteaAppUuid = request()->route('gitea_app_uuid');
+    $sourceUuid = $githubAppUuid ?? $gitlabAppUuid ?? $giteaAppUuid;
     $sources = $sourceUuid && $team ? $team->sources()->sortBy('name')->values() : collect();
     $currentSource = $sources->firstWhere('uuid', $sourceUuid);
     $destinationUuid = request()->route('destination_uuid');
@@ -140,9 +141,11 @@
         @endphp
         <x-breadcrumb-switcher title="Sources" :label="$currentSource->name ?: 'Source'" :items="$sources->map(fn ($source) => [
             'label' => $source->name ?: class_basename($source),
-            'href' => $source instanceof \App\Models\GithubApp
-                ? route('source.github.show', ['github_app_uuid' => $source->uuid])
-                : route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid]),
+            'href' => match (true) {
+                $source instanceof \App\Models\GithubApp => route('source.github.show', ['github_app_uuid' => $source->uuid]),
+                $source instanceof \App\Models\GiteaApp => route('source.gitea.show', ['gitea_app_uuid' => $source->uuid]),
+                default => route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid]),
+            },
             'active' => $source->getMorphClass() === $currentSource->getMorphClass() && $source->uuid === $currentSource->uuid,
         ])">
             <x-slot:meta>
