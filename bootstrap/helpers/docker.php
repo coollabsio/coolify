@@ -1598,8 +1598,11 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    // A value is one shell word: double-quoted (with escapes), single-quoted, and unquoted parts, as in key="a b".
+    // It cannot start with "-" (except a negative number, as in --pids-limit -1), so the next flag is not taken as a value.
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?((?!-(?!\d))(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
+        '--add-host',
         '--cap-add',
         '--cap-drop',
         '--security-opt',
@@ -1608,42 +1611,32 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--device',
         '--shm-size',
         '--dns',
+        '--tmpfs',
     ]);
-    $mapping = collect([
-        '--cap-add' => 'cap_add',
-        '--cap-drop' => 'cap_drop',
-        '--security-opt' => 'security_opt',
-        '--sysctl' => 'sysctls',
-        '--device' => 'devices',
-        '--init' => 'init',
-        '--ulimit' => 'ulimits',
-        '--privileged' => 'privileged',
-        '--ip' => 'ip',
-        '--ip6' => 'ip6',
-        '--shm-size' => 'shm_size',
-        '--dns' => 'dns',
-        '--gpus' => 'gpus',
-        '--hostname' => 'hostname',
-        '--entrypoint' => 'entrypoint',
-    ]);
+    $mapping = collect(DOCKER_RUN_OPTION_MAPPING);
     foreach ($matches as $match) {
         $option = $match[1];
+        // Remove the quotes like a shell: unescape \" \$ \` \\ in double quotes, keep single-quoted text as is
+        $value = preg_replace_callback(
+            '/"((?:\\\\.|[^"])*)"|\'([^\']*)\'/',
+            fn ($quoted) => isset($quoted[2]) ? $quoted[2] : preg_replace('/\\\\(["$`\\\\])/', '$1', $quoted[1]),
+            $match[2] ?? ''
+        );
         if ($option === '--gpus') {
-            $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
-            preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
-            $value = $device_matches[1] ?? 'all';
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
-        }
-        if ($option === '--hostname') {
-            // Match --hostname=value or --hostname value
-            $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
-            preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
-            $value = $hostname_matches[1] ?? null;
-            if ($value && ! empty(trim($value))) {
-                $options[$option][] = $value;
-                $options[$option] = array_unique($options[$option]);
+            // all, a count (2), or device IDs ("device=0,1"; the inner quotes are part of the Docker syntax)
+            $gpus = trim($value, '"');
+            $payload = [
+                'driver' => 'nvidia',
+                'capabilities' => ['gpu'],
+            ];
+            if (preg_match('/^device=([0-9A-Za-z-,]+)$/', $gpus, $device_matches)) {
+                $payload['device_ids'] = explode(',', $device_matches[1]);
+            } elseif (ctype_digit($gpus)) {
+                $payload['count'] = (int) $gpus;
             }
+            $options[$option] = $payload;
+
+            continue;
         }
         if ($option === '--entrypoint') {
             $value = null;
@@ -1677,14 +1670,18 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
             continue;
         }
-        if (isset($match[2]) && $match[2] !== '') {
-            $value = $match[2];
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
-        } else {
-            $value = true;
-            $options[$option] = $value;
+        if (in_array($option, ['--init', '--privileged', '--read-only'], true)) {
+            // Boolean flags only take a value with "=" (--privileged=false); a space-separated word is not their value
+            $hasInlineValue = str_starts_with(substr($match[0], strlen($option)), '=');
+            $options[$option] = ! ($hasInlineValue && strtolower($value) === 'false');
+
+            continue;
         }
+        if (trim($value) === '') {
+            continue;
+        }
+        $options[$option][] = $value;
+        $options[$option] = array_unique($options[$option]);
     }
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
@@ -1695,7 +1692,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         if ($option === '--ulimit') {
             $ulimits = collect([]);
             collect($value)->map(function ($ulimit) use ($ulimits) {
-                $ulimit = explode('=', $ulimit);
+                if (! str_contains($ulimit, '=')) {
+                    return;
+                }
+                $ulimit = explode('=', $ulimit, 2);
                 $type = $ulimit[0];
                 $limits = explode(':', $ulimit[1]);
                 if (count($limits) == 2) {
@@ -1706,16 +1706,20 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                         'hard' => $hard_limit,
                     ]);
                 } else {
-                    $soft_limit = $ulimit[1];
-                    $ulimits->put($type, [
-                        'soft' => $soft_limit,
-                    ]);
+                    // Compose needs both soft and hard in the mapping form, so a single limit is set directly
+                    $ulimits->put($type, $ulimit[1]);
                 }
             });
-            $compose_options->put($mapping[$option], $ulimits);
-        } elseif ($option === '--shm-size' || $option === '--hostname') {
+            if ($ulimits->isNotEmpty()) {
+                $compose_options->put($mapping[$option], $ulimits);
+            }
+        } elseif (in_array($option, ['--shm-size', '--hostname', '--runtime'], true)) {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--pids-limit') {
+            if (is_numeric($value[0])) {
+                $compose_options->put($mapping[$option], (int) $value[0]);
             }
         } elseif ($option === '--entrypoint') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
@@ -1724,23 +1728,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
-            $payload = [
-                'driver' => 'nvidia',
-                'capabilities' => ['gpu'],
-            ];
-            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
-                if (str($value[0]) != 'all') {
-                    if (str($value[0])->contains(',')) {
-                        $payload['device_ids'] = str($value[0])->explode(',')->toArray();
-                    } else {
-                        $payload['device_ids'] = [$value[0]];
-                    }
-                }
-            }
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
-                        'devices' => [$payload],
+                        'devices' => [$value],
                     ],
                 ],
             ]);
@@ -1764,6 +1755,45 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     return $compose_options->toArray();
 }
 
+/**
+ * Returns the options (--network, -e, ...) that convertDockerRunToCompose() does not apply.
+ *
+ * @return array<int, string>
+ */
+function unsupportedDockerRunOptions(?string $custom_docker_run_options): array
+{
+    // Split into shell words, so text inside a quoted value is not taken as an option
+    preg_match_all('/(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+/', $custom_docker_run_options ?? '', $words);
+    $unsupported = [];
+    foreach ($words[0] as $word) {
+        if (! str_starts_with($word, '-') || preg_match('/^-\d/', $word)) {
+            continue;
+        }
+        $option = str_starts_with($word, '--') ? '--'.ltrim(strtok($word, '='), '-') : strtok($word, '=');
+        if (! array_key_exists($option, DOCKER_RUN_OPTION_MAPPING)) {
+            $unsupported[] = $option;
+        }
+    }
+
+    return array_values(array_unique($unsupported));
+}
+
+/**
+ * Returns --mount flags that make seccomp profile files from the custom Docker options readable in the deployment
+ * helper container, where docker compose reads them. The path stays the same, so security_opt works unchanged.
+ */
+function seccompProfileMountFlags(?string $custom_docker_run_options): string
+{
+    $flags = [];
+    foreach (data_get(convertDockerRunToCompose($custom_docker_run_options), 'security_opt', []) as $security_opt) {
+        if (preg_match('#^seccomp[=:](/[A-Za-z0-9._/-]+)$#', $security_opt, $profile) && ! str_contains($profile[1], '..')) {
+            $flags[] = '--mount '.escapeshellarg("type=bind,source={$profile[1]},target={$profile[1]},readonly");
+        }
+    }
+
+    return implode(' ', array_unique($flags));
+}
+
 function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $network)
 {
     $ipv4 = data_get($docker_run_options, 'ip.0');
@@ -1778,6 +1808,10 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
     }
     if ($ipv6) {
         $docker_compose['services'][$container_name]['networks'][$network]['ipv6_address'] = $ipv6;
+    }
+    // A custom ulimit replaces the default of the same type; a recursive merge would combine both into an invalid value
+    foreach (array_keys(data_get($docker_run_options, 'ulimits', [])) as $type) {
+        unset($docker_compose['services'][$container_name]['ulimits'][$type]);
     }
     $docker_compose['services'][$container_name] = array_merge_recursive($docker_compose['services'][$container_name], $docker_run_options);
 

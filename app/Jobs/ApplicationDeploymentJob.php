@@ -2905,12 +2905,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
+            // docker compose runs in this helper and reads seccomp profile files from the custom Docker options
+            $seccompMounts = $this->pull_request_id === 0 ? seccompProfileMountFlags($this->application->custom_docker_run_options) : '';
             if ($this->dockerConfigFileExists === 'OK') {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
             } else {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
             }
         }
         if ($firstTry) {
@@ -4291,6 +4293,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->pull_request_id === 0) {
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
+            $unsupported_options = unsupportedDockerRunOptions($this->application->custom_docker_run_options);
+            if (count($unsupported_options) > 0) {
+                $this->application_deployment_queue->addLogEntry('Warning: These custom Docker options are not supported and were not applied: '.implode(', ', $unsupported_options).'. See https://coolify.io/docs/applications/builds/custom-docker-options for the supported options.', 'stderr');
+            }
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
                 if ($this->container_name !== $this->application->uuid) {
