@@ -560,3 +560,34 @@ it('resolves a literal vault reference when the application has a secret manager
 
     expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe('LITERAL_REF='.escapeComposeEnvFileValue('resolved-remote-value'));
 });
+
+it('mounts the seccomp profile from custom docker options into the helper container', function () {
+    [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob();
+    $application->update(['custom_docker_run_options' => '--security-opt seccomp=/etc/docker/seccomp-profile.json']);
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, [
+        'application' => $application->fresh(),
+        'destination' => StandaloneDocker::forceCreate([
+            'name' => 'seccomp-network',
+            'network' => 'seccomp-network',
+            'server_id' => $server->id,
+        ]),
+    ]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands) {
+        if (str_contains($process->command, 'docker run -d')) {
+            $helperCommands[] = $process->command;
+
+            return Process::result(errorOutput: 'docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /etc/docker/seccomp-profile.json', exitCode: 125);
+        }
+
+        return Process::result(output: str_contains($process->command, 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image'));
+
+    expect($helperCommands)->toHaveCount(1)
+        ->and($helperCommands[0])->toContain('type=bind,source=/etc/docker/seccomp-profile.json,target=/etc/docker/seccomp-profile.json,readonly')
+        ->and($exception->getMessage())->toContain('bind source path does not exist: /etc/docker/seccomp-profile.json');
+});

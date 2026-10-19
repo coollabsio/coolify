@@ -2905,12 +2905,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
+            // docker compose runs in this helper and reads seccomp profile files from the custom Docker options
+            $seccompMounts = $this->pull_request_id === 0 ? seccompProfileMountFlags($this->application->custom_docker_run_options) : '';
             if ($this->dockerConfigFileExists === 'OK') {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
             } else {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
             }
         }
         if ($firstTry) {

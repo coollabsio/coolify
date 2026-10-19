@@ -461,3 +461,10 @@ test('UnsupportedDockerRunOptionsIsEmptyForSupportedOptions', function () {
     expect(unsupportedDockerRunOptions('--cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp'))->toBe([])
         ->and(unsupportedDockerRunOptions(null))->toBe([]);
 });
+
+test('SeccompProfileMountFlags', function () {
+    $input = '--security-opt seccomp=/etc/docker/seccomp.json --security-opt "seccomp:/srv/app profile.json" --security-opt seccomp=/etc/../root/x.json --security-opt seccomp=unconfined --security-opt apparmor=unconfined';
+    expect(seccompProfileMountFlags($input))->toBe("--mount 'type=bind,source=/etc/docker/seccomp.json,target=/etc/docker/seccomp.json,readonly'")
+        ->and(seccompProfileMountFlags('--cap-drop ALL'))->toBe('')
+        ->and(seccompProfileMountFlags(null))->toBe('');
+});

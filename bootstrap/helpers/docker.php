@@ -1759,6 +1759,22 @@ function unsupportedDockerRunOptions(?string $custom_docker_run_options): array
     return array_values(array_unique($unsupported));
 }
 
+/**
+ * Returns --mount flags that make seccomp profile files from the custom Docker options readable in the deployment
+ * helper container, where docker compose reads them. The path stays the same, so security_opt works unchanged.
+ */
+function seccompProfileMountFlags(?string $custom_docker_run_options): string
+{
+    $flags = [];
+    foreach (data_get(convertDockerRunToCompose($custom_docker_run_options), 'security_opt', []) as $security_opt) {
+        if (preg_match('#^seccomp[=:](/[A-Za-z0-9._/-]+)$#', $security_opt, $profile) && ! str_contains($profile[1], '..')) {
+            $flags[] = '--mount '.escapeshellarg("type=bind,source={$profile[1]},target={$profile[1]},readonly");
+        }
+    }
+
+    return implode(' ', array_unique($flags));
+}
+
 function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $network)
 {
     $ipv4 = data_get($docker_run_options, 'ip.0');
