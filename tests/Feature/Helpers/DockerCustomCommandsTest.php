@@ -233,3 +233,22 @@ test('ConvertIpAndIp6Together', function () {
         'ip6' => ['2001:db8::1'],
     ]);
 });
+
+test('ConvertGpusCount', function () {
+    $output = convertDockerRunToCompose('--gpus 2');
+    expect($output)->toBe([
+        'deploy' => [
+            'resources' => [
+                'reservations' => [
+                    'devices' => [
+                        [
+                            'driver' => 'nvidia',
+                            'capabilities' => ['gpu'],
+                            'count' => 2,
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+});

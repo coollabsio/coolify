@@ -2102,7 +2102,7 @@ $siteAddress {
 
         try {
             $output = instant_remote_process([
-                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true) && echo "---GPUS---" && (nvidia-smi --query-gpu=index,uuid,memory.total,name --format=csv,noheader,nounits 2>/dev/null || true) && echo "---NVIDIA_TOOLKIT---" && (command -v nvidia-container-runtime-hook nvidia-ctk 2>/dev/null || true)',
             ], $this, false);
 
             if (! $output) {
@@ -2110,6 +2110,7 @@ $siteAddress {
             }
 
             $sections = [];
+            $sectionLines = [];
             $currentKey = null;
             foreach (explode("\n", trim($output)) as $line) {
                 $line = trim($line);
@@ -2117,6 +2118,9 @@ $siteAddress {
                     $currentKey = $m[1];
                 } elseif ($currentKey) {
                     $sections[$currentKey] = $line;
+                    if ($line !== '') {
+                        $sectionLines[$currentKey][] = $line;
+                    }
                 }
             }
 
@@ -2127,6 +2131,8 @@ $siteAddress {
                 'cpus' => (int) ($sections['CPUS'] ?? 0),
                 'memory_bytes' => (int) ($sections['MEMORY'] ?? 0),
                 'uptime_since' => $sections['UPTIME_SINCE'] ?? null,
+                'gpus' => self::parseNvidiaSmiGpus($sectionLines['GPUS'] ?? []),
+                'nvidia_container_toolkit' => ($sectionLines['NVIDIA_TOOLKIT'] ?? []) !== [],
                 'collected_at' => now()->toIso8601String(),
             ];
 
@@ -2164,6 +2170,38 @@ $siteAddress {
 
             return null;
         }
+    }
+
+    /**
+     * Parse `nvidia-smi --query-gpu=index,uuid,memory.total,name --format=csv,noheader,nounits` lines.
+     * The name is the last column because it can contain commas.
+     *
+     * @param  list<string>  $lines
+     * @return list<array{index: string, uuid: string, memory_mb: int, name: string}>
+     */
+    public static function parseNvidiaSmiGpus(array $lines): array
+    {
+        $gpus = [];
+        foreach ($lines as $line) {
+            $columns = array_map('trim', explode(',', $line, 4));
+            if (count($columns) !== 4 || ! ctype_digit($columns[0])) {
+                continue;
+            }
+            [$index, $uuid, $memory, $name] = $columns;
+            $gpus[] = ['index' => $index, 'uuid' => $uuid, 'memory_mb' => (int) $memory, 'name' => $name];
+        }
+
+        return $gpus;
+    }
+
+    /**
+     * GPUs found when the server details were last collected, or null when they were never checked.
+     *
+     * @return list<array{index: string, uuid: string, memory_mb: int, name: string}>|null
+     */
+    public function detectedGpus(): ?array
+    {
+        return data_get($this->server_metadata, 'gpus');
     }
 
     public function isTerminalEnabled()

@@ -212,9 +212,13 @@ function sharedDataApplications(?Application $application = null): array
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
         'gpu_driver' => 'string|nullable',
-        'gpu_count' => 'string|nullable',
+        'gpu_count' => ['string', 'nullable', 'regex:'.ApplicationSetting::GPU_COUNT_PATTERN],
         'gpu_device_ids' => 'string|nullable',
-        'gpu_options' => 'string|nullable',
+        'gpu_options' => ['string', 'nullable', function (string $attribute, mixed $value, Closure $fail): void {
+            if (ApplicationSetting::parseGpuOptions($value) === null) {
+                $fail('The gpu_options must be key=value pairs or a YAML mapping.');
+            }
+        }],
         'is_consistent_container_name_enabled' => 'boolean',
         'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,

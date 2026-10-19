@@ -13,6 +13,7 @@ use App\Exceptions\DeploymentException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -4265,21 +4266,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         if ($this->application->settings->is_gpu_enabled) {
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
-                [
-                    'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
-                    'capabilities' => ['gpu'],
-                    'options' => data_get($this->application, 'settings.gpu_options', []),
-                ],
+                $this->application->settings->gpuDeviceReservation(),
             ];
-            if (data_get($this->application, 'settings.gpu_count')) {
-                $count = data_get($this->application, 'settings.gpu_count');
-                if ($count === 'all') {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = $count;
-                } else {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = (int) $count;
-                }
-            } elseif (data_get($this->application, 'settings.gpu_device_ids')) {
-                $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['ids'] = data_get($this->application, 'settings.gpu_device_ids');
+            if (ApplicationSetting::parseGpuOptions($this->application->settings->gpu_options) === null) {
+                $this->application_deployment_queue->addLogEntry('GPU options are not a valid key=value list or YAML mapping. They are ignored.');
             }
         }
         if ($this->application->isHealthcheckDisabled()) {
@@ -4309,6 +4299,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->pull_request_id === 0) {
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
+            if ($this->application->settings->is_gpu_enabled && data_get($custom_compose, 'deploy.resources.reservations.devices')) {
+                data_forget($custom_compose, 'deploy.resources.reservations.devices');
+                $this->application_deployment_queue->addLogEntry('GPU access is enabled in the GPU settings, so --gpus in Custom Docker Options is ignored.');
+            }
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
                 if ($this->container_name !== $this->application->uuid) {

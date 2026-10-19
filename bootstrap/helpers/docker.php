@@ -1641,11 +1641,17 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
     foreach ($matches as $match) {
         $option = $match[1];
         if ($option === '--gpus') {
-            $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
-            preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
-            $value = $device_matches[1] ?? 'all';
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
+            // --gpus all | --gpus 2 | --gpus "device=0,1"
+            $gpuRequest = [];
+            $gpuValue = trim($match[2] ?? '', '\'"');
+            if (preg_match('/device=([0-9A-Za-z-,]+)/', $custom_docker_run_options, $device_matches)) {
+                $gpuRequest['device_ids'] = explode(',', $device_matches[1]);
+            } elseif (ctype_digit($gpuValue)) {
+                $gpuRequest['count'] = (int) $gpuValue;
+            }
+            $options[$option] = $gpuRequest;
+
+            continue;
         }
         if ($option === '--hostname') {
             // Match --hostname=value or --hostname value
@@ -1736,23 +1742,14 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
-            $payload = [
-                'driver' => 'nvidia',
-                'capabilities' => ['gpu'],
-            ];
-            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
-                if (str($value[0]) != 'all') {
-                    if (str($value[0])->contains(',')) {
-                        $payload['device_ids'] = str($value[0])->explode(',')->toArray();
-                    } else {
-                        $payload['device_ids'] = [$value[0]];
-                    }
-                }
-            }
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
-                        'devices' => [$payload],
+                        'devices' => [[
+                            'driver' => 'nvidia',
+                            'capabilities' => ['gpu'],
+                            ...$value,
+                        ]],
                     ],
                 ],
             ]);
