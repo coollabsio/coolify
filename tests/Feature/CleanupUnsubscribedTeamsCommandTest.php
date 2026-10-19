@@ -1,23 +1,29 @@
 <?php
 
+use App\Actions\Team\DeleteTeamData;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config()->set('constants.coolify.self_hosted', false);
+    Process::fake();
 });
 
 function endedSubscription(Team $team, array $attributes = []): Subscription
 {
     return Subscription::factory()->create([
         'team_id' => $team->id,
-        'updated_at' => now()->subMonths(7),
+        'ended_at' => now()->subDays(31),
         ...$attributes,
     ]);
 }
@@ -34,12 +40,12 @@ test('it refuses to run outside Coolify Cloud', function () {
     $this->assertModelExists($team);
 });
 
-test('it rejects a months value that is not a positive integer', function (string $months) {
+test('it rejects a days value that is not a positive integer', function (string $days) {
     $team = Team::factory()->create();
     endedSubscription($team);
 
-    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--months' => $months, '--yes' => true])
-        ->expectsOutput('The --months option must be a positive integer.')
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--days' => $days, '--yes' => true])
+        ->expectsOutput('The --days option must be a positive integer.')
         ->assertFailed();
 
     $this->assertModelExists($team);
@@ -58,8 +64,10 @@ test('it previews eligible teams without deleting them', function () {
     $this->assertModelExists($team);
 });
 
-test('it deletes an eligible team with its subscription, servers, projects, and orphaned owner', function () {
-    $owner = User::factory()->create();
+test('it deletes an eligible team with its subscription, servers, projects, and orphaned owner without running commands on the servers', function () {
+    Storage::fake('images');
+    $owner = User::factory()->create(['avatar_path' => 'avatars/owner.jpg', 'avatar_storage_type' => 'local']);
+    Storage::disk('images')->put('avatars/owner.jpg', 'jpg');
     $team = $owner->teams()->first();
     $subscription = endedSubscription($team);
     $server = Server::factory()->create(['team_id' => $team->id]);
@@ -75,7 +83,9 @@ test('it deletes an eligible team with its subscription, servers, projects, and 
     $this->assertModelMissing($subscription);
     $this->assertModelMissing($project);
     $this->assertModelMissing($owner);
-    expect(Server::withTrashed()->whereKey([$server->id, $trashedServer->id])->exists())->toBeFalse();
+    expect(Server::withTrashed()->whereKey([$server->id, $trashedServer->id])->exists())->toBeFalse()
+        ->and(Storage::disk('images')->exists('avatars/owner.jpg'))->toBeFalse();
+    Process::assertNothingRan();
 });
 
 test('it keeps members with another team and detaches them from the deleted team', function () {
@@ -94,9 +104,11 @@ test('it keeps members with another team and detaches them from the deleted team
     $this->assertDatabaseMissing('team_user', ['team_id' => $team->id]);
 });
 
-test('it keeps teams that are not eligible', function (array $attributes) {
-    $team = Team::factory()->create();
-    endedSubscription($team, $attributes);
+test('it keeps teams that are not eligible', function (array $subscriptionRows) {
+    $team = Team::factory()->create(['created_at' => now()->subYear()]);
+    foreach ($subscriptionRows as $attributes) {
+        endedSubscription($team, $attributes);
+    }
 
     $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
         ->expectsOutput('Deleted 0 teams and 0 users.')
@@ -104,19 +116,142 @@ test('it keeps teams that are not eligible', function (array $attributes) {
 
     $this->assertModelExists($team);
 })->with([
-    'paid subscription' => [['stripe_invoice_paid' => true, 'stripe_subscription_id' => 'sub_paid']],
-    'paused subscription that still exists in Stripe' => [['stripe_subscription_id' => 'sub_paused']],
-    'subscription ended within the cutoff' => [['updated_at' => now()->subMonths(3)]],
-    'subscription without a Stripe customer' => [['stripe_customer_id' => null]],
+    'paid subscription' => [[['stripe_invoice_paid' => true, 'stripe_subscription_id' => 'sub_paid']]],
+    'past due subscription' => [[['stripe_past_due' => true, 'stripe_subscription_id' => 'sub_due']]],
+    'subscription ended within the grace period' => [[['ended_at' => now()->subDays(29)]]],
+    'an old ended row and a current paying row' => [[['ended_at' => now()->subYear()], ['stripe_invoice_paid' => true, 'stripe_subscription_id' => 'sub_new']]],
+    'an old ended row and a recently ended row' => [[['ended_at' => now()->subYear()], ['ended_at' => now()->subDays(5)]]],
 ]);
 
-test('it respects the months option', function () {
+test('it deletes teams that stopped paying but keep a Stripe subscription id', function (array $attributes) {
     $team = Team::factory()->create();
-    endedSubscription($team, ['updated_at' => now()->subMonths(4)]);
+    endedSubscription($team, ['stripe_subscription_id' => 'sub_kept', ...$attributes]);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 1 team and 0 users.')
+        ->assertSuccessful();
+
+    $this->assertModelMissing($team);
+})->with([
+    'refunded after a fraud warning' => [['stripe_refunded_at' => now()->subDays(40)]],
+    'paused or incomplete_expired' => [['stripe_plan_id' => 'price_paused']],
+]);
+
+test('it starts the grace period when the subscription ended, not when the row was last updated', function () {
+    $team = Team::factory()->create();
+    $subscription = endedSubscription($team, ['ended_at' => now()->subDays(31)]);
+    $subscription->update(['stripe_feedback' => 'too_expensive']);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
+
+    $this->assertModelMissing($team);
+});
+
+test('it respects the days option', function () {
+    $team = Team::factory()->create();
+    endedSubscription($team, ['ended_at' => now()->subDays(10)]);
 
     $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
     $this->assertModelExists($team);
 
-    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--months' => 3, '--yes' => true])->assertSuccessful();
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--days' => 7, '--yes' => true])->assertSuccessful();
     $this->assertModelMissing($team);
+});
+
+test('it uses the configured retention period by default', function () {
+    config()->set('constants.cloud.data_retention_days', 5);
+    $team = Team::factory()->create();
+    endedSubscription($team, ['ended_at' => now()->subDays(6)]);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
+
+    $this->assertModelMissing($team);
+});
+
+test('it deletes a never-paid team after the grace period together with its member', function (array $subscription) {
+    $owner = User::factory()->create();
+    $team = $owner->teams()->first();
+    $team->forceFill(['created_at' => now()->subDays(31)])->save();
+    if ($subscription !== []) {
+        Subscription::factory()->create(['team_id' => $team->id, ...$subscription]);
+    }
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 1 team and 1 user.')
+        ->assertSuccessful();
+
+    $this->assertModelMissing($team);
+    $this->assertModelMissing($owner);
+})->with([
+    'without a subscription row' => [[]],
+    'with a row without a Stripe customer' => [['stripe_customer_id' => null]],
+]);
+
+test('it keeps a never-paid team that is younger than the grace period', function () {
+    $owner = User::factory()->create();
+    $team = $owner->teams()->first();
+    $team->forceFill(['created_at' => now()->subDays(29)])->save();
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
+
+    $this->assertModelExists($team);
+    $this->assertModelExists($owner);
+});
+
+test('it keeps the never-paid personal team of a user who is a member of another team', function () {
+    $user = User::factory()->create();
+    $personalTeam = $user->teams()->first();
+    $personalTeam->forceFill(['created_at' => now()->subYear()])->save();
+    $payingTeam = Team::factory()->create(['created_at' => now()->subYear()]);
+    Subscription::factory()->create(['team_id' => $payingTeam->id, 'stripe_invoice_paid' => true, 'stripe_subscription_id' => 'sub_paying']);
+    $payingTeam->members()->attach($user, ['role' => 'member']);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 0 teams and 0 users.')
+        ->assertSuccessful();
+
+    $this->assertModelExists($personalTeam);
+    $this->assertModelExists($user);
+});
+
+test('a team that fails to delete does not stop the others, and its users are deleted on a later run', function () {
+    Notification::fake();
+    $rootTeam = Team::forceCreate(['id' => 0, 'name' => 'Root Team', 'created_at' => now()->subYear()]);
+    $rootTeam->webhookNotificationSettings()->update(['webhook_enabled' => true, 'webhook_url' => 'https://example.com/webhook']);
+    $failingOwner = User::factory()->create();
+    $failingTeam = $failingOwner->teams()->first();
+    endedSubscription($failingTeam);
+    $otherTeam = Team::factory()->create();
+    endedSubscription($otherTeam);
+
+    $this->mock(DeleteTeamData::class, function ($mock) use ($failingTeam) {
+        $mock->shouldReceive('handle')->andReturnUsing(function (Team $team) use ($failingTeam) {
+            if ($team->id === $failingTeam->id) {
+                throw new RuntimeException('S3 is down');
+            }
+
+            return (new DeleteTeamData)->handle($team);
+        });
+    });
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 1 team and 0 users.')
+        ->expectsOutput('Could not delete 1 team. See the log for details.')
+        ->assertFailed();
+
+    $this->assertModelMissing($otherTeam);
+    $this->assertModelExists($failingTeam);
+    $this->assertModelExists($failingOwner);
+    expect($failingOwner->teams()->whereKey($failingTeam->id)->exists())->toBeTrue();
+    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "could not delete team {$failingTeam->id}: S3 is down"));
+
+    $this->forgetMock(DeleteTeamData::class);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 1 team and 1 user.')
+        ->assertSuccessful();
+
+    $this->assertModelMissing($failingTeam);
+    $this->assertModelMissing($failingOwner);
+    $this->assertModelExists($rootTeam);
 });

@@ -16,6 +16,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -318,6 +319,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function subscription()
     {
         return $this->hasOne(Subscription::class);
+    }
+
+    /**
+     * A team can have more than one subscription row, for example after it subscribed again.
+     */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
     }
 
     public function applications()
