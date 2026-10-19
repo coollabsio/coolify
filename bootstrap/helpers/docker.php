@@ -530,11 +530,13 @@ function escapeShellValue(string $value): string
  * Prefix for a Docker command that pulls on the server itself, outside the helper container. It makes the CLI use
  * the SSH user's Docker config, where the registry logins are and which the helper container mounts. On a non-root
  * server the command runs with sudo, which resets HOME to /root, so without it a private image pull is anonymous.
- * The SSH user's shell expands $HOME before sudo runs.
+ * The SSH user's shell expands $HOME before sudo runs. Without a config of the SSH user, DOCKER_CONFIG is empty and
+ * the CLI keeps /root/.docker, so a login made with `sudo docker login` still works.
  */
 function serverDockerConfigPrefix(Server $server): string
 {
-    return $server->isNonRoot() ? 'DOCKER_CONFIG="$HOME/.docker" ' : '';
+    // No && or pipe: with them, the sudo parser can wrap the line in `sudo bash -c`, where $HOME is /root.
+    return $server->isNonRoot() ? 'DOCKER_CONFIG="$(find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" ' : '';
 }
 
 function executeInDocker(string $containerId, string $command)

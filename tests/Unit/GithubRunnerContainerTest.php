@@ -113,7 +113,7 @@ it('keeps every command valid for servers with a non-root user', function () {
     $parsed = parseCommandsByLineForSudo($commands, $this->nonRootServer);
 
     expect($parsed)
-        ->toContain('sudo DOCKER_CONFIG="$HOME/.docker" docker pull '."'".config('constants.github_runner.image')."'".' || sudo docker image inspect '."'".config('constants.github_runner.image')."'".' > /dev/null')
+        ->toContain('sudo DOCKER_CONFIG="$(sudo find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" docker pull '."'".config('constants.github_runner.image')."'".' || sudo docker image inspect '."'".config('constants.github_runner.image')."'".' > /dev/null')
         ->toContain("sudo sh -c 'umask 077 && rm -f /data/coolify/github-runners/abc123.env && echo ".base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n")." | base64 -d > /data/coolify/github-runners/abc123.env'")
         ->toContain('echo '.base64_encode(GithubRunnerContainer::pullRequestHookScript()).' | sudo base64 -d | sudo tee /data/coolify/github-runners/abc123-job-started.sh > /dev/null')
         ->toContain('sudo chmod 644 /data/coolify/github-runners/abc123-job-started.sh')
