@@ -324,12 +324,18 @@ class PrivateKey extends BaseModel
         return $this->hasMany(GitlabApp::class);
     }
 
+    public function giteaApps()
+    {
+        return $this->hasMany(GiteaApp::class);
+    }
+
     public function isInUse()
     {
         return $this->servers()->exists()
             || $this->applications()->exists()
             || $this->githubApps()->exists()
-            || $this->gitlabApps()->exists();
+            || $this->gitlabApps()->exists()
+            || $this->giteaApps()->exists();
     }
 
     public function safeDelete()

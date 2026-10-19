@@ -123,6 +123,7 @@ use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
 use App\Livewire\SharedVariables\Server\Index as ServerSharedVariablesIndex;
 use App\Livewire\SharedVariables\Server\Show as ServerSharedVariablesShow;
 use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
+use App\Livewire\Source\Gitea\Change as GiteaChange;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Source\Gitlab\Change as GitLabChange;
 use App\Livewire\Storage\Index as StorageIndex;
@@ -548,6 +549,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/source/github/{github_app_uuid}/permissions', GitHubChange::class)->name('source.github.permissions');
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
     Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');
+    Route::get('/source/gitea/{gitea_app_uuid}', GiteaChange::class)->name('source.gitea.show');
 });
 
 Route::middleware(['auth'])->group(function () {

@@ -7,6 +7,7 @@ use App\Models\CloudProviderToken;
 use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
@@ -131,6 +132,8 @@ beforeEach(function () {
     $gitlabApp = transferCoverageRecord(GitlabApp::class, [...$teamId, 'is_system_wide' => false]);
     $application = Application::factory()->create([...$onDestination, 'source_type' => GithubApp::class, 'source_id' => $githubApp->id, 'private_key_id' => $deployKey->id]);
     Application::factory()->create([...$onDestination, 'source_type' => GitlabApp::class, 'source_id' => $gitlabApp->id]);
+    $giteaApp = transferCoverageRecord(GiteaApp::class, [...$teamId, 'is_system_wide' => false]);
+    Application::factory()->create([...$onDestination, 'source_type' => GiteaApp::class, 'source_id' => $giteaApp->id]);
     $preview = transferCoverageRecord(ApplicationPreview::class, ['application_id' => $application->id]);
 
     $s3 = transferCoverageRecord(S3Storage::class, $teamId);

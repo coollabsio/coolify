@@ -180,6 +180,12 @@ class Select extends Component
                 'description' => 'Deploy public or private GitLab projects through a GitLab App, with automatic webhooks and merge request previews.',
                 'logo' => resource_logo_url('gitlab-app'),
             ],
+            [
+                'id' => 'private-gitea-app',
+                'name' => 'Git Repository (with Gitea App)',
+                'description' => 'Deploy public or private Gitea repositories through a Gitea App, with automatic webhooks and pull request previews.',
+                'logo' => asset('svgs/gitea.svg'),
+            ],
         ];
         $dockerBasedApplications = [
             [

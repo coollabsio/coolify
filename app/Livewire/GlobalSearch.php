@@ -187,6 +187,8 @@ class GlobalSearch extends Component
             'new public repository' => 'public',
             'new private github' => 'private-gh-app',
             'new private gh' => 'private-gh-app',
+            'new private gitea' => 'private-gitea-app',
+            'new gitea' => 'private-gitea-app',
             'new private deploy' => 'private-deploy-key',
             'new deploy key' => 'private-deploy-key',
 
@@ -240,7 +242,7 @@ class GlobalSearch extends Component
         if (in_array($type, [
             'project', 'source',
             // Applications
-            'public', 'private-gh-app', 'private-deploy-key',
+            'public', 'private-gh-app', 'private-gitea-app', 'private-deploy-key',
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
@@ -1206,6 +1208,15 @@ class GlobalSearch extends Component
                 'description' => 'Deploy private repositories through GitHub Apps',
                 'quickcommand' => '(type: new private github)',
                 'type' => 'private-gh-app',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Private Repository (Gitea App)',
+                'description' => 'Deploy private repositories through Gitea Apps',
+                'quickcommand' => '(type: new private gitea)',
+                'type' => 'private-gitea-app',
                 'category' => 'Applications',
                 'resourceType' => 'application',
             ]);

@@ -100,14 +100,16 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
             // Transfer instance-wide sources to root team so they remain available
             $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
-                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
+                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get())
+                ->concat(GiteaApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
             foreach ($systemWideSources as $source) {
                 $source->update(['team_id' => 0]);
             }
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->concat(GitlabApp::where('team_id', $team->id)->get());
+                ->concat(GitlabApp::where('team_id', $team->id)->get())
+                ->concat(GiteaApp::where('team_id', $team->id)->get());
             foreach ($teamSources as $source) {
                 $source->delete();
             }
@@ -343,7 +345,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'projects' => $this->projects()->count(),
             'servers' => $this->servers()->count(),
             'sources' => GithubApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
-                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
+                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
+                + GiteaApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
         ]);
     }
 
@@ -406,7 +409,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             })->where('is_public', false);
         })->get();
 
-        return $sources->merge($github_apps)->merge($gitlab_apps);
+        $gitea_apps = GiteaApp::where(function ($query) {
+            $query->where(function ($q) {
+                $q->where('team_id', $this->id)
+                    ->orWhere('is_system_wide', true);
+            })->where('is_public', false);
+        })->get();
+
+        return $sources->merge($github_apps)->merge($gitlab_apps)->merge($gitea_apps);
     }
 
     public function s3s()
