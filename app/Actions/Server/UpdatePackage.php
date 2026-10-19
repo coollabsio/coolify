@@ -41,41 +41,49 @@ class UpdatePackage
                 $sanitizedPackage = escapeshellarg($package);
             }
 
-            switch ($packageManager) {
-                case 'zypper':
-                    $commandAll = 'zypper update -y';
-                    $commandInstall = 'zypper install -y '.$sanitizedPackage;
-                    break;
-                case 'dnf':
-                    $commandAll = 'dnf update -y';
-                    $commandInstall = 'dnf update -y '.$sanitizedPackage;
-                    break;
-                case 'apt':
-                    $commandAll = 'apt update && apt upgrade -y';
-                    $commandInstall = 'apt install -y '.$sanitizedPackage;
-                    break;
-                case 'pacman':
-                    $commandAll = 'pacman -Syu --noconfirm';
-                    $commandInstall = 'pacman -S --noconfirm '.$sanitizedPackage;
-                    break;
-                case 'apk':
-                    $commandAll = 'apk update && apk upgrade';
-                    $commandInstall = 'apk upgrade '.$sanitizedPackage;
-                    break;
-                default:
-                    return [
-                        'error' => 'OS not supported',
-                    ];
-            }
-            if ($all) {
-                return remote_process([$commandAll], $server);
+            if (! $all && in_array($packageManager, CheckUpdates::FULL_UPGRADE_ONLY, true)) {
+                return [
+                    'error' => 'This operating system supports only a full system upgrade. Use "Update all packages".',
+                ];
             }
 
-            return remote_process([$commandInstall], $server);
+            $commands = self::commands($packageManager, $all ? null : $sanitizedPackage);
+            if ($commands === null) {
+                return [
+                    'error' => 'OS not supported',
+                ];
+            }
+
+            return remote_process($commands, $server);
         } catch (\Exception $e) {
             return [
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Update commands that never wait for input. apt keeps changed configuration files (confold) and uses the
+     * package default for unchanged ones (confdef). A null package updates all packages.
+     *
+     * @return array<int, string>|null
+     */
+    public static function commands(?string $packageManager, ?string $escapedPackage = null): ?array
+    {
+        $aptOptions = '-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
+
+        return match ($packageManager) {
+            'apt' => [
+                'env DEBIAN_FRONTEND=noninteractive apt-get update -qq',
+                $escapedPackage === null
+                    ? "env DEBIAN_FRONTEND=noninteractive apt-get {$aptOptions} upgrade"
+                    : "env DEBIAN_FRONTEND=noninteractive apt-get {$aptOptions} install --only-upgrade {$escapedPackage}",
+            ],
+            'dnf' => [$escapedPackage === null ? 'dnf upgrade -y' : "dnf upgrade -y {$escapedPackage}"],
+            'zypper' => [$escapedPackage === null ? 'zypper --non-interactive update' : "zypper --non-interactive update {$escapedPackage}"],
+            'pacman' => $escapedPackage === null ? ['pacman -Syu --noconfirm'] : null,
+            'apk' => ['apk update', $escapedPackage === null ? 'apk upgrade' : "apk upgrade {$escapedPackage}"],
+            default => null,
+        };
     }
 }

@@ -12,6 +12,29 @@ class CheckUpdates
 
     public string $jobQueue = 'high';
 
+    /**
+     * Package managers that only support a full system upgrade. A partial upgrade on Arch Linux is not supported.
+     *
+     * @see https://wiki.archlinux.org/title/System_maintenance#Partial_upgrades_are_unsupported
+     */
+    public const FULL_UPGRADE_ONLY = ['pacman'];
+
+    /**
+     * Latest upgrade of each installed package. dnf5 does not add a newline after --qf, dnf4 does, so empty lines are skipped.
+     */
+    public const DNF_UPGRADES_COMMAND = 'LANG=C dnf repoquery -q --refresh --upgrades --latest-limit 1 --qf "%{name} %{arch} %{evr} %{repoid}\n"';
+
+    public const RPM_INSTALLED_COMMAND = 'rpm -qa --qf "%{NAME} %{ARCH} %{VERSION}-%{RELEASE}\n"';
+
+    /**
+     * Lists pacman updates without `pacman -Sy` on the live database (that would make the next single install a partial upgrade).
+     * `checkupdates` needs fakeroot when it runs as root. Without it, the same sync runs into a temporary database.
+     * pacman 7 downloads as the `alpm` user, so the temporary directory must be readable (755).
+     *
+     * @see https://man.archlinux.org/man/checkupdates.8
+     */
+    public const PACMAN_CHECK_COMMAND = "sh -c 'if command -v checkupdates >/dev/null 2>&1 && command -v fakeroot >/dev/null 2>&1; then checkupdates; rc=\$?; if [ \$rc -eq 2 ]; then exit 0; fi; exit \$rc; fi; db=\$(mktemp -d) || exit 1; chmod 755 \"\$db\"; ln -s /var/lib/pacman/local \"\$db/local\"; if ! LANG=C pacman -Sy --dbpath \"\$db\" --logfile /dev/null >/dev/null; then rm -rf \"\$db\"; exit 1; fi; pacman -Qu --dbpath \"\$db\" 2>/dev/null; rm -rf \"\$db\"; exit 0'";
+
     public function handle(Server $server)
     {
         $osId = 'unknown';
@@ -83,8 +106,9 @@ class CheckUpdates
 
                     return $out;
                 case 'dnf':
-                    $output = instant_remote_process(['LANG=C dnf list -q --updates --refresh'], $server);
-                    $out = $this->parseDnfOutput($output);
+                    $output = instant_remote_process([self::DNF_UPGRADES_COMMAND], $server);
+                    $installed = instant_remote_process([self::RPM_INSTALLED_COMMAND], $server);
+                    $out = $this->parseDnfOutput($output, $installed);
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
 
@@ -99,10 +123,7 @@ class CheckUpdates
 
                     return $out;
                 case 'pacman':
-                    // Sync database first, then check for updates
-                    // Using -Sy to refresh package database before querying available updates
-                    instant_remote_process(['pacman -Sy'], $server);
-                    $output = instant_remote_process(['pacman -Qu 2>/dev/null'], $server);
+                    $output = instant_remote_process([self::PACMAN_CHECK_COMMAND], $server);
                     $out = $this->parsePacmanOutput($output);
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
@@ -135,7 +156,7 @@ class CheckUpdates
         }
     }
 
-    private function parseZypperOutput(string $output): array
+    public function parseZypperOutput(string $output): array
     {
         $updates = [];
 
@@ -177,36 +198,37 @@ class CheckUpdates
         }
     }
 
-    private function parseDnfOutput(string $output): array
+    /**
+     * @param  string  $output  Output of DNF_UPGRADES_COMMAND: "name arch evr repoid" per line.
+     * @param  string  $installed  Output of RPM_INSTALLED_COMMAND: "name arch version-release" per line.
+     */
+    public function parseDnfOutput(string $output, string $installed = ''): array
     {
-        $updates = [];
-        $lines = explode("\n", $output);
-
-        foreach ($lines as $line) {
-            if (empty($line)) {
-                continue;
-            }
-
-            // Split by multiple spaces/tabs and filter out empty elements
-            $parts = array_values(array_filter(preg_split('/\s+/', $line)));
-
-            if (count($parts) >= 3) {
-                $package = $parts[0];
-                $new_version = $parts[1];
-                $repository = $parts[2];
-
-                // Extract architecture from package name (e.g., "cloud-init.noarch" -> "noarch")
-                $architecture = str_contains($package, '.') ? explode('.', $package)[1] : 'noarch';
-
-                $updates[] = [
-                    'package' => $package,
-                    'new_version' => $new_version,
-                    'repository' => $repository,
-                    'architecture' => $architecture,
-                    'current_version' => 'unknown', // DNF doesn't show current version in check-update output
-                ];
+        $installedVersions = [];
+        foreach (explode("\n", $installed) as $line) {
+            $parts = preg_split('/\s+/', trim($line));
+            if (count($parts) === 3) {
+                $installedVersions["{$parts[0]}.{$parts[1]}"] = $parts[2];
             }
         }
+
+        $updates = [];
+        foreach (explode("\n", $output) as $line) {
+            $parts = preg_split('/\s+/', trim($line));
+            if (count($parts) !== 4) {
+                continue;
+            }
+            [$package, $architecture, $newVersion, $repository] = $parts;
+
+            $updates["{$package}.{$architecture}"] = [
+                'package' => $package,
+                'new_version' => preg_replace('/^0:/', '', $newVersion),
+                'repository' => $repository,
+                'architecture' => $architecture,
+                'current_version' => $installedVersions["{$package}.{$architecture}"] ?? 'unknown',
+            ];
+        }
+        $updates = array_values($updates);
 
         return [
             'total_updates' => count($updates),
@@ -214,7 +236,7 @@ class CheckUpdates
         ];
     }
 
-    private function parseAptOutput(string $output): array
+    public function parseAptOutput(string $output): array
     {
         $updates = [];
         $lines = explode("\n", $output);
@@ -243,7 +265,7 @@ class CheckUpdates
         ];
     }
 
-    private function parsePacmanOutput(string $output): array
+    public function parsePacmanOutput(string $output): array
     {
         $updates = [];
         $unparsedLines = [];
@@ -284,7 +306,7 @@ class CheckUpdates
         return $result;
     }
 
-    private function parseApkOutput(string $output): array
+    public function parseApkOutput(string $output): array
     {
         $updates = [];
         $lines = explode("\n", $output);

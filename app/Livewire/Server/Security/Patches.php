@@ -87,6 +87,11 @@ class Patches extends Component
                 osId: $this->osId,
                 all: true
             );
+            if (is_array($activity)) {
+                $this->dispatch('error', message: $activity['error'] ?? 'Something went wrong.');
+
+                return;
+            }
             $this->dispatch('activityMonitor', $activity->id, ServerPackageUpdated::class);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -98,6 +103,11 @@ class Patches extends Component
         try {
             $this->authorize('update', $this->server);
             $activity = UpdatePackage::run(server: $this->server, packageManager: $this->packageManager, osId: $this->osId, package: $package);
+            if (is_array($activity)) {
+                $this->dispatch('error', message: $activity['error'] ?? 'Something went wrong.');
+
+                return;
+            }
             $this->dispatch('activityMonitor', $activity->id, ServerPackageUpdated::class);
         } catch (\Exception $e) {
             $this->dispatch('error', message: $e->getMessage());

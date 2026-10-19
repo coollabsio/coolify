@@ -112,10 +112,12 @@
                                         @endif
                                     </div>
                                     <div class="flex justify-end">
-                                        <x-forms.button type="button"
-                                            wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">
-                                            Update
-                                        </x-forms.button>
+                                        @unless (in_array($packageManager, \App\Actions\Server\CheckUpdates::FULL_UPGRADE_ONLY, true))
+                                            <x-forms.button type="button"
+                                                wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">
+                                                Update
+                                            </x-forms.button>
+                                        @endunless
                                     </div>
                                 </div>
                             @endforeach
