@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -54,9 +55,18 @@ class UpdatePackage
                 ];
             }
 
-            return remote_process($commands, $server, callEventOnFinish: 'ServerPackagesUpdateFinished', callEventData: [
+            $updateId = (string) Str::uuid();
+            $packages = $all ? [] : [$package];
+            $user = auth()->user();
+
+            return remote_process($commands, $server, type_uuid: $updateId, callEventOnFinish: 'ServerPackagesUpdateFinished', callEventData: [
+                'update_id' => $updateId,
                 'server_uuid' => $server->uuid,
-                'packages' => $all ? [] : [$package],
+                'packages' => $packages,
+                'package_manager' => $packageManager,
+                'actor_id' => $user?->id,
+                'actor_name' => $user?->name,
+                'actor_email' => $user?->email,
             ]);
         } catch (\Exception $e) {
             return [

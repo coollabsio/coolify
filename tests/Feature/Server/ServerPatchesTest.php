@@ -3,11 +3,13 @@
 use App\Actions\Server\CheckUpdates;
 use App\Actions\Server\ConfigureAutomaticSecurityUpdates;
 use App\Actions\Server\RebootServer;
+use App\Actions\Server\UpdatePackage;
 use App\Events\ServerPackagesUpdateFinished;
 use App\Events\ServerPatchCheckFinished;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\ServerPatchCheckJob;
 use App\Livewire\Server\Security\Patches;
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
@@ -399,5 +402,73 @@ describe('automatic security updates', function () {
             ->set('autoSecurityUpdatesTime', '25:00')
             ->call('submit')
             ->assertDispatched('error');
+    });
+});
+
+describe('audit trail', function () {
+    beforeEach(function () {
+        Queue::fake();
+        $this->withoutDefer();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $this->server->settings->forceFill(['patch_check_result' => patchesTestResult(), 'patch_checked_at' => now()])->saveQuietly();
+    });
+
+    it('records who requested a package update', function () {
+        $activity = Activity::query()->create(['log_name' => 'default', 'description' => '', 'properties' => []]);
+        UpdatePackage::shouldRun()->once()->andReturn($activity);
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])->call('updatePackage', 'openssl');
+
+        $event = AuditEvent::query()->where('event', 'ui.server.packages_update_requested')->sole();
+        expect($event->actor_email)->toBe($this->admin->email)
+            ->and($event->team_id)->toBe($this->team->id)
+            ->and($event->resource_uuid)->toBe($this->server->uuid)
+            ->and($event->metadata['packages'])->toBe(['openssl'])
+            ->and($event->metadata['activity_id'])->toBe($activity->id);
+    });
+
+    it('records the result of a finished package update and checks the server again', function (string $status, string $result) {
+        $activity = Activity::query()->create(['log_name' => 'default', 'description' => '', 'properties' => [
+            'type_uuid' => 'update-1', 'status' => $status, 'exitCode' => $status === 'finished' ? 0 : 100,
+        ]]);
+        auth()->logout();
+
+        ServerPackagesUpdateFinished::dispatch([
+            'update_id' => 'update-1', 'server_uuid' => $this->server->uuid, 'packages' => [], 'package_manager' => 'apt',
+            'actor_id' => $this->admin->id, 'actor_name' => $this->admin->name, 'actor_email' => $this->admin->email,
+        ]);
+
+        $event = AuditEvent::query()->where('event', 'ui.server.packages_update_finished')->sole();
+        expect($event->actor_email)->toBe($this->admin->email)
+            ->and($event->team_id)->toBe($this->team->id)
+            ->and($event->metadata)->toMatchArray(['packages' => 'all', 'result' => $result, 'activity_id' => $activity->id]);
+        Queue::assertPushed(ServerPatchCheckJob::class);
+    })->with([
+        ['finished', 'success'],
+        ['error', 'failed'],
+    ]);
+
+    it('records a reboot and a failed reboot', function () {
+        RebootServer::shouldRun()->once();
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])->call('rebootServer');
+
+        RebootServer::shouldRun()->once()->andThrow(new RuntimeException('Server is not reachable or not ready.'));
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])->call('rebootServer');
+
+        expect(AuditEvent::query()->where('event', 'ui.server.reboot_requested')->orderBy('id')->get()->map(fn ($event) => $event->metadata['result'])->all())
+            ->toBe(['started', 'failed']);
+    });
+
+    it('records a change of the automatic security updates', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->once();
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('autoSecurityUpdates', true)
+            ->call('submit');
+
+        $event = AuditEvent::query()->where('event', 'ui.server.auto_security_updates_updated')->sole();
+        expect($event->actor_email)->toBe($this->admin->email)
+            ->and($event->metadata)->toMatchArray(['enabled' => true, 'time' => '03:00', 'package_manager' => 'apt', 'result' => 'success']);
     });
 });

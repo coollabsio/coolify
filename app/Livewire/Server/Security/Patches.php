@@ -121,7 +121,14 @@ class Patches extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            RebootServer::run($this->server);
+            try {
+                RebootServer::run($this->server);
+            } catch (\Throwable $e) {
+                $this->auditPatchAction('reboot_requested', ['result' => 'failed', 'error' => $e->getMessage()], 'error');
+
+                throw $e;
+            }
+            $this->auditPatchAction('reboot_requested', ['result' => 'started']);
             $this->dispatch('success', 'Reboot started. The server is back in a few minutes, and Coolify then checks it again.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -152,13 +159,26 @@ class Patches extends Component
                 if (! ConfigureAutomaticSecurityUpdates::supportFor($packageManager)) {
                     throw new \Exception('Automatic security updates are supported only on Debian, Ubuntu, and RHEL-family servers. Run "Check for updates" first, so Coolify knows the package manager.');
                 }
-                ConfigureAutomaticSecurityUpdates::run($this->server, $packageManager, $this->autoSecurityUpdates, $time);
+                $auditContext = ['enabled' => $this->autoSecurityUpdates, 'time' => $time, 'package_manager' => $packageManager];
+                try {
+                    ConfigureAutomaticSecurityUpdates::run($this->server, $packageManager, $this->autoSecurityUpdates, $time);
+                } catch (\Throwable $e) {
+                    $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'failed', 'error' => $e->getMessage()], 'error');
+
+                    throw $e;
+                }
             }
 
             $settings->patch_check_frequency = $frequency === '' ? null : $frequency;
             $settings->is_auto_security_updates_enabled = $this->autoSecurityUpdates;
             $settings->auto_security_updates_time = $time;
+            $changedFields = auditChangedFields($settings);
             $settings->save();
+            if ($autoUpdatesChanged) {
+                $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'success']);
+            } elseif ($changedFields !== []) {
+                $this->auditPatchAction('patch_settings_updated', ['changed_fields' => $changedFields]);
+            }
             $this->syncSettings();
             $this->dispatch('success', 'Patch settings saved.');
         } catch (\Throwable $e) {
@@ -185,6 +205,19 @@ class Patches extends Component
         }
 
         return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function auditPatchAction(string $action, array $context, string $level = 'info'): void
+    {
+        auditLog("ui.server.{$action}", [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            ...$context,
+        ], $level);
     }
 
     /**
@@ -215,6 +248,11 @@ class Patches extends Component
 
             return;
         }
+        $this->auditPatchAction('packages_update_requested', [
+            'packages' => $all ? 'all' : [$package],
+            'package_manager' => $packageManager,
+            'activity_id' => $activity->id,
+        ]);
         $this->dispatch('startupdate');
         $this->dispatch('activityMonitor', $activity->id);
     }
