@@ -217,7 +217,7 @@ test('the application parser stores a content volume at its host path and Coolif
     contentHostPathAssertWritten($writePath, $content, $user);
 })->with(contentHostPathTargets())->with(['root', 'coolify']);
 
-test('loading files for a service writes content at its host path', function (string $target, string $content, string $user) {
+test('loading files for a service writes content inside the resource directory', function (string $target, string $content, string $user) {
     contentHostPathUseServerUser($user);
     $service = contentHostPathService(CONTENT_HOST_PATH_COMPOSE);
     serviceParser($service);
@@ -232,7 +232,26 @@ test('loading files for a service writes content at its host path', function (st
     $base64 = base64_encode($content);
     Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p -- \"$({$sudo}dirname -- {$escapedPath})\""));
     Process::assertRan(fn ($process) => str_contains($process->command, "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
-})->with(contentHostPathTargets())->with(['root', 'coolify']);
+})->with([
+    'home directory' => ['/etc/b.conf', 'b'],
+    'bare relative path' => ['/etc/c.conf', 'c'],
+])->with(['root', 'coolify']);
+
+// A token with only the write permission can save a Compose file. Content outside the resource
+// directory is written when the resource is deployed or started, not when its files are loaded.
+test('loading files for a service does not write content outside the resource directory', function (string $target, string $content) {
+    $service = contentHostPathService(CONTENT_HOST_PATH_COMPOSE);
+    serviceParser($service);
+    $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+
+    contentHostPathFakeServer();
+    getFilesystemVolumesFromServer($fileVolume->resource, true);
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, base64_encode($content)));
+})->with([
+    'absolute host file' => ['/etc/a.conf', 'a'],
+    'parent directory' => ['/etc/d.conf', 'd'],
+]);
 
 test('a quote in a content path is shell-escaped in every write command', function (string $user) {
     contentHostPathUseServerUser($user);
@@ -245,11 +264,9 @@ test('a quote in a content path is shell-escaped in every write command', functi
 
     contentHostPathFakeServer();
     $fileVolume->saveStorageOnServer();
-    getFilesystemVolumesFromServer($fileVolume->resource, true);
 
     $sudo = $user === 'root' ? '' : 'sudo ';
     Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}tee '/etc/my'\\''app/app.conf' > /dev/null"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}tee -- '/etc/my'\\''app/app.conf'"));
     Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p '/etc/my'\\''app'"));
 })->with(['root', 'coolify']);
 
@@ -409,4 +426,16 @@ test('the service API rejects shell injection in a content volume source', funct
 
     expect($service->fresh()->docker_compose_raw)->toBe(CONTENT_HOST_PATH_SAFE_COMPOSE)
         ->and(LocalFileVolume::query()->count())->toBe(0);
+});
+
+test('loading files for a service does not create directories outside the resource directory', function () {
+    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - type: bind\n        source: /etc/cron.d/coolify-test\n        target: /data\n";
+    $service = contentHostPathService($compose);
+    serviceParser($service);
+    $fileVolume = LocalFileVolume::query()->sole();
+
+    contentHostPathFakeServer();
+    getFilesystemVolumesFromServer($fileVolume->resource, true);
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '/etc/cron.d/coolify-test') && str_contains($process->command, 'mkdir'));
 });

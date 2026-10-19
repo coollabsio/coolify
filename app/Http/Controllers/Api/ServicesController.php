@@ -30,6 +30,7 @@ use OpenApi\Attributes as OA;
 class ServicesController extends Controller
 {
     use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployAbility;
     use Concerns\RequiresDeployForOutsideHostPaths;
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
@@ -997,7 +998,7 @@ class ServicesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete',
-        description: 'Delete service by UUID.',
+        description: 'Delete service by UUID. Needs a token with the write and deploy permissions.',
         path: '/services/{uuid}',
         operationId: 'delete-service-by-uuid',
         security: [
@@ -1040,6 +1041,7 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
         ]
     )]
     public function delete_by_uuid(Request $request)
@@ -2477,7 +2479,7 @@ class ServicesController extends Controller
                             'resource_uuid' => ['type' => 'string', 'description' => 'UUID of the service application or database sub-resource.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional). Needs the deploy ability when set.'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
                         ],
@@ -2495,7 +2497,7 @@ class ServicesController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
-            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory.'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -2699,6 +2701,13 @@ class ServicesController extends Controller
                     'message' => 'Validation failed.',
                     'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
+            }
+
+            if ($request->filled('content')) {
+                $forbidden = $this->deployAbilityForbiddenResponse($request, 'Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
+                if ($forbidden) {
+                    return $forbidden;
+                }
             }
 
             $storage = LocalFileVolume::create([
@@ -3238,7 +3247,7 @@ class ServicesController extends Controller
                 properties: [
                     new OA\Property(property: 'destination_uuid', type: 'string'),
                     new OA\Property(property: 'name', type: 'string', nullable: true),
-                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false, description: 'Whether to clone volume data. Needs the deploy ability.'),
                 ]
             )
         ),
@@ -3246,6 +3255,7 @@ class ServicesController extends Controller
             new OA\Response(response: 201, description: 'Service cloned.'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability to clone volume data.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -3287,6 +3297,10 @@ class ServicesController extends Controller
         }
 
         $this->authorize('update', $service);
+
+        if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
+            return $response;
+        }
 
         $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
             ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();

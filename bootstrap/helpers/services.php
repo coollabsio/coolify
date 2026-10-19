@@ -210,6 +210,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $fsPath = trim((string) $fileVolume->fs_path);
             $fileLocation = str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
             $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
+            // A token with only the write permission can save a Compose file, so Coolify does not
+            // write outside the resource directory here. A deployment or start writes those paths.
+            $isOutsideResourceDirectory = fn (): bool => $fileVolume->isOutsideResourceDirectory();
             // Exists and is a file
             $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
             // Exists and is a directory
@@ -225,7 +228,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 // A configured file must not lose its content because a directory is at its path.
                 // Docker leaves an empty directory when it starts before the file exists: replace it.
                 // A directory with files stays; the start or deployment shows a warning for it.
-                if (LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
+                if (! $isOutsideResourceDirectory() && LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
                     $fileVolume->saveStorageOnServer();
                 }
             } elseif ($isDir === 'OK') {
@@ -235,6 +238,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->save();
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has content
+                if ($isOutsideResourceDirectory()) {
+                    continue;
+                }
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
@@ -248,13 +254,17 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-                instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                if (! $isOutsideResourceDirectory()) {
+                    instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                }
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-                instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                if (! $isOutsideResourceDirectory()) {
+                    instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
+                }
             }
         }
     } catch (Throwable $e) {

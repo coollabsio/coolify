@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
@@ -15,6 +16,8 @@ use OpenApi\Attributes as OA;
 
 class ServerProxyController extends Controller
 {
+    use RequiresDeployAbility;
+
     private function teamIdOrAbort(): int|JsonResponse
     {
         $teamId = getTeamIdFromToken();
@@ -118,7 +121,7 @@ class ServerProxyController extends Controller
 
     #[OA\Patch(
         summary: 'Update server proxy',
-        description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.',
+        description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server. Changing proxy_type needs a token with the `write` and `deploy` permissions.',
         path: '/servers/{uuid}/proxy',
         operationId: 'update-server-proxy',
         security: [['bearerAuth' => []]],
@@ -135,7 +138,7 @@ class ServerProxyController extends Controller
                     new OA\Property(property: 'redirect_url', type: 'string', nullable: true, description: 'Public http(s) redirect URL, or null to clear.'),
                     new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                     new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'),
-                    new OA\Property(property: 'proxy_type', type: 'string', enum: ['traefik', 'caddy', 'nginx', 'none'], description: 'Proxy type (case-insensitive).'),
+                    new OA\Property(property: 'proxy_type', type: 'string', enum: ['traefik', 'caddy', 'nginx', 'none'], description: 'Proxy type (case-insensitive). Changing it starts the new proxy on the server and needs the deploy permission.'),
                 ]
             )
         ),
@@ -158,6 +161,7 @@ class ServerProxyController extends Controller
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to change the proxy type.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -213,6 +217,12 @@ class ServerProxyController extends Controller
             }
         }
 
+        $proxyTypeChanged = $request->has('proxy_type') && filled($request->proxy_type)
+            && ! str($request->proxy_type)->lower()->exactly(str($server->proxyType())->lower());
+        if ($proxyTypeChanged && ($response = $this->deployAbilityForbiddenResponse($request, 'Changing the proxy type starts the new proxy on the server, so it needs a token with the deploy permission.'))) {
+            return $response;
+        }
+
         $changedFields = array_values(array_intersect($allowedFields, array_keys($request->all())));
         $redirectChanged = false;
 
@@ -242,7 +252,7 @@ class ServerProxyController extends Controller
             $server->settings->save();
         }
 
-        if ($request->has('proxy_type') && filled($request->proxy_type)) {
+        if ($proxyTypeChanged) {
             $server->changeProxy($request->proxy_type, async: true);
             $server->refresh();
         }
@@ -322,9 +332,8 @@ class ServerProxyController extends Controller
             return $teamId;
         }
 
-        // The proxy compose file is applied on the server, like a deployment.
-        if (! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
-            return response()->json(['message' => 'Missing required permissions: deploy'], 403);
+        if ($response = $this->deployAbilityForbiddenResponse($request, 'Coolify applies the proxy configuration on the server, so it needs a token with the deploy permission.')) {
+            return $response;
         }
 
         $return = validateIncomingRequest($request);

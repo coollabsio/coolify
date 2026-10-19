@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
@@ -13,6 +14,8 @@ use OpenApi\Attributes as OA;
 
 class ScheduledTasksController extends Controller
 {
+    use RequiresDeployAbility;
+
     private function removeSensitiveData($task)
     {
         $task->makeHidden([
@@ -38,13 +41,11 @@ class ScheduledTasksController extends Controller
      */
     private function enabledTaskForbiddenResponse(Request $request, bool $enabled): ?JsonResponse
     {
-        if (! $enabled || $request->user()->tokenCan('deploy') || $request->user()->tokenCan('root')) {
+        if (! $enabled) {
             return null;
         }
 
-        return response()->json([
-            'message' => 'Missing required permissions: deploy. An enabled scheduled task runs commands in the resource containers, so it needs a token with the deploy permission.',
-        ], 403);
+        return $this->deployAbilityForbiddenResponse($request, 'An enabled scheduled task runs commands in the resource containers, so it needs a token with the deploy permission.');
     }
 
     private function resolveApplication(Request $request, int $teamId): ?Application

@@ -29,6 +29,7 @@ class StartLogDrain
         if ($type !== 'none') {
             StopLogDrain::run($server);
         }
+        $serverName = $this->fluentBitValue((string) $server->name);
         try {
             if ($type === 'none') {
                 return 'No log drain is enabled.';
@@ -54,7 +55,7 @@ class StartLogDrain
 [FILTER]
     Name                modify
     Match               *
-    Set                 coolify.server_name {$server->name}
+    Set                 coolify.server_name {$serverName}
     Rename              COOLIFY_APP_NAME coolify.app_name
     Rename              COOLIFY_PROJECT_NAME coolify.project_name
     Rename              COOLIFY_SERVER_IP coolify.server_ip
@@ -109,7 +110,7 @@ class StartLogDrain
 [FILTER]
     Name                modify
     Match               *
-    Set                 coolify.server_name {$server->name}
+    Set                 coolify.server_name {$serverName}
     Rename              COOLIFY_APP_NAME coolify.app_name
     Rename              COOLIFY_PROJECT_NAME coolify.project_name
     Rename              COOLIFY_SERVER_IP coolify.server_ip
@@ -217,6 +218,14 @@ Files:
         } catch (\Throwable $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Fluent Bit reads its config line by line, so a value with a line break could add sections.
+     */
+    private function fluentBitValue(string $value): string
+    {
+        return trim(preg_replace('/\s*[\x00-\x1F\x7F]+\s*/', ' ', $value));
     }
 
     private function logDrainNetworkConnectCommands(Server $server): array

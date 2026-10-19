@@ -97,3 +97,55 @@ it('writes a new file mount immediately when there is no transaction', function 
     expect($this->processedSaves)->toBe(1);
     Process::assertRan(fn ($process) => str_contains($process->command, base64_encode('KEY=value')));
 });
+
+it('does not write compose content outside the resource directory before a deployment', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: /etc/cron.d/coolify-test\n        target: /x\n        content: 'outside-content'\n",
+    ]);
+
+    LocalFileVolume::create([
+        'fs_path' => '/etc/cron.d/coolify-test',
+        'mount_path' => '/x',
+        'content' => 'outside-content',
+        'is_directory' => false,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    expect($this->processedSaves)->toBe(0);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, base64_encode('outside-content')));
+});
+
+it('writes compose content inside the resource directory immediately', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: ./config.env\n        target: /app/config.env\n        content: 'inside-content'\n",
+    ]);
+
+    LocalFileVolume::create([
+        'fs_path' => application_configuration_dir().'/'.$this->application->uuid.'/config.env',
+        'mount_path' => '/app/config.env',
+        'content' => 'inside-content',
+        'is_directory' => false,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    expect($this->processedSaves)->toBe(1);
+    Process::assertRan(fn ($process) => str_contains($process->command, base64_encode('inside-content')));
+});
+
+it('does not write a mount outside the resource directory before a deployment', function () {
+    LocalFileVolume::create([
+        'fs_path' => '/opt/coolify-outside.conf',
+        'mount_path' => '/app/outside.conf',
+        'content' => 'outside-without-compose',
+        'is_directory' => false,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    expect($this->processedSaves)->toBe(0);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, base64_encode('outside-without-compose')));
+});

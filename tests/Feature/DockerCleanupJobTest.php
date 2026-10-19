@@ -587,6 +587,8 @@ function dockerCleanupRunImageCommand(string $command, array $images): string
     file_put_contents("$bin/images", implode("\n", $images)."\n");
     file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = images ]; then cat $bin/images; elif [ \"\$1\" = rmi ]; then echo \"\$@\"; fi\n");
     chmod("$bin/docker", 0755);
+    file_put_contents("$bin/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("$bin/sudo", 0755);
 
     $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
 
@@ -632,3 +634,21 @@ it('removes unused images pulled by digest but keeps application images', functi
     expect($command)->toContain('docker images --digests')
         ->and(explode("\n", $output))->toBe(['rmi gtstef/filebrowser@sha256:abc', 'rmi postgres:16']);
 });
+
+it('keeps an application image name with a single quote inside the grep pattern', function (bool $nonRootUser) {
+    $marker = sys_get_temp_dir().'/docker-cleanup-injected-'.bin2hex(random_bytes(4));
+    $imageName = "evil'; touch {$marker}; echo '";
+
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildImagePruneCommand'))->invoke(new CleanupDocker, collect([$imageName, 'app-uuid']), '1.0.17');
+    if ($nonRootUser) {
+        $command = implode("\n", parseCommandsByLineForSudo(collect([$command]), new Server(['user' => 'deploy'])));
+    }
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'app-uuid:v1',
+        'postgres:16',
+    ]);
+
+    expect(file_exists($marker))->toBeFalse()
+        ->and(explode("\n", $output))->toBe(['rmi postgres:16']);
+})->with(['root user' => false, 'non-root user' => true]);

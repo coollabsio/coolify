@@ -206,13 +206,13 @@ describe('Log drains API', function () {
         expect($settings->{$field})->toBeNull();
     })->with(['logdrain_custom_config', 'logdrain_custom_config_parser']);
 
-    test('PATCH lets a write token enable the custom log drain with its saved config', function () {
+    test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
         Queue::fake();
         $this->server->settings->update(['logdrain_custom_config' => "[OUTPUT]\n    Name stdout"]);
-        $writeOnlyToken = $this->user->createToken('server-subsystems-write', ['write'])->plainTextToken;
+        $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
 
         $this->withHeaders([
-            'Authorization' => 'Bearer '.$writeOnlyToken,
+            'Authorization' => 'Bearer '.$deployToken,
             'Accept' => 'application/json',
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [

@@ -20,7 +20,7 @@ beforeEach(function () {
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
     session(['currentTeam' => $this->team]);
 
-    $newToken = $this->user->createToken('write-token', ['write']);
+    $newToken = $this->user->createToken('write-token', ['write', 'deploy']);
     $newToken->accessToken->forceFill(['team_id' => $this->team->id])->save();
     $this->token = $newToken->plainTextToken;
 });

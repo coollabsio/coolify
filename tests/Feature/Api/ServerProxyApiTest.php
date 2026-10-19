@@ -279,7 +279,7 @@ test('PUT /api/v1/servers/{uuid}/proxy/configuration requires the deploy permiss
             'configuration' => base64_encode($configuration),
         ])
         ->assertForbidden()
-        ->assertJsonPath('message', 'Missing required permissions: deploy');
+        ->assertJsonPath('message', 'Missing required permissions: deploy. Coolify applies the proxy configuration on the server, so it needs a token with the deploy permission.');
 });
 
 test('PUT /api/v1/servers/{uuid}/proxy/configuration saves with write and deploy permissions', function () {

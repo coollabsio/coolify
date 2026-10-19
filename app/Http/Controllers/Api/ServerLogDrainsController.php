@@ -109,7 +109,7 @@ class ServerLogDrainsController extends Controller
 
     #[OA\Patch(
         summary: 'Update log drain settings',
-        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Changing `logdrain_custom_config` or `logdrain_custom_config_parser` needs a token with the `deploy` permission. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
+        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
         path: '/servers/{uuid}/log-drains',
         operationId: 'update-server-log-drains',
         security: [['bearerAuth' => []]],
@@ -138,7 +138,7 @@ class ServerLogDrainsController extends Controller
             new OA\Response(response: 200, description: 'Updated log drain settings.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
-            new OA\Response(response: 403, description: 'Missing the deploy permission for a custom log drain change.'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -161,14 +161,6 @@ class ServerLogDrainsController extends Controller
         }
 
         $this->authorize('update', $server);
-
-        // The custom config is applied on the server, like a deployment.
-        $customConfigChanged = collect(['logdrain_custom_config', 'logdrain_custom_config_parser'])
-            ->contains(fn (string $field) => $request->has($field)
-                && (! is_string($request->input($field) ?? '') || (string) $request->input($field) !== (string) $server->settings->{$field}));
-        if ($customConfigChanged && ! $request->user()->tokenCan('deploy') && ! $request->user()->tokenCan('root')) {
-            return response()->json(['message' => 'Missing required permissions: deploy'], 403);
-        }
 
         $validator = customApiValidator($request->all(), [
             'is_logdrain_newrelic_enabled' => 'boolean',

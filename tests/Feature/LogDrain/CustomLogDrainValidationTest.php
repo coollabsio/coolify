@@ -127,16 +127,16 @@ describe('custom log drain API', function () {
         'parser only' => [['logdrain_custom_config_parser' => SAFE_CUSTOM_LOG_DRAIN_PARSERS]],
     ]);
 
-    test('a write-only token can still change the built-in log drains', function () {
+    test('a write-only token cannot change the built-in log drains either', function () {
         Queue::fake();
         $token = $this->user->createToken('write-only', ['write'])->plainTextToken;
 
         customLogDrainPatch($token, $this->server->uuid, [
             'logdrain_axiom_dataset_name' => 'api-dataset',
             'logdrain_axiom_api_key' => 'axiom-key-123',
-        ])->assertOk();
+        ])->assertForbidden();
 
-        expect($this->server->settings->fresh()->logdrain_axiom_dataset_name)->toBe('api-dataset');
+        expect($this->server->settings->fresh()->logdrain_axiom_dataset_name)->toBeNull();
     });
 
     test('a deploy token can save a safe custom log drain', function () {

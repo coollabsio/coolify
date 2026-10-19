@@ -76,7 +76,7 @@ test('preview imports reject another team UUID and roll back all imported record
     $user = User::factory()->create();
     $team->members()->attach($user->id, ['role' => $role]);
     session(['currentTeam' => $team]);
-    $token = $user->createToken('preview-import', ['write']);
+    $token = $user->createToken('preview-import', ['write', 'deploy']);
     $token->accessToken->forceFill(['team_id' => $team->id])->save();
     $counts = [Server::count(), Application::withTrashed()->count(), PrivateKey::count(), Project::count()];
 
