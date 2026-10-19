@@ -139,8 +139,8 @@
                                                     ]"
                                                     step2ButtonText="Turn on">
                                                     <x-slot:trigger>
-                                                        <button type="button"
-                                                            class="h-6 shrink-0 rounded-md border border-neutral-200 bg-white px-2 text-[12px] font-medium text-neutral-800 hover:bg-neutral-50 dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-fg dark:hover:bg-white/[0.1]">
+                                                        <button type="button" isHighlighted
+                                                            class="h-6 shrink-0 rounded-md border px-2 text-[12px] font-medium">
                                                             Turn on
                                                         </button>
                                                     </x-slot:trigger>
