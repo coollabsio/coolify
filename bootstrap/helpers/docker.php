@@ -526,6 +526,17 @@ function escapeShellValue(string $value): string
     return "'".str_replace("'", "'\\''", $value)."'";
 }
 
+/**
+ * Prefix for a Docker command that pulls on the server itself, outside the helper container. It makes the CLI use
+ * the SSH user's Docker config, where the registry logins are and which the helper container mounts. On a non-root
+ * server the command runs with sudo, which resets HOME to /root, so without it a private image pull is anonymous.
+ * The SSH user's shell expands $HOME before sudo runs.
+ */
+function serverDockerConfigPrefix(Server $server): string
+{
+    return $server->isNonRoot() ? 'DOCKER_CONFIG="$HOME/.docker" ' : '';
+}
+
 function executeInDocker(string $containerId, string $command)
 {
     $escapedCommand = str_replace("'", "'\\''", $command);
