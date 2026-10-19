@@ -396,6 +396,8 @@ test('the patch check frequency moves with the server and the last patch check r
         'patch_check_result' => ['osId' => 'ubuntu', 'package_manager' => 'apt', 'total_updates' => 0, 'updates' => []],
         'patch_check_error' => 'old error',
         'patch_checked_at' => now(),
+        'is_auto_security_updates_enabled' => true,
+        'auto_security_updates_time' => '04:30',
     ])->saveQuietly();
 
     $bundle = $this->exporter->export($this->server);
@@ -411,6 +413,8 @@ test('the patch check frequency moves with the server and the last patch check r
 
     $settings = Server::where('uuid', $result['server_uuid'])->first()->settings;
     expect($settings->patch_check_frequency)->toBe('daily')
+        ->and($settings->is_auto_security_updates_enabled)->toBeTrue()
+        ->and($settings->auto_security_updates_time)->toBe('04:30')
         ->and($settings->patch_check_result)->toBeNull()
         ->and($settings->patch_checked_at)->toBeNull();
 });

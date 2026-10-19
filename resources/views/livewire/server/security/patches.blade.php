@@ -198,17 +198,41 @@
                 </x-application.settings-section>
             @endif
 
-            <form wire:submit="savePatchCheckFrequency">
+            <form wire:submit="submit" class="flex flex-col gap-6">
+                <x-unsaved-bar action="submit" />
+
                 <x-application.settings-section id="server-patching-schedule-section" title="Schedule"
                     helper="Control when Coolify checks this server for package updates.">
-                    <x-slot:actions>
-                        @can('update', $server)
-                            <x-forms.button type="submit">Save</x-forms.button>
-                        @endcan
-                    </x-slot:actions>
                     <x-forms.input canGate="update" :canResource="$server" id="patchCheckFrequency"
                         label="Check frequency" placeholder="weekly (default, on Sunday)"
                         helper="Cron expression or preset such as daily, weekly, or monthly. Leave empty for the default: weekly, at a fixed time on Sunday. Coolify notifies your team when updates are available and when a check starts to fail." />
+                </x-application.settings-section>
+
+                <x-application.settings-section id="server-patching-automatic-section"
+                    title="Automatic security updates"
+                    helper="Let the server install security updates by itself every day, in a maintenance window.">
+                    @if (\App\Actions\Server\ConfigureAutomaticSecurityUpdates::supportFor($packageManager))
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="autoSecurityUpdates"
+                                label="Automatic security updates" :options="[
+                                    ['value' => false, 'label' => 'Off'],
+                                    ['value' => true, 'label' => 'Install security updates daily'],
+                                ]"
+                                helper="{{ $packageManager === 'apt' ? 'Configures unattended-upgrades for the security origins only.' : 'Configures dnf-automatic with upgrade_type = security.' }} Off removes the Coolify configuration and keeps the operating system default." />
+                            <x-forms.input canGate="update" :canResource="$server" id="autoSecurityUpdatesTime"
+                                label="Maintenance window" placeholder="03:00"
+                                helper="Daily start time (24-hour HH:MM) in the time zone of the server. Updates that need a reboot are installed, but the server is not rebooted." />
+                        </div>
+                    @elseif ($packageManager)
+                        <x-callout type="info" title="Not supported">
+                            Automatic security updates are available for Debian, Ubuntu, and RHEL-family servers
+                            (apt and dnf). This server uses {{ $packageManager }}.
+                        </x-callout>
+                    @else
+                        <x-callout type="info" title="Check for updates first">
+                            Coolify needs one successful check to know the package manager of this server.
+                        </x-callout>
+                    @endif
                 </x-application.settings-section>
             </form>
         </div>

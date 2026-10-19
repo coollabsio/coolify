@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server\Security;
 
+use App\Actions\Server\ConfigureAutomaticSecurityUpdates;
 use App\Actions\Server\RebootServer;
 use App\Actions\Server\UpdatePackage;
 use App\Jobs\ServerPatchCheckJob;
@@ -35,6 +36,10 @@ class Patches extends Component
 
     public string $patchCheckFrequency = '';
 
+    public bool $autoSecurityUpdates = false;
+
+    public string $autoSecurityUpdatesTime = '03:00';
+
     public function getListeners()
     {
         return $this->teamChannelListeners([
@@ -47,7 +52,14 @@ class Patches extends Component
         $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
         $this->authorize('viewSecurity', $this->server);
         $this->loadResult();
+        $this->syncSettings();
+    }
+
+    private function syncSettings(): void
+    {
         $this->patchCheckFrequency = (string) $this->server->settings->patch_check_frequency;
+        $this->autoSecurityUpdates = (bool) $this->server->settings->is_auto_security_updates_enabled;
+        $this->autoSecurityUpdatesTime = (string) ($this->server->settings->auto_security_updates_time ?? '03:00');
     }
 
     public function loadResult(): void
@@ -116,20 +128,43 @@ class Patches extends Component
         }
     }
 
-    public function savePatchCheckFrequency()
+    public function submit()
     {
         try {
             $this->authorize('update', $this->server);
+            $settings = $this->server->settings;
+
             $frequency = trim($this->patchCheckFrequency);
             if ($frequency !== '' && ! self::isValidPatchCheckFrequency($frequency)) {
-                $this->patchCheckFrequency = (string) $this->server->settings->patch_check_frequency;
                 throw new \Exception('Invalid check frequency. Use a cron expression or a preset (daily, weekly, monthly) that runs at most once per hour.');
             }
-            $this->server->settings->patch_check_frequency = $frequency === '' ? null : $frequency;
-            $this->server->settings->save();
-            $this->patchCheckFrequency = $frequency;
-            $this->dispatch('success', 'Check frequency saved.');
+            $time = trim($this->autoSecurityUpdatesTime);
+            if (preg_match(ConfigureAutomaticSecurityUpdates::TIME_PATTERN, $time) !== 1) {
+                throw new \Exception('Invalid time. Use the 24-hour format HH:MM, for example 03:00.');
+            }
+
+            $wasEnabled = (bool) $settings->is_auto_security_updates_enabled;
+            $autoUpdatesChanged = $this->autoSecurityUpdates !== $wasEnabled
+                || ($this->autoSecurityUpdates && $time !== $settings->auto_security_updates_time);
+            if ($autoUpdatesChanged) {
+                $this->ensureManagedHere();
+                $packageManager = data_get($settings->patch_check_result, 'package_manager');
+                if (! ConfigureAutomaticSecurityUpdates::supportFor($packageManager)) {
+                    throw new \Exception('Automatic security updates are supported only on Debian, Ubuntu, and RHEL-family servers. Run "Check for updates" first, so Coolify knows the package manager.');
+                }
+                ConfigureAutomaticSecurityUpdates::run($this->server, $packageManager, $this->autoSecurityUpdates, $time);
+            }
+
+            $settings->patch_check_frequency = $frequency === '' ? null : $frequency;
+            $settings->is_auto_security_updates_enabled = $this->autoSecurityUpdates;
+            $settings->auto_security_updates_time = $time;
+            $settings->save();
+            $this->syncSettings();
+            $this->dispatch('success', 'Patch settings saved.');
         } catch (\Throwable $e) {
+            $this->server->settings->refresh();
+            $this->syncSettings();
+
             return handleError($e, $this);
         }
     }

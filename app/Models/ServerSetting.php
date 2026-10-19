@@ -157,6 +157,8 @@ class ServerSetting extends Model
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        'is_auto_security_updates_enabled',
+        'auto_security_updates_time',
     ];
 
     /**
@@ -196,6 +198,7 @@ class ServerSetting extends Model
         'server_disk_usage_notification_interval_hours' => 'integer',
         'patch_check_result' => 'array',
         'patch_checked_at' => 'datetime',
+        'is_auto_security_updates_enabled' => 'boolean',
     ];
 
     /**

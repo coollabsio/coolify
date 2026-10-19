@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\CheckUpdates;
+use App\Actions\Server\ConfigureAutomaticSecurityUpdates;
 use App\Actions\Server\RebootServer;
 use App\Events\ServerPackagesUpdateFinished;
 use App\Events\ServerPatchCheckFinished;
@@ -149,10 +150,10 @@ describe('check frequency', function () {
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
             ->set('patchCheckFrequency', 'daily')
-            ->call('savePatchCheckFrequency')
+            ->call('submit')
             ->assertDispatched('success')
             ->set('patchCheckFrequency', '* * * * *')
-            ->call('savePatchCheckFrequency')
+            ->call('submit')
             ->assertDispatched('error');
 
         expect($this->server->settings->fresh()->patch_check_frequency)->toBe('daily');
@@ -249,7 +250,7 @@ describe('patches authorization', function () {
         session(['currentTeam' => $otherTeam]);
 
         $component->call('checkForUpdates')->assertDispatched('error');
-        $component->set('patchCheckFrequency', 'daily')->call('savePatchCheckFrequency')->assertDispatched('error');
+        $component->set('patchCheckFrequency', 'daily')->call('submit')->assertDispatched('error');
 
         Queue::assertNothingPushed();
         expect($this->server->settings->fresh()->patch_check_frequency)->toBeNull();
@@ -332,5 +333,71 @@ describe('security, reboot, and risk', function () {
         expect($payload['critical_packages_count'])->toBe(1)
             ->and($payload['security_updates'])->toBe(1)
             ->and($payload['reboot_required'])->toBeTrue();
+    });
+});
+
+describe('automatic security updates', function () {
+    beforeEach(function () {
+        Queue::fake();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $this->server->settings->forceFill(['patch_check_result' => patchesTestResult(0), 'patch_checked_at' => now()])->saveQuietly();
+    });
+
+    it('configures the server and saves the setting', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->once()
+            ->with(Mockery::on(fn ($server) => $server->is($this->server)), 'apt', true, '04:30');
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('autoSecurityUpdates', true)
+            ->set('autoSecurityUpdatesTime', '04:30')
+            ->call('submit')
+            ->assertDispatched('success');
+
+        expect($this->server->settings->fresh())
+            ->is_auto_security_updates_enabled->toBeTrue()
+            ->auto_security_updates_time->toBe('04:30');
+    });
+
+    it('does not run the server commands when only the frequency changes', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->never();
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('patchCheckFrequency', 'daily')
+            ->call('submit')
+            ->assertDispatched('success');
+    });
+
+    it('keeps the setting off when the server commands fail', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->once()->andThrow(new RuntimeException('apt-get failed'));
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('autoSecurityUpdates', true)
+            ->call('submit')
+            ->assertDispatched('error')
+            ->assertSet('autoSecurityUpdates', false);
+
+        expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeFalse();
+    });
+
+    it('shows that other package managers are not supported', function () {
+        $this->server->settings->forceFill(['patch_check_result' => [...patchesTestResult(0), 'package_manager' => 'pacman']])->saveQuietly();
+        ConfigureAutomaticSecurityUpdates::shouldRun()->never();
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->assertSee('This server uses pacman')
+            ->set('autoSecurityUpdates', true)
+            ->call('submit')
+            ->assertDispatched('error');
+    });
+
+    it('rejects an invalid maintenance window', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->never();
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('autoSecurityUpdates', true)
+            ->set('autoSecurityUpdatesTime', '25:00')
+            ->call('submit')
+            ->assertDispatched('error');
     });
 });

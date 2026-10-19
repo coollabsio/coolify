@@ -32,7 +32,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | Server timezone | `Europe/Budapest` |
 | ➕ | Docker cleanup | force cleanup on, frequency `0 4 * * *`, threshold 70, delete unused volumes on, delete unused networks on |
 | ➕ | Disk usage notification | threshold 70, check frequency `*/30 * * * *`, interval 12 h |
-| ➕ | Security > Patches | check frequency `daily` (the last check result is not moved; the target shows "never" until its first check) |
+| ➕ | Security > Patches | check frequency `daily`, automatic security updates on at `04:30` (the last check result is not moved; the target shows "never" until its first check) |
 | ➕ | Terminal | terminal access off |
 | ➕ | Image retention | "disable application image retention" on |
 | ➕ | Labels / Traefik | generate exact labels on, Traefik certificate resolver `custom` |
