@@ -270,6 +270,71 @@ test('ConvertQuotedValuesForListAndScalarOptions', function () {
     ]);
 });
 
+test('ConvertUnescapesDoubleQuotedValue', function () {
+    $input = '--security-opt "label=type:\"my\" type"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'security_opt' => ['label=type:"my" type'],
+    ]);
+});
+
+test('ConvertBooleanFlagFollowedByShortFlag', function () {
+    $input = '--init -e FOO=bar --privileged -v /a:/b';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'init' => true,
+        'privileged' => true,
+    ]);
+});
+
+test('ConvertBooleanFlagWithInlineValue', function () {
+    $input = '--privileged=false --init=true';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'privileged' => false,
+        'init' => true,
+    ]);
+});
+
+test('ConvertBooleanFlagIgnoresSpaceSeparatedWord', function () {
+    $input = '--privileged false --init "x"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'privileged' => true,
+        'init' => true,
+    ]);
+});
+
+test('ConvertUlimitWithSingleValue', function () {
+    $input = '--ulimit nofile=1024 --ulimit nproc=512:1024';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'ulimits' => [
+            'nofile' => '1024',
+            'nproc' => [
+                'soft' => '512',
+                'hard' => '1024',
+            ],
+        ],
+    ]);
+});
+
+test('ConvertIgnoresUlimitWithoutType', function () {
+    $input = '--ulimit 1024 --init';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'init' => true,
+    ]);
+});
+
+test('ConvertIgnoresOptionWithoutValue', function () {
+    $input = '--cap-add -e FOO=bar --cap-add NET_ADMIN --ulimit --dns';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_add' => ['NET_ADMIN'],
+    ]);
+});
+
 test('ConvertIgnoresEmptyQuotedValue', function () {
     $input = '--security-opt="" --init';
     $output = convertDockerRunToCompose($input);

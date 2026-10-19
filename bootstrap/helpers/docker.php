@@ -1579,8 +1579,8 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    // Values can be double-quoted (with escapes), single-quoted, or unquoted; quoted values may contain spaces and "--"
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?("(?:\\\\.|[^"])*"|\'[^\']*\'|(?!--)\S+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    // Values can be double-quoted (with escapes), single-quoted, or unquoted; unquoted values cannot start with "-", so the next flag is not taken as a value
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?("(?:\\\\.|[^"])*"|\'[^\']*\'|(?!-)\S+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
         '--cap-drop',
@@ -1649,20 +1649,24 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
             continue;
         }
-        if (isset($match[2]) && $match[2] !== '') {
-            $value = $match[2];
-            if (strlen($value) >= 2 && in_array($value[0], ['"', "'"], true) && str_ends_with($value, $value[0])) {
-                $value = substr($value, 1, -1);
-            }
-            if (trim($value) === '') {
-                continue;
-            }
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
-        } else {
-            $value = true;
-            $options[$option] = $value;
+        $value = $match[2] ?? '';
+        if (strlen($value) >= 2 && $value[0] === '"' && str_ends_with($value, '"')) {
+            $value = preg_replace('/\\\\(["$`\\\\])/', '$1', substr($value, 1, -1));
+        } elseif (strlen($value) >= 2 && $value[0] === "'" && str_ends_with($value, "'")) {
+            $value = substr($value, 1, -1);
         }
+        if ($option === '--init' || $option === '--privileged') {
+            // Boolean flags only take a value with "=" (--privileged=false); a space-separated word is not their value
+            $hasInlineValue = str_starts_with(substr($match[0], strlen($option)), '=');
+            $options[$option] = ! ($hasInlineValue && strtolower($value) === 'false');
+
+            continue;
+        }
+        if (trim($value) === '') {
+            continue;
+        }
+        $options[$option][] = $value;
+        $options[$option] = array_unique($options[$option]);
     }
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
@@ -1673,7 +1677,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         if ($option === '--ulimit') {
             $ulimits = collect([]);
             collect($value)->map(function ($ulimit) use ($ulimits) {
-                $ulimit = explode('=', $ulimit);
+                if (! str_contains($ulimit, '=')) {
+                    return;
+                }
+                $ulimit = explode('=', $ulimit, 2);
                 $type = $ulimit[0];
                 $limits = explode(':', $ulimit[1]);
                 if (count($limits) == 2) {
@@ -1684,13 +1691,13 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                         'hard' => $hard_limit,
                     ]);
                 } else {
-                    $soft_limit = $ulimit[1];
-                    $ulimits->put($type, [
-                        'soft' => $soft_limit,
-                    ]);
+                    // Compose needs both soft and hard in the mapping form, so a single limit is set directly
+                    $ulimits->put($type, $ulimit[1]);
                 }
             });
-            $compose_options->put($mapping[$option], $ulimits);
+            if ($ulimits->isNotEmpty()) {
+                $compose_options->put($mapping[$option], $ulimits);
+            }
         } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
