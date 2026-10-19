@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Actions\Application\GetRollbackImages;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
@@ -6133,7 +6134,7 @@ class ApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'List Rollback Images',
-        description: 'List available Docker images for rolling back an application. Returns an empty list when the server is unavailable or remote inspection is not possible.',
+        description: 'List available Docker images for rolling back an application: images on the server (`local`) and, when a Docker registry image name is set, images of recent successful deployments in the registry (`registry`). Returns an empty list when the server is unavailable or remote inspection is not possible.',
         path: '/applications/{uuid}/rollback-images',
         operationId: 'list-application-rollback-images',
         security: [['bearerAuth' => []]],
@@ -6157,6 +6158,7 @@ class ApplicationsController extends Controller
                                     new OA\Property(property: 'tag', type: 'string'),
                                     new OA\Property(property: 'created_at', type: 'string'),
                                     new OA\Property(property: 'is_current', type: 'boolean'),
+                                    new OA\Property(property: 'source', type: 'string', enum: ['local', 'registry']),
                                 ]
                             )
                         ),
@@ -6181,61 +6183,11 @@ class ApplicationsController extends Controller
 
         $this->authorize('view', $application);
 
-        $current = null;
-        $images = [];
-
         try {
-            $server = $application->destination?->server;
-            if ($server && $server->isFunctional()) {
-                $image = $application->docker_registry_image_name ?? $application->uuid;
-                $output = instant_remote_process([
-                    "docker inspect --format='{{.Config.Image}}' {$application->uuid}",
-                ], $server, throwError: false);
-                $current = self::currentRollbackImageTag(str($output)->trim()->toString());
-
-                $output = instant_remote_process([
-                    "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
-                ], $server);
-                $images = str($output)->trim()->explode("\n")->filter(function ($item) use ($image) {
-                    $repository = str($item)->before('#')->toString();
-
-                    // Exact repository match only — avoid substring collisions across images.
-                    return $repository === $image;
-                })->map(function ($item) use ($current) {
-                    $parts = str($item)->explode('#');
-
-                    return [
-                        'tag' => $parts[1] ?? null,
-                        'created_at' => $parts[2] ?? null,
-                        'is_current' => ($parts[1] ?? null) === $current,
-                    ];
-                })->values()->all();
-            }
+            return response()->json(GetRollbackImages::run($application));
         } catch (\Throwable) {
-            $current = null;
-            $images = [];
+            return response()->json(['current' => null, 'images' => []]);
         }
-
-        return response()->json([
-            'current' => $current,
-            'images' => $images,
-        ]);
-    }
-
-    private static function currentRollbackImageTag(string $imageReference): ?string
-    {
-        if (str_contains($imageReference, '@')) {
-            return null;
-        }
-
-        $lastColon = strrpos($imageReference, ':');
-        $lastSlash = strrpos($imageReference, '/');
-
-        if ($lastColon === false || ($lastSlash !== false && $lastColon < $lastSlash)) {
-            return null;
-        }
-
-        return substr($imageReference, $lastColon + 1) ?: null;
     }
 
     #[OA\Post(

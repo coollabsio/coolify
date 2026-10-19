@@ -5688,7 +5688,7 @@
                     "Applications"
                 ],
                 "summary": "List Rollback Images",
-                "description": "List available Docker images for rolling back an application. Returns an empty list when the server is unavailable or remote inspection is not possible.",
+                "description": "List available Docker images for rolling back an application: images on the server (`local`) and, when a Docker registry image name is set, images of recent successful deployments in the registry (`registry`). Returns an empty list when the server is unavailable or remote inspection is not possible.",
                 "operationId": "list-application-rollback-images",
                 "parameters": [
                     {
@@ -5726,6 +5726,13 @@
                                                     },
                                                     "is_current": {
                                                         "type": "boolean"
+                                                    },
+                                                    "source": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "local",
+                                                            "registry"
+                                                        ]
                                                     }
                                                 },
                                                 "type": "object"
@@ -13164,7 +13171,7 @@
                         "$ref": "#\/components\/responses\/401"
                     },
                     "403": {
-                        "description": "The token needs the deploy ability to set post_install_script_id or public_key_ids."
+                        "description": "The token needs the deploy permission for a post-install script or extra SSH keys."
                     },
                     "422": {
                         "description": "Validation failed."
@@ -17883,7 +17890,7 @@
                     "Servers"
                 ],
                 "summary": "Import server transfer bundle",
-                "description": "Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it.",
+                "description": "Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it. Needs a token with the write and deploy permissions.",
                 "operationId": "import-server-transfer-bundle",
                 "requestBody": {
                     "required": true,
@@ -17923,6 +17930,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     },
                     "422": {
                         "description": "Validation failed"
