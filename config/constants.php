@@ -27,6 +27,11 @@ return [
         'scheduled_jobs_dispatch_mode' => env('SCHEDULED_JOBS_DISPATCH_MODE'),
     ],
 
+    'cloud' => [
+        // Days after a subscription ends (or after a never-paid team was created) before cloud:cleanup-unsubscribed-teams deletes the team's data.
+        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 30),
+    ],
+
     'urls' => [
         'docs' => 'https://coolify.io/docs',
         'contact' => 'https://coolify.io/docs/contact',

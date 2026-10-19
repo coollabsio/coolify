@@ -208,7 +208,7 @@ class CloudFixSubscription extends Command
                         send_internal_notification($notificationMessage);
 
                         // Apply the same logic as customer.subscription.deleted webhook
-                        $team->subscriptionEnded();
+                        $team->subscriptionEnded($subscription);
 
                         $fixedCount++;
                         $this->info("  ✓ Fixed subscription for Team ID: {$team->id}");
@@ -280,7 +280,7 @@ class CloudFixSubscription extends Command
                         send_internal_notification($notificationMessage);
 
                         // Apply the same logic as customer.subscription.deleted webhook
-                        $team->subscriptionEnded();
+                        $team->subscriptionEnded($subscription);
 
                         $fixedCount++;
                         $this->info("  ✓ Fixed missing subscription for Team ID: {$team->id}");
@@ -726,7 +726,7 @@ class CloudFixSubscription extends Command
         send_internal_notification($message);
 
         // Call the team's subscription ended method which properly cleans up
-        $team->subscriptionEnded();
+        $team->subscriptionEnded($subscription);
     }
 
     /**
