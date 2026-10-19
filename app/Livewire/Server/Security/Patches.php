@@ -36,6 +36,7 @@ class Patches extends Component
 
     public string $patchCheckFrequency = '';
 
+    #[Locked]
     public bool $autoSecurityUpdates = false;
 
     public string $autoSecurityUpdatesTime = '03:00';
@@ -150,33 +151,15 @@ class Patches extends Component
                 throw new \Exception('Invalid time. Use the 24-hour format HH:MM, for example 03:00.');
             }
 
-            $wasEnabled = (bool) $settings->is_auto_security_updates_enabled;
-            $autoUpdatesChanged = $this->autoSecurityUpdates !== $wasEnabled
-                || ($this->autoSecurityUpdates && $time !== $settings->auto_security_updates_time);
-            if ($autoUpdatesChanged) {
-                $this->ensureManagedHere();
-                $packageManager = data_get($settings->patch_check_result, 'package_manager');
-                if (! ConfigureAutomaticSecurityUpdates::supportFor($packageManager)) {
-                    throw new \Exception('Automatic security updates are supported only on Debian, Ubuntu, and RHEL-family servers. Run "Check for updates" first, so Coolify knows the package manager.');
-                }
-                $auditContext = ['enabled' => $this->autoSecurityUpdates, 'time' => $time, 'package_manager' => $packageManager];
-                try {
-                    ConfigureAutomaticSecurityUpdates::run($this->server, $packageManager, $this->autoSecurityUpdates, $time);
-                } catch (\Throwable $e) {
-                    $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'failed', 'error' => $e->getMessage()], 'error');
-
-                    throw $e;
-                }
+            if ($settings->is_auto_security_updates_enabled && $time !== $settings->auto_security_updates_time) {
+                $this->applyAutomaticSecurityUpdates(true, $time);
             }
 
             $settings->patch_check_frequency = $frequency === '' ? null : $frequency;
-            $settings->is_auto_security_updates_enabled = $this->autoSecurityUpdates;
             $settings->auto_security_updates_time = $time;
             $changedFields = auditChangedFields($settings);
             $settings->save();
-            if ($autoUpdatesChanged) {
-                $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'success']);
-            } elseif ($changedFields !== []) {
+            if ($changedFields !== []) {
                 $this->auditPatchAction('patch_settings_updated', ['changed_fields' => $changedFields]);
             }
             $this->syncSettings();
@@ -187,6 +170,49 @@ class Patches extends Component
 
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Turns automatic security updates on or off after the user confirmed it.
+     */
+    public function toggleAutomaticSecurityUpdates()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $settings = $this->server->settings;
+            $enabled = ! $settings->is_auto_security_updates_enabled;
+            $time = $settings->auto_security_updates_time ?: '03:00';
+
+            $this->applyAutomaticSecurityUpdates($enabled, $time);
+            $settings->is_auto_security_updates_enabled = $enabled;
+            $settings->save();
+            $this->syncSettings();
+            $this->dispatch('success', $enabled ? 'Automatic security updates turned on.' : 'Automatic security updates turned off.');
+        } catch (\Throwable $e) {
+            $this->server->settings->refresh();
+            $this->syncSettings();
+
+            return handleError($e, $this);
+        }
+    }
+
+    private function applyAutomaticSecurityUpdates(bool $enabled, string $time): void
+    {
+        $this->ensureManagedHere();
+        $packageManager = data_get($this->server->settings->patch_check_result, 'package_manager');
+        if (! ConfigureAutomaticSecurityUpdates::supportFor($packageManager)) {
+            throw new \Exception('Automatic security updates are supported only on Debian, Ubuntu, and RHEL-family servers. Run "Check for updates" first, so Coolify knows the package manager.');
+        }
+
+        $auditContext = ['enabled' => $enabled, 'time' => $time, 'package_manager' => $packageManager];
+        try {
+            ConfigureAutomaticSecurityUpdates::run($this->server, $packageManager, $enabled, $time);
+        } catch (\Throwable $e) {
+            $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'failed', 'error' => $e->getMessage()], 'error');
+
+            throw $e;
+        }
+        $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'success']);
     }
 
     /**

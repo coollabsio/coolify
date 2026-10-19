@@ -347,36 +347,55 @@ describe('automatic security updates', function () {
         $this->server->settings->forceFill(['patch_check_result' => patchesTestResult(0), 'patch_checked_at' => now()])->saveQuietly();
     });
 
-    it('configures the server and saves the setting', function () {
+    it('turns automatic security updates on and off with the saved time', function () {
+        $this->server->settings->forceFill(['auto_security_updates_time' => '04:30'])->saveQuietly();
         ConfigureAutomaticSecurityUpdates::shouldRun()->once()
             ->with(Mockery::on(fn ($server) => $server->is($this->server)), 'apt', true, '04:30');
+        ConfigureAutomaticSecurityUpdates::shouldRun()->once()
+            ->with(Mockery::on(fn ($server) => $server->is($this->server)), 'apt', false, '04:30');
 
-        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->set('autoSecurityUpdates', true)
-            ->set('autoSecurityUpdatesTime', '04:30')
-            ->call('submit')
-            ->assertDispatched('success');
+        $component = Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->assertSee('Turn on automatic security updates?')
+            ->assertSee('all containers on this server stop and start again')
+            ->call('toggleAutomaticSecurityUpdates')
+            ->assertDispatched('success')
+            ->assertSet('autoSecurityUpdates', true);
+        expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeTrue();
 
-        expect($this->server->settings->fresh())
-            ->is_auto_security_updates_enabled->toBeTrue()
-            ->auto_security_updates_time->toBe('04:30');
+        $component->call('toggleAutomaticSecurityUpdates')->assertSet('autoSecurityUpdates', false);
+        expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeFalse();
     });
 
-    it('does not run the server commands when only the frequency changes', function () {
+    it('does not let the client turn on automatic updates without the confirmed action', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->never();
 
+        expect(fn () => Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])->set('autoSecurityUpdates', true))
+            ->toThrow(\Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException::class);
+    });
+
+    it('applies a new maintenance window only when automatic updates are on', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->once()
+            ->with(Mockery::on(fn ($server) => $server->is($this->server)), 'apt', true, '05:00');
+
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->set('patchCheckFrequency', 'daily')
+            ->set('autoSecurityUpdatesTime', '04:00')
             ->call('submit')
             ->assertDispatched('success');
+        expect($this->server->settings->fresh()->auto_security_updates_time)->toBe('04:00');
+
+        $this->server->settings->forceFill(['is_auto_security_updates_enabled' => true])->saveQuietly();
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('autoSecurityUpdatesTime', '05:00')
+            ->call('submit')
+            ->assertDispatched('success');
+        expect($this->server->settings->fresh()->auto_security_updates_time)->toBe('05:00');
     });
 
     it('keeps the setting off when the server commands fail', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->once()->andThrow(new RuntimeException('apt-get failed'));
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->set('autoSecurityUpdates', true)
-            ->call('submit')
+            ->call('toggleAutomaticSecurityUpdates')
             ->assertDispatched('error')
             ->assertSet('autoSecurityUpdates', false);
 
@@ -389,8 +408,8 @@ describe('automatic security updates', function () {
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
             ->assertSee('this server uses pacman')
-            ->set('autoSecurityUpdates', true)
-            ->call('submit')
+            ->assertDontSee('Turn on automatic security updates?')
+            ->call('toggleAutomaticSecurityUpdates')
             ->assertDispatched('error');
     });
 
@@ -398,10 +417,22 @@ describe('automatic security updates', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->never();
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->set('autoSecurityUpdates', true)
             ->set('autoSecurityUpdatesTime', '25:00')
             ->call('submit')
             ->assertDispatched('error');
+    });
+
+    it('does not let a member turn on automatic updates', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member, ['role' => 'admin']);
+        $this->actingAs($member);
+        $component = Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid]);
+        $member->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+        $member->unsetRelation('teams');
+        ConfigureAutomaticSecurityUpdates::shouldRun()->never();
+
+        $component->call('toggleAutomaticSecurityUpdates')->assertDispatched('error');
+        expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeFalse();
     });
 });
 
@@ -464,8 +495,7 @@ describe('audit trail', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->once();
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->set('autoSecurityUpdates', true)
-            ->call('submit');
+            ->call('toggleAutomaticSecurityUpdates');
 
         $event = AuditEvent::query()->where('event', 'ui.server.auto_security_updates_updated')->sole();
         expect($event->actor_email)->toBe($this->admin->email)

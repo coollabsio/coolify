@@ -99,13 +99,44 @@
                                 label="Check frequency" placeholder="weekly (default, on Sunday)"
                                 helper="Cron expression or preset such as daily, weekly, or monthly. Leave empty for the default: weekly, at a fixed time on Sunday. Coolify notifies your team when updates are available and when a check starts to fail." />
                             @if ($autoUpdatesSupported)
-                                <x-forms.listbox canGate="update" :canResource="$server" id="autoSecurityUpdates"
-                                    label="Automatic security updates" :options="[
-                                        ['value' => false, 'label' => 'Off'],
-                                        ['value' => true, 'label' => 'Install security updates daily'],
-                                    ]"
-                                    helper="{{ $packageManager === 'apt' ? 'Configures unattended-upgrades for the security origins only.' : 'Configures dnf-automatic with upgrade_type = security.' }} Off removes the Coolify configuration and keeps the operating system default." />
-                                <x-forms.input canGate="update" :canResource="$server" id="autoSecurityUpdatesTime"
+                                <div class="w-full">
+                                <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+                                    <span class="flex items-center gap-1 text-sm font-medium leading-4">Automatic security updates</span>
+                                    <x-helper helper="{{ $packageManager === 'apt' ? 'Uses unattended-upgrades for the security origins only.' : 'Uses dnf-automatic with upgrade_type = security.' }} Turning it off removes the Coolify configuration and keeps the operating system default." />
+                                </div>
+                                <div class="flex min-h-8 items-center justify-between gap-2">
+                                    <x-status-badge :status="$autoSecurityUpdates ? 'On, daily' : 'Off'" :type="$autoSecurityUpdates ? 'success' : 'neutral'" />
+                                    @can('update', $server)
+                                        <div wire:key="auto-security-updates-{{ $autoSecurityUpdates ? 'on' : 'off' }}">
+                                            @if ($autoSecurityUpdates)
+                                                <x-modal-confirmation title="Turn off automatic security updates?"
+                                                    buttonTitle="Turn off" submitAction="toggleAutomaticSecurityUpdates"
+                                                    warningMessage="Security fixes are then not installed automatically by Coolify."
+                                                    temporaryDisableTwoStepConfirmation :confirmWithText="false"
+                                                    :confirmWithPassword="false" :actions="[
+                                                        'Coolify removes its configuration from the server.',
+                                                        'The server uses the default of the operating system again. Check it if you want no automatic updates at all.',
+                                                    ]"
+                                                    step2ButtonText="Turn off" />
+                                            @else
+                                                <x-modal-confirmation title="Turn on automatic security updates?"
+                                                    buttonTitle="Turn on" isHighlightedButton
+                                                    warningMessage="Updates run without you. Your resources can stop for a short time during an update. You can turn this off at any time."
+                                                    submitAction="toggleAutomaticSecurityUpdates"
+                                                    temporaryDisableTwoStepConfirmation :confirmWithText="false"
+                                                    :confirmWithPassword="false" :actions="[
+                                                        'Every day at ' . $autoSecurityUpdatesTime . ' (time zone of the server), the server installs security updates without asking.',
+                                                        'If Docker comes from the operating system packages (for example docker.io or moby-engine), a security update of Docker restarts it, and all containers on this server stop and start again. Docker from the Docker repository (docker-ce, as Coolify installs it) has no security updates there and is not updated.',
+                                                        'Services that use an updated library (for example OpenSSL or glibc) can restart.',
+                                                        'A new kernel is installed, but the server is not rebooted. Coolify then shows Reboot required.',
+                                                    ]"
+                                                    step2ButtonText="Turn on" />
+                                            @endif
+                                        </div>
+                                    @endcan
+                                </div>
+                            </div>
+                            <x-forms.input canGate="update" :canResource="$server" id="autoSecurityUpdatesTime"
                                     label="Maintenance window" placeholder="03:00"
                                     helper="Daily start time (24-hour HH:MM) in the time zone of the server. Updates that need a reboot are installed, but the server is not rebooted." />
                             @endif
