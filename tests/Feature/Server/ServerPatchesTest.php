@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 
@@ -370,7 +371,7 @@ describe('automatic security updates', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->never();
 
         expect(fn () => Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])->set('autoSecurityUpdates', true))
-            ->toThrow(\Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException::class);
+            ->toThrow(CannotUpdateLockedPropertyException::class);
     });
 
     it('applies a new maintenance window only when automatic updates are on', function () {
@@ -389,6 +390,20 @@ describe('automatic security updates', function () {
             ->call('submit')
             ->assertDispatched('success');
         expect($this->server->settings->fresh()->auto_security_updates_time)->toBe('05:00');
+    });
+
+    it('turns on automatic updates with the time in the field, also when it is not saved yet', function () {
+        ConfigureAutomaticSecurityUpdates::shouldRun()->once()
+            ->with(Mockery::on(fn ($server) => $server->is($this->server)), 'apt', true, '05:45');
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('autoSecurityUpdatesTime', '05:45')
+            ->call('toggleAutomaticSecurityUpdates')
+            ->assertDispatched('success');
+
+        expect($this->server->settings->fresh())
+            ->is_auto_security_updates_enabled->toBeTrue()
+            ->auto_security_updates_time->toBe('05:45');
     });
 
     it('keeps the setting off when the server commands fail', function () {

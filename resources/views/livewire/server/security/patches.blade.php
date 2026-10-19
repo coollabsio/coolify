@@ -123,7 +123,7 @@
                                                     submitAction="toggleAutomaticSecurityUpdates"
                                                     temporaryDisableTwoStepConfirmation :confirmWithText="false"
                                                     :confirmWithPassword="false" :actions="[
-                                                        'Every day at ' . $autoSecurityUpdatesTime . ' (time zone of the server), the server installs security updates without asking.',
+                                                        'Every day at the time in Maintenance window (time zone of the server), the server installs security updates without asking.',
                                                         'If Docker comes from the operating system packages (for example docker.io or moby-engine), a security update of Docker restarts it, and all containers on this server stop and start again. Docker from the Docker repository (docker-ce, as Coolify installs it) has no security updates there and is not updated.',
                                                         'Services that use an updated library (for example OpenSSL or glibc) can restart.',
                                                         'A new kernel is installed, but the server is not rebooted. Coolify then shows Reboot required.',

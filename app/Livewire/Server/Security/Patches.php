@@ -181,10 +181,14 @@ class Patches extends Component
             $this->authorize('update', $this->server);
             $settings = $this->server->settings;
             $enabled = ! $settings->is_auto_security_updates_enabled;
-            $time = $settings->auto_security_updates_time ?: '03:00';
+            $time = trim($this->autoSecurityUpdatesTime);
+            if (preg_match(ConfigureAutomaticSecurityUpdates::TIME_PATTERN, $time) !== 1) {
+                throw new \Exception('Invalid time. Use the 24-hour format HH:MM, for example 03:00.');
+            }
 
             $this->applyAutomaticSecurityUpdates($enabled, $time);
             $settings->is_auto_security_updates_enabled = $enabled;
+            $settings->auto_security_updates_time = $time;
             $settings->save();
             $this->syncSettings();
             $this->dispatch('success', $enabled ? 'Automatic security updates turned on.' : 'Automatic security updates turned off.');
