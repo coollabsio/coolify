@@ -4,6 +4,7 @@ namespace App\Actions\User;
 
 use App\Actions\Stripe\CancelSubscription;
 use App\Actions\Team\DeleteTeamData;
+use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -107,11 +108,28 @@ class DeleteUserAccount
      */
     public function confirmationActions(User $user): array
     {
+        $removedTeams = $this->removesTeamResources($user)
+            ? $this->singleMemberTeams($user)->reject(fn (Team $team): bool => $team->isEmpty())
+            : collect();
+
         return $this->subscriptionTeams($user)
             ->map(fn (Team $team): string => "The subscription of the team \"{$team->name}\" will be cancelled immediately. This is required.")
+            ->concat($removedTeams->map(fn (Team $team): string => "The servers, projects, and Git sources of the team \"{$team->name}\" will be removed from Coolify. Nothing is stopped on the servers."))
             ->push('Your account will be permanently deleted from Coolify.')
             ->values()
             ->all();
+    }
+
+    /**
+     * Whether self-service deletion removes the data of the user's single-member teams instead of
+     * asking the user to delete it first. On Coolify Cloud, a team without a paid or past-due
+     * subscription cannot open its project and server pages, so the user could not do that.
+     */
+    public function removesTeamResources(User $user): bool
+    {
+        return isCloud() && $this->singleMemberTeams($user)->every(
+            fn (Team $team): bool => ! $team->subscriptions()->get()->contains(fn (Subscription $subscription): bool => $subscription->isPaying())
+        );
     }
 
     private function singleMemberTeams(User $user): Collection

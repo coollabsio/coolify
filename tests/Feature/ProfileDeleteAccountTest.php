@@ -17,6 +17,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 use Stripe\Service\SubscriptionService;
 use Stripe\StripeClient;
@@ -309,3 +310,45 @@ it('forgets busy github runners without cleanup instead of blocking the removal 
         ->and(GithubRunnerExecution::find($queued->id))->toBeNull()
         ->and(GithubRunnerConfig::find($config->id))->toBeNull();
 });
+
+it('lets a cloud owner whose subscription ended delete the account with the servers and projects of the personal team', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    Process::fake();
+    $user = deleteAccountUser();
+    $team = $user->teams()->first();
+    $team->update(['name' => 'Lapsed']);
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_invoice_paid' => false]);
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id]);
+    $project = Project::factory()->create(['team_id' => $team->id]);
+
+    Livewire::test(ProfileIndex::class)
+        ->assertDontSee('Before you can delete your account')
+        ->assertSee('The servers, projects, and Git sources of the team &quot;Lapsed&quot; will be removed from Coolify.', false)
+        ->call('deleteAccount', 'password')
+        ->assertRedirect(route('login'));
+
+    expect(User::find($user->id))->toBeNull()
+        ->and(Team::find($team->id))->toBeNull()
+        ->and(Server::withTrashed()->find($server->id))->toBeNull()
+        ->and(Project::find($project->id))->toBeNull();
+    Process::assertNothingRan();
+});
+
+it('still asks a cloud owner with a paying subscription to delete servers and projects first', function (array $subscription) {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $team = $user->teams()->first();
+    $team->update(['name' => 'Paying']);
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_paying', ...$subscription]);
+    Project::factory()->create(['team_id' => $team->id]);
+
+    Livewire::test(ProfileIndex::class)
+        ->assertSee('Delete all projects, servers, and Git sources of the team &quot;Paying&quot;.', false)
+        ->call('deleteAccount', 'password');
+
+    expect(User::find($user->id))->not->toBeNull()
+        ->and(Team::find($team->id))->not->toBeNull();
+})->with([
+    'paid' => [['stripe_invoice_paid' => true]],
+    'past due' => [['stripe_past_due' => true]],
+]);
