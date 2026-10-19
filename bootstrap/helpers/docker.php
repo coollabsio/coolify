@@ -774,7 +774,7 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains($normalize($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, bool $is_permanent_redirect_enabled = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -833,11 +833,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
         $redirect_schema = $is_force_https_enabled ? $schema : '{scheme}';
+        $redirect_code = $is_permanent_redirect_enabled ? ' permanent' : '';
         if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$redirect_schema}://www.{$host}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://www.{$host}{uri}{$redirect_code}");
         }
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}{$redirect_code}");
         }
         if ($is_http_basic_auth_enabled) {
             // Caddy 2.8 renamed basicauth to basic_auth; see Server::caddySupportsBasicAuthDirective().
@@ -928,7 +929,7 @@ function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
     ) : $label);
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt')
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', bool $is_permanent_redirect_enabled = false)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -938,6 +939,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         $labels->push('traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream');
     }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
+    // Every container declares the shared middleware, so a permanent variant needs its own name.
+    $redirect_to_https_name = 'redirect-to-https';
+    if ($is_permanent_redirect_enabled) {
+        $redirect_to_https_name = 'redirect-to-https-permanent';
+        $labels->push('traefik.http.middlewares.redirect-to-https-permanent.redirectscheme.scheme=https');
+        $labels->push('traefik.http.middlewares.redirect-to-https-permanent.redirectscheme.permanent=true');
+    }
+    $redirect_permanent = $is_permanent_redirect_enabled ? 'true' : 'false';
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     $http_basic_auth_label = "http-basic-auth-{$uuid}";
@@ -1020,12 +1029,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://{$redirect_capture_prefix}{2}",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent={$redirect_permanent}",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://www.{$redirect_capture_prefix}{2}",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent={$redirect_permanent}",
             ];
             if ($schema === 'https') {
                 // Set labels for https
@@ -1114,7 +1123,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_noindex) {
                         $httpMiddlewares->push($noindex_name);
                     }
-                    $httpMiddlewares->push('redirect-to-https');
+                    $httpMiddlewares->push($redirect_to_https_name);
                 } else {
                     $httpMiddlewares = $middlewares;
                 }
@@ -1226,6 +1235,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             domains: $domains,
                             onlyPort: $onlyPort,
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect,
@@ -1244,6 +1254,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             domains: $domains,
                             onlyPort: $onlyPort,
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect,
@@ -1264,6 +1275,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     domains: $domains,
                     onlyPort: $onlyPort,
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect,
@@ -1281,6 +1293,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     domains: $domains,
                     onlyPort: $onlyPort,
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect,
@@ -1312,6 +1325,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         domains: $domains,
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
+                        is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
@@ -1330,6 +1344,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         domains: $domains,
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
+                        is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
@@ -1349,6 +1364,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 domains: $domains,
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled(),
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
@@ -1365,6 +1381,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 domains: $domains,
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled(),
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,

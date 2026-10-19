@@ -199,6 +199,18 @@
                                     ]" :disabled="! auth()->user()->can('update', $service)" />
                             </div>
                         @endif
+                        <div class="flex w-full items-center gap-2 sm:w-auto service-domains-https">
+                            <label for="service-permanent-redirect-{{ $appId }}-trigger" class="mb-0! whitespace-nowrap text-[12px]!">Redirect type</label>
+                            <x-helper helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect." />
+                            <x-forms.listbox canGate="update" :canResource="$service" id="permanentRedirects.{{ $appId }}"
+                                htmlId="service-permanent-redirect-{{ $appId }}" preserveValue
+                                onChange="updatePermanentRedirect"
+                                :onChangeArgs="[(int) $appId]"
+                                :options="[
+                                    ['value' => false, 'label' => 'Temporary'],
+                                    ['value' => true, 'label' => 'Permanent'],
+                                ]" :disabled="! auth()->user()->can('update', $service)" />
+                        </div>
                     </div>
 
                     <div wire:key="service-domain-rows-{{ $appId }}">

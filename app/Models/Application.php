@@ -659,6 +659,11 @@ class Application extends BaseModel
         return data_get($this, 'settings.is_force_https_enabled', false);
     }
 
+    public function isPermanentRedirectEnabled(): bool
+    {
+        return (bool) data_get($this, 'settings.is_permanent_redirect_enabled', false);
+    }
+
     public function isStripprefixEnabled()
     {
         return data_get($this, 'settings.is_stripprefix_enabled', true);
