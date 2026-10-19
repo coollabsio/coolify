@@ -28,6 +28,7 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     $this->rootTeam = Team::factory()->create(['id' => 0, 'name' => 'Root Team']);
     $this->rootUser = User::factory()->create(['id' => 0]);
+    fakeOpenStripeSubscriptions();
 });
 
 function deleteAccountUser(): User
@@ -378,3 +379,40 @@ it('still asks a cloud owner with a paying subscription to delete servers and pr
     'paid' => [['stripe_invoice_paid' => true]],
     'past due' => [['stripe_past_due' => true]],
 ]);
+
+it('cancels the Stripe subscriptions of the email that Coolify does not record, except those of a team the user does not own', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $otherTeam = User::factory()->create()->teams()->first();
+    $otherTeam->members()->attach($user->id, ['role' => 'member']);
+    fakeOpenStripeSubscriptions([
+        ['id' => 'sub_orphan', 'status' => 'active'],
+        ['id' => 'sub_other_team', 'status' => 'active', 'metadata' => ['team_id' => (string) $otherTeam->id]],
+    ]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_orphan')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_orphan', 'status' => 'active']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_orphan', []);
+    $stripe->subscriptions->shouldNotReceive('cancel')->with('sub_other_team', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    Livewire::test(ProfileIndex::class)
+        ->assertSee('The Stripe subscription sub_orphan of your email, which is not linked to a team, will be cancelled immediately.')
+        ->assertDontSee('sub_other_team')
+        ->call('deleteAccount', 'password', [])
+        ->assertRedirect(route('login'));
+
+    expect(User::find($user->id))->toBeNull();
+});
+
+it('keeps the account when the Stripe lookup fails', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    fakeOpenStripeSubscriptions()->shouldReceive('handle')->andThrow(new RuntimeException('Stripe unavailable'));
+
+    Livewire::test(ProfileIndex::class)
+        ->assertSee('Every subscription of your teams and your email will be cancelled immediately.')
+        ->call('deleteAccount', 'password', []);
+
+    expect(User::find($user->id))->not->toBeNull();
+});

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Cloud;
 
+use App\Actions\Stripe\FindOpenStripeSubscriptions;
 use App\Actions\Team\DeleteTeamData;
 use App\Actions\User\DeleteTeamlessUser;
 use App\Models\Team;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Stripe\Subscription as StripeSubscription;
 use Throwable;
 
 class CleanupUnsubscribedTeams extends Command
@@ -46,6 +48,10 @@ class CleanupUnsubscribedTeams extends Command
             ->orderBy('id')
             ->get();
 
+        // A subscription at Stripe that Coolify has no paying row for, for example after a second
+        // checkout replaced the subscription id of the row, keeps the team.
+        $stripeHolds = $teams->mapWithKeys(fn (Team $team): array => [$team->id => $this->stripeHold($team)]);
+
         $this->info("Found {$teams->count()} ".Str::plural('team', $teams->count())." that stopped paying or never paid before {$cutoff->toDateString()}.");
 
         if ($teams->isNotEmpty()) {
@@ -54,7 +60,7 @@ class CleanupUnsubscribedTeams extends Command
                 $teams->map(fn (Team $team) => [
                     $team->id,
                     $team->name,
-                    $this->keepsTeam($team) ? 'remove data, keep team' : 'delete team',
+                    $stripeHolds[$team->id] ?? ($this->keepsTeam($team) ? 'remove data, keep team' : 'delete team'),
                     $team->servers_count,
                     $team->projects_count,
                     $team->members_count,
@@ -74,8 +80,17 @@ class CleanupUnsubscribedTeams extends Command
         $keptTeamCount = 0;
         $deletedUserCount = 0;
         $failedTeamCount = 0;
+        $skippedTeamCount = 0;
 
         foreach ($teams as $team) {
+            if ($hold = $stripeHolds[$team->id]) {
+                $skippedTeamCount++;
+                Log::warning('Skipped an unsubscribed team.', ['team_id' => $team->id, 'reason' => $hold]);
+                send_internal_notification("cloud:cleanup-unsubscribed-teams skipped team {$team->id}: {$hold}. Check the subscription in Stripe.");
+
+                continue;
+            }
+
             try {
                 $result = $this->deleteTeam($team, $cutoff);
             } catch (Throwable $e) {
@@ -107,6 +122,10 @@ class CleanupUnsubscribedTeams extends Command
         $this->info("Deleted {$deletedTeamCount} ".Str::plural('team', $deletedTeamCount)." and {$deletedUserCount} ".Str::plural('user', $deletedUserCount).'.');
         if ($keptTeamCount > 0) {
             $this->info("Removed the data of {$keptTeamCount} personal ".Str::plural('team', $keptTeamCount).' and kept '.($keptTeamCount === 1 ? 'the team' : 'the teams').'.');
+        }
+
+        if ($skippedTeamCount > 0) {
+            $this->warn("Skipped {$skippedTeamCount} ".Str::plural('team', $skippedTeamCount).' because of Stripe. See the log for details.');
         }
 
         if ($failedTeamCount > 0) {
@@ -147,6 +166,32 @@ class CleanupUnsubscribedTeams extends Command
 
             return [...$counts, 'users' => $teamlessMembers->count(), 'kept_team' => false];
         });
+    }
+
+    /**
+     * Why Stripe keeps the team, or null. Checks the team's Stripe customers and every customer with
+     * the email of an owner or admin. A paying subscription keeps the team unless it belongs to
+     * another team that exists. A failed check also keeps the team.
+     */
+    private function stripeHold(Team $team): ?string
+    {
+        try {
+            $subscription = app(FindOpenStripeSubscriptions::class)
+                ->handle(
+                    $team->members()->wherePivotIn('role', ['owner', 'admin'])->pluck('email'),
+                    $team->subscriptions()->pluck('stripe_customer_id'),
+                )
+                ->filter(fn (StripeSubscription $subscription): bool => in_array($subscription->status, FindOpenStripeSubscriptions::PAYING_STATUSES, true))
+                ->first(function (StripeSubscription $subscription) use ($team): bool {
+                    $teamId = FindOpenStripeSubscriptions::teamId($subscription);
+
+                    return $teamId === null || $teamId === $team->id || Team::query()->whereKey($teamId)->doesntExist();
+                });
+        } catch (Throwable $e) {
+            return "keep: Stripe check failed ({$e->getMessage()})";
+        }
+
+        return $subscription ? "keep: Stripe subscription {$subscription->id} is {$subscription->status}" : null;
     }
 
     /**

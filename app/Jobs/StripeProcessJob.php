@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Stripe\CancelSubscription;
+use App\Actions\Stripe\FindOpenStripeSubscriptions;
 use App\Actions\Stripe\UpdateSubscriptionQuantity;
 use App\Models\Subscription;
 use App\Models\Team;
@@ -45,12 +47,18 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $pi = data_get($data, 'payment_intent');
                     $piData = $stripe->paymentIntents->retrieve($pi, []);
                     $customerId = data_get($piData, 'customer');
-                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    if ($subscription) {
-                        $subscriptionId = data_get($subscription, 'stripe_subscription_id');
-                        $stripe->subscriptions->cancel($subscriptionId, []);
-                        $subscription->team->subscriptionEnded($subscription);
-                        send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                    // Cancel every subscription of the email, also those of its other Stripe customers.
+                    $email = $customerId ? $stripe->customers->retrieve($customerId)->email : null;
+                    $subscriptionIds = app(FindOpenStripeSubscriptions::class)->handle([$email], [$customerId])->keys()
+                        ->merge(Subscription::where('stripe_customer_id', $customerId)->whereNotNull('stripe_subscription_id')->pluck('stripe_subscription_id'))
+                        ->unique();
+                    if ($subscriptionIds->isNotEmpty()) {
+                        $failedIds = $subscriptionIds->reject(fn (string $subscriptionId): bool => CancelSubscription::cancelById($subscriptionId));
+                        if ($failedIds->isNotEmpty()) {
+                            send_internal_notification("Early fraud warning: refunded, but could not cancel subscriptions {$failedIds->implode(', ')}. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                            throw new \RuntimeException("Early fraud warning: could not cancel subscriptions {$failedIds->implode(', ')}.");
+                        }
+                        send_internal_notification("Early fraud warning created Refunded, subscriptions canceled: {$subscriptionIds->implode(', ')}. Email: {$email}, Charge: {$charge}, id: {$id}, pi: {$pi}");
                     } else {
                         send_internal_notification("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
                         throw new \RuntimeException("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");

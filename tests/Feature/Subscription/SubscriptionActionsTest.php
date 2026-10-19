@@ -113,6 +113,7 @@ describe('password confirmation', function () {
 
 describe('cancelImmediately with account deletion', function () {
     beforeEach(function () {
+        fakeOpenStripeSubscriptions();
         $this->stripe = Mockery::mock(StripeClient::class);
         $this->stripe->subscriptions = Mockery::mock(SubscriptionService::class);
         $this->instance(StripeClient::class, $this->stripe);

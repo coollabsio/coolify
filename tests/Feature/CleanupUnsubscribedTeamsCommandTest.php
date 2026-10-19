@@ -20,6 +20,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     config()->set('constants.coolify.self_hosted', false);
     Process::fake();
+    fakeOpenStripeSubscriptions();
 });
 
 function endedSubscription(Team $team, array $attributes = []): Subscription
@@ -342,4 +343,63 @@ test('a team that fails to delete does not stop the others, and its users are de
     $this->assertModelMissing($failingTeam);
     $this->assertModelMissing($failingOwner);
     $this->assertModelExists($rootTeam);
+});
+
+test('it keeps a team while Stripe has a paying subscription of its owner that Coolify does not record', function (?string $metadataTeam) {
+    Notification::fake();
+    $rootTeam = Team::forceCreate(['id' => 0, 'name' => 'Root Team', 'created_at' => now()->subYear()]);
+    $rootTeam->webhookNotificationSettings()->update(['webhook_enabled' => true, 'webhook_url' => 'https://example.com/webhook']);
+    $owner = User::factory()->create();
+    $team = $owner->teams()->first();
+    endedSubscription($team, ['stripe_customer_id' => 'cus_old']);
+    $lookup = fakeOpenStripeSubscriptions([['id' => 'sub_orphan', 'status' => 'active', 'metadata' => $metadataTeam ? ['team_id' => $metadataTeam === 'this' ? (string) $team->id : '999999'] : []]]);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Skipped 1 team because of Stripe. See the log for details.')
+        ->assertSuccessful();
+
+    $this->assertModelExists($team);
+    $this->assertModelExists($owner);
+    $lookup->shouldHaveReceived('handle')->with(Mockery::on(fn ($emails) => $emails->all() === [$owner->email]), Mockery::on(fn ($customerIds) => $customerIds->all() === ['cus_old']));
+    Notification::assertSentTo($rootTeam, GeneralNotification::class, fn (GeneralNotification $notification) => str_contains($notification->message, "skipped team {$team->id}: keep: Stripe subscription sub_orphan is active"));
+})->with([
+    'without a team' => [null],
+    'of this team' => ['this'],
+    'of a deleted team' => ['deleted'],
+]);
+
+test('it deletes a team when the paying Stripe subscription of its owner belongs to another team', function () {
+    $owner = User::factory()->create();
+    $team = $owner->teams()->first();
+    endedSubscription($team);
+    $payingTeam = Team::factory()->create();
+    $payingTeam->members()->attach($owner->id, ['role' => 'owner']);
+    Subscription::factory()->create(['team_id' => $payingTeam->id, 'stripe_subscription_id' => 'sub_paying', 'stripe_invoice_paid' => true]);
+    fakeOpenStripeSubscriptions([
+        ['id' => 'sub_paying', 'status' => 'active'],
+        ['id' => 'sub_metadata', 'status' => 'active', 'metadata' => ['team_id' => (string) $payingTeam->id]],
+        ['id' => 'sub_ended', 'status' => 'unpaid'],
+    ]);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
+
+    $this->assertModelExists($payingTeam);
+    expect(Subscription::where('team_id', $team->id)->exists())->toBeFalse();
+});
+
+test('it keeps a team when the Stripe check fails', function () {
+    $team = Team::factory()->create();
+    endedSubscription($team);
+    fakeOpenStripeSubscriptions()->shouldReceive('handle')->andThrow(new RuntimeException('Stripe is down'));
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams')
+        ->expectsTable(
+            ['Team', 'Name', 'Action', 'Servers', 'Projects', 'Members', 'Subscription ended', 'Created'],
+            [[$team->id, $team->name, 'keep: Stripe check failed (Stripe is down)', 0, 0, 0, now()->subDays(31)->toDateString(), $team->created_at->toDateString()]],
+        )
+        ->assertSuccessful();
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
+
+    $this->assertModelExists($team);
 });

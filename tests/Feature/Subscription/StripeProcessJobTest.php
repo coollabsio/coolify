@@ -12,7 +12,9 @@ use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Stripe\Customer;
 use Stripe\PaymentIntent;
+use Stripe\Service\CustomerService;
 use Stripe\Service\PaymentIntentService;
 use Stripe\Service\RefundService;
 use Stripe\Service\SubscriptionService;
@@ -447,8 +449,14 @@ test('customer.subscription.deleted ends only the deleted row of a team with dup
         ->and($server->settings()->first()->is_reachable)->toBeTruthy();
 });
 
-test('an early fraud warning refunds, cancels, and ends the subscription row', function () {
+test('an early fraud warning refunds and cancels every subscription of the email', function () {
     Server::flushIdentityMap();
+    $endedRow = Subscription::create([
+        'team_id' => Team::factory()->create()->id,
+        'stripe_customer_id' => 'cus_fraud',
+        'stripe_subscription_id' => null,
+        'stripe_invoice_paid' => false,
+    ]);
     $subscription = Subscription::create([
         'team_id' => $this->team->id,
         'stripe_customer_id' => 'cus_fraud',
@@ -457,14 +465,19 @@ test('an early fraud warning refunds, cancels, and ends the subscription row', f
     ]);
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $server->settings()->update(['is_usable' => true]);
+    $lookup = fakeOpenStripeSubscriptions([['id' => 'sub_fraud', 'status' => 'active'], ['id' => 'sub_other_customer', 'status' => 'active']]);
 
     $stripe = Mockery::mock(StripeClient::class);
     $stripe->refunds = Mockery::mock(RefundService::class);
     $stripe->refunds->shouldReceive('create')->once()->with(['charge' => 'ch_fraud']);
     $stripe->paymentIntents = Mockery::mock(PaymentIntentService::class);
     $stripe->paymentIntents->shouldReceive('retrieve')->with('pi_fraud', [])->andReturn(PaymentIntent::constructFrom(['id' => 'pi_fraud', 'customer' => 'cus_fraud']));
+    $stripe->customers = Mockery::mock(CustomerService::class);
+    $stripe->customers->shouldReceive('retrieve')->with('cus_fraud')->andReturn(Customer::constructFrom(['id' => 'cus_fraud', 'email' => 'fraud@example.com']));
     $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->andReturnUsing(fn (string $id) => Stripe\Subscription::constructFrom(['id' => $id, 'status' => 'active']));
     $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_fraud', []);
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_other_customer', []);
     app()->instance(StripeClient::class, $stripe);
 
     (new StripeProcessJob(['type' => 'radar.early_fraud_warning.created', 'data' => ['object' => [
@@ -473,8 +486,10 @@ test('an early fraud warning refunds, cancels, and ends the subscription row', f
         'payment_intent' => 'pi_fraud',
     ]]]))->handle();
 
+    $lookup->shouldHaveReceived('handle')->with(['fraud@example.com'], ['cus_fraud']);
     expect($subscription->fresh()->stripe_subscription_id)->toBeNull()
         ->and($subscription->fresh()->stripe_invoice_paid)->toBeFalsy()
         ->and($subscription->fresh()->ended_at)->not->toBeNull()
+        ->and($endedRow->fresh()->stripe_subscription_id)->toBeNull()
         ->and($server->settings()->first()->is_usable)->toBeFalsy();
 });
