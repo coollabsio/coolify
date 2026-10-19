@@ -388,7 +388,7 @@ describe('automatic security updates', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->never();
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->assertSee('This server uses pacman')
+            ->assertSee('this server uses pacman')
             ->set('autoSecurityUpdates', true)
             ->call('submit')
             ->assertDispatched('error');

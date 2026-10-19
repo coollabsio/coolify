@@ -33,66 +33,94 @@
         <x-server.sidebar :server="$server" activeMenu="security" activeSubMenu="patches" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
-            <x-application.settings-section id="server-patching-overview-section" title="Server patching"
-                helper="Discover and apply operating system package updates.">
-                <x-slot:actions>
-                    <x-status-badge status="Experimental" type="warning" />
-                    @if (isDev())
-                        <x-forms.button type="button" wire:click="sendTestEmail">
-                            Send test email
-                        </x-forms.button>
-                    @endif
-                    @can('update', $server)
-                        @if ($rebootRequired)
-                            <x-modal-confirmation title="Reboot server?" buttonTitle="Reboot server" isErrorButton
-                                submitAction="rebootServer" :actions="[
-                                    'The server reboots in a few seconds.',
-                                    'All containers on this server stop, and the containers with a restart policy start again after the reboot.',
-                                    'The server is not reachable for a few minutes.',
-                                ]"
-                                confirmationText="{{ $server->name }}"
-                                confirmationLabel="Enter the server name to confirm"
-                                shortConfirmationLabel="Server name" :confirmWithPassword="false"
-                                step2ButtonText="Reboot server" />
-                        @endif
-                        <x-forms.button type="button" wire:click="checkForUpdates" :disabled="$checking">
-                            <x-reicon name="refresh" class="size-3.5" />
-                            Check for updates
-                        </x-forms.button>
-                    @endcan
-                </x-slot:actions>
+            <form wire:submit="submit">
+                <x-unsaved-bar action="submit" />
 
-                <div class="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-fg-dim">
-                    <span>
-                        Last checked:
-                        @if ($checkedAt)
-                            <span title="{{ $checkedAt->toDateTimeString() }}">{{ $checkedAt->diffForHumans() }}</span>
-                        @else
-                            never
+                <x-application.settings-section id="server-patching-overview-section" title="Server patching"
+                    helper="Discover and apply operating system package updates.">
+                    <x-slot:actions>
+                        <x-status-badge status="Experimental" type="warning" />
+                        @if (isDev())
+                            <x-forms.button type="button" wire:click="sendTestEmail">
+                                Send test email
+                            </x-forms.button>
                         @endif
-                    </span>
-                    @if ($checkedAt && ! $error)
-                        @if ($totalUpdates === 0)
-                            <x-status-badge status="Up to date" type="success" />
-                        @else
-                            <x-status-badge :status="$totalUpdates . ' ' . Str::plural('update', $totalUpdates)" type="warning" />
-                        @endif
-                        @if ($securityUpdates > 0)
-                            <x-status-badge :status="$securityUpdates . ' ' . Str::plural('security update', $securityUpdates)" type="error" />
-                        @endif
-                        @if ($rebootRequired)
-                            <x-status-badge status="Reboot required" type="warning" />
-                        @endif
-                    @endif
-                </div>
+                        @can('update', $server)
+                            @if ($rebootRequired)
+                                <x-modal-confirmation title="Reboot server?" buttonTitle="Reboot server" isErrorButton
+                                    submitAction="rebootServer" :actions="[
+                                        'The server reboots in a few seconds.',
+                                        'All containers on this server stop, and the containers with a restart policy start again after the reboot.',
+                                        'The server is not reachable for a few minutes.',
+                                    ]"
+                                    confirmationText="{{ $server->name }}"
+                                    confirmationLabel="Enter the server name to confirm"
+                                    shortConfirmationLabel="Server name" :confirmWithPassword="false"
+                                    step2ButtonText="Reboot server" />
+                            @endif
+                            <x-forms.button type="button" wire:click="checkForUpdates" :disabled="$checking">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                Check for updates
+                            </x-forms.button>
+                        @endcan
+                    </x-slot:actions>
 
-                <x-callout type="info" title="Supported package managers">
-                    Automated package discovery currently supports apk, apt, dnf, pacman, and zypper. Status
-                    notifications can be managed from
-                    <a class="font-medium underline" href="{{ route('notifications.email') }}"
-                        {{ wireNavigate() }}>notification settings</a>.
-                </x-callout>
-            </x-application.settings-section>
+                    <div class="flex flex-col gap-4">
+
+                        <div class="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-fg-dim">
+                            <span>
+                                Last checked:
+                                @if ($checkedAt)
+                                    <span title="{{ $checkedAt->toDateTimeString() }}">{{ $checkedAt->diffForHumans() }}</span>
+                                @else
+                                    never
+                                @endif
+                            </span>
+                            @if ($checkedAt && ! $error)
+                                @if ($totalUpdates === 0)
+                                    <x-status-badge status="Up to date" type="success" />
+                                @else
+                                    <x-status-badge :status="$totalUpdates . ' ' . Str::plural('update', $totalUpdates)" type="warning" />
+                                @endif
+                                @if ($securityUpdates > 0)
+                                    <x-status-badge :status="$securityUpdates . ' ' . Str::plural('security update', $securityUpdates)" type="error" />
+                                @endif
+                                @if ($rebootRequired)
+                                    <x-status-badge status="Reboot required" type="warning" />
+                                @endif
+                            @endif
+                        </div>
+
+                        @php
+                            $autoUpdatesSupported = \App\Actions\Server\ConfigureAutomaticSecurityUpdates::supportFor($packageManager);
+                        @endphp
+                        <div @class(['grid gap-4', 'lg:grid-cols-3' => $autoUpdatesSupported])>
+                            <x-forms.input canGate="update" :canResource="$server" id="patchCheckFrequency"
+                                label="Check frequency" placeholder="weekly (default, on Sunday)"
+                                helper="Cron expression or preset such as daily, weekly, or monthly. Leave empty for the default: weekly, at a fixed time on Sunday. Coolify notifies your team when updates are available and when a check starts to fail." />
+                            @if ($autoUpdatesSupported)
+                                <x-forms.listbox canGate="update" :canResource="$server" id="autoSecurityUpdates"
+                                    label="Automatic security updates" :options="[
+                                        ['value' => false, 'label' => 'Off'],
+                                        ['value' => true, 'label' => 'Install security updates daily'],
+                                    ]"
+                                    helper="{{ $packageManager === 'apt' ? 'Configures unattended-upgrades for the security origins only.' : 'Configures dnf-automatic with upgrade_type = security.' }} Off removes the Coolify configuration and keeps the operating system default." />
+                                <x-forms.input canGate="update" :canResource="$server" id="autoSecurityUpdatesTime"
+                                    label="Maintenance window" placeholder="03:00"
+                                    helper="Daily start time (24-hour HH:MM) in the time zone of the server. Updates that need a reboot are installed, but the server is not rebooted." />
+                            @endif
+                        </div>
+
+                        <x-callout type="info" title="Supported package managers">
+                            Automated package discovery currently supports apk, apt, dnf, pacman, and zypper. Automatic
+                            security updates are available for apt and dnf (Debian, Ubuntu, and RHEL family)@if ($packageManager && ! $autoUpdatesSupported); this server uses {{ $packageManager }}@endif.
+                            Status notifications can be managed from
+                            <a class="font-medium underline" href="{{ route('notifications.email') }}"
+                                {{ wireNavigate() }}>notification settings</a>.
+                        </x-callout>
+                    </div>
+                </x-application.settings-section>
+            </form>
 
             @if ($checking)
                 <div wire:poll.10s="loadResult">
@@ -198,43 +226,6 @@
                 </x-application.settings-section>
             @endif
 
-            <form wire:submit="submit" class="flex flex-col gap-6">
-                <x-unsaved-bar action="submit" />
-
-                <x-application.settings-section id="server-patching-schedule-section" title="Schedule"
-                    helper="Control when Coolify checks this server for package updates.">
-                    <x-forms.input canGate="update" :canResource="$server" id="patchCheckFrequency"
-                        label="Check frequency" placeholder="weekly (default, on Sunday)"
-                        helper="Cron expression or preset such as daily, weekly, or monthly. Leave empty for the default: weekly, at a fixed time on Sunday. Coolify notifies your team when updates are available and when a check starts to fail." />
-                </x-application.settings-section>
-
-                <x-application.settings-section id="server-patching-automatic-section"
-                    title="Automatic security updates"
-                    helper="Let the server install security updates by itself every day, in a maintenance window.">
-                    @if (\App\Actions\Server\ConfigureAutomaticSecurityUpdates::supportFor($packageManager))
-                        <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.listbox canGate="update" :canResource="$server" id="autoSecurityUpdates"
-                                label="Automatic security updates" :options="[
-                                    ['value' => false, 'label' => 'Off'],
-                                    ['value' => true, 'label' => 'Install security updates daily'],
-                                ]"
-                                helper="{{ $packageManager === 'apt' ? 'Configures unattended-upgrades for the security origins only.' : 'Configures dnf-automatic with upgrade_type = security.' }} Off removes the Coolify configuration and keeps the operating system default." />
-                            <x-forms.input canGate="update" :canResource="$server" id="autoSecurityUpdatesTime"
-                                label="Maintenance window" placeholder="03:00"
-                                helper="Daily start time (24-hour HH:MM) in the time zone of the server. Updates that need a reboot are installed, but the server is not rebooted." />
-                        </div>
-                    @elseif ($packageManager)
-                        <x-callout type="info" title="Not supported">
-                            Automatic security updates are available for Debian, Ubuntu, and RHEL-family servers
-                            (apt and dnf). This server uses {{ $packageManager }}.
-                        </x-callout>
-                    @else
-                        <x-callout type="info" title="Check for updates first">
-                            Coolify needs one successful check to know the package manager of this server.
-                        </x-callout>
-                    @endif
-                </x-application.settings-section>
-            </form>
         </div>
     </div>
 </div>
