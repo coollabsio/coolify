@@ -39,7 +39,7 @@
                 <x-application.settings-section id="server-patching-overview-section" title="Server patching"
                     helper="Discover and apply operating system package updates.">
                     <x-slot:actions>
-                        <x-status-badge status="Experimental" type="warning" />
+                        <x-beta-badge />
                         @if (isDev())
                             <x-forms.button type="button" wire:click="sendTestEmail">
                                 Send test email
