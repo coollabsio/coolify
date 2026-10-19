@@ -165,6 +165,60 @@ test('it deletes every record of the team and leaves other teams untouched', fun
     $this->assertModelExists($member);
 });
 
+/**
+ * Stores personal data in every notification settings row of the team.
+ */
+function customizeNotificationSettings(Team $team): void
+{
+    $team->emailNotificationSettings()->update(['smtp_enabled' => true, 'smtp_from_address' => 'owner@example.com', 'smtp_recipients' => 'owner@example.com']);
+    $team->discordNotificationSettings()->update(['discord_enabled' => true, 'discord_webhook_url' => encrypt('https://discord.com/api/webhooks/1/secret')]);
+    $team->slackNotificationSettings()->update(['slack_enabled' => true, 'slack_webhook_url' => encrypt('https://hooks.slack.com/services/secret')]);
+    $team->telegramNotificationSettings()->update(['telegram_enabled' => true, 'telegram_token' => encrypt('123:secret'), 'telegram_chat_id' => encrypt('42')]);
+    $team->pushoverNotificationSettings()->update(['pushover_enabled' => true, 'pushover_user_key' => encrypt('user-key'), 'pushover_api_token' => encrypt('api-token')]);
+    $team->webhookNotificationSettings()->update(['webhook_enabled' => true, 'webhook_url' => encrypt('https://example.com/webhook')]);
+}
+
+/**
+ * The decrypted notification settings of a team, without keys and timestamps.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function notificationSettingsValues(Team $team): array
+{
+    $team = $team->fresh();
+
+    return collect(['emailNotificationSettings', 'discordNotificationSettings', 'slackNotificationSettings', 'telegramNotificationSettings', 'pushoverNotificationSettings', 'webhookNotificationSettings'])
+        ->mapWithKeys(fn (string $relation) => [$relation => collect($team->{$relation}->getAttributes())
+            ->except(['id', 'team_id', 'created_at', 'updated_at'])
+            ->map(fn ($value, string $column) => $team->{$relation}->{$column})
+            ->all()])
+        ->all();
+}
+
+test('purging keeps only the team, its memberships, and default notification settings', function () {
+    $member = User::factory()->create();
+    $otherTeam = populatedTeam(User::factory()->create())['team'];
+    $baseline = tableRowCounts();
+
+    $purged = populatedTeam($member);
+    $team = $purged['team'];
+    $team->forceFill(['personal_team' => true])->save();
+    customizeNotificationSettings($team);
+    DB::table('sessions')->insert(['id' => Str::random(40), 'user_id' => $member->id, 'payload' => '', 'last_activity' => now()->timestamp]);
+
+    app(DeleteTeamData::class)->purge($team);
+
+    $expected = $baseline;
+    foreach (['teams', 'team_user', 'sessions', 'email_notification_settings', 'discord_notification_settings', 'slack_notification_settings', 'telegram_notification_settings', 'pushover_notification_settings', 'webhook_notification_settings'] as $table) {
+        $expected[$table]++;
+    }
+    expect(tableRowCounts())->toBe($expected)
+        ->and(notificationSettingsValues($team))->toBe(notificationSettingsValues($otherTeam))
+        ->and($team->fresh()->personal_team)->toBeTrue()
+        ->and($member->fresh()->current_team_id)->toBe($team->id)
+        ->and($member->teams()->whereKey($team->id)->exists())->toBeTrue();
+});
+
 test('it runs nothing on the team servers and leaves the DNS records at the provider', function () {
     Bus::fake([ReleaseManagedDnsRecordsJob::class]);
     $doomed = populatedTeam(User::factory()->create());

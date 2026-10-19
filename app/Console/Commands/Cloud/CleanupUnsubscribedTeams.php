@@ -21,7 +21,7 @@ class CleanupUnsubscribedTeams extends Command
                             {--days= : Days since the subscription ended or the never-paid team was created (default: constants.cloud.data_retention_days)}
                             {--yes : Delete eligible teams instead of running a dry run}';
 
-    protected $description = 'Delete teams that stopped paying or never paid, with their servers, resources, projects, and users without another team';
+    protected $description = 'Delete teams that stopped paying or never paid, with their servers, resources, projects, and users without another team. A personal team of a member of another team keeps only the team and its members';
 
     public function handle(): int
     {
@@ -50,10 +50,11 @@ class CleanupUnsubscribedTeams extends Command
 
         if ($teams->isNotEmpty()) {
             $this->table(
-                ['Team', 'Name', 'Servers', 'Projects', 'Members', 'Subscription ended', 'Created'],
+                ['Team', 'Name', 'Action', 'Servers', 'Projects', 'Members', 'Subscription ended', 'Created'],
                 $teams->map(fn (Team $team) => [
                     $team->id,
                     $team->name,
+                    $this->keepsTeam($team) ? 'remove data, keep team' : 'delete team',
                     $team->servers_count,
                     $team->projects_count,
                     $team->members_count,
@@ -70,6 +71,7 @@ class CleanupUnsubscribedTeams extends Command
         }
 
         $deletedTeamCount = 0;
+        $keptTeamCount = 0;
         $deletedUserCount = 0;
         $failedTeamCount = 0;
 
@@ -88,9 +90,13 @@ class CleanupUnsubscribedTeams extends Command
                 continue;
             }
 
-            $deletedTeamCount++;
+            if ($result['kept_team']) {
+                $keptTeamCount++;
+            } else {
+                $deletedTeamCount++;
+            }
             $deletedUserCount += $result['users'];
-            Log::info('Deleted an unsubscribed team.', [
+            Log::info($result['kept_team'] ? 'Removed the data of an unsubscribed personal team and kept the team.' : 'Deleted an unsubscribed team.', [
                 'team_id' => $team->id,
                 'subscription_ended_at' => $team->subscriptions_max_ended_at,
                 'team_created_at' => $team->created_at?->toDateTimeString(),
@@ -99,6 +105,9 @@ class CleanupUnsubscribedTeams extends Command
         }
 
         $this->info("Deleted {$deletedTeamCount} ".Str::plural('team', $deletedTeamCount)." and {$deletedUserCount} ".Str::plural('user', $deletedUserCount).'.');
+        if ($keptTeamCount > 0) {
+            $this->info("Removed the data of {$keptTeamCount} personal ".Str::plural('team', $keptTeamCount).' and kept '.($keptTeamCount === 1 ? 'the team' : 'the teams').'.');
+        }
 
         if ($failedTeamCount > 0) {
             $this->error("Could not delete {$failedTeamCount} ".Str::plural('team', $failedTeamCount).'. See the log for details.');
@@ -111,9 +120,10 @@ class CleanupUnsubscribedTeams extends Command
 
     /**
      * Deletes the team and its members that have no other team, as one unit, so a failure leaves
-     * both in place for the next run. Returns null when the team is no longer eligible.
+     * both in place for the next run. A team that keepsTeam() loses only its data. Returns null
+     * when the team is no longer eligible.
      *
-     * @return array{servers: int, resources: int, projects: int, users: int}|null
+     * @return array{servers: int, resources: int, projects: int, users: int, kept_team: bool}|null
      */
     private function deleteTeam(Team $team, CarbonInterface $cutoff): ?array
     {
@@ -121,6 +131,10 @@ class CleanupUnsubscribedTeams extends Command
             $team = $this->eligibleTeams($cutoff)->whereKey($team->id)->lockForUpdate()->first();
             if (! $team) {
                 return null;
+            }
+
+            if ($this->keepsTeam($team)) {
+                return [...app(DeleteTeamData::class)->purge($team), 'users' => 0, 'kept_team' => true];
             }
 
             $memberIds = $team->members()->pluck('users.id');
@@ -131,8 +145,20 @@ class CleanupUnsubscribedTeams extends Command
                 app(DeleteTeamlessUser::class)->handle($user);
             }
 
-            return [...$counts, 'users' => $teamlessMembers->count()];
+            return [...$counts, 'users' => $teamlessMembers->count(), 'kept_team' => false];
         });
+    }
+
+    /**
+     * Whether the team is the personal team of a user who also belongs to another team. Such a team
+     * keeps its row and members, so the user keeps their personal team.
+     */
+    private function keepsTeam(Team $team): bool
+    {
+        return $team->personal_team && DB::table('team_user')
+            ->whereIn('user_id', $team->members()->select('users.id'))
+            ->where('team_id', '!=', $team->id)
+            ->exists();
     }
 
     /**

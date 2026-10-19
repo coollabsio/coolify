@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Team\DeleteTeamData;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Subscription;
@@ -8,9 +9,11 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -211,6 +214,91 @@ test('it keeps the never-paid personal team of a user who is a member of another
         ->assertSuccessful();
 
     $this->assertModelExists($personalTeam);
+    $this->assertModelExists($user);
+});
+
+/**
+ * A user whose personal team stopped paying, who is also a member of a paying team.
+ *
+ * @return array{user: User, personalTeam: Team, payingTeam: Team}
+ */
+function lapsedPersonalTeamOfPayingTeamMember(): array
+{
+    $user = User::factory()->create();
+    $personalTeam = $user->teams()->first();
+    $payingTeam = Team::factory()->create(['name' => 'Paying Team']);
+    Subscription::factory()->create(['team_id' => $payingTeam->id, 'stripe_invoice_paid' => true, 'stripe_subscription_id' => 'sub_paying']);
+    $payingTeam->members()->attach($user, ['role' => 'member']);
+    $user->update(['current_team_id' => $personalTeam->id]);
+
+    return ['user' => $user, 'personalTeam' => $personalTeam, 'payingTeam' => $payingTeam];
+}
+
+test('it keeps the lapsed personal team of a member of another team and removes only its data', function () {
+    ['user' => $user, 'personalTeam' => $personalTeam, 'payingTeam' => $payingTeam] = lapsedPersonalTeamOfPayingTeamMember();
+    $subscription = endedSubscription($personalTeam);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $personalTeam->id]);
+    $server = Server::factory()->create(['team_id' => $personalTeam->id, 'private_key_id' => $privateKey->id]);
+    $project = Project::factory()->create(['team_id' => $personalTeam->id]);
+    $personalTeam->emailNotificationSettings()->update(['smtp_enabled' => true, 'smtp_from_address' => 'owner@example.com']);
+    $personalTeam->webhookNotificationSettings()->update(['webhook_enabled' => true, 'webhook_url' => encrypt('https://example.com/webhook')]);
+    $payingServer = Server::factory()->create(['team_id' => $payingTeam->id]);
+    $sessionId = Str::random(40);
+    DB::table('sessions')->insert(['id' => $sessionId, 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp]);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams')
+        ->expectsTable(
+            ['Team', 'Name', 'Action', 'Servers', 'Projects', 'Members', 'Subscription ended', 'Created'],
+            [[$personalTeam->id, $personalTeam->name, 'remove data, keep team', 1, 1, 1, now()->subDays(31)->toDateString(), $personalTeam->created_at->toDateString()]],
+        )
+        ->assertSuccessful();
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 0 teams and 0 users.')
+        ->expectsOutput('Removed the data of 1 personal team and kept the team.')
+        ->assertSuccessful();
+
+    $personalTeam->refresh();
+    expect($personalTeam->personal_team)->toBeTrue()
+        ->and($user->teams()->pluck('teams.id')->sort()->values()->all())->toBe(collect([$personalTeam->id, $payingTeam->id])->sort()->values()->all())
+        ->and($user->fresh()->current_team_id)->toBe($personalTeam->id)
+        ->and(DB::table('sessions')->where('id', $sessionId)->exists())->toBeTrue()
+        ->and(Server::withTrashed()->whereKey($server->id)->exists())->toBeFalse()
+        ->and($personalTeam->emailNotificationSettings->smtp_enabled)->toBeFalse()
+        ->and($personalTeam->emailNotificationSettings->smtp_from_address)->toBeNull()
+        ->and($personalTeam->webhookNotificationSettings->webhook_enabled)->toBeFalse()
+        ->and($personalTeam->webhookNotificationSettings->webhook_url)->toBeNull();
+    $this->assertModelMissing($subscription);
+    $this->assertModelMissing($project);
+    $this->assertModelMissing($privateKey);
+    $this->assertModelExists($user);
+    $this->assertModelExists($payingServer);
+    expect($payingTeam->subscriptions()->count())->toBe(1);
+});
+
+test('it does not select a kept personal team again', function () {
+    ['personalTeam' => $personalTeam] = lapsedPersonalTeamOfPayingTeamMember();
+    $personalTeam->forceFill(['created_at' => now()->subYear()])->save();
+    endedSubscription($personalTeam);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])->assertSuccessful();
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams')
+        ->expectsOutputToContain('Found 0 teams')
+        ->assertSuccessful();
+    $this->assertModelExists($personalTeam);
+});
+
+test('it deletes a lapsed team that is not personal even when its members have another team', function () {
+    ['user' => $user, 'personalTeam' => $sharedTeam] = lapsedPersonalTeamOfPayingTeamMember();
+    $sharedTeam->forceFill(['personal_team' => false])->save();
+    endedSubscription($sharedTeam);
+
+    $this->artisan('cloud:cleanup-unsubscribed-teams', ['--yes' => true])
+        ->expectsOutput('Deleted 1 team and 0 users.')
+        ->assertSuccessful();
+
+    $this->assertModelMissing($sharedTeam);
     $this->assertModelExists($user);
 });
 

@@ -74,15 +74,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     protected static function booted()
     {
-        static::created(function ($team) {
-            $team->emailNotificationSettings()->create([
-                'use_instance_email_settings' => isDev(),
-            ]);
-            $team->discordNotificationSettings()->create();
-            $team->slackNotificationSettings()->create();
-            $team->telegramNotificationSettings()->create();
-            $team->pushoverNotificationSettings()->create();
-            $team->webhookNotificationSettings()->create();
+        static::created(function (Team $team) {
+            $team->createDefaultNotificationSettings();
         });
 
         static::updating(function ($team) {
@@ -92,39 +85,63 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::deleting(function (Team $team) {
-            RevokeUserTeamTokens::forTeam($team->id);
-
-            foreach ($team->privateKeys as $key) {
-                $key->delete();
-            }
-
-            // Transfer instance-wide sources to root team so they remain available
-            $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
-                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
-            foreach ($systemWideSources as $source) {
-                $source->update(['team_id' => 0]);
-            }
-
-            // Delete non-instance-wide sources owned by this team
-            $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->concat(GitlabApp::where('team_id', $team->id)->get());
-            foreach ($teamSources as $source) {
-                $source->delete();
-            }
-
-            foreach (Tag::whereTeamId($team->id)->get() as $tag) {
-                $tag->delete();
-            }
-
-            foreach ($team->environment_variables()->get() as $sharedVariable) {
-                $sharedVariable->delete();
-            }
-
-            // Also unusable storages, which the s3s relation hides.
-            foreach (S3Storage::query()->where('team_id', $team->id)->get() as $s3) {
-                $s3->delete();
-            }
+            $team->deleteOwnedRecords();
         });
+    }
+
+    /**
+     * Creates the notification settings rows every team needs, with their default values.
+     */
+    public function createDefaultNotificationSettings(): void
+    {
+        $this->emailNotificationSettings()->create([
+            'use_instance_email_settings' => isDev(),
+        ]);
+        $this->discordNotificationSettings()->create();
+        $this->slackNotificationSettings()->create();
+        $this->telegramNotificationSettings()->create();
+        $this->pushoverNotificationSettings()->create();
+        $this->webhookNotificationSettings()->create();
+    }
+
+    /**
+     * Deletes the API tokens, private keys, sources, tags, shared variables, and S3 storages of the
+     * team. Instance-wide sources move to the root team instead.
+     */
+    public function deleteOwnedRecords(): void
+    {
+        RevokeUserTeamTokens::forTeam($this->id);
+
+        foreach ($this->privateKeys()->get() as $key) {
+            $key->delete();
+        }
+
+        // Transfer instance-wide sources to root team so they remain available
+        $systemWideSources = GithubApp::where('team_id', $this->id)->where('is_system_wide', true)->get()
+            ->concat(GitlabApp::where('team_id', $this->id)->where('is_system_wide', true)->get());
+        foreach ($systemWideSources as $source) {
+            $source->update(['team_id' => 0]);
+        }
+
+        // Delete non-instance-wide sources owned by this team
+        $teamSources = GithubApp::where('team_id', $this->id)->get()
+            ->concat(GitlabApp::where('team_id', $this->id)->get());
+        foreach ($teamSources as $source) {
+            $source->delete();
+        }
+
+        foreach (Tag::whereTeamId($this->id)->get() as $tag) {
+            $tag->delete();
+        }
+
+        foreach ($this->environment_variables()->get() as $sharedVariable) {
+            $sharedVariable->delete();
+        }
+
+        // Also unusable storages, which the s3s relation hides.
+        foreach (S3Storage::query()->where('team_id', $this->id)->get() as $s3) {
+            $s3->delete();
+        }
     }
 
     public static function serverLimitReached(?Team $team = null)

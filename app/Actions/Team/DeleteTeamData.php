@@ -52,11 +52,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Deletes a team and every record Coolify keeps for it: servers, resources (also soft-deleted ones
- * and ones without a destination), projects, keys, sources, storages, tokens, settings, and the
+ * Removes every record Coolify keeps for a team: servers, resources (also soft-deleted ones and
+ * ones without a destination), projects, keys, sources, storages, tokens, settings, and the
  * subscription. Nothing runs on the team's servers; their containers keep running.
  *
- * Users are not deleted. Callers decide what happens to members without another team.
+ * purge() keeps the team and its members; handle() also deletes the team. Users are never
+ * deleted. Callers decide what happens to members without another team.
  */
 class DeleteTeamData
 {
@@ -70,9 +71,37 @@ class DeleteTeamData
     ];
 
     /**
+     * Deletes the team with its records and memberships.
+     *
      * @return array{servers: int, resources: int, projects: int}
      */
     public function handle(Team $team): array
+    {
+        return DB::transaction(function () use ($team): array {
+            $counts = $this->purge($team);
+
+            foreach ($team->members()->get() as $member) {
+                $member->clearStoredTeamIfMatches($team->id);
+                DB::table('sessions')->where('user_id', $member->id)->delete();
+            }
+            $team->members()->detach();
+            foreach (self::NOTIFICATION_SETTINGS_MODELS as $model) {
+                $model::query()->where('team_id', $team->id)->delete();
+            }
+
+            $team->delete();
+
+            return $counts;
+        });
+    }
+
+    /**
+     * Deletes the records of the team but keeps the team, its memberships, and notification
+     * settings reset to the defaults of a new team.
+     *
+     * @return array{servers: int, resources: int, projects: int}
+     */
+    public function purge(Team $team): array
     {
         return DB::transaction(function () use ($team): array {
             $projects = Project::query()->where('team_id', $team->id)->get();
@@ -140,13 +169,6 @@ class DeleteTeamData
                 $project->delete();
             }
 
-            foreach ($team->members()->get() as $member) {
-                $member->clearStoredTeamIfMatches($team->id);
-                DB::table('sessions')->where('user_id', $member->id)->delete();
-                Cache::forget("user:{$member->id}:team:{$team->id}");
-            }
-            $team->members()->detach();
-
             // Production has cascading foreign keys for most of these; the test schema does not.
             $integrationTokenIds = IntegrationToken::query()->where('team_id', $team->id)->pluck('id');
             SecretManagerLink::query()->whereIn('integration_token_id', $integrationTokenIds)->delete();
@@ -159,8 +181,13 @@ class DeleteTeamData
             foreach ([CloudProviderToken::class, CloudInitScript::class, SharedEnvironmentVariable::class, TeamInvitation::class, Subscription::class, ...self::NOTIFICATION_SETTINGS_MODELS] as $model) {
                 $model::query()->where('team_id', $team->id)->delete();
             }
+            $team->deleteOwnedRecords();
+            $team->createDefaultNotificationSettings();
 
-            $team->delete();
+            // The cached team of a member still holds the removed subscription.
+            foreach ($team->members()->pluck('users.id') as $memberId) {
+                Cache::forget("user:{$memberId}:team:{$team->id}");
+            }
 
             return [
                 'servers' => $servers->count(),
