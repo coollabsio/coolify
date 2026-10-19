@@ -200,6 +200,26 @@ function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase
  *
  * @throws Exception If the source is missing or contains shell metacharacters
  */
+/**
+ * Coolify sets container_name on every Compose service, and Docker Compose does not start more
+ * than one container of a service that has a fixed container_name.
+ *
+ * @throws Exception If the service sets scale or deploy.replicas to more than 1
+ */
+function validateComposeServiceScale(string $serviceName, mixed $service): void
+{
+    foreach (['scale', 'deploy.replicas'] as $key) {
+        $value = data_get($service, $key);
+        if (is_numeric($value) && (int) $value > 1) {
+            throw new Exception(
+                "Service \"{$serviceName}\" sets {$key} to {$value}. Coolify sets a container_name for each service, ".
+                'and Docker Compose cannot run more than one container with the same container_name. '.
+                "Remove {$key}, or define each instance as a separate service."
+            );
+        }
+    }
+}
+
 function validateComposeContentVolumeSource(array $volume): void
 {
     if (! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
@@ -1139,6 +1159,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceScale((string) $serviceName, $service);
 
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
@@ -2379,6 +2400,7 @@ function serviceParser(Service $resource): Collection
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceScale((string) $serviceName, $service);
 
         $image = data_get_str($service, 'image');
 

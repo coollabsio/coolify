@@ -123,11 +123,12 @@ class SyncStripeSubscriptions
                 }
 
                 if ($resolution === 'delete_stale') {
+                    $subscription->delete();
+
                     if (! $validReplacement && $inactiveSubscription && $team) {
                         $team->subscriptionEnded($inactiveSubscription);
                     }
 
-                    $subscription->delete();
                     $fixedCount++;
 
                     continue;
