@@ -203,7 +203,7 @@ Route::group([
     Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:deploy']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
-    Route::get('/servers/import/check', [ServerTransferController::class, 'check'])->middleware(['api.ability:write']);
+    Route::get('/servers/import/check', [ServerTransferController::class, 'check'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::post('/servers/import', [ServerTransferController::class, 'import'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::get('/servers/{uuid}/transfer', [ServerTransferController::class, 'status'])->middleware(['api.ability:read,write']);
     Route::post('/servers/{uuid}/transfer/complete', [ServerTransferController::class, 'complete'])->middleware(['api.ability:write']);

@@ -94,7 +94,7 @@
                                 helper="Base URL of the other Coolify instance (no trailing path). It must use https." />
                             <x-forms.input id="targetToken" type="password" label="Target API token" required
                                 placeholder="Paste token from target instance" autocomplete="off"
-                                helper="Create a token on the target with root (or write + create servers). It is only used for this request." />
+                                helper="Create a token on the target with root (or write + deploy). It is only used for this request." />
                         </div>
                         <div>
                             <x-modal-confirmation title="Transfer this server?" submitAction="migrateServer"

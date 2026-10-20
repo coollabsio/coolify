@@ -598,7 +598,7 @@ class ServerTransferMigrator
             $token = trim(substr($token, 7));
         }
         if ($token === '') {
-            throw new RuntimeException('A target instance API token is required (root or write + create servers).');
+            throw new RuntimeException('A target instance API token is required (root or write + deploy).');
         }
 
         return $token;
@@ -697,7 +697,7 @@ class ServerTransferMigrator
         $gates = [
             [404, 'the target instance supports server transfer', 'The target instance does not support server transfer. Upgrade it to Coolify '.config('constants.coolify.version').' or newer.'],
             [401, 'the target instance accepts the API token', 'The target instance does not accept the API token. Create a new token on the target instance and paste it here.'],
-            [403, 'the API token can create servers on the target instance', 'Use a token with the write permission from an admin or owner. Target response: '.$message],
+            [403, 'the API token can create servers on the target instance', 'Use a token with the root permission, or the write and deploy permissions, from an admin or owner. Target response: '.$message],
         ];
         foreach ($gates as [$failStatus, $label, $failMessage]) {
             if ($status === $failStatus) {

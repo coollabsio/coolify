@@ -46,6 +46,7 @@ beforeEach(function () {
     $this->sensitiveToken = $this->user->createToken('transfer-sensitive', ['*', 'read:sensitive'])->plainTextToken;
     $this->readToken = $this->user->createToken('transfer-read', ['read'])->plainTextToken;
     $this->writeToken = $this->user->createToken('transfer-write', ['read', 'write'])->plainTextToken;
+    $this->importToken = $this->user->createToken('transfer-import', ['read', 'write', 'deploy'])->plainTextToken;
 
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
     $this->server = Server::factory()->create([
@@ -394,7 +395,7 @@ describe('GET /api/v1/servers/import/check', function () {
         $listener = stream_socket_server('tcp://127.0.0.1:0');
         $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
 
-        $this->withHeaders(transferHeaders($this->writeToken))
+        $this->withHeaders(transferHeaders($this->importToken))
             ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
             ->assertOk()
             ->assertJsonPath('checks', fn ($checks) => collect($checks)->every(fn ($check) => $check['ok'] === true)
@@ -408,14 +409,14 @@ describe('GET /api/v1/servers/import/check', function () {
         $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
         fclose($listener);
 
-        $this->withHeaders(transferHeaders($this->writeToken))
+        $this->withHeaders(transferHeaders($this->importToken))
             ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
             ->assertStatus(422)
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'cannot reach the server at 127.0.0.1'));
     });
 
     test('rejects a target that is not an IP address or hostname before it opens a socket', function (string $ip) {
-        $this->withHeaders(transferHeaders($this->writeToken))
+        $this->withHeaders(transferHeaders($this->importToken))
             ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip='.urlencode($ip))
             ->assertStatus(422)
             ->assertJsonValidationErrors('ip')
@@ -423,7 +424,7 @@ describe('GET /api/v1/servers/import/check', function () {
     })->with(['tcp://127.0.0.1', 'unix:///var/run/docker.sock', 'ssl://example.com']);
 
     test('rejects another transfer bundle version', function () {
-        $this->withHeaders(transferHeaders($this->writeToken))
+        $this->withHeaders(transferHeaders($this->importToken))
             ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&schema_version=999')
             ->assertStatus(422)
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'Upgrade both instances'));
@@ -434,7 +435,7 @@ describe('GET /api/v1/servers/import/check', function () {
         $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
         $this->server->forceFill(['ip' => '127.0.0.1'])->save();
 
-        $checks = $this->withHeaders(transferHeaders($this->writeToken))
+        $checks = $this->withHeaders(transferHeaders($this->importToken))
             ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
             ->assertStatus(422)
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'already exists on this instance'))
@@ -455,6 +456,12 @@ describe('GET /api/v1/servers/import/check', function () {
             ->assertForbidden();
     });
 
+    test('rejects a token without the deploy permission that the import needs', function () {
+        $this->withHeaders(transferHeaders($this->writeToken))
+            ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=10.66.0.99')
+            ->assertForbidden();
+    });
+
     test('rejects an invalid token', function () {
         $this->withHeaders(transferHeaders('1|not-a-real-token'))
             ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=10.66.0.99')
@@ -467,7 +474,7 @@ test('the import check lists the system-wide git sources that this instance does
     $listener = stream_socket_server('tcp://127.0.0.1:0');
     $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
 
-    $this->withHeaders(transferHeaders($this->writeToken))
+    $this->withHeaders(transferHeaders($this->importToken))
         ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}&system_github_apps[]={$present->uuid}&system_github_apps[]=missing-uuid&system_gitlab_apps[]=other-missing")
         ->assertOk()
         ->assertJsonPath('missing_system_sources.github', ['missing-uuid'])

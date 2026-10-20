@@ -351,7 +351,7 @@ test('start checks the target before it queues the transfer', function (int $sta
         && $request->hasHeader('Authorization', 'Bearer wrong-token'));
 })->with([
     'invalid token' => [401, 'does not accept the API token'],
-    'token without write permission' => [403, 'write permission'],
+    'token without the write and deploy permissions' => [403, 'write and deploy permissions'],
     'conflict on the target' => [422, 'already exists on this instance'],
     'target without server transfer' => [404, 'does not support server transfer'],
 ]);
