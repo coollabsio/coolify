@@ -9,6 +9,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
@@ -255,6 +256,7 @@ function resolveComposeVolumeSourceDefault(string $source): string
 /**
  * Resolves a long-syntax bind source as Docker Compose does with the `.env` file that Coolify writes:
  * `${VAR:-default}` is the value of VAR when the resource sets it to a non-empty value, else the default.
+ * A value with a variable or vault reference stays for Docker Compose to resolve.
  *
  * @throws Exception If the value of the variable is not a shell-safe path
  */
@@ -272,6 +274,10 @@ function resolveComposeLongBindSource(string $source, Application|Service $resou
     $value = $variables->where('key', $matches[1])->first()?->real_value;
     if (blank($value)) {
         return resolveComposeVolumeSourceDefault($source);
+    }
+    // Docker Compose expands variable references in the `.env` file, and Coolify writes vault secrets to it.
+    if (str_contains($value, '$') || RemoteSecretReferences::containsReference($value)) {
+        return $source;
     }
 
     try {
