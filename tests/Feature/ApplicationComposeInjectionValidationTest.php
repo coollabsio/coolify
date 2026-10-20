@@ -76,10 +76,7 @@ function fakeRepositoryCompose(string $compose): void
 {
     Process::fake(function ($process) use ($compose) {
         $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-        if (str_contains($command, 'git --version')) {
-            return Process::result(output: 'git version 2.43.0');
-        }
-        if (str_contains($command, 'head -c')) {
+        if (str_contains($command, 'git cat-file blob')) {
             return Process::result(output: $compose);
         }
 
