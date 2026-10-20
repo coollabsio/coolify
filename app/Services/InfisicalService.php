@@ -14,7 +14,7 @@ class InfisicalService
     /** @var array<string, mixed> */
     private array $httpClientOptions;
 
-    public function __construct(string $baseUrl, private string $clientId, private string $clientSecret)
+    public function __construct(string $baseUrl, private string $clientId, private string $clientSecret, private ?int $timeout = null)
     {
         $this->baseUrl = rtrim($baseUrl, '/');
         Validator::make(['base_url' => $this->baseUrl], ['base_url' => new SafeExternalUrl])->validate();
@@ -87,7 +87,7 @@ class InfisicalService
     {
         return Http::acceptJson()
             ->withOptions($this->httpClientOptions)
-            ->connectTimeout(5)
-            ->timeout(10);
+            ->connectTimeout($this->timeout ?? 5)
+            ->timeout($this->timeout ?? 10);
     }
 }

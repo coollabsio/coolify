@@ -17,6 +17,8 @@
                 <x-forms.input required id="metadata.base_url" label="Base URL"
                     placeholder="https://app.infisical.com"
                     helper="Use the URL of your self-hosted Infisical instance, or the Infisical cloud URL." />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @else
             <div class="grid gap-4 lg:grid-cols-2">
@@ -34,6 +36,8 @@
                     placeholder="https://vault.example.com:8200" />
                 <x-forms.input id="metadata.namespace" label="Namespace (optional)"
                     placeholder="admin/team-a" helper="Only for Vault Enterprise / HCP Vault." />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @endif
 

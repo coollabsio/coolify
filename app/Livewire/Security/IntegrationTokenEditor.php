@@ -64,11 +64,13 @@ class IntegrationTokenEditor extends Component
         if ($this->integrationToken->provider === 'infisical') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         if ($this->integrationToken->provider === 'vault') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         return $rules;

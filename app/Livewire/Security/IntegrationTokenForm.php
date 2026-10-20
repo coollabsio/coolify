@@ -66,6 +66,7 @@ class IntegrationTokenForm extends Component
         if ($this->provider === 'infisical') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         if ($this->provider === 'doppler') {
@@ -75,6 +76,7 @@ class IntegrationTokenForm extends Component
         if ($this->provider === 'vault') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         return $rules;
