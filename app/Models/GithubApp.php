@@ -50,6 +50,8 @@ class GithubApp extends BaseModel
         'type' => 'string',
         'webhook_events' => 'array',
         'runner_group_id' => 'integer',
+        'client_secret' => 'encrypted',
+        'webhook_secret' => 'encrypted',
     ];
 
     protected $hidden = [
