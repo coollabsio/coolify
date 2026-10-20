@@ -16,17 +16,28 @@ class CloudflareTokenValidator
             return false;
         }
 
-        if (in_array('dns', $capabilities, true)) {
-            $zones = $client->get('https://api.cloudflare.com/client/v4/zones', ['per_page' => 1]);
-            $zoneId = $zones->json('result.0.id');
+        if (! in_array('dns', $capabilities, true)) {
+            return true;
+        }
 
-            if (! $zones->successful() || ! is_string($zoneId)) {
-                return false;
-            }
+        $zones = $client->get('https://api.cloudflare.com/client/v4/zones', ['per_page' => 1]);
+        $zoneId = $zones->json('result.0.id');
 
-            return $client->get("https://api.cloudflare.com/client/v4/zones/{$zoneId}/dns_records", [
-                'per_page' => 1,
-            ])->successful();
+        if (! $zones->successful() || ! is_string($zoneId)) {
+            return false;
+        }
+
+        if (! $client->get("https://api.cloudflare.com/client/v4/zones/{$zoneId}/dns_records", ['per_page' => 1])->successful()) {
+            return false;
+        }
+
+        if (in_array('tunnel', $capabilities, true)) {
+            $accountId = $zones->json('result.0.account.id');
+
+            return is_string($accountId) && $client->get(
+                "https://api.cloudflare.com/client/v4/accounts/{$accountId}/cfd_tunnel",
+                ['per_page' => 1, 'is_deleted' => 'false'],
+            )->successful();
         }
 
         return true;

@@ -44,7 +44,7 @@
             matches(values) { const query = this.search.trim().toLowerCase(); return !query || values.some(value => String(value || '').toLowerCase().includes(query)); },
             setViewMode(mode) { this.viewMode = mode; localStorage.setItem('coolify-s3-storages-view', mode); }
         }">
-        @include('livewire.shared.list-search-controls', ['placeholder' => 'Search S3 storages', 'singular' => 'storage', 'plural' => 'storages'])
+        @include('livewire.shared.list-search-controls', ['placeholder' => 'Search S3 storages'])
         <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($s3 as $storage)
                 <a x-show="matches(@js([$storage->name, $storage->description ?: 'S3-compatible storage', $storage->is_usable ? 'Connected' : 'Not usable']))" {{ wireNavigate() }} href="/storages/{{ $storage->uuid }}"

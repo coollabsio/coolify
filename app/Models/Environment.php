@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -32,6 +33,18 @@ class Environment extends BaseModel
         'project_id',
         'uuid',
     ];
+
+    /**
+     * Moving cards on the environment canvas is layout, not a change worth an audit event.
+     */
+    protected array $auditExclude = ['canvas_positions'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_positions' => 'array',
+        ];
+    }
 
     protected static function booted()
     {
@@ -146,6 +159,11 @@ class Environment extends BaseModel
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function resourceLinks(): HasMany
+    {
+        return $this->hasMany(ResourceLink::class);
     }
 
     protected function customizeName($value)

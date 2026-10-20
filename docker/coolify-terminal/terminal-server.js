@@ -11,8 +11,10 @@ import {
     extractSshArgs,
     extractTargetHost,
     extractTimeout,
+    detachPtyProcess,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
+    isAttachCommand,
     isAuthorizedTargetHost,
     rejectTerminalSocket,
     sanitizeSshArgs,
@@ -423,10 +425,13 @@ async function handleCommand(ws, command, userId) {
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
+    // Attach sessions share the container's main process, so they must be detached, not killed.
+    userSession.isAttach = isAttachCommand(hereDocContent);
 
     ws.send('pty-ready');
 
     ptyProcess.onData((data) => {
+        if (userSession.ptyProcess !== ptyProcess) return;
         ws.send(data);
     });
 
@@ -437,6 +442,14 @@ async function handleCommand(ws, command, userId) {
             exitCode,
             signal,
         });
+
+        // A previous PTY can exit late (e.g. an attach session detaching during a mode
+        // switch) after its replacement is already spawned. Only mutate the shared session
+        // state when this exit belongs to the session's current PTY.
+        if (userSession.ptyProcess !== ptyProcess) {
+            return;
+        }
+
         ws.send('pty-exited');
         userSession.isActive = false;
 
@@ -502,6 +515,10 @@ async function handleClose(userId) {
 async function killPtyProcess(userId) {
     const session = userSessions.get(userId);
     if (!session?.ptyProcess) return false;
+
+    if (session.isAttach) {
+        return detachPtyProcess(session);
+    }
 
     return new Promise((resolve) => {
         // Loop to ensure terminal is killed before continuing

@@ -1,0 +1,211 @@
+<?php
+
+use App\Jobs\ValidateAndInstallServerJob;
+use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\CloudProviderToken;
+use App\Models\DnsProviderZone;
+use App\Models\Environment;
+use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
+use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
+use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
+use App\Models\ManagedDnsRecord;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\ResourceLink;
+use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledTask;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Models\SharedEnvironmentVariable;
+use App\Models\SslCertificate;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
+use App\Models\Tag;
+use App\Models\Team;
+use App\Services\ServerTransfer\ServerTransferCoverage;
+use App\Services\ServerTransfer\ServerTransferExporter;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
+
+/**
+ * Saves a record without model events. Required columns that $attributes leaves out get a dummy value.
+ *
+ * @param  class-string<Model>  $modelClass
+ * @param  array<string, mixed>  $attributes
+ */
+function transferCoverageRecord(string $modelClass, array $attributes = []): Model
+{
+    $model = new $modelClass;
+    foreach (Schema::getColumns($model->getTable()) as $column) {
+        $name = $column['name'];
+        if (array_key_exists($name, $attributes) || $column['nullable'] || $column['default'] !== null || $name === 'id' || $column['auto_increment']) {
+            continue;
+        }
+        // The SQLite test schema reports dates as text, so the model casts decide first.
+        $type = strtolower($column['type_name']);
+        $attributes[$name] = match (true) {
+            $name === 'uuid' => new_public_id(),
+            $model->hasCast($name, ['date', 'datetime', 'immutable_date', 'immutable_datetime', 'timestamp']) => now(),
+            $model->hasCast($name, ['bool', 'boolean']) || str_contains($type, 'bool') => false,
+            $model->hasCast($name, ['array', 'json', 'collection', 'object']) || str_contains($type, 'json') => [],
+            str_contains($type, 'int') => 1,
+            default => 'coverage_'.$name,
+        };
+    }
+
+    return $modelClass::withoutEvents(function () use ($model, $attributes) {
+        $model->forceFill($attributes)->save();
+
+        return $model;
+    });
+}
+
+/**
+ * Every key that the records at these bundle paths contain, also the keys of their `attributes` object.
+ * A record with a `model` key counts only for that model.
+ *
+ * @param  array<string, mixed>  $bundle
+ * @param  list<string>  $paths
+ * @return array{keys: list<string>, records: int}
+ */
+function transferCoverageBundleKeys(array $bundle, array $paths, string $modelClass): array
+{
+    $records = collect($paths)
+        ->flatMap(function (string $path) use ($bundle) {
+            $found = data_get($bundle, $path);
+
+            // A path to one record returns the record itself; a path with `*` returns a list of records.
+            return is_array($found) && ! array_is_list($found) ? [$found] : Arr::wrap($found);
+        })
+        ->filter(fn ($record) => is_array($record) && ! array_is_list($record))
+        ->filter(fn (array $record) => ! isset($record['model']) || $record['model'] === $modelClass);
+
+    $keys = $records->flatMap(fn (array $record) => [...array_keys($record), ...array_keys((array) ($record['attributes'] ?? []))]);
+
+    return ['keys' => $keys->unique()->values()->all(), 'records' => $records->count()];
+}
+
+beforeEach(function () {
+    Server::flushIdentityMap();
+    Process::fake();
+    Storage::fake('ssh-keys');
+    Storage::fake('images');
+    Queue::fake([ValidateAndInstallServerJob::class]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'fqdn' => 'https://coolify-a.test']);
+
+    $team = Team::factory()->create();
+    $teamId = ['team_id' => $team->id];
+    $privateKey = PrivateKey::factory()->create($teamId);
+    $deployKey = PrivateKey::factory()->create([...$teamId, 'private_key' => generateSSHKey('ed25519')['private']]);
+    $token = CloudProviderToken::factory()->create($teamId);
+    $this->server = Server::factory()->create([...$teamId, 'private_key_id' => $privateKey->id, 'cloud_provider_token_id' => $token->id, 'ip' => '10.88.0.10']);
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    transferCoverageRecord(SwarmDocker::class, ['server_id' => $this->server->id]);
+    transferCoverageRecord(SslCertificate::class, ['server_id' => $this->server->id]);
+
+    $project = Project::factory()->create($teamId);
+    Storage::disk('images')->put("project-icons/{$project->uuid}/icon.jpg", "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00coverage");
+    $project->forceFill(['icon_path' => "project-icons/{$project->uuid}/icon.jpg", 'icon_storage_type' => 'local'])->saveQuietly();
+    $environment = $project->environments()->first() ?? Environment::factory()->create(['project_id' => $project->id]);
+    $onDestination = ['environment_id' => $environment->id, 'destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()];
+
+    $githubApp = transferCoverageRecord(GithubApp::class, [...$teamId, 'is_system_wide' => false, 'private_key_id' => $deployKey->id]);
+    $gitlabApp = transferCoverageRecord(GitlabApp::class, [...$teamId, 'is_system_wide' => false]);
+    $application = Application::factory()->create([...$onDestination, 'source_type' => GithubApp::class, 'source_id' => $githubApp->id, 'private_key_id' => $deployKey->id]);
+    Application::factory()->create([...$onDestination, 'source_type' => GitlabApp::class, 'source_id' => $gitlabApp->id]);
+    $giteaApp = transferCoverageRecord(GiteaApp::class, [...$teamId, 'is_system_wide' => false]);
+    Application::factory()->create([...$onDestination, 'source_type' => GiteaApp::class, 'source_id' => $giteaApp->id]);
+    $preview = transferCoverageRecord(ApplicationPreview::class, ['application_id' => $application->id]);
+
+    $s3 = transferCoverageRecord(S3Storage::class, $teamId);
+    $service = Service::factory()->create([...$onDestination, 'server_id' => $this->server->id]);
+    transferCoverageRecord(ResourceLink::class, [
+        'environment_id' => $environment->id,
+        'source_type' => $application->getMorphClass(), 'source_id' => $application->id,
+        'target_type' => $service->getMorphClass(), 'target_id' => $service->id,
+    ]);
+    transferCoverageRecord(GithubRunnerConfig::class, ['server_id' => $this->server->id, 'github_app_id' => $githubApp->id, 'labels' => ['coverage']]);
+    transferCoverageRecord(ServiceApplication::class, ['service_id' => $service->id]);
+    transferCoverageRecord(ServiceDatabase::class, ['service_id' => $service->id]);
+
+    $databases = collect(ServerTransferCoverage::TRANSFERRED)->keys()
+        ->filter(fn (string $class) => str_starts_with(class_basename($class), 'Standalone') && ! in_array($class, [StandaloneDocker::class], true))
+        ->map(fn (string $class) => transferCoverageRecord($class, $onDestination));
+
+    $volume = transferCoverageRecord(LocalPersistentVolume::class, ['resource_type' => $application->getMorphClass(), 'resource_id' => $application->id]);
+    transferCoverageRecord(LocalFileVolume::class, ['resource_type' => $application->getMorphClass(), 'resource_id' => $application->id]);
+    transferCoverageRecord(ScheduledVolumeBackup::class, [...$teamId, 'backupable_type' => $volume->getMorphClass(), 'backupable_id' => $volume->id, 's3_storage_id' => $s3->id]);
+    transferCoverageRecord(ScheduledTask::class, [...$teamId, 'application_id' => $application->id]);
+    transferCoverageRecord(ScheduledTask::class, [...$teamId, 'service_id' => $service->id]);
+    transferCoverageRecord(ScheduledDatabaseBackup::class, [...$teamId, 'database_type' => $databases->first()->getMorphClass(), 'database_id' => $databases->first()->id, 's3_storage_id' => $s3->id]);
+
+    $tag = transferCoverageRecord(Tag::class, $teamId);
+    foreach ([$application, $databases->first(), $service] as $tagged) {
+        $tagged->tags()->attach($tag->id);
+    }
+
+    foreach ([$application, $preview->application, $databases->first(), $service] as $resource) {
+        transferCoverageRecord(EnvironmentVariable::class, ['resourceable_type' => $resource->getMorphClass(), 'resourceable_id' => $resource->id, 'key' => 'COVERAGE_'.fake()->unique()->numberBetween(), 'value' => '{{team.COVERAGE_TEAM}}']);
+    }
+    transferCoverageRecord(EnvironmentVariable::class, ['resourceable_type' => $application->getMorphClass(), 'resourceable_id' => $application->id, 'key' => 'COVERAGE_PREVIEW', 'value' => 'x', 'is_preview' => true]);
+    transferCoverageRecord(SharedEnvironmentVariable::class, [...$teamId, 'type' => 'team', 'key' => 'COVERAGE_TEAM']);
+    transferCoverageRecord(SharedEnvironmentVariable::class, [...$teamId, 'type' => 'server', 'server_id' => $this->server->id]);
+    transferCoverageRecord(SharedEnvironmentVariable::class, [...$teamId, 'type' => 'project', 'project_id' => $project->id]);
+    transferCoverageRecord(SharedEnvironmentVariable::class, [...$teamId, 'type' => 'environment', 'environment_id' => $environment->id]);
+
+    $cloudflareToken = IntegrationToken::factory()->create([...$teamId, 'provider' => 'cloudflare', 'capabilities' => ['dns', 'tunnel'], 'metadata' => ['automatic_dns' => true]]);
+    $secretsToken = IntegrationToken::factory()->create([...$teamId, 'provider' => 'infisical', 'capabilities' => ['secrets'], 'metadata' => ['client_id' => 'coverage']]);
+    $zone = DnsProviderZone::factory()->create(['integration_token_id' => $cloudflareToken->id]);
+    ManagedDnsRecord::factory()->owned()->create(['dns_provider_zone_id' => $zone->id])->addReference($application);
+    $application->secretManagerLink()->create(['integration_token_id' => $secretsToken->id, 'settings' => ['project_id' => 'coverage', 'environment' => 'prod']]);
+    $this->server->settings->forceFill(['cloudflare_tunnel_integration_token_id' => $cloudflareToken->id])->saveQuietly();
+
+    $this->bundle = app(ServerTransferExporter::class)->export($this->server->fresh());
+});
+
+test('every model has a server transfer decision', function () {
+    $models = collect(glob(app_path('Models/*.php')))
+        ->map(fn (string $file) => 'App\\Models\\'.basename($file, '.php'))
+        ->filter(fn (string $class) => is_subclass_of($class, Model::class) && ! (new ReflectionClass($class))->isAbstract());
+
+    $undecided = $models
+        ->reject(fn (string $class) => array_key_exists($class, ServerTransferCoverage::TRANSFERRED)
+            || array_key_exists($class, ServerTransferCoverage::NOT_TRANSFERRED))
+        ->values()->all();
+
+    expect($undecided)->toBe([], 'Add these models to the server transfer (ServerTransferExporter/Importer and ServerTransferCoverage::TRANSFERRED), or to ServerTransferCoverage::NOT_TRANSFERRED with a reason.');
+});
+
+test('every column of a transferred model is in the bundle or has a reason why not', function (string $modelClass) {
+    ['keys' => $exported, 'records' => $records] = transferCoverageBundleKeys($this->bundle, ServerTransferCoverage::TRANSFERRED[$modelClass], $modelClass);
+    expect($records)->toBeGreaterThan(0, "The coverage fixture exports no {$modelClass}. Add a record of it to the beforeEach of this test.");
+
+    $notExported = [...ServerTransferCoverage::ALWAYS_NOT_EXPORTED, ...array_keys(ServerTransferCoverage::NOT_EXPORTED_COLUMNS[$modelClass] ?? [])];
+    $columns = Schema::getColumnListing((new $modelClass)->getTable());
+
+    expect(array_values(array_diff($columns, $exported, $notExported)))
+        ->toBe([], "These {$modelClass} columns are not in the transfer bundle. Export and import them (with a round-trip test), or add them to ServerTransferCoverage::NOT_EXPORTED_COLUMNS with a reason.")
+        ->and(array_values(array_intersect(array_keys(ServerTransferCoverage::NOT_EXPORTED_COLUMNS[$modelClass] ?? []), $exported)))
+        ->toBe([], "These {$modelClass} columns are exported, so remove them from ServerTransferCoverage::NOT_EXPORTED_COLUMNS.")
+        ->and(array_values(array_diff(array_keys(ServerTransferCoverage::NOT_EXPORTED_COLUMNS[$modelClass] ?? []), $columns)))
+        ->toBe([], "These {$modelClass} columns no longer exist, so remove them from ServerTransferCoverage::NOT_EXPORTED_COLUMNS.");
+})->with(array_keys(ServerTransferCoverage::TRANSFERRED));

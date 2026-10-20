@@ -95,7 +95,7 @@ it('renders stored localhost server details instead of the fetch action', functi
         ->assertSee('29.4.3')
         ->assertSee('Compose version')
         ->assertSee('2.32.4')
-        ->assertSee('Refresh server details')
+        ->assertSee('Refresh details')
         ->assertDontSee('Fetch server details');
 });
 
@@ -123,6 +123,22 @@ it('fetches localhost server details from the overview action', function () {
     expect($server->server_metadata['os'])->toBe('Ubuntu 22.04.3 LTS')
         ->and($server->dockerVersion())->toBe('29.4.3')
         ->and($server->composeVersion())->toBe('2.32.4');
+});
+
+it('does not fetch server details before the server is validated', function () {
+    $this->server->settings()->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    Process::fake();
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('refreshServerMetadata')
+        ->assertDispatched('error', 'Validate the server connection before fetching details.');
+
+    Process::assertNothingRan();
+    expect($this->server->fresh()->server_metadata)->toBeNull();
 });
 
 it('refetches localhost compose version from the overview refresh action', function () {
@@ -183,4 +199,24 @@ it('collects localhost server details after a successful connection check', func
         ->and($server->composeVersion())->toBe('2.32.4')
         ->and($server->settings->is_reachable)->toBeTrue()
         ->and($server->settings->is_usable)->toBeTrue();
+});
+
+it('shows validation-only menus as disabled until the server is validated', function () {
+    $this->server->settings()->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Docker Cleanup')
+        ->assertSee('aria-disabled="true"', false)
+        ->assertDontSee(route('server.docker-cleanup', ['server_uuid' => $this->server->uuid]), false);
+
+    $this->server->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee(route('server.docker-cleanup', ['server_uuid' => $this->server->uuid]), false);
 });

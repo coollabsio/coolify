@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\ServiceApplicationsController;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Middleware\ApiAllowed;
-use App\Http\Middleware\ApiIpAllowed;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Service;
@@ -59,9 +58,9 @@ it('applies only the IP allow-list, not the REST API switch, to MCP and MCP swit
         ->and($mcp->gatherMiddleware())->not->toContain(ApiAllowed::class)
         ->and($enable->gatherMiddleware())->not->toContain(ApiAllowed::class)
         ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class)
-        ->and($mcp->gatherMiddleware())->toContain(ApiIpAllowed::class)
-        ->and($enable->gatherMiddleware())->toContain(ApiIpAllowed::class)
-        ->and($disable->gatherMiddleware())->toContain(ApiIpAllowed::class);
+        ->and($mcp->gatherMiddleware())->toContain('api.ip.allowed')
+        ->and($enable->gatherMiddleware())->toContain('api.ip.allowed')
+        ->and($disable->gatherMiddleware())->toContain('api.ip.allowed');
 });
 
 it('throttles only failed authentication on manual webhook routes', function (string $provider) {

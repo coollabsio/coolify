@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Replicas;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScheduledVolumeBackupExecution extends BaseModel
 {
+    use HasS3Replicas;
+
     protected $fillable = [
         'uuid',
         'scheduled_volume_backup_id',
@@ -55,5 +59,10 @@ class ScheduledVolumeBackupExecution extends BaseModel
     public function s3(): BelongsTo
     {
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
+    }
+
+    public function s3Replicas(): HasMany
+    {
+        return $this->hasMany(VolumeBackupS3Replica::class, 'execution_id');
     }
 }

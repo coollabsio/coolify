@@ -17,7 +17,8 @@ use Illuminate\Queue\TimeoutExceededException;
  * - The exception code (if present)
  * - The file and line where the error occurred
  * - Previous exception details (if chained)
- * - Stack trace (first 5 lines)
+ *
+ * Stack traces are not written, because their truncated arguments can hold secrets.
  */
 it('logs comprehensive error details when failed() is called', function () {
     // Create a mock exception with all properties
@@ -111,7 +112,7 @@ it('logs comprehensive error details when failed() is called', function () {
     expect($errorMessageString)->toContain('Location:');
     expect($errorMessageString)->toContain('Caused by:');
     expect($errorMessageString)->toContain('RuntimeException: Connection refused');
-    expect($errorMessageString)->toContain('Stack trace');
+    expect($errorMessageString)->not->toContain('Stack trace');
 
     // Verify stderr type is used for error logging
     $stderrEntries = array_filter($logEntries, fn ($entry) => $entry['type'] === 'stderr');
@@ -130,9 +131,6 @@ it('logs comprehensive error details when failed() is called', function () {
 
     $locationEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Location:'));
     expect($locationEntry['hidden'])->toBeTrue();
-
-    $stackTraceEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Stack trace'));
-    expect($stackTraceEntry['hidden'])->toBeTrue();
 
     $causedByEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Caused by:'));
     expect($causedByEntry['hidden'])->toBeTrue();

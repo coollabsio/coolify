@@ -11,6 +11,7 @@ use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
 
@@ -132,6 +133,7 @@ class Bitbucket extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([

@@ -49,6 +49,24 @@ test('server cloud provider token cards show token descriptions', function () {
         ->assertSee('Used for production servers in the EU region.');
 });
 
+test('server cloud provider token page supports Hostinger VPS servers', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'hostinger_virtual_machine_id' => 17923,
+    ]);
+
+    CloudProviderToken::factory()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
+        'name' => 'Production Hostinger',
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $server->uuid])
+        ->assertSet('provider', 'hostinger')
+        ->assertSet('providerName', 'Hostinger')
+        ->assertSee('Production Hostinger');
+});
+
 describe('after the user switches the session team', function () {
     beforeEach(function () {
         $this->withoutDefer();

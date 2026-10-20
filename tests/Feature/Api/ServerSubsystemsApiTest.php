@@ -240,6 +240,89 @@ describe('Log drains API', function () {
         expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[OUTPUT]\n    Name stdout");
     });
 
+    test('PATCH enables the Amazon CloudWatch Logs drain', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_group' => '/coolify/prod',
+                'logdrain_cloudwatch_region' => 'us-east-1',
+                'logdrain_cloudwatch_stream_prefix' => 'docker/',
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_logdrain_cloudwatch_enabled', true)
+            ->assertJsonPath('logdrain_cloudwatch_group', '/coolify/prod')
+            ->assertJsonPath('logdrain_cloudwatch_stream_prefix', 'docker/');
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->is_logdrain_cloudwatch_enabled)->toBeTrue()
+            ->and($settings->logdrain_cloudwatch_region)->toBe('us-east-1');
+    });
+
+    test('PATCH rejects enabling CloudWatch without a log group', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_region' => 'us-east-1',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_cloudwatch_group');
+
+        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+    });
+
+    test('PATCH rejects enabling CloudWatch without a region', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_group' => 'coolify',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_cloudwatch_region');
+
+        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+    });
+
+    test('PATCH rejects CloudWatch values that could break the compose file', function (string $field, mixed $value) {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                $field => $value,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        'prefix with interpolation' => ['logdrain_cloudwatch_stream_prefix', 'docker/${HOME}'],
+        'prefix with colon' => ['logdrain_cloudwatch_stream_prefix', 'docker:'],
+        'prefix with template braces' => ['logdrain_cloudwatch_stream_prefix', '{{.ID}}'],
+        'invalid region' => ['logdrain_cloudwatch_region', 'not a region'],
+        'group with spaces' => ['logdrain_cloudwatch_group', 'my group'],
+    ]);
+
+    test('PATCH rejects enabling CloudWatch together with another log drain', function () {
+        Queue::fake();
+        $this->server->settings->update([
+            'is_logdrain_axiom_enabled' => true,
+            'logdrain_axiom_dataset_name' => 'ds',
+            'logdrain_axiom_api_key' => 'key',
+        ]);
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_group' => 'coolify',
+                'logdrain_cloudwatch_region' => 'us-east-1',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_logdrain_cloudwatch_enabled');
+    });
+
     test('other-team log drains endpoints return 404', function () {
         $this->withHeaders(serverSubsystemsHeaders())
             ->getJson("/api/v1/servers/{$this->otherServer->uuid}/log-drains")

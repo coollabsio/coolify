@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SharedVariables\Environment;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Application;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -11,6 +12,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Project $project;
 
@@ -59,6 +61,9 @@ class Show extends Component
 
         $this->project = Project::ownedByCurrentTeam()->where('uuid', $projectUuid)->firstOrFail();
         $this->environment = $this->project->environments()->where('uuid', $environmentUuid)->firstOrFail();
+        if ($this->prefersCanvasView('environment_variables')) {
+            return $this->redirectRoute('shared-variables.environment.canvas', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid], navigate: true);
+        }
         $this->getDevView();
     }
 

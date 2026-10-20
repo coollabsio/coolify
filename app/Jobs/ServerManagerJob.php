@@ -99,7 +99,8 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $servers->each(function (Server $server) {
             $hasCloudResource = $server->hetzner_server_id
                 || $server->vultr_instance_id
-                || $server->digitalocean_droplet_id;
+                || $server->digitalocean_droplet_id
+                || $server->hostinger_virtual_machine_id;
 
             if ($hasCloudResource && $server->cloudProviderToken) {
                 ServerCloudProviderStatusCheckJob::dispatch($server);
@@ -204,7 +205,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Dispatch ServerPatchCheckJob if due (weekly, staggered per server on Sunday).
+        // Dispatch ServerPatchCheckJob if due (by default weekly, staggered per server on Sunday).
         // The "-v2" keys start fresh: v4.3.23 stored its old run times under the unversioned keys, which
         // would make every server run these checks at once on the first run after the upgrade.
         $shouldRunPatchCheck = shouldRunCronNow(self::patchCheckCron($server), $serverTimezone, "server-patch-check-v2:{$server->id}", $this->executionTime);
@@ -228,12 +229,16 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Weekly patch check at a stable per-server time on Sunday between 04:00 and 23:59.
-     *
-     * The early hours are skipped because most daylight saving transitions happen there.
+     * The patch check frequency of the server. The default is weekly, at a stable per-server time on Sunday
+     * between 04:00 and 23:59. The early hours are skipped because most daylight saving transitions happen there.
      */
     public static function patchCheckCron(Server $server): string
     {
+        $frequency = data_get($server->settings, 'patch_check_frequency');
+        if (filled($frequency)) {
+            return VALID_CRON_STRINGS[$frequency] ?? $frequency;
+        }
+
         $slot = $server->id % (20 * 60);
 
         return sprintf('%d %d * * 0', $slot % 60, 4 + intdiv($slot, 60));

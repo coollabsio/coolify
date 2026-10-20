@@ -276,6 +276,8 @@ test('database S3 retention remains best effort when deletion fails', function (
     ]);
     ScheduledDatabaseBackupExecution::whereKey($newestExecution->id)->update(['created_at' => now()]);
     ScheduledDatabaseBackupExecution::whereKey($oldExecution->id)->update(['created_at' => now()->subDay()]);
+    $newestExecution->s3Replicas()->create(['s3_storage_id' => $s3->id, 's3_uploaded' => true]);
+    $oldExecution->s3Replicas()->create(['s3_storage_id' => $s3->id, 's3_uploaded' => true]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->with(['/backup/old.dmp'])->andReturnFalse();
     Storage::shouldReceive('build')->once()->andReturn($disk);

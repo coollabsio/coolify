@@ -78,7 +78,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->threadId) {
             $payload['message_thread_id'] = $this->threadId;
         }
-        $response = Http::post($url, $payload);
+        $response = $this->sendNotificationRequest('Telegram', $url, fn () => Http::post($url, $payload));
 
         // 401: invalid bot token, 403: the bot was blocked or removed from the chat, 400 "chat not found": wrong chat ID.
         $isConfigurationError = in_array($response->status(), [401, 403], true)

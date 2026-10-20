@@ -4,13 +4,18 @@
                         helper="Operating system and hardware details for the server running this Coolify instance.">
                         <x-slot:actions>
                             @if ($server->server_metadata)
-                                <x-forms.button type="button" class="size-8! px-0!"
-                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    :disabled="! $server->isFunctional()"
+                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
                                     <x-reicon name="refresh" class="size-3.5" />
+                                    Refresh details
                                 </x-forms.button>
                             @endif
-                            <x-status-badge :status="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
+                                :isHighlighted="! $server->isFunctional()" canGate="update" :canResource="$server">
+                                <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
+                                {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
+                            </x-forms.button>
                         </x-slot:actions>
 
                         @if ($this->limaStartCommand)
@@ -41,7 +46,9 @@
                             @include('livewire.server.partials.server-details', ['server' => $server])
                         @else
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    :disabled="! $server->isFunctional()"
+                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
                                     <x-reicon name="refresh" class="size-3.5" />
                                     Fetch server details
                                 </x-forms.button>
@@ -61,14 +68,6 @@
 
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies and connects to this server.">
-                        <x-slot:actions>
-                            <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
-                                canGate="update" :canResource="$server">
-                                <x-reicon name="refresh" class="size-3.5" />
-                                Validate connection
-                            </x-forms.button>
-                        </x-slot:actions>
-
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.input canGate="update" :canResource="$server" id="name" label="Name"
                                 required :disabled="$isValidating" />

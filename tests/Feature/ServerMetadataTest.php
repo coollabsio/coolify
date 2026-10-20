@@ -128,6 +128,35 @@ it('stores a parsed docker version when gathering server metadata', function () 
         ->and($this->server->fresh()->composeVersion())->toBe('2.32.4');
 });
 
+it('keeps transfer and migration state when gathering server metadata', function () {
+    $this->server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+    // Loaded before the transfer state is written, like a validation that runs during a transfer.
+    $staleServer = Server::find($this->server->id);
+
+    $this->server->update(['server_metadata' => [
+        'os' => 'Old OS',
+        'transfer' => ['status' => 'claimed', 'export_id' => 'export-1'],
+        'migration' => ['status' => 'succeeded', 'export_id' => 'export-1'],
+    ]]);
+
+    Process::fake([
+        '*' => Process::result(output: "---PRETTY_NAME---\nDebian GNU/Linux 12 (bookworm)\n---CPUS---\n2", exitCode: 0),
+    ]);
+
+    $staleServer->gatherServerMetadata();
+
+    expect($this->server->fresh()->server_metadata)
+        ->toMatchArray([
+            'os' => 'Debian GNU/Linux 12 (bookworm)',
+            'cpus' => 2,
+            'transfer' => ['status' => 'claimed', 'export_id' => 'export-1'],
+            'migration' => ['status' => 'succeeded', 'export_id' => 'export-1'],
+        ]);
+});
+
 it('shows the stored docker version in remote server details', function () {
     $this->server->update([
         'server_metadata' => [
@@ -190,4 +219,58 @@ it('does not call gatherServerMetadata when docker version validation fails', fu
     Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
         ->instance()
         ->validateDockerVersion();
+});
+
+it('stores detected NVIDIA GPUs and the container toolkit when gathering server metadata', function (array $gpuLines, array $toolkitLines, array $expectedGpus, bool $expectedToolkit) {
+    $this->server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: implode("\n", [
+            '---PRETTY_NAME---',
+            'Ubuntu 24.04 LTS',
+            '---CPUS---',
+            '8',
+            '---DOCKER---',
+            '29.4.3-ce',
+            '---COMPOSE---',
+            'v2.32.4',
+            '---GPUS---',
+            ...$gpuLines,
+            '---NVIDIA_TOOLKIT---',
+            ...$toolkitLines,
+        ]), exitCode: 0),
+    ]);
+
+    $this->server->gatherServerMetadata();
+    $server = $this->server->fresh();
+
+    expect($server->detectedGpus())->toBe($expectedGpus)
+        ->and($server->server_metadata['nvidia_container_toolkit'])->toBe($expectedToolkit)
+        ->and($server->server_metadata['cpus'])->toBe(8);
+})->with([
+    'two gpus' => [
+        ['0, GPU-1a2b, 81559, NVIDIA H100 80GB HBM3', '1, GPU-3c4d, 24564, NVIDIA GeForce RTX 4090, Founders'],
+        ['/usr/bin/nvidia-container-runtime-hook', '/usr/bin/nvidia-ctk'],
+        [
+            ['index' => '0', 'uuid' => 'GPU-1a2b', 'memory_mb' => 81559, 'name' => 'NVIDIA H100 80GB HBM3'],
+            ['index' => '1', 'uuid' => 'GPU-3c4d', 'memory_mb' => 24564, 'name' => 'NVIDIA GeForce RTX 4090, Founders'],
+        ],
+        true,
+    ],
+    'driver installed without a working gpu' => [
+        ['NVIDIA-SMI has failed because it could not communicate with the NVIDIA driver.'],
+        [],
+        [],
+        false,
+    ],
+    'no nvidia-smi' => [[], [], [], false],
+]);
+
+it('returns null detected GPUs when GPUs were never checked', function () {
+    $this->server->update(['server_metadata' => ['os' => 'Ubuntu 24.04 LTS']]);
+
+    expect($this->server->fresh()->detectedGpus())->toBeNull();
 });

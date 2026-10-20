@@ -97,6 +97,24 @@ test('searchable listbox renders a search field with its placeholders', function
         ->toContain('No matching server');
 });
 
+test('searchable listbox with allowCustom offers the typed value as an option', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-forms.listbox id="path" :wire="false" searchable allowCustom :options="[['value' => 'Dockerfile', 'label' => 'Dockerfile']]" />
+    BLADE);
+
+    expect($html)
+        ->toContain('x-if="customOption"')
+        ->toContain('!customOption');
+});
+
+test('listbox without allowCustom offers no custom option', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-forms.listbox id="path" :wire="false" searchable :options="[['value' => 'Dockerfile', 'label' => 'Dockerfile']]" />
+    BLADE);
+
+    expect($html)->not->toContain('x-if="customOption"');
+});
+
 test('listbox without searchable renders no search field', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.listbox id="server" :wire="false" :options="[['value' => 1, 'label' => 'One']]" />
