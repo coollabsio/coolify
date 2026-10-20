@@ -8,6 +8,7 @@ use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
@@ -5188,7 +5189,7 @@ class ApplicationsController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content needs the deploy permission.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -5323,7 +5324,7 @@ class ApplicationsController extends Controller
             }
         }
 
-        if (! $isReadOnly && ($forbidden = $this->outsideContentChangeForbiddenResponse($request, $storage))) {
+        if (! $isReadOnly && ($forbidden = $this->contentChangeForbiddenResponse($request, $storage))) {
             return $forbidden;
         }
 
@@ -5352,6 +5353,10 @@ class ApplicationsController extends Controller
         }
 
         $storage->save();
+
+        if ($storage instanceof LocalFileVolume && $storage->wasChanged('content')) {
+            ServerStorageSaveJob::dispatch($storage);
+        }
 
         auditLog('api.application.storage_updated', [
             'team_id' => $teamId,
