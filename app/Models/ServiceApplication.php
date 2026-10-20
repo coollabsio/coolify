@@ -38,6 +38,7 @@ class ServiceApplication extends BaseModel
         'is_gzip_enabled',
         'is_stripprefix_enabled',
         'is_force_https_enabled',
+        'is_permanent_redirect_enabled',
         'traefik_certificate_resolver',
         'last_online_at',
         'is_migrated',
@@ -65,6 +66,7 @@ class ServiceApplication extends BaseModel
             'domain_port_overrides' => 'array',
             'noindex_domains' => 'array',
             'is_force_https_enabled' => 'boolean',
+            'is_permanent_redirect_enabled' => 'boolean',
         ];
     }
 
@@ -144,6 +146,11 @@ class ServiceApplication extends BaseModel
     public function isForceHttpsEnabled(): bool
     {
         return $this->is_force_https_enabled;
+    }
+
+    public function isPermanentRedirectEnabled(): bool
+    {
+        return (bool) $this->is_permanent_redirect_enabled;
     }
 
     public function type()

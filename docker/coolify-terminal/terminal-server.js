@@ -535,6 +535,8 @@ async function killPtyProcess(userId) {
 
             // session.ptyProcess.kill() wont work here because of https://github.com/moby/moby/issues/9098
             // patch with https://github.com/moby/moby/issues/9098#issuecomment-189743947
+            // Ctrl-C first so interactive programs (htop, top, less) quit instead of reading the kill command as keys.
+            session.ptyProcess.write('\x03');
             session.ptyProcess.write('set +o history\nkill -TERM -$$ && exit\nset -o history\n');
 
             setTimeout(() => {
@@ -555,10 +557,19 @@ async function killPtyProcess(userId) {
                 if (killAttempts < maxAttempts) {
                     attemptKill();
                 } else {
-                    logTerminal('warn', 'PTY process still active after maximum termination attempts.', {
+                    logTerminal('warn', 'PTY process still active after maximum termination attempts. Killing the local SSH client.', {
                         userId,
                         killAttempts,
                     });
+                    // Ending the local ssh client makes sshd hang up the remote session, so nothing keeps running there.
+                    try {
+                        session.ptyProcess.kill();
+                    } catch (error) {
+                        logTerminal('error', 'Failed to kill PTY process.', {
+                            userId,
+                            error: error.message,
+                        });
+                    }
                     resolve(false);
                 }
             }, 500);

@@ -22,7 +22,7 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $discordEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:discordEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $discordWebhookUrl = null;
 
     #[Validate(['boolean'])]

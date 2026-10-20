@@ -99,6 +99,10 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->is_force_https_enabled = filter_var($payload['is_force_https_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('is_permanent_redirect_enabled', $payload)) {
+            $serviceApplication->is_permanent_redirect_enabled = filter_var($payload['is_permanent_redirect_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
         if (array_key_exists('max_restart_count', $payload)) {
             $serviceApplication->max_restart_count = $payload['max_restart_count'];
             $serviceApplication->restart_limit_reached = false;

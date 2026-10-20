@@ -23,7 +23,7 @@ trait HandlesNotificationResponse
      * Send the request and replace HTTP client exceptions, whose messages contain
      * the full URL (bot token, secret webhook path), with one that only names the
      * scheme and host. The original exception is not kept as `previous`, so the
-     * URL never reaches failed_jobs or Sentry.
+     * URL never reaches failed_jobs or the logs.
      *
      * @param  Closure(): Response  $send
      */
