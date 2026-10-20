@@ -221,11 +221,12 @@ Files:
     }
 
     /**
-     * Fluent Bit reads its config line by line, so a value with a line break could add sections.
+     * Fluent Bit reads its config line by line, so a value with a line break could add sections,
+     * and the modify filter splits `Set` on spaces, so the value must be a single token.
      */
     private function fluentBitValue(string $value): string
     {
-        return trim(preg_replace('/\s*[\x00-\x1F\x7F]+\s*/', ' ', $value));
+        return preg_replace('/[\s\x00-\x1F\x7F]+/', '-', trim($value));
     }
 
     private function logDrainNetworkConnectCommands(Server $server): array

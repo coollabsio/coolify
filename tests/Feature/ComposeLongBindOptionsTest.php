@@ -65,9 +65,10 @@ YAML;
 /**
  * Parses the Compose file as a Service or a Compose Application, twice like a second save.
  *
+ * @param  array<string, string>  $variables  Environment variables that the resource sets before the parse
  * @return array{volume: mixed, volumes: array<int, mixed>, storages: Collection, directory: string}
  */
-function parseLongBind(string $kind, string $compose): array
+function parseLongBind(string $kind, string $compose, array $variables = []): array
 {
     if ($kind === 'service') {
         $resource = Service::factory()->create([
@@ -77,6 +78,9 @@ function parseLongBind(string $kind, string $compose): array
             'destination_id' => test()->destination->id,
             'destination_type' => test()->destination->getMorphClass(),
         ])->fresh();
+        foreach ($variables as $key => $value) {
+            $resource->environment_variables()->create(['key' => $key, 'value' => $value]);
+        }
         serviceParser($resource);
         $parsed = serviceParser($resource->fresh())->toArray();
         $owner = $resource->applications()->firstOrFail();
@@ -89,6 +93,9 @@ function parseLongBind(string $kind, string $compose): array
             'destination_id' => test()->destination->id,
             'destination_type' => test()->destination->getMorphClass(),
         ])->fresh();
+        foreach ($variables as $key => $value) {
+            $resource->environment_variables()->create(['key' => $key, 'value' => $value]);
+        }
         applicationParser($resource);
         $parsed = applicationParser($resource->fresh())->toArray();
         $owner = $resource;
@@ -180,3 +187,40 @@ YAML);
             'bind' => ['create_host_path' => true],
         ]);
 })->with(['service', 'application']);
+
+it('uses the default of a ${VAR:-default} long-form bind source as the host path', function (string $kind) {
+    $result = parseLongBind($kind, longBindCompose("'\${AO_CONFIG_FILE:-./agent-orchestrator.yaml}'", LONG_BIND_READ_ONLY_OPTIONS));
+
+    expect($result['volume']['source'])->toBe($result['directory'].'/agent-orchestrator.yaml')
+        ->and($result['storages']->pluck('fs_path')->all())->toBe([$result['directory'].'/agent-orchestrator.yaml']);
+})->with(['service', 'application']);
+
+it('keeps the volume name of a long-form named volume with a ${VAR:-default} source', function (string $kind) {
+    $result = parseLongBind($kind, <<<'YAML'
+services:
+  probe:
+    image: alpine:3.22
+    volumes:
+      - type: volume
+        source: '${DATA_VOLUME:-pgdata}'
+        target: /fixture
+YAML);
+
+    expect($result['volume']['source'])->toEndWith('_data-volume-pgdata');
+})->with(['service', 'application']);
+
+it('uses the value that the resource sets for a ${VAR:-default} long-form bind source', function (string $kind, string $value, string $expected) {
+    $result = parseLongBind($kind, longBindCompose("'\${AO_CONFIG_FILE:-./agent-orchestrator.yaml}'", LONG_BIND_READ_ONLY_OPTIONS), ['AO_CONFIG_FILE' => $value]);
+    $expected = str_replace('{directory}', $result['directory'], $expected);
+
+    expect($result['volume']['source'])->toBe($expected)
+        ->and($result['storages']->pluck('fs_path')->all())->toBe([$expected]);
+})->with(['service', 'application'])->with([
+    'absolute value' => ['/opt/ao-custom.yaml', '/opt/ao-custom.yaml'],
+    'relative value' => ['./custom.yaml', '{directory}/custom.yaml'],
+    'empty value' => ['', '{directory}/agent-orchestrator.yaml'],
+]);
+
+it('rejects an unsafe value for a ${VAR:-default} long-form bind source', function (string $kind) {
+    parseLongBind($kind, longBindCompose("'\${AO_CONFIG_FILE:-./agent-orchestrator.yaml}'", LONG_BIND_READ_ONLY_OPTIONS), ['AO_CONFIG_FILE' => '/opt/x;touch /tmp/pwned']);
+})->with(['service', 'application'])->throws(Exception::class, 'the value of AO_CONFIG_FILE is not a safe path');
