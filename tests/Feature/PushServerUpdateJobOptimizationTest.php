@@ -146,6 +146,33 @@ it('does not dispatch proxy network work when the proxy is running', function ()
     Queue::assertNothingPushed();
 });
 
+it('marks a stale proxy status as running when sentinel reports a running proxy', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->proxy->set('status', 'exited');
+    $server->save();
+
+    $data = [
+        'containers' => [
+            [
+                'name' => 'coolify-proxy',
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => ['coolify.managed' => true],
+            ],
+        ],
+        'filesystem_usage_root' => ['used_percentage' => 10],
+    ];
+
+    Event::fake([ServiceChecked::class]);
+
+    (new PushServerUpdateJob($server, $data))->handle();
+
+    expect($server->fresh()->proxy->get('status'))->toBe('running');
+});
+
 it('uses default queue for PushServerUpdateJob', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
