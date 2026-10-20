@@ -5,7 +5,10 @@ namespace App\Helpers;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Contracts\Process\ProcessResult;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -42,8 +45,15 @@ class SshMultiplexingHelper
                     return true;
                 }
 
-                if (self::masterConnectionExists($server)) {
+                $check = self::runMuxControlCommand($server, 'check');
+                if ($check?->successful()) {
                     return self::refreshMultiplexedConnection($server);
+                }
+
+                // A wedged master accepts on its socket but never answers, and a new
+                // `ssh -fN` would hang on it too. Remove the socket so a fresh master can bind.
+                if ($check === null) {
+                    File::delete(self::muxSocket($server));
                 }
 
                 return self::establishNewMultiplexedConnection($server);
@@ -92,8 +102,8 @@ class SshMultiplexingHelper
 
     public static function removeMuxFile(Server $server): void
     {
-        $checkProcess = Process::run(self::muxControlCommand($server, 'check'));
-        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+        $checkProcess = self::runMuxControlCommand($server, 'check');
+        $pid = $checkProcess && preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
             ? $matches[1]
             : null;
 
@@ -101,9 +111,9 @@ class SshMultiplexingHelper
             self::markMuxProcessAsRetiring($pid, self::muxSocket($server));
         }
 
-        $stopProcess = Process::run(self::muxControlCommand($server, 'stop'));
+        $stopProcess = self::runMuxControlCommand($server, 'stop');
 
-        if ($pid !== null && ! $stopProcess->successful()) {
+        if ($pid !== null && ! $stopProcess?->successful()) {
             self::unmarkMuxProcessAsRetiring($pid, self::muxSocket($server));
         }
     }
@@ -288,15 +298,17 @@ class SshMultiplexingHelper
     {
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
-        $healthCheckTimeout = config('constants.ssh.mux_health_check_timeout');
-
-        $healthCommand = "timeout $healthCheckTimeout ssh -o ControlMaster=auto -o ControlPath=$muxSocket ";
+        $healthCommand = "ssh -o ControlMaster=auto -o ControlPath=$muxSocket ";
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
         $healthCommand .= self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
-        $process = Process::run($healthCommand);
+        try {
+            $process = Process::timeout((int) config('constants.ssh.mux_health_check_timeout'))->run($healthCommand);
+        } catch (ProcessTimedOutException) {
+            return false;
+        }
 
         return $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
     }
@@ -337,7 +349,21 @@ class SshMultiplexingHelper
 
     private static function masterConnectionExists(Server $server): bool
     {
-        return Process::run(self::muxControlCommand($server, 'check'))->exitCode() === 0;
+        return self::runMuxControlCommand($server, 'check')?->successful() === true;
+    }
+
+    /**
+     * Use a PHP-side timeout, not the `timeout` binary: BusyBox `timeout` in the Coolify image
+     * kills ssh with SIGTERM, and Symfony turns that into an exception. Returns null on timeout.
+     */
+    private static function runMuxControlCommand(Server $server, string $operation): ?ProcessResult
+    {
+        try {
+            return Process::timeout((int) config('constants.ssh.mux_health_check_timeout'))
+                ->run(self::muxControlCommand($server, $operation));
+        } catch (ProcessTimedOutException) {
+            return null;
+        }
     }
 
     private static function connectionIsReusable(Server $server): bool
