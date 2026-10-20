@@ -252,8 +252,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 }
 
 /**
- * Throws the remote command error. Handler::register() never sends RuntimeException to Sentry,
- * so SSH key, DNS, and timeout failures on user servers are not reported.
+ * Throws the remote command error.
  */
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
 {
@@ -383,7 +382,8 @@ function remove_iip($text)
 
     // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, git basic auth, etc.)
     // (protocol://user:password@host → protocol://user:<REDACTED>@host)
-    $text = preg_replace('/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
+    // User and password cannot contain whitespace, so a match never spans log lines.
+    $text = preg_replace('/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:\s@\/]+:)[^@\s]+(@)/i', '$1'.REDACTED.'$2', $text);
 
     // Email addresses
     $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);

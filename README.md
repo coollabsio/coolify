@@ -26,7 +26,7 @@ Your configurations stay on your servers. If you stop using Coolify, your runnin
 ## What can Coolify do?
 
 - **Deploy any application:** Build from GitHub, GitLab, Bitbucket, or Gitea with Nixpacks, Railpack, Dockerfile, Docker Compose, or a prebuilt Docker image.
-- **Run databases and services:** Deploy managed databases and more than 300 one-click services with persistent storage and generated credentials.
+- **Run databases and services:** Deploy managed databases and more than 360 one-click services with persistent storage and generated credentials.
 - **Automate deployments:** Deploy on every Git push, create pull-request previews, call deployment webhooks, and roll back to retained application images.
 - **Manage networking:** Configure custom domains, automatic HTTPS certificates, reverse proxies, health checks, and container networks.
 - **Operate your infrastructure:** Manage multiple servers, inspect deployment and runtime logs, open container terminals, and monitor resource status.

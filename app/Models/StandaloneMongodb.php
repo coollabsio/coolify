@@ -71,7 +71,9 @@ class StandaloneMongodb extends BaseModel
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
+        'mongo_initdb_root_password' => 'encrypted',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
         'health_check_retries' => 'integer',
@@ -279,22 +281,6 @@ class StandaloneMongodb extends BaseModel
         }
 
         return null;
-    }
-
-    public function mongoInitdbRootPassword(): Attribute
-    {
-        return Attribute::make(
-            get: function ($value) {
-                try {
-                    return decrypt($value);
-                } catch (\Throwable $th) {
-                    $this->mongo_initdb_root_password = encrypt($value);
-                    $this->save();
-
-                    return $value;
-                }
-            }
-        );
     }
 
     public function portsMappings(): Attribute

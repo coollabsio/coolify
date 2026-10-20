@@ -57,33 +57,32 @@ function expectServerSourceImportStarts(): void
 }
 
 dataset('server source import variants', ['standalone', 'service']);
+dataset('import sources', [
+    'upload' => [fn () => ['source' => 'upload', 'upload_id' => (string) Str::uuid()]],
+    's3' => [fn () => ['source' => 's3', 's3_storage_uuid' => (string) Str::uuid(), 'path' => '/backups/backup.sql']],
+    'server' => [fn () => ['source' => 'server', 'path' => '/tmp/backup.sql']],
+]);
 
-test('a write token cannot import from a server path', function (string $variant) {
+test('a write token without deploy cannot start an import from any source', function (string $variant, array $payload) {
     $action = Mockery::mock(StartDatabaseImport::class);
     $action->shouldNotReceive('handle');
     app()->instance(StartDatabaseImport::class, $action);
 
     $this->withToken(serverSourceImportToken($this->user, $this->team, ['read', 'write']))
-        ->postJson($this->importPaths[$variant], ['source' => 'server', 'path' => '/etc/hostname'])
+        ->postJson($this->importPaths[$variant], $payload)
         ->assertForbidden()
-        ->assertJsonPath('message', 'Missing required permissions: deploy. An import from a server path needs a token with the deploy permission.');
-})->with('server source import variants');
+        ->assertJsonPath('message', 'Missing required permissions: deploy. An import runs the dump in the database container, so it needs a token with the deploy permission.');
 
-test('a write token with deploy or a root token can import from a server path', function (string $variant, array $abilities) {
+    expect(Activity::query()->count())->toBe(0);
+})->with('server source import variants')->with('import sources');
+
+test('a write token with deploy or a root token can start an import from any source', function (string $variant, array $payload, array $abilities) {
     expectServerSourceImportStarts();
 
     $this->withToken(serverSourceImportToken($this->user, $this->team, $abilities))
-        ->postJson($this->importPaths[$variant], ['source' => 'server', 'path' => '/tmp/backup.sql'])
+        ->postJson($this->importPaths[$variant], $payload)
         ->assertAccepted();
-})->with('server source import variants')->with([
+})->with('server source import variants')->with('import sources')->with([
     'write and deploy' => [['read', 'write', 'deploy']],
     'root' => [['root']],
 ]);
-
-test('a write token can still import from an upload without deploy', function () {
-    expectServerSourceImportStarts();
-
-    $this->withToken(serverSourceImportToken($this->user, $this->team, ['read', 'write']))
-        ->postJson($this->importPaths['standalone'], ['source' => 'upload', 'upload_id' => (string) Str::uuid()])
-        ->assertAccepted();
-});

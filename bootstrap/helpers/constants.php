@@ -23,6 +23,29 @@ const STANDALONE_DATABASE_MODELS = [
     'clickhouse' => StandaloneClickhouse::class,
     'sqlite' => StandaloneSqlite::class,
 ];
+// Custom Docker options that Coolify converts to Compose; other options conflict with settings Coolify manages
+const DOCKER_RUN_OPTION_MAPPING = [
+    '--add-host' => 'extra_hosts',
+    '--cap-add' => 'cap_add',
+    '--cap-drop' => 'cap_drop',
+    '--security-opt' => 'security_opt',
+    '--sysctl' => 'sysctls',
+    '--device' => 'devices',
+    '--init' => 'init',
+    '--ulimit' => 'ulimits',
+    '--privileged' => 'privileged',
+    '--ip' => 'ip',
+    '--ip6' => 'ip6',
+    '--shm-size' => 'shm_size',
+    '--dns' => 'dns',
+    '--gpus' => 'gpus',
+    '--hostname' => 'hostname',
+    '--entrypoint' => 'entrypoint',
+    '--pids-limit' => 'pids_limit',
+    '--read-only' => 'read_only',
+    '--runtime' => 'runtime',
+    '--tmpfs' => 'tmpfs',
+];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
     'hourly' => '0 * * * *',

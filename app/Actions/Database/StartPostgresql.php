@@ -263,6 +263,7 @@ class StartPostgresql
         $environment_variables = collect();
         $this->resolvedPostgresUser = (string) $this->database->postgres_user;
         $this->resolvedPostgresDatabase = (string) $this->database->postgres_db;
+        $postgresPassword = (string) $this->database->postgres_password;
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
@@ -273,6 +274,8 @@ class StartPostgresql
                 $this->resolvedPostgresUser = $composeFileValue;
             } elseif ($env->key === 'POSTGRES_DB') {
                 $this->resolvedPostgresDatabase = $composeFileValue;
+            } elseif ($env->key === 'POSTGRES_PASSWORD') {
+                $postgresPassword = $resolvedValue;
             }
         }
 
@@ -286,12 +289,16 @@ class StartPostgresql
         if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_PASSWORD')) {
             $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
         }
+        // psql in the healthcheck, backups, and restores reads PGPASSWORD when pg_hba.conf requires a password for local connections.
+        if (! $this->hasEnvironmentVariable($environment_variables, 'PGPASSWORD')) {
+            $environment_variables->push("PGPASSWORD={$postgresPassword}");
+        }
 
         if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_DB')) {
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -342,5 +349,7 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $config_file_path";
     }
 }

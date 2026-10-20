@@ -168,7 +168,7 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     ]);
 
     $literal = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $literal->fs_path = '/data/my files/config.yaml';
+    $literal->fs_path = '/data/application/my files/config.yaml';
     $literal->is_directory = true;
     $literal->shouldReceive('save')->once();
     $file = Mockery::mock(LocalFileVolume::class)->makePartial();
@@ -190,6 +190,8 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
     $application->setRelation('destination', (object) ['server' => $server]);
     $file->setRelation('resource', $application);
+    $literal->setRelation('resource', $application);
+    $expression->setRelation('resource', $application);
 
     Process::fake(fn ($process) => Process::result(output: match (true) {
         str_contains($process->command, 'readlink -f') => 'OK',
@@ -198,8 +200,8 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     }));
     getFilesystemVolumesFromServer($application, true);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "test -f '/data/my files/config.yaml'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '/data/my files/config.yaml'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "test -f '/data/application/my files/config.yaml'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '/data/application/my files/config.yaml'"));
     Process::assertRan(fn ($process) => str_contains($process->command, "dirname -- '/data/application/my files/settings.json'"));
     Process::assertRan(fn ($process) => str_contains($process->command, "tee -- '/data/application/my files/settings.json'"));
     Process::assertRan(fn ($process) => str_contains($process->command, '${DATA_PATH:-/srv/app/config.yaml}'));

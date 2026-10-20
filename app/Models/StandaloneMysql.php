@@ -73,6 +73,7 @@ class StandaloneMysql extends BaseModel
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',

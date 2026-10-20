@@ -67,6 +67,10 @@ class Service extends BaseModel
 
     protected $appends = ['server_status', 'status'];
 
+    protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
+    ];
+
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the

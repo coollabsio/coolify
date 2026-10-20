@@ -60,8 +60,8 @@ describe('ScheduledTask locked properties', function () {
         expect($attributes)->not->toBeEmpty();
     });
 
-    test('Executions component task property has Locked attribute', function () {
-        $property = new ReflectionProperty(Executions::class, 'task');
+    test('Executions component task id property has Locked attribute', function () {
+        $property = new ReflectionProperty(Executions::class, 'taskId');
         $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();

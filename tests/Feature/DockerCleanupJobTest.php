@@ -3,6 +3,7 @@
 use App\Actions\Server\CleanupDocker;
 use App\Events\DockerCleanupDone;
 use App\Jobs\DockerCleanupJob;
+use App\Jobs\ScheduledJobManager;
 use App\Models\Application;
 use App\Models\DockerCleanupExecution;
 use App\Models\Environment;
@@ -194,6 +195,34 @@ it('leaves a running scheduled cleanup untouched when a manual cleanup fails bef
         ->and($scheduledExecution->fresh()->finished_at)->toBeNull();
     Notification::assertNothingSent();
     Event::assertNotDispatched(DockerCleanupDone::class);
+});
+
+it('fails a cleanup execution whose worker was killed once the server lock has expired, so it does not stay running', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 16, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $interrupted = DockerCleanupExecution::create(['server_id' => $server->id]);
+    Carbon::setTestNow(now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() - 1));
+    $live = DockerCleanupExecution::create(['server_id' => $server->id]);
+    $finished = DockerCleanupExecution::create(['server_id' => $server->id, 'status' => 'success', 'finished_at' => now()]);
+
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+
+    expect($interrupted->fresh()->status)->toBe('running');
+
+    Carbon::setTestNow(now()->addSeconds(2));
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+
+    expect($interrupted->fresh()->only(['status', 'message']))->toBe(['status' => 'failed', 'message' => DockerCleanupJob::INTERRUPTED_MESSAGE])
+        ->and($interrupted->fresh()->finished_at)->not->toBeNull()
+        ->and($live->fresh()->only(['status', 'finished_at']))->toBe(['status' => 'running', 'finished_at' => null])
+        ->and($finished->fresh()->status)->toBe('success');
+    Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
 });
 
 it('skips a scheduled cleanup occurrence while another cleanup holds the server lock, so it is not reported missed later', function () {
@@ -558,6 +587,8 @@ function dockerCleanupRunImageCommand(string $command, array $images): string
     file_put_contents("$bin/images", implode("\n", $images)."\n");
     file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = images ]; then cat $bin/images; elif [ \"\$1\" = rmi ]; then echo \"\$@\"; fi\n");
     chmod("$bin/docker", 0755);
+    file_put_contents("$bin/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("$bin/sudo", 0755);
 
     $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
 
@@ -603,3 +634,21 @@ it('removes unused images pulled by digest but keeps application images', functi
     expect($command)->toContain('docker images --digests')
         ->and(explode("\n", $output))->toBe(['rmi gtstef/filebrowser@sha256:abc', 'rmi postgres:16']);
 });
+
+it('keeps an application image name with a single quote inside the grep pattern', function (bool $nonRootUser) {
+    $marker = sys_get_temp_dir().'/docker-cleanup-injected-'.bin2hex(random_bytes(4));
+    $imageName = "evil'; touch {$marker}; echo '";
+
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildImagePruneCommand'))->invoke(new CleanupDocker, collect([$imageName, 'app-uuid']), '1.0.17');
+    if ($nonRootUser) {
+        $command = implode("\n", parseCommandsByLineForSudo(collect([$command]), new Server(['user' => 'deploy'])));
+    }
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'app-uuid:v1',
+        'postgres:16',
+    ]);
+
+    expect(file_exists($marker))->toBeFalse()
+        ->and(explode("\n", $output))->toBe(['rmi postgres:16']);
+})->with(['root user' => false, 'non-root user' => true]);

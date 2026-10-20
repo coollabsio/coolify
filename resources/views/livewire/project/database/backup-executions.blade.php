@@ -44,6 +44,9 @@
                             <span>Availability</span>
                             <span class="text-right">Actions</span>
                         </div>
+                        @php
+                            $server = $this->server();
+                        @endphp
                         @foreach ($executions as $execution)
                             @php
                                 $executionStatus = data_get($execution, 'status');
@@ -92,11 +95,15 @@
                                             title="Backup path: {{ data_get($execution, 'filename', 'N/A') }}">{{ data_get($execution, 'filename', 'N/A') }}</code>
                                         <x-copy-button :value="data_get($execution, 'filename', '')" label="Copy backup path" />
                                     </div>
-                                    <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
+                                    <div class="text-[11px] text-neutral-600 dark:text-fg-dim"
+                                        title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $server) }}@if ($executionStatus !== 'running')&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}@endif">
                                         @if ($executionStatus === 'running')
                                             Running now
                                         @else
-                                            {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
+                                            <div class="text-black dark:text-fg">
+                                                {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}
+                                            </div>
+                                            <div>{{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}</div>
                                         @endif
                                     </div>
                                     <div class="text-[11px] text-neutral-600 dark:text-fg-dim">

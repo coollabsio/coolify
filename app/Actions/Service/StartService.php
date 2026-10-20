@@ -45,29 +45,53 @@ class StartService
         // doesn't match configuration. Recreate?") would read the next script lines as the answer.
         // Give Compose no stdin so it uses the default answer (keep the volume). Never pass --yes:
         // it recreates the volume and deletes its data.
+        // Pass -f so Compose uses only the file that Coolify wrote.
+        $compose = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
-            $commands[] = "docker compose --project-directory {$workdir} pull < /dev/null";
+            $commands[] = "{$compose} pull < /dev/null";
         }
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         }
         $commands[] = 'echo Starting service.';
-        $commands[] = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid} up -d --remove-orphans --force-recreate --build < /dev/null";
-        $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         if (data_get($service, 'connect_to_docker_network')) {
-            $compose = data_get($service, 'docker_compose', []);
-            $safeNetwork = escapeshellarg($service->destination->network);
-            $serviceNames = data_get(parseDockerComposeYaml($compose), 'services', []);
-            foreach ($serviceNames as $serviceName => $serviceConfig) {
-                $containerName = escapeshellarg("{$serviceName}-{$service->uuid}");
-                $commands[] = "docker network connect --alias {$containerName} {$safeNetwork} {$containerName} >/dev/null 2>&1 || true";
+            // Connect the created containers to the predefined network before they start. A container
+            // that needs this network during a service_healthy wait never gets it after `up -d`.
+            $commands[] = "{$compose} up -d --remove-orphans --force-recreate --build --no-start < /dev/null";
+            $composeServices = data_get(parseDockerComposeYaml(data_get($service, 'docker_compose', '')), 'services', []);
+            foreach ($composeServices as $serviceName => $serviceConfig) {
+                if ($command = self::predefinedNetworkConnectCommand($service, $serviceName, $serviceConfig)) {
+                    $commands[] = $command;
+                }
             }
+            $commands[] = "{$compose} start < /dev/null";
+        } else {
+            $commands[] = "{$compose} up -d --remove-orphans --force-recreate --build < /dev/null";
         }
+        $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
+    }
+
+    /**
+     * Connects a container to the predefined network of the destination, unless it is already
+     * connected (declared in the compose file, or a running container that was not recreated).
+     * Containers with a network_mode cannot join other networks and are skipped.
+     */
+    public static function predefinedNetworkConnectCommand(Service $service, string $serviceName, mixed $serviceConfig): ?string
+    {
+        if (data_get($serviceConfig, 'network_mode') !== null) {
+            return null;
+        }
+        $network = escapeshellarg($service->destination->network);
+        $containerName = escapeshellarg("{$serviceName}-{$service->uuid}");
+        $warning = escapeshellarg("Warning: Could not connect {$serviceName} to the {$service->destination->network} network.");
+        $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
+
+        return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
     }
 
     /**

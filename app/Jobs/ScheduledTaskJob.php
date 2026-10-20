@@ -80,6 +80,17 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         $this->executionUuid = new_public_id();
     }
 
+    /**
+     * The lock outlives the worker timeout, so a run killed at the timeout still blocks a new run
+     * while its remote command can still be running.
+     */
+    public function middleware(): array
+    {
+        $expireAfter = ($this->task->timeout ?? 300) + 300;
+
+        return [ScheduledJobDeliveryService::withoutOverlapping('scheduled-task-'.$this->task->id, $this->occurrenceUuid)->expireAfter($expireAfter)->dontRelease()];
+    }
+
     private function initializeExecutionContext(): void
     {
         $this->task->loadMissing([
@@ -144,12 +155,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             if ($this->resource->type() === 'application') {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource, 0);
-                if ($containers->count() > 0) {
-                    $containers->each(function ($container) {
+                // `docker ps -a` also lists stopped containers, for example the old container of a rolling update.
+                getCurrentApplicationContainerStatus($this->server, $this->resource, 0)
+                    ->filter(fn ($container) => data_get($container, 'State') === 'running')
+                    ->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);
                     });
-                }
             } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
@@ -171,7 +182,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
+                if (count($this->containers) == 1 || $containerName === $this->task->container || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
                     $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName)." {$cmd}";

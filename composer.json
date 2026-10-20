@@ -40,7 +40,6 @@
         "purplepixie/phpdns": "2.3.6",
         "pusher/pusher-php-server": "7.3.0",
         "resend/resend-laravel": "1.5.0",
-        "sentry/sentry-laravel": "4.27.0",
         "socialiteproviders/authentik": "5.3.0",
         "socialiteproviders/clerk": "5.1.0",
         "socialiteproviders/discord": "4.2.0",

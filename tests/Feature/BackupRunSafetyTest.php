@@ -277,6 +277,58 @@ it('stores service database backups in the folder of earlier releases', function
         ->toContain("/rallly-rallly_db-{$service->uuid}/pg-dump-rallly-");
 });
 
+function backupRunSafetyServiceDatabase(Server $server, StandaloneDocker $destination, Environment $environment, string $image): ServiceDatabase
+{
+    $service = Service::factory()->create([
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'environment_id' => $environment->id,
+    ]);
+
+    return ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'db',
+        'image' => $image,
+        'status' => 'running:healthy',
+    ]);
+}
+
+it('backs up a service database without a database env variable from the backup settings', function (string $image, string $env, array $settings, string $databaseName) {
+    $database = backupRunSafetyServiceDatabase($this->server, $this->destination, $this->environment, $image);
+    $backup = backupRunSafetySchedule($database, $this->team, $settings);
+    backupRunSafetyFakeRemoteCommands(["docker exec '{$database->name}-{$database->service->uuid}' env" => $env]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect(ScheduledDatabaseBackupExecution::query()->sole())
+        ->status->toBe('success')
+        ->database_name->toBe($databaseName);
+})->with([
+    'mariadb, all databases' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret', ['dump_all' => true], 'all'],
+    'mariadb, selected database' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
+    'mysql, all databases' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['dump_all' => true], 'all'],
+    'mysql, selected database' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
+]);
+
+it('records a failed execution and notifies when no service database to back up is known', function (string $image, string $env) {
+    $database = backupRunSafetyServiceDatabase($this->server, $this->destination, $this->environment, $image);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    $this->team->emailNotificationSettings->update(['smtp_enabled' => true, 'backup_failure_email_notifications' => true]);
+    $commands = backupRunSafetyFakeRemoteCommands(["docker exec '{$database->name}-{$database->service->uuid}' env" => $env]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect(ScheduledDatabaseBackupExecution::query()->sole())
+        ->status->toBe('failed')
+        ->message->toContain('No database to back up');
+    expect($commands->contains(fn (string $command) => str_contains($command, 'dump')))->toBeFalse();
+    Notification::assertSentTo($this->team, BackupFailed::class);
+})->with([
+    'mariadb' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret'],
+    'mysql' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret'],
+]);
+
 // --- Worker timeout (M16) ---
 
 it('stops the backup command at the backup timeout, before the worker timeout', function () {

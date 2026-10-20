@@ -130,7 +130,7 @@ class ServerSentinelController extends Controller
 
     #[OA\Patch(
         summary: 'Update Sentinel settings',
-        description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel.',
+        description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel. Needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/sentinel',
         operationId: 'update-server-sentinel',
         security: [['bearerAuth' => []]],
@@ -165,6 +165,7 @@ class ServerSentinelController extends Controller
             new OA\Response(response: 200, description: 'Updated Sentinel settings.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],

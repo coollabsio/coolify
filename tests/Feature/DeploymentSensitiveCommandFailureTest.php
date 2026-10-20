@@ -256,6 +256,33 @@ it('keeps the command in the error message for failed commands that are not sens
         ->not->toContain('[command hidden because it contains sensitive data]');
 });
 
+it('explains how to fix a Docker network that Docker Engine reports with an IPv6 gateway prefix', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'ParseAddr("fde4:75c5:b9d4::1/64"): unexpected character, want colon (at "/64")', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose up -d',
+    ]));
+
+    expect($exception->getMessage())
+        ->toContain('ParseAddr("fde4:75c5:b9d4::1/64")')
+        ->toContain('systemctl restart docker')
+        ->toContain('28.0.1');
+});
+
+it('does not add the Docker network hint to other failures', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'ParseAddr("fde4:75c5:b9d4::1 "): unexpected character', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose up -d',
+    ]));
+
+    expect($exception->getMessage())->not->toContain('systemctl restart docker');
+});
+
 it('redacts locked values from the error output of failed commands', function () {
     [$job] = makeSensitiveCommandFailureJob([
         ['key' => 'LOCKED_SECRET', 'value' => SENSITIVE_FAILURE_SECRET, 'is_shown_once' => true],
@@ -532,4 +559,35 @@ it('resolves a literal vault reference when the application has a secret manager
     $runtime = invokeSensitiveFailureJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
     expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe('LITERAL_REF='.escapeComposeEnvFileValue('resolved-remote-value'));
+});
+
+it('mounts the seccomp profile from custom docker options into the helper container', function () {
+    [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob();
+    $application->update(['custom_docker_run_options' => '--security-opt seccomp=/etc/docker/seccomp-profile.json']);
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, [
+        'application' => $application->fresh(),
+        'destination' => StandaloneDocker::forceCreate([
+            'name' => 'seccomp-network',
+            'network' => 'seccomp-network',
+            'server_id' => $server->id,
+        ]),
+    ]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands) {
+        if (str_contains($process->command, 'docker run -d')) {
+            $helperCommands[] = $process->command;
+
+            return Process::result(errorOutput: 'docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /etc/docker/seccomp-profile.json', exitCode: 125);
+        }
+
+        return Process::result(output: str_contains($process->command, 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image'));
+
+    expect($helperCommands)->toHaveCount(1)
+        ->and($helperCommands[0])->toContain('type=bind,source=/etc/docker/seccomp-profile.json,target=/etc/docker/seccomp-profile.json,readonly')
+        ->and($exception->getMessage())->toContain('bind source path does not exist: /etc/docker/seccomp-profile.json');
 });

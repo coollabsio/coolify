@@ -244,7 +244,7 @@
                     "Applications"
                 ],
                 "summary": "Delete Preview Deployment",
-                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record.",
+                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record. Needs a token with the write and deploy permissions.",
                 "operationId": "delete-preview-deployment-by-pull-request-id",
                 "parameters": [
                     {
@@ -293,6 +293,9 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     }
                 },
                 "security": [
@@ -769,19 +772,19 @@
                                     },
                                     "manual_webhook_secret_github": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Github."
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitlab": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitlab."
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_bitbucket": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Bitbucket."
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitea": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitea."
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
                                     },
                                     "redirect": {
                                         "type": "string",
@@ -846,7 +849,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -910,6 +913,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -1039,6 +1046,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -1365,19 +1375,19 @@
                                     },
                                     "manual_webhook_secret_github": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Github."
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitlab": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitlab."
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_bitbucket": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Bitbucket."
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitea": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitea."
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
                                     },
                                     "redirect": {
                                         "type": "string",
@@ -1442,7 +1452,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -1506,6 +1516,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -1635,6 +1649,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -1961,19 +1978,19 @@
                                     },
                                     "manual_webhook_secret_github": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Github."
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitlab": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitlab."
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_bitbucket": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Bitbucket."
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitea": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitea."
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
                                     },
                                     "redirect": {
                                         "type": "string",
@@ -2038,7 +2055,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -2102,6 +2119,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -2231,6 +2252,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -2495,19 +2519,19 @@
                                     },
                                     "manual_webhook_secret_github": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Github."
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitlab": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitlab."
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_bitbucket": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Bitbucket."
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitea": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitea."
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
                                     },
                                     "redirect": {
                                         "type": "string",
@@ -2593,6 +2617,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -2717,6 +2745,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -2966,19 +2997,19 @@
                                     },
                                     "manual_webhook_secret_github": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Github."
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitlab": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitlab."
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_bitbucket": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Bitbucket."
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitea": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitea."
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
                                     },
                                     "redirect": {
                                         "type": "string",
@@ -3064,6 +3095,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -3189,6 +3224,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
+                    },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
@@ -3305,7 +3343,7 @@
                     "Applications"
                 ],
                 "summary": "Delete",
-                "description": "Delete application by UUID.",
+                "description": "Delete application by UUID. Needs a token with the write and deploy permissions.",
                 "operationId": "delete-application-by-uuid",
                 "parameters": [
                     {
@@ -3383,6 +3421,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     }
                 },
                 "security": [
@@ -3624,19 +3665,19 @@
                                     },
                                     "manual_webhook_secret_github": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Github."
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitlab": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitlab."
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_bitbucket": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Bitbucket."
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
                                     },
                                     "manual_webhook_secret_gitea": {
                                         "type": "string",
-                                        "description": "Manual webhook secret for Gitea."
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
                                     },
                                     "redirect": {
                                         "type": "string",
@@ -3701,7 +3742,7 @@
                                     },
                                     "watch_paths": {
                                         "type": "string",
-                                        "description": "The watch paths."
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
                                     },
                                     "use_build_server": {
                                         "type": "boolean",
@@ -3764,6 +3805,10 @@
                                     "is_stripprefix_enabled": {
                                         "type": "boolean",
                                         "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
                                     },
                                     "traefik_certificate_resolver": {
                                         "type": "string",
@@ -3866,6 +3911,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -4976,7 +5024,7 @@
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "File content (file only, optional)."
+                                        "description": "File content (file only, optional). Needs the deploy ability when set."
                                     },
                                     "is_directory": {
                                         "type": "boolean",
@@ -5014,7 +5062,7 @@
                         "$ref": "#\/components\/responses\/404"
                     },
                     "403": {
-                        "description": "The token needs the deploy permission for a mount outside the resource directory."
+                        "description": "The token needs the deploy permission for a mount outside the resource directory or for a file storage with content."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -5405,7 +5453,7 @@
                                         ]
                                     },
                                     "clone_volumes": {
-                                        "description": "Whether to clone volume data.",
+                                        "description": "Whether to clone volume data. Needs the deploy ability.",
                                         "type": "boolean",
                                         "default": false
                                     }
@@ -5440,6 +5488,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to clone volume data."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -6549,6 +6600,7 @@
                     "Databases"
                 ],
                 "summary": "Import database backup",
+                "description": "Restore a backup into the database. Every import source requires the deploy ability.",
                 "operationId": "create-database-import",
                 "parameters": [
                     {
@@ -6574,6 +6626,9 @@
                 "responses": {
                     "202": {
                         "description": "Import queued"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability."
                     },
                     "409": {
                         "description": "Another start, restart or import of this database is already in progress."
@@ -6776,7 +6831,7 @@
                                     },
                                     "backup_now": {
                                         "type": "boolean",
-                                        "description": "Whether to trigger backup immediately after creation"
+                                        "description": "Whether to trigger backup immediately after creation. Needs a token with the deploy permission."
                                     },
                                     "database_backup_retention_amount_locally": {
                                         "type": "integer",
@@ -6848,6 +6903,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "403": {
+                        "description": "The token needs the deploy permission to use backup_now."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -6914,7 +6972,7 @@
                     "Databases"
                 ],
                 "summary": "Delete",
-                "description": "Delete database by UUID.",
+                "description": "Delete database by UUID. Needs a token with the write and deploy permissions.",
                 "operationId": "delete-database-by-uuid",
                 "parameters": [
                     {
@@ -6992,6 +7050,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     }
                 },
                 "security": [
@@ -7039,11 +7100,11 @@
                                     },
                                     "is_public": {
                                         "type": "boolean",
-                                        "description": "Is the database public?"
+                                        "description": "Is the database public? Changing it starts or stops the database proxy, so it needs a token with the deploy permission."
                                     },
                                     "public_port": {
                                         "type": "integer",
-                                        "description": "Public port of the database"
+                                        "description": "Public port of the database (1024-65535)"
                                     },
                                     "public_port_timeout": {
                                         "type": "integer",
@@ -7238,6 +7299,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "403": {
+                        "description": "The token needs the deploy permission to change is_public or to use instant_deploy."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -7374,7 +7438,7 @@
                                     },
                                     "backup_now": {
                                         "type": "boolean",
-                                        "description": "Whether to take a backup now or not"
+                                        "description": "Whether to take a backup now or not. Needs a token with the deploy permission."
                                     },
                                     "enabled": {
                                         "type": "boolean",
@@ -7442,6 +7506,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission to use backup_now."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -9800,7 +9867,7 @@
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "File content (file only, optional)."
+                                        "description": "File content (file only, optional). Needs the deploy ability when set."
                                     },
                                     "is_directory": {
                                         "type": "boolean",
@@ -9838,7 +9905,7 @@
                         "$ref": "#\/components\/responses\/404"
                     },
                     "403": {
-                        "description": "The token needs the deploy permission for a mount outside the resource directory."
+                        "description": "The token needs the deploy permission for a mount outside the resource directory or for a file storage with content."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -10227,6 +10294,7 @@
                                         ]
                                     },
                                     "clone_volumes": {
+                                        "description": "Whether to clone volume data. Needs the deploy ability.",
                                         "type": "boolean",
                                         "default": false
                                     }
@@ -10245,6 +10313,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to clone volume data."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -10690,7 +10761,7 @@
                     "Destinations"
                 ],
                 "summary": "Create destination",
-                "description": "Create a Docker network destination on a server owned by the authenticated team.",
+                "description": "Create a Docker network destination on a server owned by the authenticated team. The network must be new: Docker's built-in networks (bridge, host, none) and networks that already exist on a standalone server are rejected, because Coolify connects the proxy to the destination network.",
                 "operationId": "create-server-destination",
                 "parameters": [
                     {
@@ -10717,6 +10788,7 @@
                                         "maxLength": 255
                                     },
                                     "network": {
+                                        "description": "Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.",
                                         "type": "string",
                                         "maxLength": 255,
                                         "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
@@ -10755,7 +10827,7 @@
                         "description": "A destination with this network already exists."
                     },
                     "422": {
-                        "$ref": "#\/components\/responses\/422"
+                        "description": "Validation failed, the network is reserved or already exists on the server, or the server could not be checked."
                     }
                 },
                 "security": [
@@ -11103,6 +11175,7 @@
                     "DigitalOcean"
                 ],
                 "summary": "Create a server on DigitalOcean",
+                "description": "Create a DigitalOcean droplet and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.",
                 "operationId": "create-digitalocean-server",
                 "responses": {
                     "201": {
@@ -11110,6 +11183,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission for a cloud-init script or extra SSH keys."
                     },
                     "422": {
                         "description": "Validation failed."
@@ -12564,7 +12640,7 @@
                     "Hetzner"
                 ],
                 "summary": "Create Hetzner Server",
-                "description": "Create a new server on Hetzner and register it in Coolify.",
+                "description": "Create a new server on Hetzner and register it in Coolify. A cloud-init script or extra SSH key IDs need a token with the deploy permission.",
                 "operationId": "create-hetzner-server",
                 "requestBody": {
                     "description": "Hetzner server creation parameters",
@@ -12635,7 +12711,7 @@
                                         "items": {
                                             "type": "integer"
                                         },
-                                        "description": "Additional Hetzner SSH key IDs"
+                                        "description": "Additional Hetzner SSH key IDs. Needs a token with the deploy permission."
                                     },
                                     "hetzner_firewall_ids": {
                                         "type": "array",
@@ -12653,7 +12729,7 @@
                                     },
                                     "cloud_init_script": {
                                         "type": "string",
-                                        "description": "Cloud-init YAML script (optional)"
+                                        "description": "Cloud-init YAML script (optional). Needs a token with the deploy permission."
                                     },
                                     "instant_validate": {
                                         "type": "boolean",
@@ -12697,6 +12773,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission for a cloud-init script or extra SSH keys."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -14642,7 +14721,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -14667,6 +14746,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -14796,7 +14878,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -14821,6 +14903,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -14990,7 +15075,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -15015,6 +15100,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -15144,7 +15232,7 @@
                                     },
                                     "enabled": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the scheduled task is enabled.",
+                                        "description": "The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.",
                                         "default": true
                                     }
                                 },
@@ -15169,6 +15257,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability for an enabled task."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -15243,7 +15334,7 @@
                     "Scheduled Tasks"
                 ],
                 "summary": "Execute Task",
-                "description": "Queue immediate execution of a scheduled task for an application.",
+                "description": "Queue immediate execution of a scheduled task for an application. Requires the deploy ability.",
                 "operationId": "execute-scheduled-task-by-application-uuid",
                 "parameters": [
                     {
@@ -15272,6 +15363,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "The token needs the deploy ability."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -15289,7 +15383,7 @@
                     "Scheduled Tasks"
                 ],
                 "summary": "Execute Task",
-                "description": "Queue immediate execution of a scheduled task for a service.",
+                "description": "Queue immediate execution of a scheduled task for a service. Requires the deploy ability.",
                 "operationId": "execute-scheduled-task-by-service-uuid",
                 "parameters": [
                     {
@@ -15317,6 +15411,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -15895,7 +15992,7 @@
                     "Servers"
                 ],
                 "summary": "Update Docker cleanup settings",
-                "description": "Update Docker cleanup settings for a server owned by the authenticated team.",
+                "description": "Update Docker cleanup settings for a server owned by the authenticated team. Turning on `delete_unused_volumes` needs a token with the `deploy` permission.",
                 "operationId": "update-server-docker-cleanup",
                 "parameters": [
                     {
@@ -15978,6 +16075,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "403": {
+                        "description": "Turning on `delete_unused_volumes` needs the deploy permission."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -15998,7 +16098,7 @@
                     "Servers"
                 ],
                 "summary": "Run Docker cleanup",
-                "description": "Dispatch a manual Docker cleanup job for a server owned by the authenticated team.",
+                "description": "Dispatch a manual Docker cleanup job for a server owned by the authenticated team. Needs a token with the write and deploy permissions.",
                 "operationId": "run-server-docker-cleanup",
                 "parameters": [
                     {
@@ -16051,6 +16151,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -16257,7 +16360,7 @@
                     "Servers"
                 ],
                 "summary": "Log in to a registry on a server",
-                "description": "Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login.",
+                "description": "Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login. Needs a token with the write and deploy permissions.",
                 "operationId": "login-server-registry",
                 "parameters": [
                     {
@@ -16322,6 +16425,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -16557,7 +16663,7 @@
                     "Servers"
                 ],
                 "summary": "Update log drain settings",
-                "description": "Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team.",
+                "description": "Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.",
                 "operationId": "update-server-log-drains",
                 "parameters": [
                     {
@@ -16618,6 +16724,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -16730,7 +16839,7 @@
                     "Servers"
                 ],
                 "summary": "Update server proxy",
-                "description": "Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.",
+                "description": "Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server. Changing proxy_type needs a token with the `write` and `deploy` permissions.",
                 "operationId": "update-server-proxy",
                 "parameters": [
                     {
@@ -16770,7 +16879,7 @@
                                         ]
                                     },
                                     "proxy_type": {
-                                        "description": "Proxy type (case-insensitive).",
+                                        "description": "Proxy type (case-insensitive). Changing it starts the new proxy on the server and needs the deploy permission.",
                                         "type": "string",
                                         "enum": [
                                             "traefik",
@@ -16840,6 +16949,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "403": {
+                        "description": "The token needs the deploy permission to change the proxy type."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -16860,7 +16972,7 @@
                     "Servers"
                 ],
                 "summary": "Save server proxy configuration",
-                "description": "Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).",
+                "description": "Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).",
                 "operationId": "save-server-proxy-configuration",
                 "parameters": [
                     {
@@ -16965,7 +17077,7 @@
                     "Servers"
                 ],
                 "summary": "Restart server proxy",
-                "description": "Queue a proxy restart for a team-owned server.",
+                "description": "Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.",
                 "operationId": "restart-server-proxy",
                 "parameters": [
                     {
@@ -17130,7 +17242,7 @@
                     "Servers"
                 ],
                 "summary": "Update Sentinel settings",
-                "description": "Update Sentinel settings for a server owned by the authenticated team. Changing token\/metrics timing fields may restart Sentinel.",
+                "description": "Update Sentinel settings for a server owned by the authenticated team. Changing token\/metrics timing fields may restart Sentinel. Needs a token with the write and deploy permissions.",
                 "operationId": "update-server-sentinel",
                 "parameters": [
                     {
@@ -17233,6 +17345,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -17299,7 +17414,7 @@
                                     "name": {
                                         "type": "string",
                                         "example": "My Server",
-                                        "description": "The name of the server."
+                                        "description": "The name of the server. Must not contain control characters such as new lines."
                                     },
                                     "description": {
                                         "type": "string",
@@ -17451,7 +17566,7 @@
                     "Servers"
                 ],
                 "summary": "Delete",
-                "description": "Delete server by UUID.",
+                "description": "Delete server by UUID. With force or delete_from_provider, needs a token with the write and deploy permissions.",
                 "operationId": "delete-server-by-uuid",
                 "parameters": [
                     {
@@ -17466,7 +17581,7 @@
                     {
                         "name": "force",
                         "in": "query",
-                        "description": "Also delete all resources on the server.",
+                        "description": "Also delete all resources on the server. Needs the deploy permission.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
@@ -17476,7 +17591,7 @@
                     {
                         "name": "delete_from_provider",
                         "in": "query",
-                        "description": "Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.",
+                        "description": "Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone. Needs the deploy permission.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
@@ -17485,6 +17600,9 @@
                     }
                 ],
                 "responses": {
+                    "403": {
+                        "description": "The token needs the deploy permission to delete the resources or the cloud server."
+                    },
                     "200": {
                         "description": "Server deleted.",
                         "content": {
@@ -17525,7 +17643,7 @@
                     "Servers"
                 ],
                 "summary": "Update",
-                "description": "Update Server.",
+                "description": "Update Server. Changing proxy_type needs a token with the write and deploy permissions.",
                 "operationId": "update-server-by-uuid",
                 "parameters": [
                     {
@@ -17547,7 +17665,7 @@
                                 "properties": {
                                     "name": {
                                         "type": "string",
-                                        "description": "The name of the server."
+                                        "description": "The name of the server. Must not contain control characters such as new lines."
                                     },
                                     "description": {
                                         "type": "string",
@@ -17594,7 +17712,7 @@
                                             "caddy",
                                             "none"
                                         ],
-                                        "description": "The proxy type."
+                                        "description": "The proxy type. Changing it starts the new proxy on the server and needs the deploy permission."
                                     },
                                     "concurrent_builds": {
                                         "type": "integer",
@@ -17631,6 +17749,9 @@
                     }
                 },
                 "responses": {
+                    "403": {
+                        "description": "The token needs the deploy permission to change the proxy type."
+                    },
                     "201": {
                         "description": "Server updated.",
                         "content": {
@@ -17795,7 +17916,7 @@
                     "Servers"
                 ],
                 "summary": "Validate",
-                "description": "Validate server by UUID.",
+                "description": "Validate server by UUID. With install=true, needs a token with the write and deploy permissions.",
                 "operationId": "validate-server-by-uuid",
                 "parameters": [
                     {
@@ -17815,7 +17936,7 @@
                             "schema": {
                                 "properties": {
                                     "install": {
-                                        "description": "Install missing prerequisites and Docker. This can restart the Docker daemon.",
+                                        "description": "Install missing prerequisites and Docker, then start the proxy. This can restart the Docker daemon. Needs the deploy permission.",
                                         "type": "boolean",
                                         "default": false
                                     }
@@ -17826,6 +17947,9 @@
                     }
                 },
                 "responses": {
+                    "403": {
+                        "description": "The token needs the deploy permission to install the server."
+                    },
                     "201": {
                         "description": "Server validation started.",
                         "content": {
@@ -18070,6 +18194,13 @@
                                         ]
                                     },
                                     "is_force_https_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false.",
                                         "type": [
                                             "boolean",
                                             "null"
@@ -18542,6 +18673,7 @@
                     "Service databases"
                 ],
                 "summary": "Import service database backup",
+                "description": "Restore a backup into the service database. Every import source requires the deploy ability.",
                 "operationId": "create-service-database-import",
                 "parameters": [
                     {
@@ -18576,6 +18708,9 @@
                 "responses": {
                     "202": {
                         "description": "Import queued"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability."
                     },
                     "409": {
                         "description": "Another start, restart or import of this database is already in progress."
@@ -18802,6 +18937,7 @@
                                         "type": "boolean"
                                     },
                                     "is_public": {
+                                        "description": "Changing it starts or stops the database proxy, so it needs a token with the deploy permission.",
                                         "type": "boolean"
                                     },
                                     "public_port": {
@@ -18842,6 +18978,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission to change is_public."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -19434,7 +19573,7 @@
                     "Services"
                 ],
                 "summary": "Delete",
-                "description": "Delete service by UUID.",
+                "description": "Delete service by UUID. Needs a token with the write and deploy permissions.",
                 "operationId": "delete-service-by-uuid",
                 "parameters": [
                     {
@@ -19522,6 +19661,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     }
                 },
                 "security": [
@@ -20637,7 +20779,7 @@
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
-                                        "description": "File content (file only, optional)."
+                                        "description": "File content (file only, optional). Needs the deploy ability when set."
                                     },
                                     "is_directory": {
                                         "type": "boolean",
@@ -20675,7 +20817,7 @@
                         "$ref": "#\/components\/responses\/404"
                     },
                     "403": {
-                        "description": "The token needs the deploy permission for a mount outside the resource directory."
+                        "description": "The token needs the deploy permission for a mount outside the resource directory or for a file storage with content."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -21064,6 +21206,7 @@
                                         ]
                                     },
                                     "clone_volumes": {
+                                        "description": "Whether to clone volume data. Needs the deploy ability.",
                                         "type": "boolean",
                                         "default": false
                                     }
@@ -21082,6 +21225,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to clone volume data."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -22289,7 +22435,7 @@
                     "Applications"
                 ],
                 "summary": "Set application storage backup schedule",
-                "description": "Create or replace the backup schedule for an application persistent volume or directory storage.",
+                "description": "Create or replace the backup schedule for an application persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.",
                 "operationId": "set-application-storage-backup-schedule",
                 "parameters": [
                     {
@@ -22349,7 +22495,7 @@
                         "$ref": "#\/components\/responses\/401"
                     },
                     "403": {
-                        "description": "Forbidden."
+                        "description": "Forbidden, or the token needs the deploy permission for stop_during_backup."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -22419,7 +22565,7 @@
                     "Databases"
                 ],
                 "summary": "Set database storage backup schedule",
-                "description": "Create or replace the backup schedule for a database persistent volume or directory storage.",
+                "description": "Create or replace the backup schedule for a database persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.",
                 "operationId": "set-database-storage-backup-schedule",
                 "parameters": [
                     {
@@ -22479,7 +22625,7 @@
                         "$ref": "#\/components\/responses\/401"
                     },
                     "403": {
-                        "description": "Forbidden."
+                        "description": "Forbidden, or the token needs the deploy permission for stop_during_backup."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -22549,7 +22695,7 @@
                     "Services"
                 ],
                 "summary": "Set service storage backup schedule",
-                "description": "Create or replace the backup schedule for a service persistent volume or directory storage.",
+                "description": "Create or replace the backup schedule for a service persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.",
                 "operationId": "set-service-storage-backup-schedule",
                 "parameters": [
                     {
@@ -22609,7 +22755,7 @@
                         "$ref": "#\/components\/responses\/401"
                     },
                     "403": {
-                        "description": "Forbidden."
+                        "description": "Forbidden, or the token needs the deploy permission for stop_during_backup."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -22679,7 +22825,7 @@
                     "Applications"
                 ],
                 "summary": "Run application storage backup",
-                "description": "Queue an immediate volume backup for an application storage that has a schedule.",
+                "description": "Queue an immediate volume backup for an application storage that has a schedule. Needs a token with the write and deploy permissions.",
                 "operationId": "run-application-storage-backup",
                 "parameters": [
                     {
@@ -22706,6 +22852,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -22723,7 +22872,7 @@
                     "Databases"
                 ],
                 "summary": "Run database storage backup",
-                "description": "Queue an immediate volume backup for a database storage that has a schedule.",
+                "description": "Queue an immediate volume backup for a database storage that has a schedule. Needs a token with the write and deploy permissions.",
                 "operationId": "run-database-storage-backup",
                 "parameters": [
                     {
@@ -22750,6 +22899,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -22767,7 +22919,7 @@
                     "Services"
                 ],
                 "summary": "Run service storage backup",
-                "description": "Queue an immediate volume backup for a service storage that has a schedule.",
+                "description": "Queue an immediate volume backup for a service storage that has a schedule. Needs a token with the write and deploy permissions.",
                 "operationId": "run-service-storage-backup",
                 "parameters": [
                     {
@@ -22793,6 +22945,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the write and deploy permissions."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -22915,7 +23070,7 @@
                     "Vultr"
                 ],
                 "summary": "Create Vultr Server",
-                "description": "Create a Vultr instance and link it as a Coolify server.",
+                "description": "Create a Vultr instance and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.",
                 "operationId": "create-vultr-server",
                 "responses": {
                     "201": {
@@ -22923,6 +23078,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy permission for a cloud-init script or extra SSH keys."
                     },
                     "422": {
                         "description": "Validation failed."
@@ -23247,6 +23405,7 @@
                         "default": false
                     },
                     "stop_during_backup": {
+                        "description": "Stop the resource containers during the backup. Needs a token with the deploy permission.",
                         "type": "boolean",
                         "default": false
                     },
@@ -23977,6 +24136,10 @@
                     "is_stripprefix_enabled": {
                         "type": "boolean"
                     },
+                    "is_permanent_redirect_enabled": {
+                        "type": "boolean",
+                        "description": "Use permanent (301\/308) instead of temporary (302\/307) proxy redirects."
+                    },
                     "connect_to_docker_network": {
                         "type": "boolean"
                     },
@@ -23992,6 +24155,9 @@
                         "type": "boolean"
                     },
                     "is_env_sorting_enabled": {
+                        "type": "boolean"
+                    },
+                    "include_coolify_default_variables": {
                         "type": "boolean"
                     },
                     "is_container_label_readonly_enabled": {

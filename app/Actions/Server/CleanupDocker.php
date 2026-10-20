@@ -273,11 +273,12 @@ class CleanupDocker implements ShouldBeUnique
 
         // Add application repo exclusion if there are applications
         if ($applicationImageRepos->isNotEmpty()) {
-            $grepCommands .= " | grep -v -E '^({$appExcludePatterns})[_:@].+'";
+            // The repository names come from application data, so quote the pattern for the shell.
+            $grepCommands .= ' | grep -v -E '.escapeshellarg("^({$appExcludePatterns})[_:@].+");
         }
 
         // Add infrastructure image exclusion (matches any registry prefix)
-        $grepCommands .= " | grep -v -E '{$infraExcludePattern}'";
+        $grepCommands .= ' | grep -v -E '.escapeshellarg($infraExcludePattern);
 
         $commands[] = "docker images --digests --format '{{if eq .Tag \"<none>\"}}{{.Repository}}@{{.Digest}}{{else}}{{.Repository}}:{{.Tag}}{{end}}' | ".
             $grepCommands.' | '.

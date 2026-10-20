@@ -268,6 +268,66 @@ test('PUT /api/v1/servers/{uuid}/proxy/configuration forbids normal members', fu
         ->assertForbidden();
 });
 
+test('PUT /api/v1/servers/{uuid}/proxy/configuration requires the deploy permission', function () {
+    $writeOnlyToken = serverProxyApiToken($this->user, $this->team, ['write']);
+    $configuration = "services:\n  traefik:\n    image: traefik:v3.5\n";
+
+    SaveProxyConfiguration::shouldNotRun();
+
+    $this->withHeaders(serverProxyApiHeaders($writeOnlyToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode($configuration),
+        ])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Missing required permissions: deploy. Coolify applies the proxy configuration on the server, so it needs a token with the deploy permission.');
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration saves with write and deploy permissions', function () {
+    $deployToken = serverProxyApiToken($this->user, $this->team, ['write', 'deploy']);
+
+    SaveProxyConfiguration::shouldRun()->once();
+
+    $this->withHeaders(serverProxyApiHeaders($deployToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode("services:\n  traefik:\n    image: traefik:v3.5\n"),
+        ])
+        ->assertOk();
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration requires the write permission', function () {
+    $deployOnlyToken = serverProxyApiToken($this->user, $this->team, ['deploy']);
+
+    SaveProxyConfiguration::shouldNotRun();
+
+    $this->withHeaders(serverProxyApiHeaders($deployOnlyToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode("services:\n  traefik:\n    image: traefik:v3.5\n"),
+        ])
+        ->assertForbidden();
+});
+
+test('POST /api/v1/servers/{uuid}/proxy/restart requires the deploy permission', function () {
+    Queue::fake();
+    $writeOnlyToken = serverProxyApiToken($this->user, $this->team, ['write']);
+
+    $this->withHeaders(serverProxyApiHeaders($writeOnlyToken))
+        ->postJson("/api/v1/servers/{$this->server->uuid}/proxy/restart")
+        ->assertForbidden();
+
+    Queue::assertNotPushed(RestartProxyJob::class);
+});
+
+test('POST /api/v1/servers/{uuid}/proxy/restart works with the deploy permission', function () {
+    Queue::fake();
+    $deployToken = serverProxyApiToken($this->user, $this->team, ['deploy']);
+
+    $this->withHeaders(serverProxyApiHeaders($deployToken))
+        ->postJson("/api/v1/servers/{$this->server->uuid}/proxy/restart")
+        ->assertOk();
+
+    Queue::assertPushed(RestartProxyJob::class);
+});
+
 test('POST /api/v1/servers/{uuid}/proxy/restart queues RestartProxyJob', function () {
     Queue::fake();
 

@@ -398,7 +398,12 @@ class Github extends Controller
                 // Just pong
                 return response('pong');
             }
-            $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
+            // One GitHub App can be installed on several accounts, each added as its own source.
+            $installation_id = data_get($payload, 'installation.id');
+            $github_app = is_numeric($installation_id)
+                ? GithubApp::where('app_id', $x_github_hook_installation_target_id)->where('installation_id', (int) $installation_id)->first()
+                : null;
+            $github_app ??= GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
             if (is_null($github_app)) {
                 return response('Nothing to do. No GitHub App found.');
             }

@@ -184,7 +184,7 @@ class ServerTransferController extends Controller
 
     #[OA\Post(
         summary: 'Import server transfer bundle',
-        description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it.',
+        description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it. Needs a token with the write and deploy permissions.',
         path: '/servers/import',
         operationId: 'import-server-transfer-bundle',
         security: [['bearerAuth' => []]],
@@ -205,6 +205,7 @@ class ServerTransferController extends Controller
             new OA\Response(response: 200, description: 'Dry-run result'),
             new OA\Response(response: 201, description: 'Imported'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 422, description: 'Validation failed'),
         ]
     )]

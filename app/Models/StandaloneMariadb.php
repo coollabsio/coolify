@@ -72,12 +72,14 @@ class StandaloneMariadb extends BaseModel
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
         'health_check_retries' => 'integer',
         'health_check_start_period' => 'integer',
         'mariadb_password' => 'encrypted',
+        'mariadb_root_password' => 'encrypted',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',

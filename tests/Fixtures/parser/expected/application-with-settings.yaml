@@ -1,0 +1,3035 @@
+1_deploy:
+  docker_compose_domains:
+    web:
+      domain: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    api:
+      domain: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+    my-app:
+      domain: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io:80'
+    admin:
+      domain: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io:8080'
+    blog:
+      domain: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+  previews: {  }
+  volumes:
+    - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
+    - 'referenceapplication0001_web-data:/app/data'
+  files:
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/config
+      mount_path: /app/config
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/selinux
+      mount_path: /app/selinux
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh
+      mount_path: /docker-entrypoint.d/init.sh
+      is_directory: false
+      content: |
+        #!/bin/sh
+        echo "application reference fixture"
+  environment_variables:
+    BARE_PASSTHROUGH: null
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+    NO_BRACES_VALUE: null
+    REQUIRED:
+      value: null
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+    SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+    SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+    SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web:
+        build:
+          context: .
+          dockerfile: Dockerfile
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+          SELF_REF: '${SELF_REF}'
+          SHARED: shared-value
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          USER: '${SERVICE_USER_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          NO_BRACES_VALUE: null
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: web-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          COOLIFY_FQDN: web-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$5
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=web-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-web-2567.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-web-2567.rule=Host(`web-referenceapplication0001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-web-2567.service=http-0-referenceapplication0001-web-2567
+          - traefik.http.services.http-0-referenceapplication0001-web-2567.loadbalancer.server.port=3000
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 3000}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceapplication0001
+        volumes:
+          - 'referenceapplication0001_web-data:/app/data'
+          - '/data/coolify/applications/referenceapplication0001/config:/app/config:ro'
+          - '/data/coolify/applications/referenceapplication0001/selinux:/app/selinux:z'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/applications/referenceapplication0001/web-init.sh
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        depends_on:
+          db:
+            condition: service_healthy
+        container_name: web-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+        image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
+      api:
+        image: 'node:22-alpine'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          COOLIFY_FQDN: api-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        ports:
+          - '3001:3001'
+          -
+            target: 3002
+            published: 3002
+            protocol: tcp
+        expose:
+          - 3001
+        volumes:
+          - 'shared-external:/shared'
+          - 'nfs-data:/mnt/nfs'
+        container_name: api-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=api-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-api-8a5d.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-api-8a5d.rule=Host(`api-referenceapplication0001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-api-8a5d.service=http-0-referenceapplication0001-api-8a5d
+          - traefik.http.services.http-0-referenceapplication0001-api-8a5d.loadbalancer.server.port=3001
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 3001}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      my-app:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: ''
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          COOLIFY_FQDN: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        container_name: my-app-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=my-app-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.rule=Host(`my-app-referenceapplication0001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.service=http-0-referenceapplication0001-my-app-4dcb
+          - traefik.http.services.http-0-referenceapplication0001-my-app-4dcb.loadbalancer.server.port=80
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 80}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      api.v2:
+        image: traefik/whoami
+        container_name: api.v2-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=apiv2-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api.v2-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      admin:
+        image: 'nginx:alpine'
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: admin-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          COOLIFY_FQDN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        networks:
+          internal:
+            ipv4_address: 172.30.0.10
+          referenceapplication0001: null
+          coolify: null
+        container_name: admin-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=admin-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-admin-2123.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-admin-2123.rule=Host(`admin-referenceapplication0001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-admin-2123.service=http-0-referenceapplication0001-admin-2123
+          - traefik.http.services.http-0-referenceapplication0001-admin-2123.loadbalancer.server.port=8080
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceapplication0001
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      blog:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: blog-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          COOLIFY_FQDN: 'blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        container_name: blog-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=blog-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - caddy_0.handle_path.0_redir-ghost-referenceapplication0001.handler=rewrite
+          - 'caddy_0.handle_path.0_redir-ghost-referenceapplication0001.rewrite.regexp=^/blog:2368/(.*)'
+          - caddy_0.handle_path.0_redir-ghost-referenceapplication0001.rewrite.replacement=/$1
+          - traefik.enable=true
+          - 'traefik.http.middlewares.redir-ghost-referenceapplication0001.redirectregex.regex=^/blog:2368/(.*)'
+          - traefik.http.middlewares.redir-ghost-referenceapplication0001.redirectregex.replacement=/$1
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-blog-126a.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-blog-126a.middlewares=redir-ghost-referenceapplication0001
+          - 'traefik.http.routers.http-0-referenceapplication0001-blog-126a.rule=Host(`blog-referenceapplication0001.10.0.0.1.sslip.io`) && PathPrefix(`/blog:2368`)'
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle=/blog:2368*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://blog-referenceapplication0001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      db:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: db-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        volumes:
+          - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
+        networks:
+          internal: null
+          referenceapplication0001: null
+          coolify: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=db-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      sidecar:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceapplication0001-20260102T030405
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=sidecar-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      worker:
+        image: 'node:22-alpine'
+        command:
+          - node
+          - worker.js
+        environment:
+          APP_URL: '${SERVICE_URL_WEB}'
+          APP_URL_WITH_PORT: '${SERVICE_URL_WEB_3000}'
+          API_HOST: '${SERVICE_FQDN_API}'
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: worker-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        depends_on:
+          - db
+        container_name: worker-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=worker-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      shared-external:
+        external: true
+      nfs-data:
+        driver_opts:
+          type: nfs
+          o: 'addr=10.0.0.2,rw'
+          device: ':/exports/data'
+      referenceapplication0001_web-data:
+        name: referenceapplication0001_web-data
+      referenceapplication0001_db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+        name: referenceapplication0001_db-data
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceapplication0001:
+        name: referenceapplication0001
+        external: true
+      coolify:
+        name: coolify
+        external: true
+2_custom_domains:
+  docker_compose_domains:
+    web:
+      domain: 'https://web.example.com:3000'
+    api:
+      domain: 'https://www.api.example.com'
+      redirect: non-www
+    my-app:
+      domain: 'https://my-app.example.com:80'
+    admin:
+      domain: 'https://admin.example.com:8080'
+    blog:
+      domain: 'https://blog.example.com/blog:2368'
+    api.v2:
+      domain: 'https://api-v2.example.com'
+  previews: {  }
+  volumes:
+    - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
+    - 'referenceapplication0001_web-data:/app/data'
+  files:
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/config
+      mount_path: /app/config
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/selinux
+      mount_path: /app/selinux
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh
+      mount_path: /docker-entrypoint.d/init.sh
+      is_directory: false
+      content: |
+        #!/bin/sh
+        echo "application reference fixture"
+  environment_variables:
+    BARE_PASSTHROUGH: null
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+    NO_BRACES_VALUE: null
+    REQUIRED:
+      value: null
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_FQDN_ADMIN: admin.example.com
+    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_API: www.api.example.com
+    SERVICE_FQDN_API_V2: api-v2.example.com
+    SERVICE_FQDN_BLOG: blog.example.com
+    SERVICE_FQDN_MY_APP: my-app.example.com
+    SERVICE_FQDN_WEB: web.example.com
+    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_URL_ADMIN: 'https://admin.example.com'
+    SERVICE_URL_API: 'https://www.api.example.com'
+    SERVICE_URL_API_V2: 'https://api-v2.example.com'
+    SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+    SERVICE_URL_MY_APP: 'https://my-app.example.com'
+    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_WEB: 'https://web.example.com'
+    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web:
+        build:
+          context: .
+          dockerfile: Dockerfile
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+          SELF_REF: '${SELF_REF}'
+          SHARED: shared-value
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          USER: '${SERVICE_USER_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          NO_BRACES_VALUE: null
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: web-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_URL: 'https://web.example.com'
+          COOLIFY_FQDN: web.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$5
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=web-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-web-2567.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-web-2567.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceapplication0001-web-2567.rule=Host(`web.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-web-2567.service=http-0-referenceapplication0001-web-2567
+          - traefik.http.routers.https-0-referenceapplication0001-web-2567.entryPoints=https
+          - 'traefik.http.routers.https-0-referenceapplication0001-web-2567.rule=Host(`web.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-web-2567.service=https-0-referenceapplication0001-web-2567
+          - traefik.http.routers.https-0-referenceapplication0001-web-2567.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-web-2567.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-web-2567.loadbalancer.server.port=3000
+          - traefik.http.services.https-0-referenceapplication0001-web-2567.loadbalancer.server.port=3000
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 3000}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://web.example.com'
+          - caddy_ingress_network=referenceapplication0001
+        volumes:
+          - 'referenceapplication0001_web-data:/app/data'
+          - '/data/coolify/applications/referenceapplication0001/config:/app/config:ro'
+          - '/data/coolify/applications/referenceapplication0001/selinux:/app/selinux:z'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/applications/referenceapplication0001/web-init.sh
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        depends_on:
+          db:
+            condition: service_healthy
+        container_name: web-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+        image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
+      api:
+        image: 'node:22-alpine'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_URL: 'https://www.api.example.com'
+          COOLIFY_FQDN: www.api.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        ports:
+          - '3001:3001'
+          -
+            target: 3002
+            published: 3002
+            protocol: tcp
+        expose:
+          - 3001
+        volumes:
+          - 'shared-external:/shared'
+          - 'nfs-data:/mnt/nfs'
+        container_name: api-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=api-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.0-referenceapplication0001-to-non-www.redirectregex.permanent=false
+          - 'traefik.http.middlewares.0-referenceapplication0001-to-non-www.redirectregex.regex=^(http|https)://www\.(.+)'
+          - 'traefik.http.middlewares.0-referenceapplication0001-to-non-www.redirectregex.replacement=$${1}://$${2}'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-api-8a5d.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-api-8a5d.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceapplication0001-api-8a5d.rule=Host(`www.api.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-api-8a5d.service=http-0-referenceapplication0001-api-8a5d
+          - traefik.http.routers.https-0-referenceapplication0001-api-8a5d.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-api-8a5d.middlewares=0-referenceapplication0001-to-non-www
+          - 'traefik.http.routers.https-0-referenceapplication0001-api-8a5d.rule=Host(`www.api.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-api-8a5d.service=https-0-referenceapplication0001-api-8a5d
+          - traefik.http.routers.https-0-referenceapplication0001-api-8a5d.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-api-8a5d.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-api-8a5d.loadbalancer.server.port=3001
+          - traefik.http.services.https-0-referenceapplication0001-api-8a5d.loadbalancer.server.port=3001
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 3001}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.redir=https://api.example.com{uri}'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://www.api.example.com'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      my-app:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: ''
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_URL: 'https://my-app.example.com'
+          COOLIFY_FQDN: my-app.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        container_name: my-app-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=my-app-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.rule=Host(`my-app.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.service=http-0-referenceapplication0001-my-app-4dcb
+          - traefik.http.routers.https-0-referenceapplication0001-my-app-4dcb.entryPoints=https
+          - 'traefik.http.routers.https-0-referenceapplication0001-my-app-4dcb.rule=Host(`my-app.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-my-app-4dcb.service=https-0-referenceapplication0001-my-app-4dcb
+          - traefik.http.routers.https-0-referenceapplication0001-my-app-4dcb.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-my-app-4dcb.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-my-app-4dcb.loadbalancer.server.port=80
+          - traefik.http.services.https-0-referenceapplication0001-my-app-4dcb.loadbalancer.server.port=80
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 80}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://my-app.example.com'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      api.v2:
+        image: traefik/whoami
+        container_name: api.v2-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=apiv2-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-api-v2-b0fa.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-api-v2-b0fa.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceapplication0001-api-v2-b0fa.rule=Host(`api-v2.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-api-v2-b0fa.entryPoints=https
+          - 'traefik.http.routers.https-0-referenceapplication0001-api-v2-b0fa.rule=Host(`api-v2.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-api-v2-b0fa.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-api-v2-b0fa.tls=true
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://api-v2.example.com'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api.v2-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_URL: 'https://api-v2.example.com'
+          COOLIFY_FQDN: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      admin:
+        image: 'nginx:alpine'
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: admin-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_URL: 'https://admin.example.com'
+          COOLIFY_FQDN: admin.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        networks:
+          internal:
+            ipv4_address: 172.30.0.10
+          referenceapplication0001: null
+          coolify: null
+        container_name: admin-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=admin-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - traefik.enable=true
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-admin-2123.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-admin-2123.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceapplication0001-admin-2123.rule=Host(`admin.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-admin-2123.service=http-0-referenceapplication0001-admin-2123
+          - traefik.http.routers.https-0-referenceapplication0001-admin-2123.entryPoints=https
+          - 'traefik.http.routers.https-0-referenceapplication0001-admin-2123.rule=Host(`admin.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-admin-2123.service=https-0-referenceapplication0001-admin-2123
+          - traefik.http.routers.https-0-referenceapplication0001-admin-2123.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-admin-2123.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-admin-2123.loadbalancer.server.port=8080
+          - traefik.http.services.https-0-referenceapplication0001-admin-2123.loadbalancer.server.port=8080
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://admin.example.com'
+          - caddy_ingress_network=referenceapplication0001
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      blog:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: blog-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_URL: 'https://blog.example.com/blog:2368'
+          COOLIFY_FQDN: 'blog.example.com/blog:2368'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        container_name: blog-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=blog-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - traefik.docker.network=referenceapplication0001
+          - caddy_0.handle_path.0_redir-ghost-referenceapplication0001.handler=rewrite
+          - 'caddy_0.handle_path.0_redir-ghost-referenceapplication0001.rewrite.regexp=^/blog:2368/(.*)'
+          - caddy_0.handle_path.0_redir-ghost-referenceapplication0001.rewrite.replacement=/$1
+          - traefik.enable=true
+          - 'traefik.http.middlewares.redir-ghost-referenceapplication0001.redirectregex.regex=^/blog:2368/(.*)'
+          - traefik.http.middlewares.redir-ghost-referenceapplication0001.redirectregex.replacement=/$1
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-blog-126a.entryPoints=http
+          - traefik.http.routers.http-0-referenceapplication0001-blog-126a.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceapplication0001-blog-126a.rule=Host(`blog.example.com`) && PathPrefix(`/blog:2368`)'
+          - traefik.http.routers.https-0-referenceapplication0001-blog-126a.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-blog-126a.middlewares=redir-ghost-referenceapplication0001
+          - 'traefik.http.routers.https-0-referenceapplication0001-blog-126a.rule=Host(`blog.example.com`) && PathPrefix(`/blog:2368`)'
+          - traefik.http.routers.https-0-referenceapplication0001-blog-126a.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-blog-126a.tls=true
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle=/blog:2368*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://blog.example.com'
+          - caddy_ingress_network=referenceapplication0001
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      db:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: db-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        volumes:
+          - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
+        networks:
+          internal: null
+          referenceapplication0001: null
+          coolify: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=db-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      sidecar:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceapplication0001-20260102T030405
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=sidecar-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      worker:
+        image: 'node:22-alpine'
+        command:
+          - node
+          - worker.js
+        environment:
+          APP_URL: '${SERVICE_URL_WEB}'
+          APP_URL_WITH_PORT: '${SERVICE_URL_WEB_3000}'
+          API_HOST: '${SERVICE_FQDN_API}'
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: worker-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+        depends_on:
+          - db
+        container_name: worker-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=worker-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        networks:
+          referenceapplication0001: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      shared-external:
+        external: true
+      nfs-data:
+        driver_opts:
+          type: nfs
+          o: 'addr=10.0.0.2,rw'
+          device: ':/exports/data'
+      referenceapplication0001_web-data:
+        name: referenceapplication0001_web-data
+      referenceapplication0001_db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+        name: referenceapplication0001_db-data
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceapplication0001:
+        name: referenceapplication0001
+        external: true
+      coolify:
+        name: coolify
+        external: true
+3_preview:
+  docker_compose_domains:
+    web:
+      domain: 'https://web.example.com:3000'
+    api:
+      domain: 'https://www.api.example.com'
+      redirect: non-www
+    my-app:
+      domain: 'https://my-app.example.com:80'
+    admin:
+      domain: 'https://admin.example.com:8080'
+    blog:
+      domain: 'https://blog.example.com/blog:2368'
+    api.v2:
+      domain: 'https://api-v2.example.com'
+  previews:
+    7:
+      fqdn: 'https://7.web.example.com,https://7.www.api.example.com,https://7.my-app.example.com,https://7.admin.example.com,https://7.blog.example.com/blog:2368,https://7.api-v2.example.com'
+      docker_compose_domains:
+        web:
+          domain: 'https://7.web.example.com'
+        api:
+          domain: 'https://7.www.api.example.com'
+        my-app:
+          domain: 'https://7.my-app.example.com'
+        admin:
+          domain: 'https://7.admin.example.com'
+        blog:
+          domain: 'https://7.blog.example.com/blog:2368'
+        api.v2:
+          domain: 'https://7.api-v2.example.com'
+        sidecar:
+          domain: ''
+        worker:
+          domain: ''
+  volumes:
+    - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
+    - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
+    - 'referenceapplication0001_nfs-data-pr-7:/mnt/nfs'
+    - 'referenceapplication0001_shared-external-pr-7:/shared'
+    - 'referenceapplication0001_web-data:/app/data'
+    - 'referenceapplication0001_web-data-pr-7:/app/data'
+  files:
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/config-pr-7
+      mount_path: /app/config
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/selinux-pr-7
+      mount_path: /app/selinux
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-7
+      mount_path: /docker-entrypoint.d/init.sh
+      is_directory: false
+      content: |
+        #!/bin/sh
+        echo "application reference fixture"
+  environment_variables:
+    BARE_PASSTHROUGH: null
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+    NO_BRACES_VALUE: null
+    REQUIRED:
+      value: null
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_FQDN_ADMIN: 7.admin.example.com
+    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_API: 7.www.api.example.com
+    SERVICE_FQDN_API_V2: 7.api-v2.example.com
+    SERVICE_FQDN_BLOG: 7.blog.example.com
+    SERVICE_FQDN_MY_APP: 7.my-app.example.com
+    SERVICE_FQDN_WEB: 7.web.example.com
+    SERVICE_FQDN_WEB_3000: null
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+    SERVICE_URL_API: 'https://7.www.api.example.com'
+    SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+    SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+    SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_WEB: 'https://7.web.example.com'
+    SERVICE_URL_WEB_3000: null
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web-pr-7:
+        build:
+          context: .
+          dockerfile: Dockerfile
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          SERVICE_URL_WEB_3000: ''
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+          SELF_REF: '${SELF_REF}'
+          SHARED: shared-value
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          USER: '${SERVICE_USER_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          NO_BRACES_VALUE: null
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: web-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_URL: 'https://7.web.example.com'
+          COOLIFY_FQDN: 7.web.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$5
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=web-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+          - traefik.docker.network=referenceapplication0001-7
+          - traefik.enable=true
+          - 'traefik.http.middlewares.0-referenceapplication0001-7-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-7-web-2567.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-web-2567.middlewares=0-referenceapplication0001-7-noindex,redirect-to-https'
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-web-2567.rule=Host(`7.web.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-7-web-2567.service=http-0-referenceapplication0001-7-web-2567
+          - traefik.http.routers.https-0-referenceapplication0001-7-web-2567.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-7-web-2567.middlewares=0-referenceapplication0001-7-noindex
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-web-2567.rule=Host(`7.web.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-web-2567.service=https-0-referenceapplication0001-7-web-2567
+          - traefik.http.routers.https-0-referenceapplication0001-7-web-2567.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-7-web-2567.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-7-web-2567.loadbalancer.server.port=3000
+          - traefik.http.services.https-0-referenceapplication0001-7-web-2567.loadbalancer.server.port=3000
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 3000}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header.0_-Server=
+          - 'caddy_0.header.1_X-Robots-Tag="noindex, nofollow"'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://7.web.example.com'
+          - caddy_ingress_network=referenceapplication0001-7
+        volumes:
+          - 'referenceapplication0001_web-data-pr-7:/app/data'
+          - '/data/coolify/applications/referenceapplication0001/config-pr-7:/app/config:ro'
+          - '/data/coolify/applications/referenceapplication0001/selinux-pr-7:/app/selinux:z'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-7
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        depends_on:
+          db-pr-7:
+            condition: service_healthy
+        container_name: web-referenceapplication0001-pr-7
+        restart: unless-stopped
+        networks:
+          referenceapplication0001-7: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+        image: 'referenceapplication0001_web:pr-7'
+      api-pr-7:
+        image: 'node:22-alpine'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_URL: 'https://7.www.api.example.com'
+          COOLIFY_FQDN: 7.www.api.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        ports:
+          - '3001:3001'
+          -
+            target: 3002
+            published: 3002
+            protocol: tcp
+        expose:
+          - 3001
+        volumes:
+          - 'referenceapplication0001_shared-external-pr-7:/shared'
+          - 'referenceapplication0001_nfs-data-pr-7:/mnt/nfs'
+        container_name: api-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=api-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+          - traefik.docker.network=referenceapplication0001-7
+          - traefik.enable=true
+          - 'traefik.http.middlewares.0-referenceapplication0001-7-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-7-api-8a5d.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-api-8a5d.middlewares=0-referenceapplication0001-7-noindex,redirect-to-https'
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-api-8a5d.rule=Host(`7.www.api.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-7-api-8a5d.service=http-0-referenceapplication0001-7-api-8a5d
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-8a5d.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-8a5d.middlewares=0-referenceapplication0001-7-noindex
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-api-8a5d.rule=Host(`7.www.api.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-8a5d.service=https-0-referenceapplication0001-7-api-8a5d
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-8a5d.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-8a5d.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-7-api-8a5d.loadbalancer.server.port=3001
+          - traefik.http.services.https-0-referenceapplication0001-7-api-8a5d.loadbalancer.server.port=3001
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 3001}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header.0_-Server=
+          - 'caddy_0.header.1_X-Robots-Tag="noindex, nofollow"'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://7.www.api.example.com'
+          - caddy_ingress_network=referenceapplication0001-7
+        networks:
+          referenceapplication0001-7: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      my-app-pr-7:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: ''
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_URL: 'https://7.my-app.example.com'
+          COOLIFY_FQDN: 7.my-app.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        container_name: my-app-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=my-app-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+          - traefik.docker.network=referenceapplication0001-7
+          - traefik.enable=true
+          - 'traefik.http.middlewares.0-referenceapplication0001-7-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-7-my-app-4dcb.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-my-app-4dcb.middlewares=0-referenceapplication0001-7-noindex,redirect-to-https'
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-my-app-4dcb.rule=Host(`7.my-app.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-7-my-app-4dcb.service=http-0-referenceapplication0001-7-my-app-4dcb
+          - traefik.http.routers.https-0-referenceapplication0001-7-my-app-4dcb.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-7-my-app-4dcb.middlewares=0-referenceapplication0001-7-noindex
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-my-app-4dcb.rule=Host(`7.my-app.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-my-app-4dcb.service=https-0-referenceapplication0001-7-my-app-4dcb
+          - traefik.http.routers.https-0-referenceapplication0001-7-my-app-4dcb.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-7-my-app-4dcb.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-7-my-app-4dcb.loadbalancer.server.port=80
+          - traefik.http.services.https-0-referenceapplication0001-7-my-app-4dcb.loadbalancer.server.port=80
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 80}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header.0_-Server=
+          - 'caddy_0.header.1_X-Robots-Tag="noindex, nofollow"'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://7.my-app.example.com'
+          - caddy_ingress_network=referenceapplication0001-7
+        networks:
+          referenceapplication0001-7: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      api.v2-pr-7:
+        image: traefik/whoami
+        container_name: api.v2-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=apiv2-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+          - traefik.docker.network=referenceapplication0001-7
+          - traefik.enable=true
+          - 'traefik.http.middlewares.0-referenceapplication0001-7-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-7-api-v2-b0fa.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-api-v2-b0fa.middlewares=0-referenceapplication0001-7-noindex,redirect-to-https'
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-api-v2-b0fa.rule=Host(`7.api-v2.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.middlewares=0-referenceapplication0001-7-noindex
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.rule=Host(`7.api-v2.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.tls=true
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header.0_-Server=
+          - 'caddy_0.header.1_X-Robots-Tag="noindex, nofollow"'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://7.api-v2.example.com'
+          - caddy_ingress_network=referenceapplication0001-7
+        networks:
+          referenceapplication0001-7: null
+          coolify: null
+        environment:
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api.v2-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_URL: 'https://7.api-v2.example.com'
+          COOLIFY_FQDN: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      admin-pr-7:
+        image: 'nginx:alpine'
+        environment:
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: admin-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_URL: 'https://7.admin.example.com'
+          COOLIFY_FQDN: 7.admin.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        networks:
+          internal:
+            ipv4_address: 172.30.0.10
+          referenceapplication0001-7: null
+          coolify: null
+        container_name: admin-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=admin-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+          - traefik.docker.network=referenceapplication0001-7
+          - traefik.enable=true
+          - 'traefik.http.middlewares.0-referenceapplication0001-7-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-7-admin-2123.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-admin-2123.middlewares=0-referenceapplication0001-7-noindex,redirect-to-https'
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-admin-2123.rule=Host(`7.admin.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceapplication0001-7-admin-2123.service=http-0-referenceapplication0001-7-admin-2123
+          - traefik.http.routers.https-0-referenceapplication0001-7-admin-2123.entryPoints=https
+          - traefik.http.routers.https-0-referenceapplication0001-7-admin-2123.middlewares=0-referenceapplication0001-7-noindex
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-admin-2123.rule=Host(`7.admin.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-admin-2123.service=https-0-referenceapplication0001-7-admin-2123
+          - traefik.http.routers.https-0-referenceapplication0001-7-admin-2123.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-7-admin-2123.tls=true
+          - traefik.http.services.http-0-referenceapplication0001-7-admin-2123.loadbalancer.server.port=8080
+          - traefik.http.services.https-0-referenceapplication0001-7-admin-2123.loadbalancer.server.port=8080
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle=/*'
+          - caddy_0.header.0_-Server=
+          - 'caddy_0.header.1_X-Robots-Tag="noindex, nofollow"'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://7.admin.example.com'
+          - caddy_ingress_network=referenceapplication0001-7
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      blog-pr-7:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: blog-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_URL: 'https://7.blog.example.com/blog:2368'
+          COOLIFY_FQDN: '7.blog.example.com/blog:2368'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        container_name: blog-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=blog-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+          - traefik.docker.network=referenceapplication0001-7
+          - caddy_0.handle_path.0_redir-ghost-referenceapplication0001-7.handler=rewrite
+          - 'caddy_0.handle_path.0_redir-ghost-referenceapplication0001-7.rewrite.regexp=^/blog:2368/(.*)'
+          - caddy_0.handle_path.0_redir-ghost-referenceapplication0001-7.rewrite.replacement=/$1
+          - traefik.enable=true
+          - 'traefik.http.middlewares.0-referenceapplication0001-7-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow'
+          - 'traefik.http.middlewares.redir-ghost-referenceapplication0001-7.redirectregex.regex=^/blog:2368/(.*)'
+          - traefik.http.middlewares.redir-ghost-referenceapplication0001-7.redirectregex.replacement=/$1
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceapplication0001-7-blog-126a.entryPoints=http
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-blog-126a.middlewares=0-referenceapplication0001-7-noindex,redirect-to-https'
+          - 'traefik.http.routers.http-0-referenceapplication0001-7-blog-126a.rule=Host(`7.blog.example.com`) && PathPrefix(`/blog:2368`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.entryPoints=https
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.middlewares=redir-ghost-referenceapplication0001-7,0-referenceapplication0001-7-noindex'
+          - 'traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.rule=Host(`7.blog.example.com`) && PathPrefix(`/blog:2368`)'
+          - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.tls=true
+          - 'caddy_0.handle.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle=/blog:2368*'
+          - caddy_0.header.0_-Server=
+          - 'caddy_0.header.1_X-Robots-Tag="noindex, nofollow"'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://7.blog.example.com'
+          - caddy_ingress_network=referenceapplication0001-7
+        networks:
+          referenceapplication0001-7: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      db-pr-7:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: db-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        volumes:
+          - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
+        networks:
+          internal: null
+          referenceapplication0001-7: null
+          coolify: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=db-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      sidecar-pr-7:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceapplication0001-pr-7
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=sidecar-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+        environment:
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      worker-pr-7:
+        image: 'node:22-alpine'
+        command:
+          - node
+          - worker.js
+        environment:
+          APP_URL: '${SERVICE_URL_WEB}'
+          APP_URL_WITH_PORT: '${SERVICE_URL_WEB_3000}'
+          API_HOST: '${SERVICE_FQDN_API}'
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: worker-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+        depends_on:
+          - db-pr-7
+        container_name: worker-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=worker-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+        networks:
+          referenceapplication0001-7: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      referenceapplication0001_web-data-pr-7:
+        name: referenceapplication0001_web-data-pr-7
+      referenceapplication0001_shared-external-pr-7:
+        name: referenceapplication0001_shared-external-pr-7
+      referenceapplication0001_nfs-data-pr-7:
+        name: referenceapplication0001_nfs-data-pr-7
+      referenceapplication0001_db-data-pr-7:
+        name: referenceapplication0001_db-data-pr-7
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceapplication0001-7:
+        name: referenceapplication0001-7
+        external: true
+      coolify:
+        name: coolify
+        external: true
+4_preview_without_generated_domains:
+  docker_compose_domains:
+    web:
+      domain: 'https://web.example.com:3000'
+    api:
+      domain: 'https://www.api.example.com'
+      redirect: non-www
+    my-app:
+      domain: 'https://my-app.example.com:80'
+    admin:
+      domain: 'https://admin.example.com:8080'
+    blog:
+      domain: 'https://blog.example.com/blog:2368'
+    api.v2:
+      domain: 'https://api-v2.example.com'
+  previews:
+    8: {  }
+    7:
+      fqdn: 'https://7.web.example.com,https://7.www.api.example.com,https://7.my-app.example.com,https://7.admin.example.com,https://7.blog.example.com/blog:2368,https://7.api-v2.example.com'
+      docker_compose_domains:
+        web:
+          domain: 'https://7.web.example.com'
+        api:
+          domain: 'https://7.www.api.example.com'
+        my-app:
+          domain: 'https://7.my-app.example.com'
+        admin:
+          domain: 'https://7.admin.example.com'
+        blog:
+          domain: 'https://7.blog.example.com/blog:2368'
+        api.v2:
+          domain: 'https://7.api-v2.example.com'
+        sidecar:
+          domain: ''
+        worker:
+          domain: ''
+  volumes:
+    - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
+    - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
+    - 'referenceapplication0001_db-data-pr-8:/var/lib/postgresql/data'
+    - 'referenceapplication0001_nfs-data-pr-7:/mnt/nfs'
+    - 'referenceapplication0001_nfs-data-pr-8:/mnt/nfs'
+    - 'referenceapplication0001_shared-external-pr-7:/shared'
+    - 'referenceapplication0001_shared-external-pr-8:/shared'
+    - 'referenceapplication0001_web-data:/app/data'
+    - 'referenceapplication0001_web-data-pr-7:/app/data'
+    - 'referenceapplication0001_web-data-pr-8:/app/data'
+  files:
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/config-pr-8
+      mount_path: /app/config
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/selinux-pr-8
+      mount_path: /app/selinux
+      is_directory: true
+    -
+      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-8
+      mount_path: /docker-entrypoint.d/init.sh
+      is_directory: false
+      content: |
+        #!/bin/sh
+        echo "application reference fixture"
+  environment_variables:
+    BARE_PASSTHROUGH: null
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+    NO_BRACES_VALUE: null
+    REQUIRED:
+      value: null
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_FQDN_ADMIN: referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_API: referenceapplication0001.10.0.0.1.sslip.io/api
+    SERVICE_FQDN_API_V2: 7.api-v2.example.com
+    SERVICE_FQDN_BLOG: 7.blog.example.com
+    SERVICE_FQDN_MY_APP: 7.my-app.example.com
+    SERVICE_FQDN_WEB: 7.web.example.com
+    SERVICE_FQDN_WEB_3000: null
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+    SERVICE_URL_API: 'https://7.www.api.example.com'
+    SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+    SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+    SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_WEB: 'https://7.web.example.com'
+    SERVICE_URL_WEB_3000: null
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web-pr-8:
+        build:
+          context: .
+          dockerfile: Dockerfile
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          SERVICE_URL_WEB_3000: ''
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          NO_BRACES_MAGIC: $SERVICE_PASSWORD_NOBRACES
+          SELF_REF: '${SELF_REF}'
+          SHARED: shared-value
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          USER: '${SERVICE_USER_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          NO_BRACES_VALUE: null
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: web-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$5
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=web-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        volumes:
+          - 'referenceapplication0001_web-data-pr-8:/app/data'
+          - '/data/coolify/applications/referenceapplication0001/config-pr-8:/app/config:ro'
+          - '/data/coolify/applications/referenceapplication0001/selinux-pr-8:/app/selinux:z'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-8
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        depends_on:
+          db-pr-8:
+            condition: service_healthy
+        container_name: web-referenceapplication0001-pr-8
+        restart: unless-stopped
+        networks:
+          referenceapplication0001-8: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+        image: 'referenceapplication0001_web:pr-8'
+      api-pr-8:
+        image: 'node:22-alpine'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        ports:
+          - '3001:3001'
+          -
+            target: 3002
+            published: 3002
+            protocol: tcp
+        expose:
+          - 3001
+        volumes:
+          - 'referenceapplication0001_shared-external-pr-8:/shared'
+          - 'referenceapplication0001_nfs-data-pr-8:/mnt/nfs'
+        container_name: api-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=api-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        networks:
+          referenceapplication0001-8: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      my-app-pr-8:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: ''
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        container_name: my-app-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=my-app-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        networks:
+          referenceapplication0001-8: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      api.v2-pr-8:
+        image: traefik/whoami
+        container_name: api.v2-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=apiv2-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        networks:
+          referenceapplication0001-8: null
+          coolify: null
+        environment:
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: api.v2-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      admin-pr-8:
+        image: 'nginx:alpine'
+        environment:
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: admin-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        networks:
+          internal:
+            ipv4_address: 172.30.0.10
+          referenceapplication0001-8: null
+          coolify: null
+        container_name: admin-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=admin-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      blog-pr-8:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: blog-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        container_name: blog-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=blog-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        networks:
+          referenceapplication0001-8: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      db-pr-8:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: db-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        volumes:
+          - 'referenceapplication0001_db-data-pr-8:/var/lib/postgresql/data'
+        networks:
+          internal: null
+          referenceapplication0001-8: null
+          coolify: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=db-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      sidecar-pr-8:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceapplication0001-pr-8
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=sidecar-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        environment:
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+      worker-pr-8:
+        image: 'node:22-alpine'
+        command:
+          - node
+          - worker.js
+        environment:
+          APP_URL: '${SERVICE_URL_WEB}'
+          APP_URL_WITH_PORT: '${SERVICE_URL_WEB_3000}'
+          API_HOST: '${SERVICE_FQDN_API}'
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: worker-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+        depends_on:
+          - db-pr-8
+        container_name: worker-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=worker-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        networks:
+          referenceapplication0001-8: null
+          coolify: null
+        logging:
+          driver: fluentd
+          options:
+            fluentd-address: 'tcp://127.0.0.1:24224'
+            fluentd-async: 'true'
+            fluentd-sub-second-precision: 'true'
+            env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      referenceapplication0001_web-data-pr-8:
+        name: referenceapplication0001_web-data-pr-8
+      referenceapplication0001_shared-external-pr-8:
+        name: referenceapplication0001_shared-external-pr-8
+      referenceapplication0001_nfs-data-pr-8:
+        name: referenceapplication0001_nfs-data-pr-8
+      referenceapplication0001_db-data-pr-8:
+        name: referenceapplication0001_db-data-pr-8
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceapplication0001-8:
+        name: referenceapplication0001-8
+        external: true
+      coolify:
+        name: coolify
+        external: true

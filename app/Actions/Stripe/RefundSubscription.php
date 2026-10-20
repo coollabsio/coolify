@@ -129,7 +129,7 @@ class RefundSubscription
                 'stripe_past_due' => false,
             ]);
 
-            $team->subscriptionEnded();
+            $team->subscriptionEnded($subscription);
 
             \Log::info("Refunded and cancelled subscription {$subscription->stripe_subscription_id} for team {$team->name}");
 

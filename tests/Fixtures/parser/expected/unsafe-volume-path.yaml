@@ -1,0 +1,2 @@
+1_deploy:
+  error: "Exception: Invalid Docker volume definition: Invalid volume source: contains forbidden character ';' (command separator). Shell metacharacters are not allowed for security reasons. Please use safe path names without shell metacharacters."

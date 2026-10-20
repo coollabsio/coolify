@@ -191,6 +191,7 @@ class ScheduledJobManager implements ShouldQueue
         // Process Docker cleanups - don't let failures stop the job manager
         try {
             if ($this->includes('docker-cleanups')) {
+                DockerCleanupJob::failInterruptedExecutions();
                 $this->processDockerCleanups();
             }
         } catch (\Throwable $e) {

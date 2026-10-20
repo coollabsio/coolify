@@ -217,7 +217,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($db) {
                         $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
                     } else {
-                        throw new \Exception('MYSQL_DATABASE not found');
+                        $databasesToBackup = $this->configuredDatabasesToBackup();
+                        if (blank($databasesToBackup)) {
+                            $this->recordUndeterminedDatabases('MYSQL_DATABASE');
+
+                            return;
+                        }
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $commands[] = "docker exec {$escapedContainerName} env";
@@ -251,7 +256,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         if ($db) {
                             $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
                         } else {
-                            throw new \Exception('MARIADB_DATABASE or MYSQL_DATABASE not found');
+                            $databasesToBackup = $this->configuredDatabasesToBackup();
+                            if (blank($databasesToBackup)) {
+                                $this->recordUndeterminedDatabases('MARIADB_DATABASE or MYSQL_DATABASE');
+
+                                return;
+                            }
                         }
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
@@ -1015,6 +1025,38 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             'filename' => null,
             'local_storage_deleted' => false,
         ]);
+    }
+
+    /**
+     * Databases picked on the backup, for service databases whose container does not name one.
+     *
+     * @return string|array<int, string>|null
+     */
+    private function configuredDatabasesToBackup(): string|array|null
+    {
+        if ($this->backup->dump_all) {
+            return ['all'];
+        }
+
+        return $this->backup->databases_to_backup;
+    }
+
+    /**
+     * Show a run that cannot start because no database is known in the execution list, and notify the team.
+     */
+    private function recordUndeterminedDatabases(string $envNames): void
+    {
+        $message = "No database to back up: the container does not set {$envNames}. Select \"All databases\" or enter the databases to back up in the backup settings.";
+        $this->recordSkippedBackup($message);
+        $this->logSkippedRun('no_databases_determined');
+        try {
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $message, 'unknown'));
+        } catch (Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
+                'backup_id' => $this->backup->uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function markStaleExecutionsAsFailed(): void

@@ -188,6 +188,58 @@ describe('Log drains API', function () {
             ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
     });
 
+    test('PATCH requires the deploy permission to change the custom log drain config', function (string $field) {
+        Queue::fake();
+        $writeOnlyToken = $this->user->createToken('server-subsystems-write', ['write'])->plainTextToken;
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$writeOnlyToken,
+            'Accept' => 'application/json',
+        ])
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                $field => "[OUTPUT]\n    Name stdout",
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Missing required permissions: deploy');
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->{$field})->toBeNull();
+    })->with(['logdrain_custom_config', 'logdrain_custom_config_parser']);
+
+    test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
+        Queue::fake();
+        $this->server->settings->update(['logdrain_custom_config' => "[OUTPUT]\n    Name stdout"]);
+        $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$deployToken,
+            'Accept' => 'application/json',
+        ])
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_custom_enabled' => true,
+                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+            ])
+            ->assertOk();
+
+        expect($this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeTruthy();
+    });
+
+    test('PATCH changes the custom log drain config with the deploy permission', function () {
+        Queue::fake();
+        $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$deployToken,
+            'Accept' => 'application/json',
+        ])
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+            ])
+            ->assertOk();
+
+        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[OUTPUT]\n    Name stdout");
+    });
+
     test('other-team log drains endpoints return 404', function () {
         $this->withHeaders(serverSubsystemsHeaders())
             ->getJson("/api/v1/servers/{$this->otherServer->uuid}/log-drains")

@@ -62,7 +62,7 @@ describe('Traefik noindex middleware', function () {
             ->toBe(middlewaresOf($labels, 'https-0-testuuid'))
             ->toContain(
                 'https-0-testuuid-stripprefix',
-                'gzip',
+                'gzip-sse',
                 '0-testuuid-to-www',
                 'http-basic-auth-testuuid',
                 '0-testuuid-noindex',

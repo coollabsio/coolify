@@ -8,6 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
@@ -50,6 +51,19 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
+        $response = $this->sendMessage();
+
+        // 401: invalid bot token, 403: the bot was blocked or removed from the chat, 400 "chat not found": wrong chat ID.
+        $isConfigurationError = in_array($response->status(), [401, 403], true)
+            || ($response->status() === 400 && Str::contains((string) $response->json('description'), 'chat not found', true));
+        $this->handleNotificationResponse($response, 'Telegram', $isConfigurationError);
+    }
+
+    /**
+     * Call the Telegram sendMessage API and return its response without handling errors.
+     */
+    public function sendMessage(): Response
+    {
         $url = 'https://api.telegram.org/bot'.$this->token.'/sendMessage';
         $inlineButtons = [];
         if (! empty($this->buttons)) {
@@ -78,11 +92,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->threadId) {
             $payload['message_thread_id'] = $this->threadId;
         }
-        $response = Http::post($url, $payload);
 
-        // 401: invalid bot token, 403: the bot was blocked or removed from the chat, 400 "chat not found": wrong chat ID.
-        $isConfigurationError = in_array($response->status(), [401, 403], true)
-            || ($response->status() === 400 && Str::contains((string) $response->json('description'), 'chat not found', true));
-        $this->handleNotificationResponse($response, 'Telegram', $isConfigurationError);
+        return Http::post($url, $payload);
     }
 }

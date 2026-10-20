@@ -37,6 +37,8 @@ class Domains extends Component
 
     public bool $isForceHttpsEnabled = true;
 
+    public bool $isPermanentRedirectEnabled = false;
+
     /**
      * Per compose-service www/non-www redirect direction.
      * Keys are wire-safe (dots encoded) — use serviceRedirectWireKey().
@@ -154,6 +156,7 @@ class Domains extends Component
             'editingRedirect' => 'string|required|in:both,www,non-www',
             'redirect' => 'string|required|in:both,www,non-www',
             'isForceHttpsEnabled' => 'boolean',
+            'isPermanentRedirectEnabled' => 'boolean',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
         ];
@@ -260,6 +263,18 @@ class Domains extends Component
         $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
     }
 
+    public function updatePermanentRedirect(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validateOnly('isPermanentRedirectEnabled');
+
+        $this->application->settings->is_permanent_redirect_enabled = $this->isPermanentRedirectEnabled;
+        $this->saveApplicationSettingsWithAudit($this->application);
+        $this->resetDefaultLabels();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Redirect type updated.');
+    }
+
     public function loadDomainState(bool $parseCompose = true): void
     {
         $this->application->refresh();
@@ -271,6 +286,7 @@ class Domains extends Component
             $this->redirect = $this->application->redirect ?? 'both';
         }
         $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
+        $this->isPermanentRedirectEnabled = $this->application->isPermanentRedirectEnabled();
 
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);

@@ -14,6 +14,11 @@ use OpenApi\Attributes as OA;
 
 class DestinationsController extends Controller
 {
+    /**
+     * Docker's built-in networks. A destination must not use them.
+     */
+    private const RESERVED_NETWORK_NAMES = ['bridge', 'host', 'none'];
+
     private function transform(StandaloneDocker|SwarmDocker $destination): array
     {
         return [
@@ -159,7 +164,7 @@ class DestinationsController extends Controller
 
     #[OA\Post(
         summary: 'Create destination',
-        description: 'Create a Docker network destination on a server owned by the authenticated team.',
+        description: 'Create a Docker network destination on a server owned by the authenticated team. The network must be new: Docker\'s built-in networks (bridge, host, none) and networks that already exist on a standalone server are rejected, because Coolify connects the proxy to the destination network.',
         path: '/servers/{server_uuid}/destinations',
         operationId: 'create-server-destination',
         security: [['bearerAuth' => []]],
@@ -173,7 +178,7 @@ class DestinationsController extends Controller
                 required: ['network'],
                 properties: [
                     new OA\Property(property: 'name', type: 'string', maxLength: 255),
-                    new OA\Property(property: 'network', type: 'string', maxLength: 255, pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'),
+                    new OA\Property(property: 'network', type: 'string', maxLength: 255, pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$', description: 'Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.'),
                     new OA\Property(property: 'type', type: 'string', enum: ['standalone', 'swarm']),
                 ],
                 type: 'object',
@@ -188,7 +193,7 @@ class DestinationsController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 409, description: 'A destination with this network already exists.'),
-            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 422, description: 'Validation failed, the network is reserved or already exists on the server, or the server could not be checked.'),
         ],
     )]
     public function create(Request $request, string $server_uuid): JsonResponse
@@ -224,6 +229,13 @@ class DestinationsController extends Controller
             return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
         }
 
+        if (in_array(strtolower($request->input('network')), self::RESERVED_NETWORK_NAMES, true)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['network' => ['The network name is reserved by Docker. Use a different name.']],
+            ], 422);
+        }
+
         $expectedType = $server->isSwarm() ? 'swarm' : 'standalone';
         $type = $request->input('type', $expectedType);
         if ($type !== $expectedType) {
@@ -238,6 +250,11 @@ class DestinationsController extends Controller
         $exists = $class::where('server_id', $server->id)->where('network', $request->input('network'))->exists();
         if ($exists) {
             return response()->json(['message' => 'A destination with this network already exists on the server.'], 409);
+        }
+
+        // Creating a standalone destination connects the proxy to the network, so it must not be an existing network.
+        if ($class === StandaloneDocker::class && ($response = $this->existingServerNetworkResponse($server, $request->input('network')))) {
+            return $response;
         }
 
         try {
@@ -263,6 +280,27 @@ class DestinationsController extends Controller
         ]);
 
         return response()->json($this->transform($destination->load('server:id,uuid')), 201);
+    }
+
+    private function existingServerNetworkResponse(Server $server, string $network): ?JsonResponse
+    {
+        try {
+            $output = instant_remote_process(["docker network ls --format '{{.Name}}'"], $server);
+        } catch (\Throwable) {
+            return response()->json([
+                'message' => 'Could not read the Docker networks on the server. Check that the server is reachable and try again.',
+            ], 422);
+        }
+
+        $existingNetworks = array_map('trim', explode("\n", (string) $output));
+        if (in_array($network, $existingNetworks, true)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['network' => ['A Docker network with this name already exists on the server. Use a new network name.']],
+            ], 422);
+        }
+
+        return null;
     }
 
     private function isUniqueConstraintViolation(QueryException $exception): bool

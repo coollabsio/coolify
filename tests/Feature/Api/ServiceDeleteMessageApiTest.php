@@ -24,7 +24,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
     session(['currentTeam' => $this->team]);
-    $token = $this->user->createToken('service-delete-message', ['write']);
+    $token = $this->user->createToken('service-delete-message', ['write', 'deploy']);
     $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
     $this->bearerToken = $token->plainTextToken;
 

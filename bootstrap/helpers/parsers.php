@@ -26,6 +26,9 @@ use Symfony\Component\Yaml\Yaml;
  */
 function parseDockerComposeYaml(string $compose): mixed
 {
+    // Editors on Windows can save files with a UTF-8 BOM, which Symfony YAML keeps in the first key.
+    $compose = preg_replace('/^\xEF\xBB\xBF/', '', $compose);
+
     return Yaml::parse($compose, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
 }
 
@@ -200,6 +203,26 @@ function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase
  *
  * @throws Exception If the source is missing or contains shell metacharacters
  */
+/**
+ * Coolify sets container_name on every Compose service, and Docker Compose does not start more
+ * than one container of a service that has a fixed container_name.
+ *
+ * @throws Exception If the service sets scale or deploy.replicas to more than 1
+ */
+function validateComposeServiceScale(string $serviceName, mixed $service): void
+{
+    foreach (['scale', 'deploy.replicas'] as $key) {
+        $value = data_get($service, $key);
+        if (is_numeric($value) && (int) $value > 1) {
+            throw new Exception(
+                "Service \"{$serviceName}\" sets {$key} to {$value}. Coolify sets a container_name for each service, ".
+                'and Docker Compose cannot run more than one container with the same container_name. '.
+                "Remove {$key}, or define each instance as a separate service."
+            );
+        }
+    }
+}
+
 function validateComposeContentVolumeSource(array $volume): void
 {
     if (! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
@@ -212,6 +235,52 @@ function validateComposeContentVolumeSource(array $volume): void
     }
 
     validateComposeArrayVolumeSource($source);
+}
+
+/**
+ * Replaces a `${VAR:-default}` volume source with its default, as the short volume syntax does.
+ * An empty default becomes `${VAR}`. Other sources do not change.
+ */
+function resolveComposeVolumeSourceDefault(string $source): string
+{
+    if (! preg_match('/^\$\{([^}]+)\}$/', $source, $matches) || ! str_contains($matches[1], ':-')) {
+        return $source;
+    }
+
+    [$varName, $defaultValue] = explode(':-', $matches[1], 2);
+
+    return $defaultValue !== '' ? $defaultValue : '${'.$varName.'}';
+}
+
+/**
+ * Resolves a long-syntax bind source as Docker Compose does with the `.env` file that Coolify writes:
+ * `${VAR:-default}` is the value of VAR when the resource sets it to a non-empty value, else the default.
+ *
+ * @throws Exception If the value of the variable is not a shell-safe path
+ */
+function resolveComposeLongBindSource(string $source, Application|Service $resource, bool $isPreview = false): string
+{
+    if (! preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}$/', $source, $matches)) {
+        return resolveComposeVolumeSourceDefault($source);
+    }
+
+    $variables = match (true) {
+        $resource instanceof Service => $resource->environment_variables(),
+        $isPreview => $resource->runtime_environment_variables_preview()->where('is_runtime', true),
+        default => $resource->runtime_environment_variables()->where('is_runtime', true),
+    };
+    $value = $variables->where('key', $matches[1])->first()?->real_value;
+    if (blank($value)) {
+        return resolveComposeVolumeSourceDefault($source);
+    }
+
+    try {
+        validateShellSafePath($value, 'volume source');
+    } catch (Exception $e) {
+        throw new Exception("Invalid Docker volume definition (array syntax): the value of {$matches[1]} is not a safe path. ".$e->getMessage(), 0, $e);
+    }
+
+    return $value;
 }
 
 /**
@@ -909,26 +978,8 @@ function parseDockerVolumeString(string $volumeString): array
         }
     }
 
-    // Handle environment variable expansion in source
-    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
-    if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
-        $varContent = $matches[1];
-
-        // Check if there's a default value with :-
-        if (strpos($varContent, ':-') !== false) {
-            $parts = explode(':-', $varContent, 2);
-            $varName = $parts[0];
-            $defaultValue = isset($parts[1]) ? $parts[1] : '';
-
-            // If there's a non-empty default value, use it for source
-            if ($defaultValue !== '') {
-                $source = $defaultValue;
-            } else {
-                // Empty default value, keep the variable reference for env resolution
-                $source = '${'.$varName.'}';
-            }
-        }
-        // Otherwise keep the variable as-is for later expansion (no default value)
+    if ($source) {
+        $source = resolveComposeVolumeSourceDefault((string) $source);
     }
 
     // Validate source path for command injection attempts
@@ -1139,6 +1190,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceScale((string) $serviceName, $service);
 
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
@@ -1476,6 +1528,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource, $isPullRequest));
+                        }
                     }
                     validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
@@ -2031,7 +2087,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
@@ -2107,6 +2165,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2125,6 +2184,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2145,6 +2205,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2161,6 +2222,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2377,6 +2439,7 @@ function serviceParser(Service $resource): Collection
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceScale((string) $serviceName, $service);
 
         $image = data_get_str($service, 'image');
 
@@ -2547,6 +2610,10 @@ function serviceParser(Service $resource): Collection
                 $port = $parsed['port'];
                 $fqdnFor = $parsed['service_name'];
 
+                if (isCopiedServiceUrlDeclaration($resource, $services, $savedService, $key->value())) {
+                    continue;
+                }
+
                 // Only ServiceApplication has fqdn column, ServiceDatabase does not
                 $isServiceApplication = $savedService instanceof ServiceApplication;
 
@@ -2667,8 +2734,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_FQDN_UMAMI_3000)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $fqdnFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -2712,8 +2779,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_URL_DASHBOARD_6791)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $urlFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -2886,6 +2953,10 @@ function serviceParser(Service $resource): Collection
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource));
+                        }
                     }
                     validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
@@ -3333,7 +3404,9 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
@@ -3396,6 +3469,7 @@ function serviceParser(Service $resource): Collection
                             uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -3414,6 +3488,7 @@ function serviceParser(Service $resource): Collection
                             uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -3434,6 +3509,7 @@ function serviceParser(Service $resource): Collection
                     uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -3450,6 +3526,7 @@ function serviceParser(Service $resource): Collection
                     uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),

@@ -38,6 +38,8 @@ it('validates without installing by default', function () {
 });
 
 it('validates and installs when explicitly requested', function () {
+    $this->token = $this->user->createToken('server-validation-install', ['write', 'deploy'])->plainTextToken;
+
     $response = $this->withHeaders(serverValidationHeaders())
         ->postJson("/api/v1/servers/{$this->server->uuid}/validate", ['install' => true]);
 
