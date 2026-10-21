@@ -169,7 +169,7 @@
                     <x-table.loading id="deployment-table-filter-loading"
                         target="toggleDeploymentFilter,clearFilter,setPullRequestFilter"
                         text="Filtering deployments..." class="rounded-lg" />
-                    <div class="deployment-table-scroll">
+                    <div @class(['deployment-table-scroll', 'deployment-table-embedded' => $embedded])>
                         <div class="data-table-header deployment-table-grid rounded-none!">
                             <span>Status</span>
                             <span>Source</span>

@@ -7,6 +7,7 @@ use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Service\UpdateServiceApplicationFromApi;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
 use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -535,7 +536,10 @@ class ServiceApplicationsController extends Controller
         }
 
         $lines = normalizeLogLines($request->query('lines'));
-        $logs = getContainerLogs($server, $containerName, $lines);
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($server, $containerName, $lines),
+            EnvironmentVariable::logRedactionSecretsFor($serviceApplication->service),
+        );
 
         return response()->json([
             'logs' => $logs,

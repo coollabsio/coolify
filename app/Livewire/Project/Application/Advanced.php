@@ -260,11 +260,21 @@ class Advanced extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            if ($this->gpuCount && $this->gpuDeviceIds) {
+            // Check only changed GPU values, so stored legacy values do not block other settings.
+            $settings = $this->application->settings;
+            $gpuSelectionChanged = $this->gpuCount !== $settings->gpu_count || $this->gpuDeviceIds !== $settings->gpu_device_ids;
+            if ($gpuSelectionChanged && filled($this->gpuCount) && filled($this->gpuDeviceIds)) {
                 $this->dispatch('error', 'You cannot set both GPU count and GPU device IDs.');
-                $this->gpuCount = null;
-                $this->gpuDeviceIds = null;
-                $this->syncData(true);
+
+                return;
+            }
+            if ($this->gpuCount !== $settings->gpu_count && filled($this->gpuCount) && ! preg_match(ApplicationSetting::GPU_COUNT_PATTERN, trim($this->gpuCount))) {
+                $this->dispatch('error', 'GPU count must be a number or "all".');
+
+                return;
+            }
+            if ($this->gpuOptions !== $settings->gpu_options && ApplicationSetting::parseGpuOptions($this->gpuOptions) === null) {
+                $this->dispatch('error', 'GPU options must be key=value pairs (one per line) or a YAML mapping.');
 
                 return;
             }
@@ -437,6 +447,33 @@ class Advanced extends Component
         }
     }
 
+    public function refreshGpus(): void
+    {
+        try {
+            $servers = $this->application->maintenanceServers();
+            foreach ($servers as $server) {
+                $this->authorize('update', $server);
+            }
+            $functionalServers = $servers->filter(fn ($server) => $server->isFunctional());
+            if ($functionalServers->isEmpty()) {
+                $this->dispatch('error', 'Validate the server connection before you refresh GPUs.');
+
+                return;
+            }
+
+            $failed = $functionalServers->reject(fn ($server) => $server->gatherServerMetadata())->pluck('name');
+            $this->application->unsetRelation('destination')->unsetRelation('additional_servers');
+            if ($failed->isNotEmpty()) {
+                $this->dispatch('error', 'Could not collect GPUs from '.$failed->implode(', ').'. Check the application logs for the remote command output.');
+
+                return;
+            }
+            $this->dispatch('success', 'GPUs refreshed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function render()
     {
         $server = data_get($this->application, 'destination.server');
@@ -444,6 +481,7 @@ class Advanced extends Component
         return view('livewire.project.application.advanced', [
             'isTraefikProxy' => $server?->proxyType() === ProxyTypes::TRAEFIK->value,
             'serverCertificateResolver' => $server?->traefikCertificateResolver() ?? ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+            'gpuServers' => $this->application->maintenanceServers(),
         ]);
     }
 

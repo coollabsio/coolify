@@ -178,6 +178,7 @@ class GlobalSearch extends Component
             'new github app' => 'source',
             'new github' => 'source',
             'new source' => 'source',
+            'new canvas' => 'canvas',
 
             // Applications - Git-based
             'new public' => 'public',
@@ -186,6 +187,8 @@ class GlobalSearch extends Component
             'new public repository' => 'public',
             'new private github' => 'private-gh-app',
             'new private gh' => 'private-gh-app',
+            'new private gitea' => 'private-gitea-app',
+            'new gitea' => 'private-gitea-app',
             'new private deploy' => 'private-deploy-key',
             'new deploy key' => 'private-deploy-key',
 
@@ -239,7 +242,7 @@ class GlobalSearch extends Component
         if (in_array($type, [
             'project', 'source',
             // Applications
-            'public', 'private-gh-app', 'private-deploy-key',
+            'public', 'private-gh-app', 'private-gitea-app', 'private-deploy-key',
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
@@ -1175,6 +1178,18 @@ class GlobalSearch extends Component
             ]);
         }
 
+        // Canvas - deploy resources visually; can be used if user has createAnyResource permission
+        if ($user->can('createAnyResource')) {
+            $items->push([
+                'name' => 'Canvas',
+                'description' => 'Deploy resources visually on the deploy canvas',
+                'quickcommand' => '(type: new canvas)',
+                'type' => 'canvas',
+                'category' => 'Quick Actions',
+                'route' => 'deploy-canvas',
+            ]);
+        }
+
         // === Applications Category ===
 
         if ($user->can('createAnyResource')) {
@@ -1193,6 +1208,15 @@ class GlobalSearch extends Component
                 'description' => 'Deploy private repositories through GitHub Apps',
                 'quickcommand' => '(type: new private github)',
                 'type' => 'private-gh-app',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Private Repository (Gitea App)',
+                'description' => 'Deploy private repositories through Gitea Apps',
+                'quickcommand' => '(type: new private gitea)',
+                'type' => 'private-gitea-app',
                 'category' => 'Applications',
                 'resourceType' => 'application',
             ]);
@@ -1352,6 +1376,13 @@ class GlobalSearch extends Component
 
         if (! $item) {
             return;
+        }
+
+        // If it has a route, it's a page-based quick action
+        if (isset($item['route'])) {
+            $this->dispatch('closeSearchModal');
+
+            return redirectRoute($this, $item['route']);
         }
 
         // If it has a component, it's a modal-based resource

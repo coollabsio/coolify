@@ -10,7 +10,7 @@
       domain: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io:8080'
     blog:
       domain: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
-  previews: {  }
+  previews: {}
   volumes:
     - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
     - 'referenceapplication0001_web-data:/app/data'
@@ -653,7 +653,7 @@
       domain: 'https://blog.example.com/blog:2368'
     api.v2:
       domain: 'https://api-v2.example.com'
-  previews: {  }
+  previews: {}
   volumes:
     - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
     - 'referenceapplication0001_web-data:/app/data'
@@ -2021,7 +2021,7 @@
     api.v2:
       domain: 'https://api-v2.example.com'
   previews:
-    8: {  }
+    8: {}
     7:
       fqdn: 'https://7.web.example.com,https://7.www.api.example.com,https://7.my-app.example.com,https://7.admin.example.com,https://7.blog.example.com/blog:2368,https://7.api-v2.example.com'
       docker_compose_domains:

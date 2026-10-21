@@ -9,12 +9,24 @@ import {
     extractTargetHost,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
+    isAttachCommand,
+    detachPtyProcess,
     isAuthorizedTargetHost,
     normalizeHostForAuthorization,
     rejectTerminalSocket,
     sanitizeSshArgs,
     validateSshArgs,
 } from './terminal-utils.js';
+
+test('isAttachCommand detects a docker attach session', () => {
+    assert.equal(isAttachCommand('docker attach --detach-keys="ctrl-p,ctrl-q" --sig-proxy=false \'minecraft\''), true);
+    assert.equal(isAttachCommand('sudo docker attach --sig-proxy=false \'minecraft\''), true);
+});
+
+test('isAttachCommand does not match a docker exec shell session', () => {
+    assert.equal(isAttachCommand("docker exec -it 'web-1' sh -c 'exec $SHELL'"), false);
+    assert.equal(isAttachCommand(''), false);
+});
 
 test('getTerminalProcessEnv preserves the PATH needed by SSH proxy commands', () => {
     assert.deepEqual(getTerminalProcessEnv({
@@ -457,4 +469,64 @@ test('rejectTerminalSocket handles socket errors so unauthenticated clients cann
     assert.doesNotThrow(() => ws.emitError(new Error('Invalid WebSocket frame: RSV1 must be clear')));
     assert.equal(ws.terminated, true);
     ws.peerClosed();
+});
+
+function attachSession() {
+    const listeners = new Set();
+    const process = {
+        writes: [],
+        kills: 0,
+        write(data) { this.writes.push(data); },
+        kill() { this.kills++; },
+        onExit(listener) {
+            listeners.add(listener);
+            return { dispose: () => listeners.delete(listener) };
+        },
+        exit() { for (const listener of [...listeners]) listener({ exitCode: 0 }); },
+    };
+    return { ptyProcess: process, isActive: true, terminalSessionTimer: null };
+}
+
+test('attach teardown waits for delayed exit after the kill fallback', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const session = attachSession();
+    const process = session.ptyProcess;
+    let resolved = false;
+    const completion = detachPtyProcess(session).then(result => { resolved = true; return result; });
+    for (let i = 0; i < 3; i++) t.mock.timers.tick(500);
+    await Promise.resolve();
+    assert.equal(process.kills, 1);
+    assert.equal(resolved, false);
+    assert.deepEqual(process.writes, ['\x10\x11', '\x10\x11', '\x10\x11']);
+    process.exit();
+    assert.equal(await completion, true);
+    assert.equal(session.isActive, false);
+    assert.equal(session.ptyProcess, null);
+});
+
+test('late attach exit cannot clear a replacement session or its timer', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const session = attachSession();
+    const process = session.ptyProcess;
+    const completion = detachPtyProcess(session);
+    const replacement = attachSession().ptyProcess;
+    session.ptyProcess = replacement;
+    const timer = setTimeout(() => {}, 10000);
+    session.terminalSessionTimer = timer;
+    process.exit();
+    assert.equal(await completion, true);
+    assert.equal(session.isActive, true);
+    assert.equal(session.ptyProcess, replacement);
+    assert.equal(session.terminalSessionTimer, timer);
+    t.mock.timers.tick(3000);
+    assert.equal(replacement.writes.length, 0);
+});
+
+test('attach teardown fails closed if the PTY never exits', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const session = attachSession();
+    const completion = detachPtyProcess(session);
+    for (let i = 0; i < 5; i++) t.mock.timers.tick(500);
+    assert.equal(await completion, false);
+    assert.equal(session.isActive, true);
 });

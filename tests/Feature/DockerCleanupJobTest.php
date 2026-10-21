@@ -529,7 +529,7 @@ it('scans application images with a fixed number of remote commands and keeps th
     }
 });
 
-it('removes stopped Coolify containers but keeps the proxy, databases, applications and services', function () {
+it('removes stopped Coolify containers but keeps the proxy, databases, applications and services', function (bool $nonRoot) {
     $command = (new ReflectionMethod(CleanupDocker::class, 'buildContainerPruneCommand'))->invoke(new CleanupDocker);
     preg_match("/--format '([^']+)'/", $command, $format);
     $stoppedContainers = collect([
@@ -547,6 +547,14 @@ it('removes stopped Coolify containers but keeps the proxy, databases, applicati
     file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = ps ]; then cat $bin/containers; else echo \"\$@\"; fi\n");
     chmod("$bin/docker", 0755);
 
+    if ($nonRoot) {
+        $server = new Server;
+        $server->user = 'coolify';
+        $command = parseCommandsByLineForSudo(collect([$command]), $server)[0];
+        file_put_contents("$bin/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+        chmod("$bin/sudo", 0755);
+    }
+
     $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
 
     array_map('unlink', glob("$bin/*"));
@@ -554,7 +562,7 @@ it('removes stopped Coolify containers but keeps the proxy, databases, applicati
 
     expect($command)->toContain('--filter label=coolify.managed=true')
         ->and(trim((string) $output))->toBe('rm helper');
-});
+})->with(['root' => false, 'non-root sudo parser' => true]);
 
 it('broadcasts DockerCleanupDone without the cleanup log so large logs fit the Reverb message size', function () {
     $server = dockerCleanupReachableServer();

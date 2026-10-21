@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Exceptions\RemoteSecretException;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -234,7 +238,10 @@ class EnvironmentVariable extends BaseModel
         return $this->resolveRealValue(revealLockedSharedVariables: false);
     }
 
-    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true): ?string
+    /**
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     */
+    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true, ?Collection $sharedVariables = null): ?string
     {
         if (! $this->relationLoaded('resourceable')) {
             $this->load('resourceable');
@@ -255,7 +262,7 @@ class EnvironmentVariable extends BaseModel
             $resource->load('destination.server');
         }
 
-        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables, $sharedVariables);
 
         return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
     }
@@ -363,9 +370,12 @@ class EnvironmentVariable extends BaseModel
     }
 
     /** @return array<int, string> */
-    public function logRedactionValues(): array
+    /**
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables  Preloaded shared variables, to avoid one query per reference.
+     */
+    public function logRedactionValues(?Collection $sharedVariables = null): array
     {
-        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false);
+        $resolvedValue = $this->resolveRealValue(escapeLegacyValue: false, sharedVariables: $sharedVariables);
         if (! is_string($resolvedValue) || $resolvedValue === '') {
             return [];
         }
@@ -421,6 +431,177 @@ class EnvironmentVariable extends BaseModel
         return $values;
     }
 
+    /**
+     * Collect the values to hide in a resource's logs.
+     *
+     * Locked values, database passwords, and resolved remote secrets are always hidden,
+     * whatever their length. Other values are hidden unless the resource limits log redaction
+     * to locked values only.
+     *
+     * Remote secrets are fetched at most once per call, and only when a variable references one.
+     * Callers that already hold the fetched values, such as deployments, pass $resolveRemoteSecrets = false.
+     *
+     * @return array{known: array<int, string>, locked: array<int, string>}
+     */
+    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
+    {
+        if ($resource === null) {
+            return ['known' => [], 'locked' => []];
+        }
+
+        $isDatabase = ! $resource instanceof Application && ! $resource instanceof Service;
+        $secrets = ['known' => [], 'locked' => []];
+        if ($isDatabase) {
+            foreach (array_keys($resource->getAttributes()) as $attribute) {
+                if (str_contains($attribute, 'password')) {
+                    $value = $resource->getAttribute($attribute);
+                    if (is_string($value) && $value !== '') {
+                        $secrets['locked'][] = $value;
+                    }
+                }
+            }
+        }
+
+        $variables = collect($isDatabase ? $resource->runtime_environment_variables : $resource->environment_variables);
+        if ($includePreview && $resource instanceof Application) {
+            $variables = $variables->merge($resource->environment_variables_preview ?? []);
+        }
+        if ($variables->isEmpty()) {
+            return $secrets;
+        }
+
+        // Load the resource relations once and share them, so each variable does not load its own copy.
+        $resource->loadMissing('environment.project.team');
+        if (method_exists($resource, 'server')) {
+            $resource->loadMissing('server');
+        }
+        if (method_exists($resource, 'destination')) {
+            $resource->loadMissing('destination.server');
+        }
+        // Use copies so the resource's own loaded variables do not get a reference back to the resource.
+        $variables = $variables->map(fn (self $variable): self => (clone $variable)->setRelation('resourceable', $resource));
+        $sharedVariables = self::sharedVariablesReferencedBy($variables, $resource->team()?->id);
+
+        $redactAllValues = $resource->redactsAllEnvValuesInLogs();
+        $unresolvedKeys = [];
+        $remoteSecretFailure = null;
+        foreach ($variables as $variable) {
+            if ($resolveRemoteSecrets) {
+                $secrets['locked'] = array_merge(
+                    $secrets['locked'],
+                    self::remoteSecretLogRedactionValuesFor($resource, $variable, $sharedVariables, $remoteSecretFailure, $unresolvedKeys),
+                );
+            }
+            if ($variable->isLockedForLogs($sharedVariables)) {
+                $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues($sharedVariables));
+            } elseif ($redactAllValues) {
+                $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues($sharedVariables));
+            }
+        }
+
+        if ($remoteSecretFailure !== null) {
+            Log::warning('Could not resolve remote secrets for log redaction; their resolved values are not hidden.', [
+                'resource_type' => $resource->getMorphClass(),
+                'resource_uuid' => $resource->uuid,
+                'variables' => array_values(array_unique($unresolvedKeys)),
+                'exception' => $remoteSecretFailure::class,
+            ]);
+        }
+
+        return $secrets;
+    }
+
+    /**
+     * Resolved remote secret values of a variable; these are always hidden.
+     *
+     * When the references cannot be resolved, export still works: the reference text and any keys
+     * that did resolve are hidden, and the variable is reported. After a failed or empty fetch the
+     * source is not asked again.
+     *
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     * @param  array<int, string>  $unresolvedKeys
+     * @return array<int, string>
+     */
+    private static function remoteSecretLogRedactionValuesFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource, self $variable, ?Collection $sharedVariables, ?RemoteSecretException &$failure, array &$unresolvedKeys): array
+    {
+        // Cheap check first, so variables without references never query or contact a source.
+        $value = $variable->resolveRealValue(escapeLegacyValue: false, sharedVariables: $sharedVariables);
+        if (! RemoteSecretReferences::containsReference($value) || ! $resource->environmentVariableUsesSecretManager($variable)) {
+            return [];
+        }
+
+        if ($failure === null || $resource->resolvedSecretManagerValuesForRedaction() !== []) {
+            try {
+                return self::remoteSecretLogRedactionValues([$resource->resolveSecretManagerEnvironmentVariableValue($variable)]);
+            } catch (RemoteSecretException $e) {
+                $failure = $e;
+            }
+        }
+
+        $unresolvedKeys[] = $variable->key;
+        $available = array_intersect_key($resource->resolvedSecretManagerValuesForRedaction(), array_flip(RemoteSecretReferences::referencedKeys($value)));
+
+        return [...self::remoteSecretLogRedactionValues(array_values($available)), ...$variable->logRedactionValues($sharedVariables)];
+    }
+
+    /**
+     * A variable is locked when it is locked itself or references a locked shared variable.
+     *
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables  Preloaded shared variables of the resource's team.
+     */
+    public function isLockedForLogs(?Collection $sharedVariables = null): bool
+    {
+        if ($this->is_shown_once) {
+            return true;
+        }
+
+        $references = self::sharedVariableReferences($this->value);
+        if ($references === []) {
+            return false;
+        }
+
+        $sharedVariables ??= self::sharedVariablesReferencedBy(collect([$this]), $this->resourceable?->team()?->id);
+        if ($sharedVariables === null) {
+            return true;
+        }
+
+        return $sharedVariables->contains(fn (SharedEnvironmentVariable $shared): bool => $shared->is_shown_once
+            && in_array(['type' => $shared->type, 'key' => $shared->key], $references, true));
+    }
+
+    /**
+     * Load every shared variable that the given variables reference, with one query.
+     *
+     * @param  Collection<int, self>  $variables
+     * @return Collection<int, SharedEnvironmentVariable>|null Null when the team is unknown.
+     */
+    private static function sharedVariablesReferencedBy(Collection $variables, ?int $teamId): ?Collection
+    {
+        if ($teamId === null) {
+            return null;
+        }
+
+        $keys = $variables
+            ->flatMap(fn (self $variable): array => self::sharedVariableReferences($variable->value))
+            ->pluck('key')
+            ->unique()
+            ->values();
+
+        return $keys->isEmpty()
+            ? collect()
+            : SharedEnvironmentVariable::query()->where('team_id', $teamId)->whereIn('key', $keys)->get();
+    }
+
+    /**
+     * @return array<int, array{type: string, key: string}>
+     */
+    private static function sharedVariableReferences(?string $value): array
+    {
+        preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $value, $matches, PREG_SET_ORDER);
+
+        return array_map(fn (array $match): array => ['type' => $match[1], 'key' => $match[2]], $matches);
+    }
+
     public function resolveReferencedValue(): ?string
     {
         $value = $this->value;
@@ -439,7 +620,10 @@ class EnvironmentVariable extends BaseModel
             ->first()?->value ?? $value;
     }
 
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true)
+    /**
+     * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     */
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true, ?Collection $sharedVariables = null)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
@@ -474,11 +658,15 @@ class EnvironmentVariable extends BaseModel
             if (is_null($id)) {
                 continue;
             }
-            $found = SharedEnvironmentVariable::where('type', $type)
-                ->where('key', $variable)
-                ->where('team_id', $resource->team()->id)
-                ->where("{$type}_id", $id)
-                ->first();
+            $found = $sharedVariables !== null
+                ? $sharedVariables->first(fn (SharedEnvironmentVariable $shared): bool => $shared->type === $type->value()
+                    && $shared->key === $variable->value()
+                    && (int) $shared->{"{$type}_id"} === (int) $id)
+                : SharedEnvironmentVariable::where('type', $type)
+                    ->where('key', $variable)
+                    ->where('team_id', $resource->team()->id)
+                    ->where("{$type}_id", $id)
+                    ->first();
             if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }

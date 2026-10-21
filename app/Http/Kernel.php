@@ -4,6 +4,7 @@ namespace App\Http;
 
 use App\Http\Middleware\AddServerTimingHeaders;
 use App\Http\Middleware\ApiAbility;
+use App\Http\Middleware\ApiIpAllowed;
 use App\Http\Middleware\ApiSensitiveData;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\CanAccessTerminal;
@@ -116,6 +117,7 @@ class Kernel extends HttpKernel
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
+        'api.ip.allowed' => ApiIpAllowed::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
     ];
 }

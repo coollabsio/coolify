@@ -157,13 +157,11 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
             @include('livewire.traffic._paths-list', ['paths' => $topPaths])
         </x-application.settings-section>
 
-        <x-application.settings-section id="analytics-country-section" title="Countries"
-            helper="Request volume by visitor country for the selected range." flush>
-            @include('livewire.traffic._geo', [
-                'countries' => data_get($breakdowns, 'country', []),
-                'attribution' => $attribution,
-            ])
-        </x-application.settings-section>
+        @include('livewire.traffic._geo', [
+            'countries' => data_get($breakdowns, 'country', []),
+            'cities' => trafficCityRows(data_get($breakdowns, 'city', [])),
+            'attribution' => $attribution,
+        ])
 
         {{-- Requests by device type (donut) + HTTP versions / cache / status. --}}
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">

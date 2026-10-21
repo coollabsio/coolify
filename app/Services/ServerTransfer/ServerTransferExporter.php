@@ -5,31 +5,46 @@ namespace App\Services\ServerTransfer;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
+use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\ManagedDnsRecord;
+use App\Models\ManagedDnsRecordReference;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Services\ProjectIconStorageService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class ServerTransferExporter
 {
+    /**
+     * Larger project icons are not put in the bundle. Icons that Coolify stores are small JPEG files.
+     */
+    public const MAX_PROJECT_ICON_BYTES = 2 * 1024 * 1024;
+
     /**
      * Settings that are instance-bound or runtime health state and must not transfer.
      *
@@ -47,6 +62,12 @@ class ServerTransferExporter
         'sentinel_custom_url',
         'is_sentinel_enabled',
         'is_sentinel_debug_enabled',
+        // Exported as cloudflare_tunnel_integration_token_uuid.
+        'cloudflare_tunnel_integration_token_id',
+        // The last patch check of the source; the target runs its own.
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
     ];
 
     /**
@@ -85,6 +106,9 @@ class ServerTransferExporter
         if (! $privateKey instanceof PrivateKey) {
             throw new RuntimeException('Server has no private key to export.');
         }
+        if ((int) $privateKey->team_id !== (int) $server->team_id) {
+            throw new RuntimeException('The server private key does not belong to the server team. Select a private key of this team first.');
+        }
 
         if (! $includeSensitive) {
             throw new RuntimeException('Server transfer export requires sensitive data access (read:sensitive).');
@@ -99,15 +123,36 @@ class ServerTransferExporter
         $this->assertNoAdditionalDestinations($server, $applications);
 
         $projectIds = $this->collectProjectIds($applications, $databases, $services);
-        $projects = Project::query()->whereIn('id', $projectIds)->orderBy('name')->get();
+        $projects = Project::query()->where('team_id', $server->team_id)->whereIn('id', $projectIds)->orderBy('name')->get();
+        if ($projects->count() !== collect($projectIds)->unique()->count()) {
+            throw new RuntimeException('Some resources on this server belong to a project of another team. Move them to a project of this team first.');
+        }
 
         $destinationUuidByKey = $this->destinationUuidMap($server);
-        $dependencies = $this->collectDependencies($server, $applications, $databases, $services);
+        $runnerConfig = $server->githubRunnerConfig()->with('githubApp')->first();
+        $dependencies = $this->collectDependencies($server, $applications, $databases, $services, $runnerConfig);
 
         $sourceInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
-        $warnings = $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl);
-        if ($secretManagerWarning = $this->secretManagerWarning($applications->concat($databases)->concat($services))) {
-            $warnings[] = $secretManagerWarning;
+        $managedDns = $this->collectManagedDnsRecords($server, $applications, $services);
+        $integrationTokens = $this->collectIntegrationTokens($server, $applications->concat($databases)->concat($services), $managedDns['records']);
+
+        $serverSharedEnvVars = $this->exportSharedEnvVars(
+            SharedEnvironmentVariable::query()
+                ->where('type', 'server')
+                ->where('server_id', $server->id)
+                ->get()
+        );
+        $projectWarnings = [];
+        $leftOutLinks = 0;
+        $projectPayloads = $projects->map(function (Project $project) use ($destinationUuidByKey, $applications, $databases, $services, &$projectWarnings, &$leftOutLinks) {
+            return $this->exportProject($project, $destinationUuidByKey, $applications, $databases, $services, $projectWarnings, $leftOutLinks);
+        })->values()->all();
+
+        $warnings = $this->buildWarnings($applications, $dependencies);
+        $warnings = array_merge($warnings, $managedDns['warnings'], $projectWarnings);
+        if ($leftOutLinks > 0) {
+            $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
+                .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
         }
 
         $payload = ServerTransferBundle::wrap([
@@ -116,29 +161,30 @@ class ServerTransferExporter
                 'name' => config('app.name'),
             ],
             'warnings' => $warnings,
+            // Manual steps after the transfer. The source replaces {target_url} with the URL of the target.
+            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications),
             // Back-compat: single server key
             'private_key' => $this->exportPrivateKey($privateKey),
             // All keys needed by server, apps, and git sources
             'private_keys' => $dependencies['private_keys']->map(fn (PrivateKey $key) => $this->exportPrivateKey($key))->values()->all(),
             'github_apps' => $dependencies['github_apps']->map(fn (GithubApp $app) => $this->exportGithubApp($app))->values()->all(),
             'gitlab_apps' => $dependencies['gitlab_apps']->map(fn (GitlabApp $app) => $this->exportGitlabApp($app))->values()->all(),
+            'gitea_apps' => $dependencies['gitea_apps']->map(fn (GiteaApp $app) => $this->exportGiteaApp($app))->values()->all(),
             's3_storages' => $dependencies['s3_storages']->map(fn (S3Storage $storage) => $this->exportS3Storage($storage))->values()->all(),
             'cloud_provider_tokens' => $dependencies['cloud_provider_tokens']->map(fn (CloudProviderToken $token) => $this->exportCloudProviderToken($token))->values()->all(),
+            'integration_tokens' => $integrationTokens->map(fn (IntegrationToken $token) => $this->exportIntegrationToken($token))->values()->all(),
+            'dns_zones' => $managedDns['records']->pluck('zone')->unique('id')->map(fn (DnsProviderZone $zone) => $this->exportDnsZone($zone))->values()->all(),
+            'managed_dns_records' => $managedDns['records']->map(fn (ManagedDnsRecord $record) => $this->exportManagedDnsRecord($record, $managedDns['resource_keys']))->values()->all(),
             'ssl_certificates' => $this->exportSslCertificates($server),
             'volume_backups' => $this->exportVolumeBackups($applications, $databases, $services),
             'server' => $this->exportServer($server),
             'destinations' => $this->exportDestinations($server),
+            'github_runner_config' => $runnerConfig ? $this->exportGithubRunnerConfig($runnerConfig) : null,
             'shared_environment_variables' => [
-                'server' => $this->exportSharedEnvVars(
-                    SharedEnvironmentVariable::query()
-                        ->where('type', 'server')
-                        ->where('server_id', $server->id)
-                        ->get()
-                ),
+                'server' => $serverSharedEnvVars,
+                'team' => $this->exportReferencedTeamSharedEnvVars($server->team_id, $serverSharedEnvVars, $projectPayloads),
             ],
-            'projects' => $projects->map(function (Project $project) use ($server, $destinationUuidByKey, $applications, $databases, $services) {
-                return $this->exportProject($project, $server, $destinationUuidByKey, $applications, $databases, $services);
-            })->values()->all(),
+            'projects' => $projectPayloads,
         ]);
 
         return $payload;
@@ -152,72 +198,84 @@ class ServerTransferExporter
      *     private_keys: Collection<int, PrivateKey>,
      *     github_apps: Collection<int, GithubApp>,
      *     gitlab_apps: Collection<int, GitlabApp>,
+     *     gitea_apps: Collection<int, GiteaApp>,
      *     s3_storages: Collection<int, S3Storage>,
      *     cloud_provider_tokens: Collection<int, CloudProviderToken>
      * }
      */
-    private function collectDependencies(Server $server, Collection $applications, Collection $databases, Collection $services): array
+    private function collectDependencies(Server $server, Collection $applications, Collection $databases, Collection $services, ?GithubRunnerConfig $runnerConfig): array
     {
+        $teamId = $server->team_id;
         $privateKeys = collect([$server->privateKey])->filter();
         $githubApps = collect();
         $gitlabApps = collect();
+        $giteaApps = collect();
         $s3Ids = collect();
+
+        // System-wide GitHub Apps are instance-owned; do not copy them. The application source and the runner
+        // config still record the App uuid, so the import can re-link to a system-wide App of the target.
+        $collectGithubApp = function (int|string $id) use ($teamId, $githubApps, $privateKeys): void {
+            $gh = $this->findGitSource(GithubApp::class, $id, $teamId);
+            if ($gh && ! $gh->is_system_wide) {
+                $githubApps->push($gh);
+                if ($gh->private_key_id) {
+                    $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gh->private_key_id, $teamId, 'private key'));
+                }
+            }
+        };
+
+        if ($runnerConfig) {
+            $collectGithubApp($runnerConfig->github_app_id);
+        }
 
         foreach ($applications as $application) {
             if ($application->private_key_id) {
-                $key = PrivateKey::find($application->private_key_id);
-                if ($key) {
-                    $privateKeys->push($key);
-                }
+                $privateKeys->push($this->findTeamRecord(PrivateKey::class, $application->private_key_id, $teamId, 'private key'));
             }
 
             if ($application->source_type === GithubApp::class && $application->source_id !== null) {
-                $gh = GithubApp::find($application->source_id);
-                // System-wide GitHub Apps are instance-owned; do not copy them.
-                // Application export still records source.uuid so import can re-link
-                // to an existing system-wide app on the target instance.
-                if ($gh && ! $gh->is_system_wide) {
-                    $githubApps->push($gh);
-                    if ($gh->private_key_id) {
-                        $pk = PrivateKey::find($gh->private_key_id);
-                        if ($pk) {
-                            $privateKeys->push($pk);
-                        }
-                    }
-                }
+                $collectGithubApp($application->source_id);
             }
 
             if ($application->source_type === GitlabApp::class && $application->source_id !== null) {
-                $gl = GitlabApp::find($application->source_id);
+                $gl = $this->findGitSource(GitlabApp::class, $application->source_id, $teamId);
                 // System-wide GitLab Apps are instance-owned; re-link by UUID on import.
                 if ($gl && ! $gl->is_system_wide) {
                     $gitlabApps->push($gl);
                     if ($gl->private_key_id) {
-                        $pk = PrivateKey::find($gl->private_key_id);
-                        if ($pk) {
-                            $privateKeys->push($pk);
-                        }
+                        $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gl->private_key_id, $teamId, 'private key'));
+                    }
+                }
+            }
+
+            if ($application->source_type === GiteaApp::class && $application->source_id !== null) {
+                $gt = $this->findGitSource(GiteaApp::class, $application->source_id, $teamId);
+                // System-wide Gitea Apps are instance-owned; re-link by UUID on import.
+                if ($gt && ! $gt->is_system_wide) {
+                    $giteaApps->push($gt);
+                    if ($gt->private_key_id) {
+                        $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gt->private_key_id, $teamId, 'private key'));
                     }
                 }
             }
         }
 
-        $collectVolumeS3 = function ($resource) use (&$s3Ids): void {
+        $collectBackupS3 = function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup) use (&$s3Ids): void {
+            $s3Ids->push($backup->s3_storage_id, ...$backup->s3Storages()->pluck('s3_storages.id')->all());
+        };
+
+        $collectVolumeS3 = function ($resource) use ($collectBackupS3): void {
             if (method_exists($resource, 'persistentStorages')) {
                 foreach ($resource->persistentStorages as $volume) {
                     foreach ($volume->scheduledBackups as $vb) {
-                        if ($vb->s3_storage_id) {
-                            $s3Ids->push($vb->s3_storage_id);
-                        }
+                        $collectBackupS3($vb);
                     }
                 }
             }
             if (method_exists($resource, 'fileStorages')) {
                 foreach ($resource->fileStorages as $file) {
                     foreach ($file->scheduledBackups as $vb) {
-                        if ($vb->s3_storage_id) {
-                            $s3Ids->push($vb->s3_storage_id);
-                        }
+                        $collectBackupS3($vb);
                     }
                 }
             }
@@ -226,9 +284,7 @@ class ServerTransferExporter
         foreach ($databases as $database) {
             if (method_exists($database, 'scheduledBackups')) {
                 foreach ($database->scheduledBackups as $backup) {
-                    if ($backup->s3_storage_id) {
-                        $s3Ids->push($backup->s3_storage_id);
-                    }
+                    $collectBackupS3($backup);
                 }
             }
             $database->loadMissing(['persistentStorages.scheduledBackups', 'fileStorages.scheduledBackups']);
@@ -257,9 +313,7 @@ class ServerTransferExporter
             }
             foreach ($service->databases as $serviceDb) {
                 foreach ($serviceDb->scheduledBackups as $backup) {
-                    if ($backup->s3_storage_id) {
-                        $s3Ids->push($backup->s3_storage_id);
-                    }
+                    $collectBackupS3($backup);
                 }
                 $collectVolumeS3($serviceDb);
             }
@@ -267,19 +321,65 @@ class ServerTransferExporter
 
         $cloudTokens = collect();
         if ($server->cloud_provider_token_id) {
-            $token = CloudProviderToken::find($server->cloud_provider_token_id);
-            if ($token) {
-                $cloudTokens->push($token);
-            }
+            $cloudTokens->push($this->findTeamRecord(CloudProviderToken::class, $server->cloud_provider_token_id, $teamId, 'cloud provider token'));
         }
 
         return [
             'private_keys' => $privateKeys->unique('id')->values(),
             'github_apps' => $githubApps->unique('id')->values(),
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
-            's3_storages' => S3Storage::query()->whereIn('id', $s3Ids->unique()->filter()->all())->get(),
+            'gitea_apps' => $giteaApps->unique('id')->values(),
+            's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
+    }
+
+    /**
+     * Load a credential record that must belong to the server team. A record of another team is
+     * never exported, so a broken reference stops the export instead of leaking its secrets.
+     *
+     * @template T of Model
+     *
+     * @param  class-string<T>  $modelClass
+     * @return T
+     */
+    private function findTeamRecord(string $modelClass, int|string $id, int $teamId, string $label): Model
+    {
+        $record = $modelClass::query()->where('team_id', $teamId)->find($id);
+        if (! $record) {
+            throw new RuntimeException("A {$label} used on this server does not belong to the server team. Select a {$label} of this team first.");
+        }
+
+        return $record;
+    }
+
+    /**
+     * System-wide git sources are returned as they are (they are only linked by UUID, never exported).
+     *
+     * @param  class-string<GithubApp|GitlabApp|GiteaApp>  $modelClass
+     */
+    private function findGitSource(string $modelClass, int|string $id, int $teamId): GithubApp|GitlabApp|GiteaApp|null
+    {
+        $source = $modelClass::find($id);
+        if ($source && ! $source->is_system_wide && (int) $source->team_id !== $teamId) {
+            throw new RuntimeException('A git source used on this server does not belong to the server team. Select a git source of this team first.');
+        }
+
+        return $source;
+    }
+
+    /**
+     * @param  list<int|string>  $ids
+     * @return Collection<int, S3Storage>
+     */
+    private function findTeamS3Storages(array $ids, int $teamId): Collection
+    {
+        $storages = S3Storage::query()->where('team_id', $teamId)->whereIn('id', $ids)->get();
+        if ($storages->count() !== count($ids)) {
+            throw new RuntimeException('An S3 storage used by a backup on this server does not belong to the server team. Select an S3 storage of this team first.');
+        }
+
+        return $storages;
     }
 
     /**
@@ -287,16 +387,9 @@ class ServerTransferExporter
      * @param  array<string, mixed>  $dependencies
      * @return list<string>
      */
-    private function buildWarnings(Collection $applications, array $dependencies, string $sourceInstanceUrl): array
+    private function buildWarnings(Collection $applications, array $dependencies): array
     {
         $warnings = [];
-
-        if ($dependencies['github_apps']->isNotEmpty()) {
-            $warnings[] = 'Team-scoped GitHub Apps were exported with credentials (system-wide apps are skipped). After import, update each GitHub App webhook URL (and setup/callback URL if used) to this Coolify instance so push/PR automations keep working. '
-                ."Webhook path: {$sourceInstanceUrl}/webhooks/source/github/events "
-                .'(replace host with the target instance FQDN after import). '
-                .'Also reinstall/refresh the GitHub App installation if installation_id is invalid on the new host.';
-        }
 
         $usesSystemWideGithub = $applications->contains(function (Application $app) {
             if ($app->source_type !== GithubApp::class || $app->source_id === null) {
@@ -322,9 +415,16 @@ class ServerTransferExporter
             $warnings[] = 'Some applications use a system-wide GitLab App, which is not exported. On import, Coolify will re-link to a matching system-wide GitLab App on the target instance (by UUID) if one exists.';
         }
 
-        if ($dependencies['gitlab_apps']->isNotEmpty()) {
-            $warnings[] = 'Team-scoped GitLab Apps/OAuth sources were exported (system-wide apps are skipped). After import, update GitLab webhook URLs to the target Coolify instance '
-                ."({$sourceInstanceUrl}/webhooks/source/gitlab/events — use the new FQDN) and refresh OAuth tokens if needed.";
+        $usesSystemWideGitea = $applications->contains(function (Application $app) {
+            if ($app->source_type !== GiteaApp::class || $app->source_id === null) {
+                return false;
+            }
+            $gt = GiteaApp::find($app->source_id);
+
+            return $gt?->is_system_wide === true;
+        });
+        if ($usesSystemWideGitea) {
+            $warnings[] = 'Some applications use a system-wide Gitea App, which is not exported. On import, Coolify will re-link to a matching system-wide Gitea App on the target instance (by UUID) if one exists.';
         }
 
         if ($dependencies['s3_storages']->isNotEmpty()) {
@@ -335,24 +435,184 @@ class ServerTransferExporter
     }
 
     /**
-     * Secret manager links point to integration tokens of this instance, which are not exported.
+     * Managed DNS records that only exported resources use. A record that a resource staying on this instance
+     * also uses is not exported: this instance keeps managing it.
      *
-     * @param  Collection<int, Model>  $resources
+     * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Service>  $services
+     * @return array{
+     *     records: Collection<int, ManagedDnsRecord>,
+     *     resource_keys: array<string, array{kind: string, uuid: string}|null>,
+     *     warnings: list<string>
+     * }
      */
-    private function secretManagerWarning(Collection $resources): ?string
+    private function collectManagedDnsRecords(Server $server, Collection $applications, Collection $services): array
     {
-        $linkedNames = $resources
-            ->filter(fn (Model $resource) => method_exists($resource, 'secretManagerLink') && $resource->secretManagerLink()->exists())
-            ->pluck('name')
-            ->unique()
-            ->values();
-
-        if ($linkedNames->isEmpty()) {
-            return null;
+        // Keyed by "morph type:id". Soft-deleted previews are covered, but their references are not exported.
+        $resourceKeys = [];
+        foreach ($applications as $application) {
+            $resourceKeys[$application->getMorphClass().':'.$application->id] = ['kind' => 'application', 'uuid' => $application->uuid];
+            foreach (ApplicationPreview::withTrashed()->where('application_id', $application->id)->get() as $preview) {
+                $resourceKeys[$preview->getMorphClass().':'.$preview->id] = $preview->trashed() ? null : ['kind' => 'preview', 'uuid' => $preview->uuid];
+            }
+        }
+        foreach ($services as $service) {
+            foreach ($service->applications as $serviceApplication) {
+                $resourceKeys[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['kind' => 'service_application', 'uuid' => $serviceApplication->uuid];
+            }
+        }
+        if ($resourceKeys === []) {
+            return ['records' => collect(), 'resource_keys' => [], 'warnings' => []];
         }
 
-        return 'Some resources load environment variables from a secret manager: '.$linkedNames->implode(', ').'. '
-            .'Secret manager tokens and links are not exported. After import, add the integration token on the target instance and link the secret manager source again, or deployments of these resources fail.';
+        $records = ManagedDnsRecord::query()
+            ->whereHas('references', function ($query) use ($resourceKeys) {
+                $query->where(function ($query) use ($resourceKeys) {
+                    foreach (array_keys($resourceKeys) as $key) {
+                        [$type, $id] = explode(':', $key, 2);
+                        $query->orWhere(fn ($query) => $query->where('resource_type', $type)->where('resource_id', $id));
+                    }
+                });
+            })
+            ->with(['references', 'zone.integrationToken', 'integrationToken'])
+            ->orderBy('name')
+            ->get();
+
+        $exported = collect();
+        $warnings = [];
+        foreach ($records as $record) {
+            $teamId = (int) $server->team_id;
+            if ((int) $record->team_id !== $teamId
+                || (int) $record->integrationToken?->team_id !== $teamId
+                || (int) $record->zone?->integrationToken?->team_id !== $teamId) {
+                $warnings[] = "DNS record {$record->name} is not transferred, because its DNS provider token belongs to another team. The target instance does not manage it.";
+
+                continue;
+            }
+            $sharedWithOtherResources = $record->references
+                ->contains(fn (ManagedDnsRecordReference $reference) => ! array_key_exists($reference->resource_type.':'.$reference->resource_id, $resourceKeys));
+            if ($sharedWithOtherResources) {
+                $warnings[] = "DNS record {$record->name} stays managed by this instance, because a resource that is not transferred also uses it. The target instance does not update or delete it.";
+
+                continue;
+            }
+            $hasLiveReference = $record->references
+                ->contains(fn (ManagedDnsRecordReference $reference) => $resourceKeys[$reference->resource_type.':'.$reference->resource_id] !== null);
+            if ($hasLiveReference) {
+                $exported->push($record);
+            }
+        }
+
+        return ['records' => $exported, 'resource_keys' => $resourceKeys, 'warnings' => $warnings];
+    }
+
+    /**
+     * Integration tokens that the exported resources need: secret manager links, managed DNS records, and the
+     * Cloudflare tunnel of the server.
+     *
+     * @param  Collection<int, Model>  $resources
+     * @param  Collection<int, ManagedDnsRecord>  $dnsRecords
+     * @return Collection<int, IntegrationToken>
+     */
+    private function collectIntegrationTokens(Server $server, Collection $resources, Collection $dnsRecords): Collection
+    {
+        $tokenIds = collect([$server->settings?->cloudflare_tunnel_integration_token_id]);
+        foreach ($resources as $resource) {
+            if (method_exists($resource, 'secretManagerLink')) {
+                $tokenIds->push($resource->secretManagerLink()->value('integration_token_id'));
+            }
+        }
+        foreach ($dnsRecords as $record) {
+            $tokenIds->push($record->integration_token_id, $record->zone->integration_token_id);
+        }
+
+        return $tokenIds->filter()->unique()->values()
+            ->map(fn (int|string $id) => $this->findTeamRecord(IntegrationToken::class, $id, (int) $server->team_id, 'integration token'));
+    }
+
+    /**
+     * Manual steps after the transfer. {target_url} stands for the URL of the target instance.
+     *
+     * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>, gitea_apps: Collection<int, GiteaApp>}  $dependencies
+     * @param  Collection<int, Application>  $applications
+     * @return list<string>
+     */
+    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
+    {
+        $steps = [];
+        // A manual webhook is set in the repository itself, so its URL still points to this instance. Every
+        // application has the secrets, so list the git applications that do not deploy through a private App.
+        $manualWebhookApps = $applications
+            ->filter(fn (Application $application) => $application->build_pack !== 'dockerimage' && filled($application->git_repository)
+                && (! $application->source || data_get($application->source, 'is_public') === true))
+            ->pluck('name');
+        if ($manualWebhookApps->isNotEmpty()) {
+            $steps[] = 'If a repository of these applications has a manual webhook to Coolify, change its URL to the target: '
+                .$manualWebhookApps->implode(', ').'. Use {target_url}/webhooks/source/github/events/manual, '
+                .'{target_url}/webhooks/source/gitlab/events/manual, {target_url}/webhooks/source/bitbucket/events/manual, '
+                .'or {target_url}/webhooks/source/gitea/events/manual.';
+        }
+        foreach ($dependencies['github_apps'] as $githubApp) {
+            $steps[] = "On GitHub, open the settings of GitHub App {$githubApp->name}. Set the Webhook URL to {target_url}/webhooks/source/github/events, "
+                .'the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.';
+        }
+        foreach ($dependencies['gitlab_apps'] as $gitlabApp) {
+            $steps[] = "In GitLab, open Settings > Webhooks of every project that uses GitLab App {$gitlabApp->name}, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.";
+        }
+        foreach ($dependencies['gitea_apps'] as $giteaApp) {
+            $steps[] = "In Gitea, open the OAuth2 application of Gitea App {$giteaApp->name} and set the redirect URI to {target_url}/webhooks/source/gitea/redirect. "
+                .'Then set the webhook URL of every repository that uses it to {target_url}/webhooks/source/gitea/events.';
+        }
+        if ($runnerConfig) {
+            $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
+                .'Enabling them stops runners that another Coolify instance started on this server.';
+        }
+
+        return $steps;
+    }
+
+    /**
+     * Team variables are exported only when an exported variable references them as {{team.KEY}}.
+     *
+     * @param  list<array<string, mixed>>  $serverVariables
+     * @param  list<array<string, mixed>>  $projects
+     * @return list<array<string, mixed>>
+     */
+    private function exportReferencedTeamSharedEnvVars(int $teamId, array $serverVariables, array $projects): array
+    {
+        $values = collect($serverVariables)->pluck('value');
+        foreach ([
+            '*.shared_environment_variables.*.value',
+            '*.environments.*.shared_environment_variables.*.value',
+            '*.environments.*.applications.*.environment_variables.*.value',
+            '*.environments.*.applications.*.environment_variables_preview.*.value',
+            '*.environments.*.databases.*.environment_variables.*.value',
+            '*.environments.*.services.*.environment_variables.*.value',
+            '*.environments.*.services.*.applications.*.environment_variables.*.value',
+        ] as $path) {
+            $values = $values->merge(data_get($projects, $path, []));
+        }
+
+        $keys = $values
+            ->filter(fn ($value) => is_string($value))
+            ->flatMap(function (string $value) {
+                preg_match_all('/{{\s*team\.(.+?)\s*}}/', $value, $matches);
+
+                return $matches[1];
+            })
+            ->unique()
+            ->values();
+        if ($keys->isEmpty()) {
+            return [];
+        }
+
+        return $this->exportSharedEnvVars(
+            SharedEnvironmentVariable::query()
+                ->where('type', 'team')
+                ->where('team_id', $teamId)
+                ->whereIn('key', $keys)
+                ->get()
+        );
     }
 
     /**
@@ -362,7 +622,7 @@ class ServerTransferExporter
     {
         try {
             $material = $key->private_key;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw new RuntimeException(
                 "Cannot decrypt private key \"{$key->name}\" (uuid={$key->uuid}). "
                 .'This instance APP_KEY does not match the key that encrypted the data '
@@ -398,6 +658,9 @@ class ServerTransferExporter
                 // Read through cast so encrypted fields are plaintext for re-encryption on import.
                 $settingsPayload[$key] = $settings->{$key};
             }
+            $settingsPayload['cloudflare_tunnel_integration_token_uuid'] = $settings->cloudflare_tunnel_integration_token_id
+                ? IntegrationToken::query()->whereKey($settings->cloudflare_tunnel_integration_token_id)->value('uuid')
+                : null;
         }
 
         return [
@@ -405,12 +668,18 @@ class ServerTransferExporter
             'name' => $server->name,
             'description' => $server->description,
             'ip' => (string) $server->ip,
-            'port' => (int) $server->port,
+            'port' => $server->port ?: 22,
             'user' => (string) $server->user,
             'proxy' => $server->proxy?->toArray() ?? [],
             'server_role' => $server->settings->effectiveServerRole()->value,
             'is_build_server' => $server->isBuildServer(),
             'cloud_provider_token_uuid' => $server->cloudProviderToken?->uuid,
+            'hetzner_server_id' => $server->hetzner_server_id,
+            'vultr_instance_id' => $server->vultr_instance_id,
+            'digitalocean_droplet_id' => $server->digitalocean_droplet_id,
+            'hostinger_virtual_machine_id' => $server->hostinger_virtual_machine_id,
+            'proxy_error_page' => $server->proxy_error_page,
+            'swarm_cluster' => $server->swarm_cluster,
             'settings' => $settingsPayload,
         ];
     }
@@ -446,29 +715,37 @@ class ServerTransferExporter
      * @param  Collection<int, Model>  $databases
      * @param  Collection<int, Service>  $services
      * @param  array<string, string>  $destinationUuidByKey
+     * @param  list<string>  $warnings
      * @return array<string, mixed>
      */
     private function exportProject(
         Project $project,
-        Server $server,
         array $destinationUuidByKey,
         Collection $applications,
         Collection $databases,
         Collection $services,
+        array &$warnings,
+        int &$leftOutLinks,
     ): array {
-        $environments = $project->environments()->orderBy('name')->get();
+        // Only environments with a resource of this server. The other environments stay on this instance.
+        $environmentIds = $applications->pluck('environment_id')
+            ->merge($databases->pluck('environment_id'))
+            ->merge($services->pluck('environment_id'))
+            ->unique();
+        $environments = $project->environments()->whereIn('id', $environmentIds)->orderBy('name')->get();
 
         return [
             'uuid' => $project->uuid,
             'name' => $project->name,
             'description' => $project->description,
+            'icon' => $this->exportProjectIcon($project, $warnings),
             'shared_environment_variables' => $this->exportSharedEnvVars(
                 SharedEnvironmentVariable::query()
                     ->where('type', 'project')
                     ->where('project_id', $project->id)
                     ->get()
             ),
-            'environments' => $environments->map(function (Environment $environment) use ($destinationUuidByKey, $applications, $databases, $services) {
+            'environments' => $environments->map(function (Environment $environment) use ($destinationUuidByKey, $applications, $databases, $services, &$leftOutLinks) {
                 $envApps = $applications->where('environment_id', $environment->id)->values();
                 $envDbs = $databases->where('environment_id', $environment->id)->values();
                 $envServices = $services->where('environment_id', $environment->id)->values();
@@ -477,6 +754,10 @@ class ServerTransferExporter
                     'uuid' => $environment->uuid,
                     'name' => $environment->name,
                     'description' => $environment->description,
+                    // Keyed by resource uuid; only the positions of exported resources.
+                    'canvas_positions' => collect($environment->canvas_positions ?? [])
+                        ->only($envApps->pluck('uuid')->merge($envDbs->pluck('uuid'))->merge($envServices->pluck('uuid')))
+                        ->all(),
                     'shared_environment_variables' => $this->exportSharedEnvVars(
                         SharedEnvironmentVariable::query()
                             ->where('type', 'environment')
@@ -486,8 +767,102 @@ class ServerTransferExporter
                     'applications' => $envApps->map(fn (Application $app) => $this->exportApplication($app, $destinationUuidByKey))->all(),
                     'databases' => $envDbs->map(fn (Model $db) => $this->exportDatabase($db, $destinationUuidByKey))->all(),
                     'services' => $envServices->map(fn (Service $service) => $this->exportService($service, $destinationUuidByKey))->all(),
+                    'resource_links' => $this->exportResourceLinks($environment, $envApps, $envDbs, $envServices, $leftOutLinks),
                 ];
             })->values()->all(),
+        ];
+    }
+
+    /**
+     * The icon file travels in the bundle; the target stores it in its own icon storage.
+     *
+     * @param  list<string>  $warnings
+     * @return array{content_base64: string, extension: string, mime: string}|null
+     */
+    private function exportProjectIcon(Project $project, array &$warnings): ?array
+    {
+        if (blank($project->icon_path)) {
+            return null;
+        }
+
+        try {
+            $contents = app(ProjectIconStorageService::class)->projectContents($project);
+        } catch (Throwable) {
+            $contents = null;
+        }
+        if (! is_string($contents) || $contents === '') {
+            $warnings[] = "The icon of project {$project->name} cannot be read, so it is not transferred. Upload it again on the target instance.";
+
+            return null;
+        }
+        if (strlen($contents) > self::MAX_PROJECT_ICON_BYTES) {
+            $warnings[] = "The icon of project {$project->name} is larger than 2 MB, so it is not transferred. Upload it again on the target instance.";
+
+            return null;
+        }
+
+        return [
+            'content_base64' => base64_encode($contents),
+            'extension' => strtolower(pathinfo($project->icon_path, PATHINFO_EXTENSION)) ?: 'jpg',
+            'mime' => (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents) ?: 'application/octet-stream',
+        ];
+    }
+
+    /**
+     * Canvas links whose two resources are both exported. Each end is the kind and uuid of a resource of the
+     * environment, the same keys that the import uses for its resource maps.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $databases
+     * @param  Collection<int, Service>  $services
+     * @return list<array{uuid: string, label: string|null, source: array{kind: string, uuid: string}, target: array{kind: string, uuid: string}}>
+     */
+    private function exportResourceLinks(Environment $environment, Collection $applications, Collection $databases, Collection $services, int &$leftOut): array
+    {
+        $ends = collect();
+        foreach (['application' => $applications, 'database' => $databases, 'service' => $services] as $kind => $resources) {
+            foreach ($resources as $resource) {
+                $ends->put($resource->getMorphClass().':'.$resource->getKey(), ['kind' => $kind, 'uuid' => $resource->uuid]);
+            }
+        }
+
+        $out = [];
+        foreach ($environment->resourceLinks()->orderBy('id')->get() as $link) {
+            $source = $ends->get($link->source_type.':'.$link->source_id);
+            $target = $ends->get($link->target_type.':'.$link->target_id);
+            if (! $source || ! $target) {
+                $leftOut++;
+
+                continue;
+            }
+            $out[] = ['uuid' => $link->uuid, 'label' => $link->label, 'source' => $source, 'target' => $target];
+        }
+
+        return $out;
+    }
+
+    /**
+     * The target imports the config disabled. Enabling it there removes the runner containers of the source.
+     *
+     * @return array<string, mixed>
+     */
+    private function exportGithubRunnerConfig(GithubRunnerConfig $config): array
+    {
+        return [
+            'uuid' => $config->uuid,
+            'github_app_uuid' => $config->githubApp?->uuid,
+            'labels' => $config->labels ?? [],
+            'is_enabled' => (bool) $config->is_enabled,
+            'is_dedicated' => (bool) $config->is_dedicated,
+            'allow_pull_requests' => (bool) $config->allow_pull_requests,
+            'max_runners' => $config->max_runners,
+            'docker_mode' => $config->docker_mode?->value,
+            'runner_image' => $config->runner_image,
+            'cpu_limit' => $config->cpu_limit,
+            'memory_limit' => $config->memory_limit,
+            'capacity_wait_timeout' => $config->capacity_wait_timeout,
+            'idle_timeout' => $config->idle_timeout,
+            'job_timeout' => $config->job_timeout,
         ];
     }
 
@@ -533,6 +908,8 @@ class ServerTransferExporter
             'docker_compose',
             'docker_compose_raw',
             'custom_labels',
+            'is_maintenance_enabled',
+            'maintenance_page',
         ] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $application->{$hidden};
@@ -553,9 +930,11 @@ class ServerTransferExporter
 
         $source = null;
         if ($application->source_type === GithubApp::class && $application->source) {
-            $source = ['type' => 'github_app', 'uuid' => $application->source->uuid];
+            $source = ['type' => 'github_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
         } elseif ($application->source_type === GitlabApp::class && $application->source) {
-            $source = ['type' => 'gitlab_app', 'uuid' => $application->source->uuid];
+            $source = ['type' => 'gitlab_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
+        } elseif ($application->source_type === GiteaApp::class && $application->source) {
+            $source = ['type' => 'gitea_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
         }
 
         return [
@@ -571,6 +950,7 @@ class ServerTransferExporter
             'scheduled_tasks' => $this->exportScheduledTasks($application->scheduled_tasks()->get()),
             'tags' => $this->exportTags($application->tags),
             'previews' => $this->exportPreviews($application->previews),
+            'secret_manager_link' => $this->exportSecretManagerLink($application),
             'source' => $source,
             'private_key_uuid' => $application->private_key?->uuid,
             'had_git_source' => filled($application->source_id),
@@ -615,6 +995,11 @@ class ServerTransferExporter
             }
         }
 
+        // Not fillable
+        if (in_array('include_coolify_default_variables', $columns, true)) {
+            $attrs['include_coolify_default_variables'] = $database->include_coolify_default_variables;
+        }
+
         $destinationKey = $database->destination_type.':'.$database->destination_id;
 
         return [
@@ -638,6 +1023,7 @@ class ServerTransferExporter
             'scheduled_backups' => method_exists($database, 'scheduledBackups')
                 ? $this->exportScheduledBackups($database->scheduledBackups)
                 : [],
+            'secret_manager_link' => $this->exportSecretManagerLink($database),
         ];
     }
 
@@ -671,8 +1057,8 @@ class ServerTransferExporter
             $attrs[$field] = $service->{$field};
         }
 
-        // Hidden compose fields
-        foreach (['docker_compose', 'docker_compose_raw'] as $hidden) {
+        // Hidden compose fields, maintenance mode and the Coolify default variables switch (not fillable)
+        foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $service->{$hidden};
             }
@@ -688,6 +1074,7 @@ class ServerTransferExporter
             'environment_variables' => $this->exportEnvVars($service->environment_variables()->get()),
             'scheduled_tasks' => $this->exportScheduledTasks($service->scheduled_tasks()->get()),
             'tags' => $this->exportTags($service->tags),
+            'secret_manager_link' => $this->exportSecretManagerLink($service),
             'applications' => $service->applications
                 ->map(fn ($app) => $this->exportServiceApplication($app))
                 ->values()
@@ -864,8 +1251,11 @@ class ServerTransferExporter
                 'is_shared' => (bool) $variable->is_shared,
                 'is_required' => (bool) ($variable->is_required ?? false),
                 'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
+                'preserve_compose_null' => (bool) $variable->preserve_compose_null,
                 'comment' => $variable->comment,
                 'order' => $variable->order,
+                // The Coolify version that created the variable.
+                'version' => $variable->version,
             ];
         }
 
@@ -982,7 +1372,9 @@ class ServerTransferExporter
                 'database_backup_retention_max_storage_s3' => $backup->database_backup_retention_max_storage_s3,
                 'timeout' => $backup->timeout,
                 'disable_local_backup' => (bool) ($backup->disable_local_backup ?? false),
+                'missing_backup_notification_days' => $backup->missing_backup_notification_days,
                 's3_storage_uuid' => $backup->s3?->uuid,
+                's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                 'had_s3_storage' => filled($backup->s3_storage_id),
             ];
         }
@@ -1014,6 +1406,10 @@ class ServerTransferExporter
             'metadata' => $app->metadata,
             'pull_requests' => $app->pull_requests,
             'administration' => $app->administration,
+            'organization_self_hosted_runners' => $app->organization_self_hosted_runners,
+            'actions' => $app->actions,
+            'webhook_events' => $app->webhook_events,
+            'runner_group_id' => $app->runner_group_id,
             'private_key_uuid' => $app->privateKey?->uuid,
             'webhook_url_hint' => '/webhooks/source/github/events',
         ];
@@ -1055,6 +1451,33 @@ class ServerTransferExporter
     /**
      * @return array<string, mixed>
      */
+    private function exportGiteaApp(GiteaApp $app): array
+    {
+        return [
+            'uuid' => $app->uuid,
+            'name' => $app->name,
+            'organization' => $app->organization,
+            'api_url' => $app->api_url,
+            'html_url' => $app->html_url,
+            'custom_port' => $app->custom_port,
+            'custom_user' => $app->custom_user,
+            'is_system_wide' => false,
+            'is_public' => (bool) $app->is_public,
+            'client_id' => $app->client_id,
+            'client_secret' => $app->client_secret,
+            'access_token' => $app->access_token,
+            'refresh_token' => $app->refresh_token,
+            'expires_at' => $app->expires_at,
+            'redirect_uri' => $app->redirect_uri,
+            'webhook_secret' => $app->webhook_secret,
+            'private_key_uuid' => $app->privateKey?->uuid,
+            'webhook_url_hint' => '/webhooks/source/gitea/events',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function exportS3Storage(S3Storage $storage): array
     {
         return [
@@ -1081,6 +1504,85 @@ class ServerTransferExporter
             'token' => $token->token,
             'name' => $token->name,
             'description' => $token->description,
+        ];
+    }
+
+    /**
+     * The token is read through its cast, so the bundle has it in plaintext like the other credentials.
+     *
+     * @return array<string, mixed>
+     */
+    private function exportIntegrationToken(IntegrationToken $token): array
+    {
+        return [
+            'uuid' => $token->uuid,
+            'provider' => $token->provider,
+            'name' => $token->name,
+            'token' => $token->token,
+            'capabilities' => $token->capabilities,
+            'metadata' => $token->metadata,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exportDnsZone(DnsProviderZone $zone): array
+    {
+        return [
+            'uuid' => $zone->uuid,
+            'integration_token_uuid' => $zone->integrationToken->uuid,
+            'provider_zone_id' => $zone->provider_zone_id,
+            'name' => $zone->name,
+            'account_id' => $zone->account_id,
+            'account_name' => $zone->account_name,
+        ];
+    }
+
+    /**
+     * The ownership comment proves at the provider that this instance created the record. The target compares it
+     * with the remote comment before it takes ownership.
+     *
+     * @param  array<string, array{kind: string, uuid: string}|null>  $resourceKeys
+     * @return array<string, mixed>
+     */
+    private function exportManagedDnsRecord(ManagedDnsRecord $record, array $resourceKeys): array
+    {
+        return [
+            'uuid' => $record->uuid,
+            'integration_token_uuid' => $record->integrationToken->uuid,
+            'dns_provider_zone_uuid' => $record->zone->uuid,
+            'provider_record_id' => $record->provider_record_id,
+            'type' => $record->type,
+            'name' => $record->name,
+            'content' => $record->content,
+            'owned' => (bool) $record->owned,
+            'ownership_comment' => $record->ownershipComment(),
+            'references' => $record->references
+                ->map(fn (ManagedDnsRecordReference $reference) => $resourceKeys[$reference->resource_type.':'.$reference->resource_id] ?? null)
+                ->filter()
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array{uuid: string, integration_token_uuid: string, settings: array<string, mixed>|null}|null
+     */
+    private function exportSecretManagerLink(Model $resource): ?array
+    {
+        if (! method_exists($resource, 'secretManagerLink')) {
+            return null;
+        }
+        $link = $resource->secretManagerLink()->with('integrationToken')->first();
+        if (! $link) {
+            return null;
+        }
+
+        return [
+            'uuid' => $link->uuid,
+            'integration_token_uuid' => $link->integrationToken->uuid,
+            'settings' => $link->settings,
         ];
     }
 
@@ -1140,6 +1642,8 @@ class ServerTransferExporter
                 'git_type' => $preview->git_type,
                 'docker_compose_domains' => $preview->docker_compose_domains,
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
+                'domain_port_overrides' => $preview->domain_port_overrides,
+                'max_restart_count' => $preview->max_restart_count,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],
@@ -1194,7 +1698,9 @@ class ServerTransferExporter
                         'retention_days_s3' => $backup->retention_days_s3,
                         'retention_max_storage_s3' => $backup->retention_max_storage_s3,
                         'timeout' => $backup->timeout,
+                        'missing_backup_notification_days' => $backup->missing_backup_notification_days,
                         's3_storage_uuid' => $backup->s3?->uuid,
+                        's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                         'had_s3_storage' => filled($backup->s3_storage_id),
                     ];
                 }

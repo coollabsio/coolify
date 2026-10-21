@@ -109,7 +109,7 @@ class Analytics extends Component
     private const MAX_LEADERBOARD_APPS = 200;
 
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = ['country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
 
     /**
      * Per-request cache of Sentinel key => display metadata, so resolving a name/domain/link

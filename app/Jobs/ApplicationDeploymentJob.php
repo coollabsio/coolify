@@ -13,7 +13,9 @@ use App\Exceptions\DeploymentException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
@@ -109,7 +111,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $dockerImagePreviewTag = null;
 
-    private GithubApp|GitlabApp|string $source = 'other';
+    private GithubApp|GitlabApp|GiteaApp|string $source = 'other';
 
     private StandaloneDocker|SwarmDocker $destination;
 
@@ -633,6 +635,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->run_post_deployment_command();
         } catch (Exception $e) {
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
+        }
+
+        // Domains can change with a deployment, so the maintenance routes follow them.
+        if ($this->pull_request_id === 0 && $this->application->is_maintenance_enabled) {
+            try {
+                $this->application->syncMaintenancePage();
+            } catch (Exception $e) {
+                \Log::warning('Maintenance page update failed for '.$this->deployment_uuid.': '.$e->getMessage());
+            }
         }
 
     }
@@ -1575,6 +1586,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'save' => 'local_image_found',
         ]);
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
+            $this->application_deployment_queue->addLogEntry("Image ({$this->production_image_name}) not found on the server. Pulling it from the Docker registry.");
             $this->execute_remote_command([
                 'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
                 'ignore_errors' => true,
@@ -3554,11 +3566,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $variables;
     }
 
+    /**
+     * Without the `...` entry, the list replaces the packages that Railpack generates
+     * (for example libatomic1, which Node.js 25+ needs at runtime).
+     */
     private function merge_railpack_deploy_apt_packages(Collection $variables): Collection
     {
         $packages = collect(preg_split('/\s+/', trim((string) $variables->get('RAILPACK_DEPLOY_APT_PACKAGES', ''))) ?: [])
             ->filter()
             ->values();
+
+        if (! $packages->contains('...')) {
+            $packages->prepend('...');
+        }
 
         foreach (['curl', 'wget'] as $package) {
             if (! $packages->contains($package)) {
@@ -3645,7 +3665,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." {$this->workdir}";
 
         return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
+            ."\n".railpackBuilderLockedScript('('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
     }
 
     private function decode_railpack_config(string $config, string $source): array
@@ -4245,25 +4265,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }
         if ($this->mainServer->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
-            $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$this->container_name]['logging'] = generate_log_drain_configuration($this->mainServer);
         }
         if ($this->application->settings->is_gpu_enabled) {
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
-                [
-                    'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
-                    'capabilities' => ['gpu'],
-                    'options' => data_get($this->application, 'settings.gpu_options', []),
-                ],
+                $this->application->settings->gpuDeviceReservation(),
             ];
-            if (data_get($this->application, 'settings.gpu_count')) {
-                $count = data_get($this->application, 'settings.gpu_count');
-                if ($count === 'all') {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = $count;
-                } else {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = (int) $count;
-                }
-            } elseif (data_get($this->application, 'settings.gpu_device_ids')) {
-                $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['ids'] = data_get($this->application, 'settings.gpu_device_ids');
+            if (ApplicationSetting::parseGpuOptions($this->application->settings->gpu_options) === null) {
+                $this->application_deployment_queue->addLogEntry('GPU options are not a valid key=value list or YAML mapping. They are ignored.');
             }
         }
         if ($this->application->isHealthcheckDisabled()) {
@@ -4293,6 +4302,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->pull_request_id === 0) {
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
+            if ($this->application->settings->is_gpu_enabled && data_get($custom_compose, 'deploy.resources.reservations.devices')) {
+                data_forget($custom_compose, 'deploy.resources.reservations.devices');
+                $this->application_deployment_queue->addLogEntry('GPU access is enabled in the GPU settings, so --gpus in Custom Docker Options is ignored.');
+            }
             $unsupported_options = unsupportedDockerRunOptions($this->application->custom_docker_run_options);
             if (count($unsupported_options) > 0) {
                 $this->application_deployment_queue->addLogEntry('Warning: These custom Docker options are not supported and were not applied: '.implode(', ', $unsupported_options).'. See https://coolify.io/docs/applications/builds/custom-docker-options for the supported options.', 'stderr');
@@ -6054,9 +6067,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $unsuccessful = $deployments->first(fn (ApplicationDeploymentQueue $deployment) => $deployment->status !== ApplicationDeploymentStatus::FINISHED->value);
+        // Additional servers pull the image and do not clone, so only the main deployment has the commit message.
+        $parentDeployment = ApplicationDeploymentQueue::query()->where('deployment_uuid', $parentDeploymentUuid)->first();
         $this->application->environment->project->team?->notify($unsuccessful
-            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview)
-            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview));
+            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview, $parentDeployment)
+            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview, $parentDeployment));
     }
 
     /**
@@ -6065,7 +6080,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function sendDeploymentNotification(string $notificationClass): void
     {
         $this->application->environment->project->team?->notify(
-            new $notificationClass($this->application, $this->deployment_uuid, $this->preview)
+            new $notificationClass($this->application, $this->deployment_uuid, $this->preview, $this->application_deployment_queue)
         );
     }
 
@@ -6091,7 +6106,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->failDeployment();
 
-        // Log comprehensive error information
+        // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
+        // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written
+        // because their truncated arguments can hold partial secrets that redaction cannot match.
         $errorMessage = $exception->getMessage() ?: 'Unknown error occurred';
         $errorCode = $exception->getCode();
         $errorClass = get_class($exception);
@@ -6118,14 +6135,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $previousClass = get_class($previous);
             $this->application_deployment_queue->addLogEntry("  {$previousClass}: {$previousMessage}", 'stderr', hidden: true);
             $this->application_deployment_queue->addLogEntry("  at {$previous->getFile()}:{$previous->getLine()}", 'stderr', hidden: true);
-        }
-
-        // Log first few lines of stack trace for debugging
-        $trace = $exception->getTraceAsString();
-        $traceLines = explode("\n", $trace);
-        $this->application_deployment_queue->addLogEntry('Stack trace (first 5 lines):', 'stderr', hidden: true);
-        foreach (array_slice($traceLines, 0, 5) as $traceLine) {
-            $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr', hidden: true);
         }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
 

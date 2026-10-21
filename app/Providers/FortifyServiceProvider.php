@@ -7,6 +7,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Models\OauthSetting;
 use App\Models\User;
+use App\Support\PasskeyRelyingParty;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ServiceProvider;
@@ -68,6 +69,7 @@ class FortifyServiceProvider extends ServiceProvider
                     fn (OauthSetting $oauthSetting) => $oauthSetting->couldBeEnabled() && $oauthSetting->allowsUserCreation()
                 ),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
+                'passkeys_available' => PasskeyRelyingParty::isAvailable(),
             ]);
         });
 
@@ -108,7 +110,10 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
 
         Fortify::confirmPasswordView(function () {
-            return view('auth.confirm-password');
+            return view('auth.confirm-password', [
+                'can_confirm_with_passkey' => PasskeyRelyingParty::isAvailable()
+                    && auth()->user()->hasPasskeysEnabled(),
+            ]);
         });
 
         Fortify::twoFactorChallengeView(function () {
