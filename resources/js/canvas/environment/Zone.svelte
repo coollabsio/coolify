@@ -59,7 +59,7 @@
         {#if zone.ip}
           <button
             type="button"
-            class="truncate font-mono text-[11px] text-neutral-400 hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim"
+            class="shrink-0 font-mono text-[11px] text-neutral-400 hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim"
             title={showIp ? 'Hide IP address' : 'Show IP address'}
             onpointerdown={e => e.stopPropagation()}
             onclick={() => (showIp = !showIp)}

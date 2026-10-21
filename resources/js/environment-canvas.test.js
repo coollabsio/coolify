@@ -6,6 +6,7 @@ import {
   MAX_ROWS,
   COLUMN_GAP,
   ROW_GAP,
+  SERVER_ZONE_MIN_WIDTH,
   ZONE_HEADER,
   ZONE_PADDING,
   ZONE_GAP,
@@ -128,6 +129,13 @@ test('zone boxes wrap their cards with padding and header', () => {
     { id: box.id, x: box.x, y: box.y, width: box.width, height: box.height, nodes: box.nodes },
     { id: 's1', x: -ZONE_PADDING, y: -ZONE_PADDING - ZONE_HEADER, width: 660 + ZONE_PADDING * 2, height: 130 + ZONE_PADDING * 2 + ZONE_HEADER, nodes: ['a', 'd'] },
   );
+});
+
+test('server canvas zone boxes are wide enough for their header, also with one card', () => {
+  const g = graph([node('a', 'application', 's1')], { zones: [{ id: 's1', name: 'One', details: {} }] });
+  const [box] = zoneBoxes(g, { a: { x: 0, y: 0 } }, { a: { width: 260, height: 100 } });
+  assert.equal(box.x, -ZONE_PADDING);
+  assert.equal(box.width, SERVER_ZONE_MIN_WIDTH);
 });
 
 test('zone boxes skip zones without cards', () => {
@@ -385,12 +393,13 @@ test('server view: saved groups of different environments that would overlap are
   assert.ok(Math.abs(p.x - s.x) >= CARD_WIDTH || Math.abs(p.y - s.y) >= estimateNodeHeight(g.nodes[0]), 'the groups do not cover each other');
 });
 
-test('status summary counts resources by tone, without unmanaged containers', () => {
+test('status summary counts resources by tone, without unmanaged containers and placeholder cards', () => {
   const nodes = [
     node('a', 'application', 'z', { status: 'running:healthy' }),
     node('b', 'database', 'z', { status: 'exited:unhealthy' }),
     node('c', 'service', 'z', { status: 'exited' }),
     node('container:1', 'container', 'z', { status: 'exited' }),
+    node('empty:1', 'empty', 'z', { status: null }),
   ];
   assert.deepEqual(statusSummary(nodes), { ok: 1, warn: 0, bad: 2, busy: 0, idle: 0 });
   assert.equal(statusWord('exited:unhealthy'), 'Exited');

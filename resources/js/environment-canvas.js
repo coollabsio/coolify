@@ -12,6 +12,7 @@ export const ZONE_GAP = 72;
 export const ZONE_PADDING = 24;
 export const ZONE_HEADER = 40;
 export const SERVER_ZONE_HEADER = 68; // server canvas: a second header row with host facts, proxy and usage
+export const SERVER_ZONE_MIN_WIDTH = 560; // server canvas: room for the header (name, IP, status, host facts) above one card
 export const MAX_CHILDREN = 5;
 export const MAX_ROWS = 6; // auto placement wraps a type into another column after this many cards
 export const NO_SERVER = 'No server';
@@ -414,7 +415,7 @@ export function zoneBoxes(graph, positions, sizes = {}) {
       nodes: group.nodes.map(n => n.id),
       x: minX - ZONE_PADDING,
       y: minY - ZONE_PADDING - zoneHeader(group.zone),
-      width: maxX - minX + ZONE_PADDING * 2,
+      width: Math.max(maxX - minX + ZONE_PADDING * 2, group.zone?.details ? SERVER_ZONE_MIN_WIDTH : 0),
       height: maxY - minY + ZONE_PADDING * 2 + zoneHeader(group.zone),
     });
   }
@@ -541,10 +542,10 @@ export function fitView(bounds, area, readable = false) {
   return { z, x: x - bounds.minX * z, y: y - bounds.minY * z };
 }
 
-/** Resource cards per status tone ({ok, warn, bad, busy, idle}); unmanaged containers are not counted. */
+/** Resource cards per status tone ({ok, warn, bad, busy, idle}); unmanaged containers and placeholder cards are not counted. */
 export function statusSummary(nodes) {
   const out = { ok: 0, warn: 0, bad: 0, busy: 0, idle: 0 };
-  for (const n of nodes || []) if (n.type !== 'container' && !isSource(n)) out[statusTone(n.status)]++;
+  for (const n of nodes || []) if (n.type !== 'container' && n.type !== 'empty' && !isSource(n)) out[statusTone(n.status)]++;
   return out;
 }
 
