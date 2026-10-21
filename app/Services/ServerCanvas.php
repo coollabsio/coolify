@@ -65,6 +65,23 @@ class ServerCanvas
             ->reject(fn (Environment $environment) => $used->has($environment->id))
             ->map(fn (Environment $environment) => $this->canvas->emptyNode($environment->project, $environment, $zoneOf($environment->project), $environment->project->name.' / '.$environment->name, $canEdit))
             ->values();
+        // The canvas draws a zone around its cards, so a server without cards gets a placeholder card.
+        $filled = $nodes->concat($empty)->pluck('zone')->flip();
+        $bare = $servers->reject(fn (Server $server) => $filled->has($server->uuid))->map(fn (Server $server) => [
+            'id' => 'empty-server:'.$server->uuid,
+            'type' => 'empty',
+            'name' => 'No resources yet',
+            'subtitle' => 'Open to see this server',
+            'status' => null,
+            'zone' => $server->uuid,
+            'extra_zones' => [],
+            'urls' => [],
+            'children' => [],
+            'link' => route('server.show', ['server_uuid' => $server->uuid]),
+            'context' => null,
+            'project' => null,
+            'environment' => null,
+        ])->values();
 
         return [
             'title' => $single ? $single->name : 'Servers',
@@ -80,7 +97,7 @@ class ServerCanvas
             'zones' => $servers->map(fn (Server $server) => [...$this->canvas->zone($server, $canReadSensitive), 'details' => $this->details($server)])
                 ->when($empty->contains('zone', EnvironmentCanvas::EMPTY_ZONE), fn (Collection $zones) => $zones->push($this->canvas->emptyZone()))
                 ->values()->all(),
-            'nodes' => $nodes->concat($empty)->all(),
+            'nodes' => $nodes->concat($empty)->concat($bare)->all(),
             'links' => collect($graph['links'])->filter(fn (array $link) => $shown->has($link['source']) && $shown->has($link['target']))->values()->all(),
             'positions' => [],
         ];

@@ -105,6 +105,24 @@ test('the servers canvas puts empty environments of a project without resources 
         ->and(collect($response->json('nodes'))->where('project.uuid', $bare->uuid)->pluck('zone')->all())->toBe([$this->db->uuid]);
 });
 
+test('the servers canvas shows a server without resources as a placeholder card in its zone', function () {
+    serverCanvasApp($this->environment, $this->web, 'storefront');
+    Environment::query()->where('project_id', $this->project->id)->where('name', '!=', 'staging')->delete();
+
+    $response = serverCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/servers/canvas')
+        ->assertOk();
+
+    $placeholder = collect($response->json('nodes'))->firstWhere('zone', $this->db->uuid);
+
+    expect($placeholder)->toMatchArray([
+        'id' => 'empty-server:'.$this->db->uuid,
+        'type' => 'empty',
+        'name' => 'No resources yet',
+        'link' => route('server.show', ['server_uuid' => $this->db->uuid]),
+    ])->and(collect($response->json('nodes'))->where('zone', $this->web->uuid)->pluck('name')->all())->toBe(['storefront']);
+});
+
 test('one server canvas shows only that server, and links that leave it are hidden', function () {
     $app = serverCanvasApp($this->environment, $this->web, 'storefront');
     $api = serverCanvasApp($this->environment, $this->db, 'orders-api');
