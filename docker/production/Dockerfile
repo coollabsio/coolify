@@ -1,7 +1,6 @@
 # Versions
-# https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-# Pinned: v5 moved user bundles to /etc/s6-overlay/user-bundles.d and breaks startup (#12141)
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v4.5.1
+# Temporary: serversideup/php v4.5.1 (8.4-fpm-nginx-alpine) rebuilt on the patched PHP 8.4 release
+ARG SERVERSIDEUP_PHP_IMAGE=ghcr.io/coollabsio/serversideup-php:8.4-fpm-nginx-alpine-v4.5.1-hotfix
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.7.3
 # https://www.postgresql.org/support/versioning/
@@ -19,7 +18,7 @@ ARG GROUP_ID=9999
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
+FROM ${SERVERSIDEUP_PHP_IMAGE} AS base
 
 USER root
 
@@ -69,7 +68,7 @@ FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 # =================================================================
 # Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+FROM ${SERVERSIDEUP_PHP_IMAGE} AS terminal-dependencies
 
 USER root
 
@@ -87,7 +86,7 @@ COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM ${SERVERSIDEUP_PHP_IMAGE}
 
 ARG USER_ID
 ARG GROUP_ID
