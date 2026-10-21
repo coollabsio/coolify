@@ -13,13 +13,21 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /** A manual check runs in the web request, so it does not wait for CDN retries. */
+    public int $cdnTries = 3;
+
+    public function __construct(int $cdnTries = 3)
+    {
+        $this->cdnTries = $cdnTries;
+    }
+
     public function handle(): void
     {
         try {
             if (isDev() || isCloud()) {
                 return;
             }
-            $versions = refresh_versions_file();
+            $versions = refresh_versions_file($this->cdnTries);
             if ($versions === null) {
                 return;
             }

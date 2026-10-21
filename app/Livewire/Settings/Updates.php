@@ -159,7 +159,7 @@ class Updates extends Component
     public function checkManually()
     {
         $this->authorize('update', $this->settings);
-        CheckForUpdatesJob::dispatchSync();
+        CheckForUpdatesJob::dispatchSync(cdnTries: 1);
         $this->dispatch('updateAvailable');
         $settings = instanceSettings();
         if ($settings->new_version_available) {

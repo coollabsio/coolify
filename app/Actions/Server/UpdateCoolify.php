@@ -6,7 +6,6 @@ use App\Jobs\DatabaseBackupJob;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Services\CoolifyUpgradeStatus;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -37,7 +36,8 @@ class UpdateCoolify
 
         // Fetch fresh version from CDN instead of using cache
         try {
-            $response = Http::retry(3, 1000)->timeout(10)
+            // A manual update runs in the web request, so it does not wait for a retry; it falls back to the cache.
+            $response = cdn_http(tries: $manual_update ? 1 : 3)
                 ->get(config('constants.coolify.versions_url'));
 
             if ($response->successful()) {
