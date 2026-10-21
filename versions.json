@@ -13,7 +13,7 @@
             "version": "1.0.13"
         },
         "sentinel": {
-            "version": "0.0.21"
+            "version": "1.1.2"
         }
     },
     "traefik": {
