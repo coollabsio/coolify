@@ -163,3 +163,11 @@ it('preserves other component versions when preventing Coolify downgrade', funct
     $job = new CheckForUpdatesJob;
     $job->handle();
 });
+
+it('keeps the local versions.json when the CDN fetch fails', function () {
+    Http::fake(['*' => Http::response('', 500)]);
+    File::shouldReceive('put')->never();
+    Cache::shouldReceive('forget')->never();
+
+    expect(refresh_versions_file())->toBeNull();
+});

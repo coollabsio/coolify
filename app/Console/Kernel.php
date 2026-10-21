@@ -51,6 +51,11 @@ class Kernel extends ConsoleKernel
             ->name('cleanup:ssh-mux')
             ->hourly()
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
+        // Every cloud node reads its own versions.json, so each node refreshes it (no onOneServer).
+        $this->scheduleInstance->call(fn () => refresh_versions_file())
+            ->name('versions:refresh-local')
+            ->hourly()
+            ->when(fn () => isCloud());
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->call(fn () => app(ScheduledJobDeliveryService::class)->deleteOldOccurrences())
             ->name('cleanup:scheduled-job-occurrences')

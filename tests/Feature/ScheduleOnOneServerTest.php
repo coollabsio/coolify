@@ -41,6 +41,20 @@ it('schedules ssh mux cleanup locally on every scheduler host', function () {
     expect($event->getSummaryForDisplay())->toBe('cleanup:ssh-mux');
 });
 
+it('refreshes the local versions.json hourly on every cloud node', function (bool $cloud) {
+    config(['constants.coolify.self_hosted' => ! $cloud]);
+    $schedule = app(Schedule::class);
+
+    $event = collect($schedule->events())->first(
+        fn ($e) => (string) $e->description === 'versions:refresh-local'
+    );
+
+    expect($event)->not->toBeNull();
+    expect($event->onOneServer)->toBeFalse();
+    expect($event->expression)->toBe('0 * * * *');
+    expect($event->filtersPass(app()))->toBe($cloud);
+})->with(['cloud' => true, 'self-hosted' => false]);
+
 it('schedules every production job with onOneServer', function () {
     $schedule = app(Schedule::class);
 
