@@ -466,34 +466,19 @@ it('splits scheduled backup settings and executions across dedicated urls', func
     $this->get($generalUrl)
         ->assertOk()
         ->assertSee('General')
-        ->assertSee('S3 storage')
-        ->assertSee('Retention')
         ->assertSee('Executions')
         ->assertSee('Danger Zone')
         ->assertSee('Backup schedule')
         ->assertSee('File-level consistency')
-        ->assertDontSee('Enable S3')
-        ->assertDontSee('Backups to keep')
-        ->assertDontSee('Review generated archives')
-        ->assertDontSee('Delete backup schedule');
-
-    $this->get($generalUrl.'/s3')
-        ->assertOk()
         ->assertSeeText('No validated S3 storage')
-        ->assertDontSee('Local copy')
-        ->assertDontSee('Enable S3')
-        ->assertDontSee('Disable S3')
-        ->assertDontSee('Backups to keep')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Review generated archives');
-
-    $this->get($generalUrl.'/retention')
-        ->assertOk()
         ->assertSee('Local backups')
         ->assertSee('S3 backups')
         ->assertSee('Backups to keep')
-        ->assertDontSee('File-level consistency')
-        ->assertDontSee('Review generated archives');
+        ->assertDontSee('Review generated archives')
+        ->assertDontSee('Delete backup schedule');
+
+    $this->get($generalUrl.'/s3')->assertRedirect($generalUrl);
+    $this->get($generalUrl.'/retention')->assertRedirect($generalUrl);
 
     $this->get($generalUrl.'/executions')
         ->assertOk()
@@ -874,6 +859,7 @@ it('deletes an individual S3 archive from the storage recorded on its execution'
         'local_storage_deleted' => true,
         's3_uploaded' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $originalStorage->id, 's3_uploaded' => true]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')
         ->once()
@@ -953,7 +939,6 @@ it('enables and disables volume S3 backups from the S3 title action', function (
     $component = Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ])
         ->assertSee('Enable S3')
         ->assertDontSee('You do not have permission to perform this action.')
@@ -986,9 +971,8 @@ it('persists S3 settings the first time when a volume backup schedule does not e
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ])
-        ->assertSet('s3StorageId', $s3Storage->id)
+        ->assertSet('s3StorageIds', [$s3Storage->id])
         ->call('toggleS3')
         ->assertSet('saveToS3', true)
         ->assertDispatched('success');
@@ -1018,9 +1002,8 @@ it('persists the selected S3 storage when a volume backup schedule does not exis
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ])
-        ->set('s3StorageId', $s3Storage->id)
+        ->set('s3StorageIds', [$s3Storage->id])
         ->assertDispatched('success');
 
     $backup = ScheduledVolumeBackup::query()->sole();
@@ -1042,7 +1025,6 @@ it('shows and saves volume S3 retention while S3 backups are disabled', function
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 'retention',
     ])
         ->assertSee('S3 backups')
         ->set('retentionAmountS3', 12)
@@ -1069,7 +1051,6 @@ it('allows team owners to edit volume backup retention settings', function () {
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 'retention',
     ])->assertDontSee('You do not have permission to perform this action.');
 });
 
@@ -1096,7 +1077,6 @@ it('does not enable S3 backups when another volume backup setting is invalid', f
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ])
         ->set('frequency', 'not a valid schedule')
         ->call('toggleS3')
@@ -1140,10 +1120,9 @@ it('does not change S3 storage when another volume backup setting is invalid', f
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ])
         ->set('frequency', 'not a valid schedule')
-        ->set('s3StorageId', $secondS3Storage->id)
+        ->set('s3StorageIds', [$secondS3Storage->id])
         ->assertHasErrors('frequency')
         ->assertNotDispatched('success');
 
@@ -1261,18 +1240,18 @@ it('lists and accepts only S3 storages of the resource team when the session tea
     $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application]);
 
     expect($component->get('availableS3Storages')->pluck('id')->all())->toBe([$resourceTeamStorage->id])
-        ->and($component->get('s3StorageId'))->toBe($resourceTeamStorage->id);
+        ->and($component->get('s3StorageIds'))->toBe([$resourceTeamStorage->id]);
 
     $component->set('frequency', 'daily')
         ->set('saveToS3', true)
-        ->set('s3StorageId', $otherTeamStorage->id)
-        ->assertHasErrors('s3StorageId')
+        ->set('s3StorageIds', [$otherTeamStorage->id])
+        ->assertHasErrors('s3StorageIds')
         ->call('save')
-        ->assertHasErrors('s3StorageId');
+        ->assertHasErrors('s3StorageIds');
 
     expect(ScheduledVolumeBackup::query()->count())->toBe(0);
 
-    $component->set('s3StorageId', $resourceTeamStorage->id)
+    $component->set('s3StorageIds', [$resourceTeamStorage->id])
         ->call('save')
         ->assertHasNoErrors();
 
@@ -1302,9 +1281,9 @@ it('only accepts a usable S3 storage owned by the current team', function () {
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
         ->set('frequency', 'daily')
         ->set('saveToS3', true)
-        ->set('s3StorageId', $foreignStorage->id)
+        ->set('s3StorageIds', [$foreignStorage->id])
         ->call('save')
-        ->assertHasErrors('s3StorageId');
+        ->assertHasErrors('s3StorageIds');
 
     expect(ScheduledVolumeBackup::query()->count())->toBe(0);
 });
@@ -1329,7 +1308,7 @@ it('saves the database-style S3 backup controls immediately', function () {
     ]);
 
     $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
-        ->assertSet('s3StorageId', $s3Storage->id)
+        ->assertSet('s3StorageIds', [$s3Storage->id])
         ->set('saveToS3', true)
         ->call('instantSave')
         ->set('disableLocalBackup', true)
@@ -1384,8 +1363,8 @@ it('saves the selected volume backup S3 storage immediately while S3 is disabled
         's3_storage_id' => $firstS3Storage->id,
     ]);
 
-    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application, 'section' => 's3'])
-        ->set('s3StorageId', $secondS3Storage->id)
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('s3StorageIds', [$secondS3Storage->id])
         ->assertDispatched('success');
 
     $backup = ScheduledVolumeBackup::query()->sole();
@@ -1419,7 +1398,6 @@ it('saves the archive behavior immediately and the local copy with the S3 form',
     $s3Component = Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ]);
     // The local copy choice belongs to the S3 form and is persisted by its explicit save.
     $s3Component->set('disableLocalBackup', true)->call('save')->assertDispatched('success');
@@ -1446,14 +1424,12 @@ it('allows volume S3 backups to be disabled when no usable storage remains', fun
     $component = Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
     ])
         ->assertSet('saveToS3', true)
         ->assertSeeText('S3 storage')
         ->assertSeeText('No validated S3 storage')
         ->assertSeeHtml('href="'.route('storage.index').'"')
         ->assertSeeText('Open S3 storage')
-        ->assertDontSee('Save')
         ->assertDontSee('Disable S3')
         ->assertDontSee('Local copy')
         ->call('toggleS3')
@@ -1493,6 +1469,7 @@ it('disables S3 volume backups when the storage is deleted', function () {
         's3_uploaded' => true,
         's3_cleanup_pending' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $s3Storage->id, 's3_uploaded' => true]);
 
     $s3Storage->delete();
 
@@ -1537,6 +1514,7 @@ it('marks historical executions deleted when their recorded S3 storage is remove
         's3_uploaded' => true,
         's3_cleanup_pending' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $originalStorage->id, 's3_uploaded' => true]);
 
     $originalStorage->delete();
 
@@ -1711,7 +1689,7 @@ it('deletes S3 archives from the storage recorded on each execution', function (
         'frequency' => 'daily',
         'save_s3' => true,
     ]);
-    ScheduledVolumeBackupExecution::create([
+    $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         's3_storage_id' => $originalStorage->id,
         'status' => 'success',
@@ -1719,6 +1697,7 @@ it('deletes S3 archives from the storage recorded on each execution', function (
         'local_storage_deleted' => true,
         's3_uploaded' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $originalStorage->id, 's3_uploaded' => true]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')
         ->once()
@@ -1984,7 +1963,8 @@ it('keeps the upload destination on the volume backup execution', function () {
     $execution = ScheduledVolumeBackupExecution::query()->sole();
 
     expect($execution->s3_storage_id)->toBe($s3Storage->id)
-        ->and($execution->s3->is($s3Storage))->toBeTrue();
+        ->and($execution->s3->is($s3Storage))->toBeTrue()
+        ->and($execution->s3Replicas()->sole()->s3_storage_id)->toBe($s3Storage->id);
 });
 
 it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and without a local archive', function () {
@@ -2043,6 +2023,7 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
     expect($execution->status)->toBe('success')
         ->and($execution->size)->toBe(128)
         ->and($execution->s3_uploaded)->toBeTrue()
+        ->and($execution->s3Replicas()->sole()->s3_uploaded)->toBeTrue()
         ->and($execution->local_storage_deleted)->toBeTrue();
 });
 
@@ -2251,15 +2232,26 @@ it('removes retained S3 archives from the storage recorded on each execution', f
         'status' => 'success',
         'filename' => '/data/coolify/backups/volumes/test/old.tar.gz',
         's3_uploaded' => true,
+        'created_at' => now()->subDays(2),
+    ]);
+    $oldExecution->s3Replicas()->create(['s3_storage_id' => $originalStorage->id, 's3_uploaded' => true]);
+    $retainedOriginalExecution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $originalStorage->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/retained-original.tar.gz',
+        's3_uploaded' => true,
         'created_at' => now()->subDay(),
     ]);
-    ScheduledVolumeBackupExecution::create([
+    $retainedOriginalExecution->s3Replicas()->create(['s3_storage_id' => $originalStorage->id, 's3_uploaded' => true]);
+    $newExecution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         's3_storage_id' => $newStorage->id,
         'status' => 'success',
         'filename' => '/data/coolify/backups/volumes/test/new.tar.gz',
         's3_uploaded' => true,
     ]);
+    $newExecution->s3Replicas()->create(['s3_storage_id' => $newStorage->id, 's3_uploaded' => true]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->with(['/data/coolify/backups/volumes/test/old.tar.gz'])->andReturnTrue();
     Storage::shouldReceive('build')
@@ -2271,7 +2263,10 @@ it('removes retained S3 archives from the storage recorded on each execution', f
 
     $method->invoke($job, $server);
 
-    expect($oldExecution->fresh()->s3_storage_deleted)->toBeTrue();
+    expect($oldExecution->fresh()->s3_storage_deleted)->toBeTrue()
+        ->and($oldExecution->s3Replicas()->sole()->s3_storage_deleted)->toBeTrue()
+        ->and($retainedOriginalExecution->fresh()->s3_storage_deleted)->toBeFalse()
+        ->and($newExecution->fresh()->s3_storage_deleted)->toBeFalse();
 });
 
 it('does not query execution history when local retention is unlimited', function () {
@@ -2584,6 +2579,7 @@ it('cleans an interrupted S3 upload and coordinates recovery with the backup loc
         'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
         's3_cleanup_pending' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $s3Storage->id]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->andReturnTrue();
     Storage::shouldReceive('build')->once()->andReturn($disk);
@@ -2593,7 +2589,7 @@ it('cleans an interrupted S3 upload and coordinates recovery with the backup loc
     $job->handle();
 
     expect($execution->fresh()->s3_cleanup_pending)->toBeFalse()
-        ->and($execution->fresh()->s3_storage_deleted)->toBeTrue();
+        ->and($execution->s3Replicas()->sole()->s3_storage_deleted)->toBeTrue();
 });
 
 it('cleans an interrupted upload from the execution S3 storage after a schedule switch', function () {
@@ -2632,6 +2628,7 @@ it('cleans an interrupted upload from the execution S3 storage after a schedule 
         'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
         's3_cleanup_pending' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $originalStorage->id]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->andReturnTrue();
     Storage::shouldReceive('build')
@@ -2642,7 +2639,7 @@ it('cleans an interrupted upload from the execution S3 storage after a schedule 
     VolumeBackupRecoveryJob::cleanupS3Upload($execution);
 
     expect($execution->fresh()->s3_cleanup_pending)->toBeFalse()
-        ->and($execution->fresh()->s3_storage_deleted)->toBeTrue();
+        ->and($execution->s3Replicas()->sole()->s3_storage_deleted)->toBeTrue();
 });
 
 it('keeps the S3 key tracked when interrupted upload cleanup must be retried', function () {
@@ -2673,6 +2670,7 @@ it('keeps the S3 key tracked when interrupted upload cleanup must be retried', f
         'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
         's3_cleanup_pending' => true,
     ]);
+    $execution->s3Replicas()->create(['s3_storage_id' => $s3Storage->id]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->andReturnFalse();
     Storage::shouldReceive('build')->once()->andReturn($disk);
@@ -2990,3 +2988,26 @@ it('fails the volume archive only on fatal tar errors', function (int $tarExitCo
     'file changed as we read it' => [1, 0],
     'fatal error' => [2, 2],
 ]);
+
+it('shows the backup actions in the header bar on every application backup page', function () {
+    config(['cache.default' => 'array', 'app.maintenance.driver' => 'file']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $showUrl = route('project.application.backup.show', [
+        'project_uuid' => $application->project()->uuid,
+        'environment_uuid' => $application->environment->uuid,
+        'application_uuid' => $application->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    foreach (['', '/executions', '/danger'] as $suffix) {
+        expect($this->get($showUrl.$suffix)->assertOk()->getContent())
+            ->toMatch('/x-teleport="#resource-action-hud-slot".*?wire:click="toggleEnabled".*?Disable backup.*?wire:click="backupNow"/s');
+    }
+});

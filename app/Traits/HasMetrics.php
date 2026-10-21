@@ -27,7 +27,63 @@ trait HasMetrics
         return convertContainerMemoryBytesToMegabytes($metrics);
     }
 
+    /**
+     * Root filesystem usage percentage over time. Disk history interleaves every
+     * mount, so we keep only the root mount before mapping.
+     */
+    public function getDiskMetrics(int $mins = 5): ?array
+    {
+        $rows = $this->fetchMetricRows('disk', $mins);
+        if ($rows === null) {
+            return null;
+        }
+
+        if (array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
+            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/'));
+        }
+
+        return $this->mapRows($rows, 'usedPercent', $mins);
+    }
+
+    /**
+     * Host load average (1 minute) over time.
+     */
+    public function getLoadMetrics(int $mins = 5): ?array
+    {
+        return $this->getMetrics('load', $mins, 'load1');
+    }
+
+    /**
+     * Network throughput over time, as separate receive/transmit byte-rate series.
+     *
+     * @return array{rx: ?array, tx: ?array}|null
+     */
+    public function getNetworkMetrics(int $mins = 5): ?array
+    {
+        $rows = $this->fetchMetricRows('network', $mins);
+        if ($rows === null) {
+            return null;
+        }
+
+        return [
+            'rx' => $this->mapRows($rows, 'rxBytesPerSec', $mins),
+            'tx' => $this->mapRows($rows, 'txBytesPerSec', $mins),
+        ];
+    }
+
     private function getMetrics(string $type, int $mins, string $valueField): ?array
+    {
+        return $this->mapRows($this->fetchMetricRows($type, $mins), $valueField, $mins);
+    }
+
+    /**
+     * Fetch and decode the raw Sentinel history rows for a metric type, or null when
+     * metrics are disabled. Throws on a Sentinel error response (caller decides whether
+     * to treat that as fatal or optional).
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    protected function fetchMetricRows(string $type, int $mins): ?array
     {
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
@@ -63,7 +119,21 @@ trait HasMetrics
             throw new \Exception($error);
         }
 
-        $metrics = collect(json_decode($response, true))->map(function ($metric) use ($valueField) {
+        return json_decode($response, true) ?: [];
+    }
+
+    /**
+     * Map raw rows to [timestampMs, value] pairs, downsampling long ranges.
+     *
+     * @param  array<int, array<string, mixed>>|null  $rows
+     */
+    private function mapRows(?array $rows, string $valueField, int $mins): ?array
+    {
+        if ($rows === null) {
+            return null;
+        }
+
+        $metrics = collect($rows)->map(function ($metric) use ($valueField) {
             return [(int) $metric['time'], (float) ($metric[$valueField] ?? 0.0)];
         })->toArray();
 

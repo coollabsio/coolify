@@ -1,18 +1,19 @@
-{{-- Rendered twice: in the desktop sidebar footer and in the mobile top bar. `.visible` pauses
+{{-- Rendered twice: in the desktop top bar and in the mobile top bar. `.visible` pauses
      polling for the copy hidden by the current breakpoint (a display:none element has no box). --}}
 <div wire:poll.3000ms.visible x-data="{ expanded: false }" x-on:click.outside="expanded = false"
-    x-on:keydown.escape.window="expanded = false" @class(['relative' => $variant === 'sidebar'])>
-    @if ($this->deploymentCount > 0)
+    x-on:keydown.escape.window="expanded = false" @class(['relative' => $variant === 'topbar'])>
+    @if ($this->deploymentCount > 0 && ! $this->isOnlyCurrentApplicationDeploying)
         @php
             $deploymentLabel = $this->deploymentCount.' '.Str::plural('deployment', $this->deploymentCount);
         @endphp
-        {{-- Deployment list: opens beside the sidebar on desktop. On mobile the root is not positioned,
-             so the list anchors to the sticky top bar and spans its width. --}}
+        {{-- Deployment list: on desktop it opens below the button, aligned to its right edge.
+             On mobile the root is not positioned, so the list anchors to the sticky top bar
+             and spans its width. --}}
         <div x-show="expanded" x-cloak x-transition.opacity.duration.150ms
             @class([
-                'surface-popover absolute z-60 overflow-hidden rounded-xl',
-                'bottom-0 left-full ml-5 w-[22rem]' => $variant === 'sidebar',
-                'inset-x-4 top-full mt-2' => $variant === 'mobile',
+                'surface-popover absolute top-full z-60 mt-2 overflow-hidden rounded-xl',
+                'right-0 w-[22rem]' => $variant === 'topbar',
+                'inset-x-4' => $variant === 'mobile',
             ])>
             <div class="max-h-96 space-y-1 overflow-y-auto p-2 scrollbar">
                 @foreach ($this->deployments as $deployment)
@@ -69,38 +70,18 @@
                 @endforeach
             </div>
         </div>
-
-        @if ($variant === 'sidebar')
-            <button type="button" x-on:click="expanded = !expanded" title="{{ $deploymentLabel }}"
-                aria-label="Active deployments" :aria-expanded="expanded.toString()"
-                class="menu-item w-full text-left text-coollabs dark:text-warning"
-                :class="[collapsed && 'lg:justify-center lg:px-0', expanded && 'menu-item-active']">
-                <span class="relative inline-flex">
-                    <svg class="menu-item-icon animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                        aria-hidden="true">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
-                    </svg>
-                    <span x-show="collapsed" x-cloak
-                        class="absolute -right-1.5 -top-1.5 flex min-w-3.5 items-center justify-center rounded-full bg-coollabs px-1 text-[9px] font-semibold leading-3.5 text-white dark:bg-warning dark:text-black">{{ $this->deploymentCount }}</span>
-                </span>
-                <span class="menu-item-label" :class="collapsed && 'lg:hidden'">{{ $deploymentLabel }}</span>
-            </button>
-        @else
-            <button type="button" x-on:click="expanded = !expanded" title="{{ $deploymentLabel }}"
-                aria-label="Active deployments" :aria-expanded="expanded.toString()"
-                class="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-coollabs transition-colors hover:bg-neutral-100 dark:text-warning dark:hover:bg-white/[0.06]">
-                <svg class="size-3.5 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                    aria-hidden="true">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                    </path>
-                </svg>
-                <span>{{ $this->deploymentCount }}</span>
-            </button>
-        @endif
+        <button type="button" x-on:click="expanded = !expanded" title="{{ $deploymentLabel }}"
+            aria-label="Active deployments" :aria-expanded="expanded.toString()"
+            :class="expanded && 'bg-neutral-100 dark:bg-white/[0.06]'"
+            class="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-coollabs transition-colors hover:bg-neutral-100 dark:text-warning dark:hover:bg-white/[0.06]">
+            <svg class="size-3.5 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
+            </svg>
+            <span>{{ $this->deploymentCount }}</span>
+        </button>
     @endif
 </div>

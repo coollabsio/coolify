@@ -194,6 +194,7 @@
                                     <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open ? 'rotate-180' : ''" />
                                 </button></x-slot:trigger>
                                 <div x-data="{ downloadingAllLogs: false }">
+                                    <p class="px-2 py-1.5 text-xs text-neutral-500 dark:text-fg-dim">Copied and downloaded logs hide secrets. The live view shows the raw output.</p>
                                     <button type="button" role="menuitem" class="listbox-option"
                                         x-on:click="
                                             open = false;
@@ -215,7 +216,7 @@
                                     </button>
                                     <button type="button" role="menuitem" class="listbox-option"
                                         x-on:click="downloadLogs(); open = false">
-                                        <span class="flex-1 text-left">Download displayed logs</span>
+                                        <span class="flex-1 text-left">Download logs</span>
                                     </button>
                                     <button type="button" role="menuitem" x-on:click="
                                         downloadingAllLogs = true;

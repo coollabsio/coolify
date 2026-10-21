@@ -132,9 +132,6 @@ class CleanupDocker implements ShouldBeUnique
         }
         $helperImageVersion = getHelperVersion();
         $helperImageWithVersion = coolifyHelperImage().":$helperImageVersion";
-        $buildxMetadataVolume = isDev() && $server->isLocalhost()
-            ? 'coolify-buildx'
-            : '$HOME/.docker/buildx';
 
         $cleanupLog = [];
 
@@ -161,7 +158,8 @@ class CleanupDocker implements ShouldBeUnique
             $this->buildContainerPruneCommand(),
             $imagePruneCmd,
             'docker builder prune -af',
-            "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImageWithVersion} docker buildx prune --builder coolify-railpack -af 2>/dev/null || true",
+            // The prune fails on a stopped builder, so start it first.
+            railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, 'docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; docker buildx prune --builder coolify-railpack -af'),
             $this->buildCoolifyImageCleanupCommand($helperImageVersion),
         ];
 
@@ -178,7 +176,7 @@ class CleanupDocker implements ShouldBeUnique
             if ($commandOutput !== null) {
                 $cleanupLog[] = [
                     'command' => $command,
-                    'output' => $commandOutput,
+                    'output' => remove_iip($commandOutput),
                 ];
             }
         }
@@ -379,7 +377,7 @@ class CleanupDocker implements ShouldBeUnique
             $deleteOutput = $this->runRemoteCommand($deleteCommand, $server);
             $cleanupLog[] = [
                 'command' => $deleteCommand,
-                'output' => $deleteOutput ?? 'Images removed or were in use',
+                'output' => remove_iip($deleteOutput ?? 'Images removed or were in use'),
             ];
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -11,6 +12,8 @@ use Livewire\Component;
 
 class Dashboard extends Component
 {
+    use RemembersCanvasView;
+
     public Collection $projects;
 
     public Collection $servers;
@@ -19,6 +22,12 @@ class Dashboard extends Component
 
     public function mount()
     {
+        if ($this->prefersCanvasView('dashboard')) {
+            $this->redirectRoute('dashboard.canvas', navigate: true);
+
+            return;
+        }
+
         $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
         $this->servers = Server::ownedByCurrentTeamCached();
         $this->projects = Project::ownedByCurrentTeam()

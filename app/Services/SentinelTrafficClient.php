@@ -48,7 +48,7 @@ class SentinelTrafficClient
 
     /** @var array<int, string> */
     private const ALLOWED_DIMENSIONS = [
-        'status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot', 'agent', 'ip', 'useragent',
+        'status', 'method', 'country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot', 'agent', 'ip', 'useragent',
     ];
 
     public function __construct(protected Server $server) {}

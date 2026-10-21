@@ -3,6 +3,7 @@
 namespace App\Support\DatabaseImport;
 
 use App\Models\ServiceDatabase;
+use App\Support\PostgresUser;
 use InvalidArgumentException;
 
 class DatabaseImportCommandBuilder
@@ -64,7 +65,7 @@ AWK;
     public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false, bool $keepOwners = false, ?string $sqliteDatabase = null, bool $restoreMysqlUsers = false): string
     {
         $script = match ($this->databaseType($resource)) {
-            'postgresql' => $dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting, $keepOwners),
+            'postgresql' => $this->postgresqlPrelude().($dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting, $keepOwners)),
             'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll, $restoreMysqlUsers),
             'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll, $restoreMysqlUsers),
             'mongodb' => $this->mongodb($replaceExisting),
@@ -178,6 +179,24 @@ SH;
     }
 
     /**
+     * Sets the PostgreSQL user once (see PostgresUser) and defines the checks that run after the
+     * backup format is accepted and before the first change. When no user variable is set,
+     * "postgres" is a guess, so a failed connection must stop the restore with a clear error.
+     */
+    private function postgresqlPrelude(): string
+    {
+        return 'pg_user='.PostgresUser::shellExpression()."\n".<<<'SH'
+check_connection() {
+  psql -U "$pg_user" -d template1 -Atc 'SELECT 1' >/dev/null 2>&1 || fail "Cannot connect to PostgreSQL as user \"$pg_user\". Set POSTGRES_USER on the database container to its superuser. Nothing was changed."
+}
+check_superuser() {
+  [ "$(psql -U "$pg_user" -d template1 -Atc 'SELECT rolsuper FROM pg_roles WHERE rolname = current_user' 2>/dev/null)" = t ] || fail "Restoring all databases needs a PostgreSQL superuser, and \"$pg_user\" is not one or cannot connect. Set POSTGRES_USER on the database container to its superuser. Nothing was changed."
+}
+
+SH;
+    }
+
+    /**
      * pg_dump custom and tar archives are restored with pg_restore, SQL dumps with psql.
      * pg_restore cannot read gzip files, so both clients receive the backup on stdin.
      * SQL cannot replace single objects, so replacing recreates the target database.
@@ -193,32 +212,35 @@ SH;
         $suffix = bin2hex(random_bytes(16));
         $sqlRestore = $replaceExisting ? "\n  new=coolify_restore_new_{$suffix}\n  old=coolify_restore_old_{$suffix}\n".<<<'SH'
 
+  check_connection
   echo 'SQL backups cannot replace single objects. The backup is restored into a new database first; the current database is replaced only when that restore succeeds.'
-  if ! existing=$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname IN (:'new', :'old');" | psql -v ON_ERROR_STOP=1 -At -v new="$new" -v old="$old" -U $POSTGRES_USER -d template1); then
+  if ! existing=$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname IN (:'new', :'old');" | psql -v ON_ERROR_STOP=1 -At -v new="$new" -v old="$old" -U "$pg_user" -d template1); then
     fail 'The temporary database names could not be checked. Nothing was changed.'
   fi
   [ -z "$existing" ] || fail 'A temporary database name is already in use. Nothing was changed.'
-  createdb -U $POSTGRES_USER "$new" || exit 1
-  if ! stream | psql -v ON_ERROR_STOP=1 --single-transaction -U $POSTGRES_USER -d "$new"; then
-    PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new"
+  createdb -U "$pg_user" "$new" || exit 1
+  if ! stream | psql -v ON_ERROR_STOP=1 --single-transaction -U "$pg_user" -d "$new"; then
+    PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U "$pg_user" --if-exists "$new"
     fail 'The SQL restore failed. The current database was not changed.'
   fi
-  if ! printf '%s\n' "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'db' AND pid <> pg_backend_pid();" 'ALTER DATABASE :"db" RENAME TO :"old";' 'ALTER DATABASE :"new" RENAME TO :"db";' | psql -v ON_ERROR_STOP=1 -v db="$db" -v old="$old" -v new="$new" -U $POSTGRES_USER -d template1 >/dev/null; then
+  if ! printf '%s\n' "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'db' AND pid <> pg_backend_pid();" 'ALTER DATABASE :"db" RENAME TO :"old";' 'ALTER DATABASE :"new" RENAME TO :"db";' | psql -v ON_ERROR_STOP=1 -v db="$db" -v old="$old" -v new="$new" -U "$pg_user" -d template1 >/dev/null; then
     # Undo a half-done swap: the current database keeps its name and data.
-    printf '%s\n' 'ALTER DATABASE :"old" RENAME TO :"db";' | psql -v db="$db" -v old="$old" -U $POSTGRES_USER -d template1 >/dev/null 2>&1
-    PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new"
+    printf '%s\n' 'ALTER DATABASE :"old" RENAME TO :"db";' | psql -v db="$db" -v old="$old" -U "$pg_user" -d template1 >/dev/null 2>&1
+    PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U "$pg_user" --if-exists "$new"
     fail 'The current database is in use and could not be replaced. Nothing was changed.'
   fi
-  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$old" || exit 1
+  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U "$pg_user" --if-exists "$old" || exit 1
 SH : <<<'SH'
 
-  stream | psql -v ON_ERROR_STOP=1 --single-transaction -U $POSTGRES_USER -d "$db"
+  check_connection
+  stream | psql -v ON_ERROR_STOP=1 --single-transaction -U "$pg_user" -d "$db"
 SH;
 
         return <<<SH
-db=\${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}
+db=\${POSTGRES_DB:-\$pg_user}
 if [ "\$(stream | head -c 5)" = PGDMP ] || is_tar; then
-  stream | pg_restore --exit-on-error --single-transaction{$owners}{$clean} -U \$POSTGRES_USER -d "\$db"
+  check_connection
+  stream | pg_restore --exit-on-error --single-transaction{$owners}{$clean} -U "\$pg_user" -d "\$db"
 elif ! is_text; then
   fail 'Unsupported PostgreSQL backup format. Use a pg_dump archive (custom or tar format) or an SQL file.'
 elif stream | head -c 4096 | grep -q 'PostgreSQL database cluster dump'; then
@@ -235,7 +257,7 @@ SH;
     private function postgresqlDumpAll(): string
     {
         return <<<'SH'
-db=${POSTGRES_DB:-${POSTGRES_USER:-postgres}}
+db=${POSTGRES_DB:-$pg_user}
 if [ "$(stream | head -c 5)" = PGDMP ] || is_tar; then
   kind=archive
   stream | pg_restore -l >/dev/null 2>&1 || fail 'pg_restore cannot read this backup archive. Nothing was changed.'
@@ -244,13 +266,14 @@ elif is_text; then
 else
   fail 'Unsupported PostgreSQL backup format. Use a pg_dump archive (custom or tar format) or an SQL file. Nothing was changed.'
 fi
-psql -U ${POSTGRES_USER} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" || exit 1
-psql -U ${POSTGRES_USER} -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U ${POSTGRES_USER} --if-exists {} || exit 1
-createdb -U ${POSTGRES_USER} "$db" || exit 1
+check_superuser
+psql -U "$pg_user" -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" || exit 1
+psql -U "$pg_user" -d template1 -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U "$pg_user" --maintenance-db=template1 --if-exists {} || exit 1
+createdb -U "$pg_user" "$db" || exit 1
 if [ "$kind" = archive ]; then
-  stream | pg_restore -U ${POSTGRES_USER} -d "$db"
+  stream | pg_restore -U "$pg_user" -d "$db"
 else
-  stream | psql -U ${POSTGRES_USER} -d "$db"
+  stream | psql -U "$pg_user" -d "$db"
 fi
 SH;
     }

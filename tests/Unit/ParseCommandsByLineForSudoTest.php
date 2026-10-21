@@ -863,3 +863,17 @@ test('parseCommandsByLineForSudo keeps pipes inside quoted strings unchanged', f
 
     expect($result[0])->toBe("sudo docker ps --format '{{.Names}} | {{.Image}}' | sudo grep app");
 });
+
+test('railpack builder helper command gets sudo only outside the helper script', function () {
+    $command = railpackBuilderHelperCommand('$HOME/.docker/buildx', 'coolify-helper:1.0.0', 'docker buildx prune --builder coolify-railpack -af');
+
+    $parsed = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
+
+    // The SSH user's shell must expand $HOME, so the line must not be wrapped in `sudo bash -c`.
+    expect($parsed)->toBe(
+        'sudo docker run --rm -v $HOME/.docker/buildx:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock coolify-helper:1.0.0'
+        ." bash -c 'exec 9>/root/.docker/buildx/coolify-railpack.lock; if flock -s 9; then :; else exit $?; fi; docker buildx prune --builder coolify-railpack -af; status=$?;"
+        .' if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi;'
+        ." exit \$status' 2>/dev/null || sudo true"
+    );
+});

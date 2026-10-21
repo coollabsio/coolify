@@ -19,11 +19,26 @@
                 @endif
             </p>
         </div>
+        @unless (isset($tag))
+            <div class="flex shrink-0 items-center gap-2">
+                @can('create', App\Models\Tag::class)
+                    <x-modal-input title="New tag">
+                        <x-slot:content>
+                            <button type="button" class="button button-highlighted whitespace-nowrap">
+                                <x-reicon name="plus" class="size-3.5" />
+                                New tag
+                            </button>
+                        </x-slot:content>
+                        @include('livewire.tags.partials.new-tag-form')
+                    </x-modal-input>
+                @endcan
+            </div>
+        @endunless
     </header>
 
     @if ($tags->isEmpty())
         <x-empty title="No tags yet"
-            description="Open a resource and add a tag to start grouping related deployments."
+            description="Create a tag, then connect it to resources to group related deployments."
             icon-name="tags" />
     @elseif (! isset($tag))
         <div x-data="tagsIndex()" class="w-full">
@@ -41,7 +56,7 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <x-table.dropdown panel-class="w-52!">
                         <x-slot:trigger>
                             <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
@@ -68,27 +83,8 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle :list-url="route('tags.show')"
+                        :canvas-url="route('tags.canvas')" />
                 </div>
             </div>
 
@@ -176,7 +172,7 @@
                     search: '',
                     sortBy: 'name-asc',
                     sortOpen: false,
-                    viewMode: localStorage.getItem('tags-view') || 'grid',
+                    viewMode: @js($this->listView('tags', 'grid')),
                     page: 1,
                     pageSize: 12,
                     tags: @js($tagsJs),
@@ -231,7 +227,7 @@
                     setViewMode(mode) {
                         this.viewMode = mode;
                         this.page = 1;
-                        localStorage.setItem('tags-view', mode);
+                        this.$wire.saveListView('tags', mode);
                     },
                     previousPage() {
                         this.page = Math.max(1, this.page - 1);
@@ -284,6 +280,56 @@
             <x-application.settings-section :title="$tag->name"
                 description="Use this webhook to deploy every resource with this tag.">
                 <x-slot:actions>
+                    {{-- Two ways to connect: a list in a modal, or the canvas (wide screens only). --}}
+                    <x-modal-input title="Connect to resources" subtitle="Add this tag to resources, or remove it."
+                        wireOpen="connectResourcesOpen" :wireIgnore="false" :contentClicks="false">
+                        <x-slot:content>
+                            <button type="button" class="button whitespace-nowrap" wire:click="openConnectResources">
+                                <x-reicon name="link" class="size-3.5" />
+                                Connect to resources
+                            </button>
+                        </x-slot:content>
+                        @forelse ($connectableResources as $context => $resources)
+                            <div wire:key="connect-group-{{ $context }}" class="mb-4 last:mb-0">
+                                <p class="mb-1.5 truncate text-[11px] font-medium text-neutral-500 dark:text-fg-faint">{{ $context }}</p>
+                                <div class="flex flex-col gap-1">
+                                    @foreach ($resources as $resource)
+                                        <label wire:key="connect-resource-{{ $resource['uuid'] }}" @class([
+                                            'flex items-center gap-2.5 rounded-md border border-neutral-200 px-3 py-2 text-[13px] dark:border-white/[0.08]',
+                                            'cursor-pointer' => $resource['can_update'],
+                                            'opacity-60' => ! $resource['can_update'],
+                                        ])>
+                                            <input type="checkbox" @checked($resource['tagged']) @disabled(! $resource['can_update'])
+                                                wire:click="toggleResource(@js($resource['uuid']))" wire:loading.attr="disabled"
+                                                class="size-4 shrink-0 rounded-sm border-neutral-300 text-accent focus:ring-accent dark:border-white/20 dark:bg-transparent" />
+                                            <span class="min-w-0 truncate">{{ $resource['name'] }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <div wire:loading.remove wire:target="openConnectResources">
+                                <x-empty title="No resources yet" description="Create a resource in a project first." icon-name="tags" size="sm" />
+                            </div>
+                        @endforelse
+                    </x-modal-input>
+                    <a href="{{ app(App\Services\TagCanvas::class)->connectLink($tag) }}"
+                        class="button hidden whitespace-nowrap md:inline-flex"
+                        title="Add this tag to resources on the canvas, and see which resources have it">
+                        <x-reicon name="deploy-canvas" class="size-3.5" />
+                        Connect in canvas
+                    </a>
+                    @can('delete', $tag)
+                        <x-modal-confirmation title="Delete this tag?" isErrorButton buttonTitle="Delete"
+                            submitAction="deleteTag" :actions="[
+                                'The tag will be removed from every resource.',
+                                'The deploy webhook of this tag will stop working.',
+                            ]"
+                            confirmationText="{{ $tag->name }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Tag Name below"
+                            shortConfirmationLabel="Tag Name" :confirmWithPassword="false"
+                            step2ButtonText="Delete tag" />
+                    @endcan
                     <x-modal-confirmation title="Redeploy all resources with this tag?"
                         buttonTitle="Redeploy all" submitAction="redeployAll" :actions="[
                             'All resources with this tag will be redeployed.',
@@ -302,7 +348,7 @@
                 description="{{ $resourceCount }} {{ Str::plural('resource', $resourceCount) }} use this tag.">
                 @if ($resourceCount === 0)
                     <x-empty title="No resources use this tag"
-                        description="Add this tag to an application or service to see it here."
+                        description="Connect this tag to resources to see them here."
                         icon-name="tags" size="sm" />
                 @else
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -311,8 +357,8 @@
                                 class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
-                                        class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                        <x-reicon name="browser-code" class="size-3.5" />
+                                        class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-resource-logo :resource="$application" icon-class="size-3.5" />
                                     </div>
                                     <div class="min-w-0">
                                         <h3
@@ -335,8 +381,8 @@
                                 class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
-                                        class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                        <x-reicon name="layers" class="size-3.5" />
+                                        class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-resource-logo :resource="$service" icon-class="size-3.5" />
                                     </div>
                                     <div class="min-w-0">
                                         <h3

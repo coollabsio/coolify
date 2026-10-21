@@ -3,8 +3,6 @@
 namespace App\Livewire\Server;
 
 use App\Models\Server;
-use App\Services\ServerTransfer\ServerTransferBundle;
-use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -21,25 +19,27 @@ class Transfer extends Component
 
     public string $targetToken = '';
 
-    /** Manual transfer */
-    /** Encrypts the downloaded file when filled; empty or whitespace means no encryption. */
-    public ?string $passphrase = null;
-
     public ?string $exportId = null;
+
+    /** Transfer back fields, shown for an archive */
+    public string $managerUrl = '';
+
+    public string $managerToken = '';
+
+    public string $thisInstanceUrl = '';
 
     /** @var list<string> */
     public array $lastWarnings = [];
 
-    public ?string $lastResultJson = null;
-
     public function mount(string $server_uuid): void
     {
-        $this->ensureDevelopmentAvailability();
-
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            $this->authorize('view', $this->server);
+            // The transfer exports every credential of the server, so only admins and owners may open it.
+            $this->authorize('update', $this->server);
             $this->exportId = data_get($this->server->server_metadata, 'transfer.export_id');
+            $this->managerUrl = (string) data_get($this->server->server_metadata, 'transfer.target_instance_url', '');
+            $this->thisInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
         } catch (Throwable $e) {
             handleError($e, $this);
             $this->redirect(route('server.index'), navigate: true);
@@ -51,82 +51,91 @@ class Transfer extends Component
         return (int) $this->server->id === 0;
     }
 
+    /**
+     * State of the queued transfer to another instance, read by the page poll.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getMigrationProperty(): ?array
+    {
+        $migration = data_get($this->server->server_metadata, 'migration');
+
+        return is_array($migration) ? $migration : null;
+    }
+
+    /**
+     * Manual steps of a finished transfer that the target instance cannot do.
+     *
+     * @return list<string>
+     */
+    public function getPostTransferChecklistProperty(): array
+    {
+        if (data_get($this->migration, 'status') !== 'succeeded') {
+            return [];
+        }
+
+        return array_values(array_filter((array) data_get($this->migration, 'checklist', []), 'is_string'));
+    }
+
+    public function refreshMigration(): void
+    {
+        $this->server->refresh();
+        $this->lastWarnings = array_values((array) data_get($this->migration, 'warnings', $this->lastWarnings));
+    }
+
     public function migrateServer(ServerTransferMigrator $migrator): void
     {
-        $this->ensureDevelopmentAvailability();
-
         try {
             $this->authorize('update', $this->server);
             if ($this->isLocalhost) {
                 throw new \RuntimeException('The Coolify host (localhost) cannot be transferred.');
             }
 
-            $result = $migrator->migrate(
+            $migrator->start(
                 server: $this->server,
                 targetUrl: $this->targetUrl,
                 targetToken: $this->targetToken,
             );
 
+            auditLog('ui.server.migrate', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'target_url' => $this->targetUrl,
+            ]);
+
             $this->server->refresh();
-            $this->exportId = $result['export_id'] ?? $this->exportId;
-            $this->lastWarnings = array_values((array) data_get($result, 'warnings', []));
-            // Never echo the target token in the result dump.
-            $safe = $result;
-            unset($safe['target_token']);
-            $this->lastResultJson = json_encode($safe, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $this->lastWarnings = [];
             $this->targetToken = '';
-            $this->dispatch('success', $result['message'] ?? 'Server transferred.');
+            $this->dispatch('success', 'All checks passed. The transfer started.');
         } catch (Throwable $e) {
+            // A failed check is saved in the transfer log, so show it.
+            $this->server->refresh();
             handleError($e, $this);
         }
     }
 
-    public function exportBundle(ServerTransferExporter $exporter)
+    public function transferBack(ServerTransferMigrator $migrator): void
     {
-        $this->ensureDevelopmentAvailability();
-
         try {
             $this->authorize('update', $this->server);
-            if ($this->isLocalhost) {
-                throw new \RuntimeException('The Coolify host (localhost) cannot be transferred.');
-            }
+            $migrator->requestTransferBack($this->server, auth()->user(), $this->managerUrl, $this->managerToken, $this->thisInstanceUrl);
 
-            $bundle = $exporter->export($this->server, includeSensitive: true);
-            $this->exportId = data_get($bundle, 'export_id');
-            $this->lastWarnings = array_values((array) data_get($bundle, 'warnings', []));
-            $this->lastResultJson = null;
-
-            $payload = $bundle;
-            $fileName = 'server-transfer-'.$this->server->uuid.'.json';
-            if (filled($this->passphrase)) {
-                $payload = ServerTransferBundle::encryptWithPassphrase($bundle, $this->passphrase);
-                $fileName = 'server-transfer-'.$this->server->uuid.'.encrypted.json';
-            }
-
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            if ($json === false) {
-                throw new \RuntimeException('Failed to encode transfer bundle.');
-            }
-
-            $this->dispatch('success', 'Transfer bundle ready for download.');
-
-            return response()->streamDownload(function () use ($json) {
-                echo $json;
-            }, $fileName, [
-                'Content-Type' => 'application/json',
+            auditLog('ui.server.transfer_back', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'from' => $this->managerUrl,
             ]);
+
+            $this->server->refresh();
+            $this->managerToken = '';
+            $this->dispatch('success', 'The other instance started the transfer back.');
         } catch (Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 
     public function render()
     {
         return view('livewire.server.transfer');
-    }
-
-    private function ensureDevelopmentAvailability(): void
-    {
-        abort_unless(isDev(), 404);
     }
 }
