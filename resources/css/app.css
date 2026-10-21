@@ -1270,23 +1270,23 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
        ladder, so every panel shares one temperature (no blue cast). */
     /* A very small Coolify purple tint (hue 300) so dark mode is not pure
        black. The translucent cards, wells, and inputs pick it up too. */
-    --color-app: oklch(14.6% 0.018 300);
-    --color-panel: oklch(19.2% 0.03 300);
+    --color-app: oklch(18.6% 0.018 300);
+    --color-panel: oklch(23.2% 0.03 300);
     --coollabs-canvas: var(--color-app);
     /* The opaque surfaces (menus, listbox panels, modals, tooltips) get the
        same tint so they match the tinted canvas. */
-    --coollabs-elevated: oklch(20.02% 0.018 300);
-    --coollabs-recessed: oklch(25.2% 0.018 300);
-    --coollabs-base: oklch(22.64% 0.018 300);
-    --coollabs-fill: oklch(29.31% 0.018 300);
-    --color-surface: oklch(20.02% 0.018 300);
-    --color-raised: oklch(22.64% 0.018 300);
-    --color-selected: oklch(26.86% 0.018 300);
-    --color-log: oklch(15.91% 0.018 300);
-    --coollabs-line: oklch(32% 0.012 300);
-    /* Crisped from 26.9% (1.36:1 on canvas) to 32% (1.63:1) so dark cards
+    --coollabs-elevated: oklch(24% 0.018 300);
+    --coollabs-recessed: oklch(29.2% 0.018 300);
+    --coollabs-base: oklch(26.6% 0.018 300);
+    --coollabs-fill: oklch(33.31% 0.018 300);
+    --color-surface: oklch(24.02% 0.018 300);
+    --color-raised: oklch(26.64% 0.018 300);
+    --color-selected: oklch(30.86% 0.018 300);
+    --color-log: oklch(19.91% 0.018 300);
+    --coollabs-line: oklch(36% 0.012 300);
+    /* Kept about 1.6:1 on the canvas so dark cards
        and tables show a visible edge instead of blending into the canvas. */
-    --coollabs-hairline: oklch(32% 0.012 300);
+    --coollabs-hairline: oklch(36% 0.012 300);
     --coollabs-subtle: oklch(70.8% 0 0);
     /* Neutral (was #a8a8b0 / #7a7a84, both cool-tinted). Sidebar text now shares
        the same neutral temperature as the content text, so the sidebar no longer
@@ -1848,6 +1848,27 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     background: linear-gradient(var(--well-bg), var(--well-bg)), var(--card-underlay);
 }
 
+/* Dark mode: top-level cards use the topbar color (see DESIGN.md). */
+.dark :is(.application-settings-section, .empty-state):not(:is(.application-settings-section, .application-settings-section-body) *) {
+    background: var(--color-panel);
+}
+
+/* Dark mode: collection tiles, pagination bars, and tables match the cards.
+   A tile is a card without a well, so it takes the topbar color. A table (a
+   shell with a header row) takes the topbar color on the header row and the
+   box content (well) color on the rows. */
+.dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"] {
+    background: var(--color-panel);
+}
+
+.dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"]:has(> [class~="border-b"]:first-child) {
+    background: color-mix(in srgb, var(--color-panel) 66%, black);
+}
+
+.dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"] > [class~="border-b"]:first-child {
+    background: var(--color-panel);
+}
+
 /* Brief accent ring when a settings nav sub-item scrolls a section into view.
    Use a real border on ::after (not animated multi-layer box-shadow) so the
    ring is the same weight on every side — box-shadow rings look thicker on
@@ -1963,8 +1984,8 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 
 /* Floating panels in the well must stay opaque: restore the global dark values. */
 .dark .application-settings-section-body :is(.listbox-panel, .searchable-listbox-panel, [role="listbox"], [role="menu"]) {
-    --coollabs-recessed: oklch(25.2% 0.018 300);
-    --coollabs-line: oklch(32% 0.012 300);
+    --coollabs-recessed: oklch(29.2% 0.018 300);
+    --coollabs-line: oklch(36% 0.012 300);
 }
 
 .settings-mobile-header {

@@ -29,8 +29,9 @@ change.
   soft outer box with a small title row.
 - **Tactile buttons.** Buttons and navigation icon tiles have a 2px bottom
   edge. They lift 1px on hover and press down on click.
-- **Near-black, not black.** Dark mode is a very dark gray with a faint brand
-  tint. Light mode is pure neutral gray.
+- **Dark gray, not black.** Dark mode is a dark gray with a faint brand tint
+  (page canvas about sRGB 20,17,26, never near-black). Light mode is pure
+  neutral gray.
 - **One accent per theme.** Purple in light mode, yellow in dark mode (purple
   has too little contrast on dark surfaces). Everything else is neutral.
 - **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
@@ -92,9 +93,9 @@ follow the theme or the tint.
 }
 
 .dark {
-    /* Surfaces (dark: near-black with a faint purple tint, hue 300) */
-    --ui-canvas: oklch(14.6% 0.018 300);
-    --ui-panel: oklch(19.2% 0.03 300);
+    /* Surfaces (dark: dark gray with a faint purple tint, hue 300) */
+    --ui-canvas: oklch(18.6% 0.018 300);    /* sRGB 20,17,26 */
+    --ui-panel: oklch(23.2% 0.03 300);      /* sRGB 31,26,41: header bar, card and table headers */
     --ui-card-bg: rgb(255 255 255 / 6%);
     --ui-card-border: rgb(255 255 255 / 8%);
     --ui-well-bg: rgb(0 0 0 / 34%);
@@ -102,9 +103,9 @@ follow the theme or the tint.
     --ui-well-shadow: 0 1px 2px rgb(0 0 0 / 25%);
     --ui-control-bg: rgb(255 255 255 / 3%);
     --ui-control-border: rgb(255 255 255 / 8%);
-    --ui-menu-bg: oklch(25.2% 0.018 300);
-    --ui-menu-border: oklch(32% 0.012 300);
-    --ui-hover: oklch(29.31% 0.018 300);
+    --ui-menu-bg: oklch(29.2% 0.018 300);
+    --ui-menu-border: oklch(36% 0.012 300);
+    --ui-hover: oklch(33.31% 0.018 300);
     --ui-divider: rgb(255 255 255 / 7%);
     --ui-chrome-border: rgb(255 255 255 / 4%);
 
@@ -135,7 +136,13 @@ Rules for the tokens:
   Keep it small: chroma 0.012 for borders, 0.018 for surfaces, 0.03 for the
   header. On near-black, pick the hue by the rendered sRGB value: red must be a
   little above green, or the tint looks blue (hue 300 renders the canvas as
-  sRGB 11,9,17).
+  sRGB 20,17,26).
+- **Dark lightness level.** The canvas is at 18.6% and the header panel at
+  23.2%. Do not make dark mode darker than this; the page looks too heavy. To
+  change the level, move every dark surface and border token by the same
+  amount (canvas, panel, menu, hover, borders, and the Coolify surface ladder),
+  so the steps between layers stay the same. If you move only some of them, a
+  hover fill can become darker than its menu.
 - The primary buttons use purple in both themes. Only focus rings, active
   navigation, and other accent states change to yellow in dark mode.
 
@@ -176,6 +183,9 @@ Class names below are examples. Keep the values and structure.
 
 - Three layers: the canvas (page and sidebar, `--ui-canvas`), the top header
   bar (`--ui-panel`, 48px high), and the cards on the canvas.
+- In dark mode, the header bar, the outer box of a top-level card, and the
+  header row of a table use the same color (`--ui-panel`). The card wells and
+  table rows are the darker content layer below them.
 - The sidebar is the canvas color and has a 1px `--ui-chrome-border` right
   edge. The brand block (product name and version) at the top of the sidebar
   column also uses the canvas color, with a 1px bottom border.
@@ -224,6 +234,7 @@ Class names below are examples. Keep the values and structure.
     background: var(--ui-card-bg); box-shadow: var(--ui-card-shadow);
     overflow: visible;                      /* menus and tooltips must escape */
 }
+.dark .card { background: var(--ui-panel); }  /* top-level card: same as the header bar */
 .card-header {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 16px; padding: 4px 8px 10px;
@@ -313,14 +324,20 @@ Class names below are examples. Keep the values and structure.
 
 ### Tables
 
-- Header row: 40px, 13px medium, `--ui-fg-faint`, a faint fill
-  (`rgb(0 0 0 / 2%)` light, `rgb(255 255 255 / 2%)` dark), and a 1px
-  `--ui-divider` bottom border.
+- Header row: 40px, 13px medium, `--ui-fg-faint`, and a 1px `--ui-divider`
+  bottom border. Fill: `rgb(0 0 0 / 2%)` in light mode, `--ui-panel` in dark
+  mode (the same as the header bar and the card outer box).
+- Dark mode rows use the card well color
+  (`color-mix(in srgb, var(--ui-panel) 66%, black)`, the same as
+  `--ui-well-bg` over the panel), so a table looks like a card: header on
+  top, content below.
 - Data rows: about 48px, 10px 16px padding, a 1px divider, and a faint hover
   fill. Put the row action at the far right.
 - Toolbar on top (search left; filter, sort, and add right), pagination in the
   footer. Hide the footer when there is only one page.
 - Use a table, not cards, for a collection that can grow.
+- Grid view tiles of a collection are cards without a well. In dark mode they
+  are `--ui-panel`, the same as the header bar.
 
 ### Status badge
 
@@ -497,13 +514,22 @@ The surface ladder is defined in `resources/css/app.css`.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--coollabs-canvas` | 97% off-white | 14.6% (tinted, = `--color-app`) | page canvas (kept below card fills so cards lift) |
-| `--coollabs-elevated` | 98% neutral | 20.02% neutral | shells and modal headers |
-| `--coollabs-base` | white | 22.64% neutral | nested modal bodies and legacy panels |
-| `--coollabs-recessed` | 96% neutral | 25.2% neutral | inputs and listboxes (`rgb(255 255 255 / 3%)` inside the dark card well) |
-| `--coollabs-fill` | 92.2% neutral | 29.31% neutral | dividers and passive fills |
-| `--coollabs-line` | translucent dark | 32% neutral | control borders (`rgb(255 255 255 / 8%)` inside the dark card well) |
-| `--coollabs-hairline` | 85.5% neutral | 32% neutral | shell rings (crisp enough to read as a card edge, ~1.5:1) |
+| `--coollabs-canvas` | 97% off-white | 18.6% (tinted, = `--color-app`) | page canvas (kept below card fills so cards lift) |
+| `--color-panel` | white | 23.2% | topbar, top-level card outer box, table header row |
+| `--coollabs-elevated` | 98% neutral | 24% | shells and modal headers |
+| `--coollabs-base` | white | 26.6% | nested modal bodies and legacy panels |
+| `--coollabs-recessed` | 96% neutral | 29.2% | inputs and listboxes (`rgb(255 255 255 / 3%)` inside the dark card well) |
+| `--coollabs-fill` | 92.2% neutral | 33.31% | dividers, passive fills, menu hover |
+| `--coollabs-line` | translucent dark | 36% | control borders (`rgb(255 255 255 / 8%)` inside the dark card well) |
+| `--coollabs-hairline` | 85.5% neutral | 36% | shell rings (crisp enough to read as a card edge, ~1.6:1) |
+
+The dark level is fixed: canvas 18.6%, panel 23.2%. Also `--color-surface`
+24.02%, `--color-raised` 26.64%, `--color-selected` 30.86%, and `--color-log`
+19.91%. All dark surfaces have hue 300 (chroma 0.018, borders 0.012, panel
+0.03). Do not make dark mode darker. To change the level, move the full ladder
+by the same amount, including the opaque reset values for floating panels in
+the card well (`.dark .application-settings-section-body :is(.listbox-panel,
+...)`).
 | `--coollabs-subtle` | 50% neutral | 70.8% neutral | labels and muted titles (light darkened for WCAG AA 4.5:1) |
 
 Accent behavior is intentionally theme-aware:
@@ -531,11 +557,12 @@ content canvas is the base, the topbar breadcrumb bar lifts off it, and cards
 lift off the content:
 
 - **Content canvas** is the base layer: `bg-app` in dark (deepest,
-  `--color-app` `oklch(14.6% 0.018 300)`, sRGB 11,9,17), `bg-neutral-50` in light. The
+  `--color-app` `oklch(18.6% 0.018 300)`, sRGB 20,17,26), `bg-neutral-50` in light. The
   `<main>` content area and page body use it.
 - **Topbar chrome** uses `bg-panel` in dark (`--color-panel`
-  `oklch(19.2% 0.03 300)`, sRGB 21,16,30, a clear step lighter than the content canvas)
-  and `bg-white` in light, so the header reads as a separate panel.
+  `oklch(23.2% 0.03 300)`, sRGB 31,26,41, a clear step lighter than the content canvas)
+  and `bg-white` in light, so the header reads as a separate panel. In dark
+  mode, top-level layer cards and table header rows use the same `--color-panel`.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
   use the content canvas color (`bg-neutral-50` / `dark:bg-app`). The sidebar
   has a 1px right border, and the brand block has a 1px bottom border. These
@@ -544,10 +571,10 @@ lift off the content:
   solid hairline grey. The mobile drawer keeps `bg-panel` / `bg-white`.
 
 Dark surface tokens are exact oklch equivalents of chosen sRGB steps. oklch
-lightness compresses toward pure black below ~15%, so do not pick dark values by
-round oklch percentages. The dark ladder is `--color-app` 10,
-`--coollabs-elevated` 22, `--coollabs-base` 28, `--coollabs-recessed` 34 (sRGB),
-which reads as distinct surfaces.
+lightness compresses toward pure black below ~15%, so check the rendered sRGB
+value. The dark ladder is `--color-app` 20,17,26, `--color-panel` 31,26,41,
+`--coollabs-elevated` 32,29,39, `--coollabs-base` 39,36,45,
+`--coollabs-recessed` 45,42,52 (sRGB), which reads as distinct surfaces.
 
 Temperature: in light mode every panel is **pure neutral gray** (r=g=b). In
 dark mode, every surface token (`--color-app`, `--color-panel`, `--coollabs-*`,
@@ -561,9 +588,16 @@ from the others. The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
 The only intentional color is the purple/yellow brand accent.
 - **Layer cards** use the outer box and inset well from section 5.
-- **Tables and collection tiles** outside a layer card lift off the content
-  canvas with `dark:bg-white/[0.05]` plus the crisp `--coollabs-hairline` ring;
-  in light they are `bg-white` with the ring and the restrained card lift.
+- **Tables and collection tiles** outside a layer card use the
+  `rounded-xl border … dark:bg-white/[0.05]` shell plus the crisp
+  `--coollabs-hairline` ring; in light they are `bg-white` with the ring and
+  the restrained card lift. In dark mode these shells are painted like layer
+  cards. A tile, a separate pagination bar, or an empty box is a card without a
+  well, so it is `--color-panel`. A table (a shell whose first child is a
+  `border-b` header row) has a `--color-panel` header row and rows in the well
+  color (`color-mix(in srgb, var(--color-panel) 66%, black)`).
+  These rules match the Tailwind classes in `resources/css/app.css`, because
+  the table shells are copied markup without a shared class.
 
 Do not paint the content area with the same `bg-panel` as the topbar, and do
 not drop card fills below `dark:bg-white/[0.05]`; both make surfaces read as one
@@ -781,7 +815,9 @@ replace a manual shell when modifying it instead of creating another variant.
 Anatomy:
 
 - soft outer box: 12px radius, 1px border, 6px padding, faint fill
-  (`rgb(0 0 0 / 0.75%)` light, `rgb(255 255 255 / 6%)` dark);
+  (`rgb(0 0 0 / 0.75%)` light). In dark mode a top-level card is
+  `--color-panel`, the same as the topbar; a nested card keeps
+  `rgb(255 255 255 / 6%)` over its parent;
 - small title row on the outer box (13px semibold title, 11px description and
   header links), no divider below it;
 - body is an inset well: 8px radius, 1px border, white in light and
