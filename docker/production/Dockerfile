@@ -1,14 +1,15 @@
 # Versions
-# https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-# Pinned: v5 moved user bundles to /etc/s6-overlay/user-bundles.d and breaks startup (#12141)
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v4.5.1
+# Temporary: serversideup/php v4.5.1 (8.4-fpm-nginx-alpine) rebuilt on the patched PHP 8.4 release
+ARG SERVERSIDEUP_PHP_IMAGE=ghcr.io/coollabsio/serversideup-php:8.4-fpm-nginx-alpine-v4.5.1-hotfix
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2026.7.3
+ARG CLOUDFLARED_VERSION=2026.10.3
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.2-r1
+# https://nodejs.org/en/about/previous-releases
+ARG NODE_VERSION=24.22.1
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.0
 
@@ -19,7 +20,7 @@ ARG GROUP_ID=9999
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
+FROM ${SERVERSIDEUP_PHP_IMAGE} AS base
 
 USER root
 
@@ -49,10 +50,15 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
+# Temporary: the node:24.22.1 multi-arch manifest is not published yet, pull the per-arch image instead
+FROM amd64/node:${NODE_VERSION}-alpine3.24 AS nodejs-amd64
+FROM arm64v8/node:${NODE_VERSION}-alpine3.24 AS nodejs-arm64
+FROM nodejs-${TARGETARCH} AS nodejs
+
 # =================================================================
 # Stage 2: Frontend assets compilation
 # =================================================================
-FROM node:24-alpine AS static-assets
+FROM nodejs AS static-assets
 
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
@@ -69,12 +75,15 @@ FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 # =================================================================
 # Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+FROM ${SERVERSIDEUP_PHP_IMAGE} AS terminal-dependencies
 
 USER root
 
 RUN apk upgrade && \
-    apk add --no-cache nodejs npm make g++ python3
+    apk add --no-cache make g++ python3
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 COPY docker/coolify-terminal/package*.json /terminal/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefix /terminal && \
@@ -87,7 +96,7 @@ COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM ${SERVERSIDEUP_PHP_IMAGE}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -130,7 +139,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
-    nodejs \
+    libstdc++ \
     openssh-client \
     git \
     git-lfs \
@@ -189,6 +198,7 @@ COPY --chown=www-data:www-data versions.json ./versions.json
 RUN composer dump-autoload
 
 # Install terminal WebSocket server dependencies
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
 COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure Nginx and S6 overlay
