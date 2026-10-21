@@ -514,7 +514,7 @@ tr {
 }
 
 tr th {
-    @apply px-3 py-3.5 text-left text-black dark:text-white;
+    @apply px-3 py-3.5 text-left text-neutral-500 dark:text-fg-faint;
 }
 
 tr th:first-child {
@@ -1299,8 +1299,10 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Tertiary text. Base token (59.31%) only clears 4.5:1 on app/panel; it
        failed on surface/raised/selected (4.46/4.20/3.73). Raised to 64% so the
        313 dark:text-fg-faint usages clear AA across the whole surface ladder,
-       while staying clearly dimmer than fg-dim (76.99%). */
-    --color-fg-faint: oklch(65% 0 0);
+       while staying clearly dimmer than fg-dim (76.99%). A faint purple tint
+       (hue 300, like the surfaces) so muted text sits in the surface instead
+       of reading as a cold neutral gray. */
+    --color-fg-faint: oklch(65% 0.02 300);
     /* Error text. The base error red (57.71%) failed on every dark surface
        (4.10/3.75/3.53). Brightened for dark mode so text-error clears AA on the
        card ladder while staying unmistakably red. */
@@ -2845,6 +2847,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .data-table-row:hover {
     background: rgba(0, 0, 0, 0.02);
+    color: var(--color-fg-faint);
 }
 
 .dark .data-table-row:hover {
