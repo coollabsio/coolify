@@ -30,55 +30,49 @@
                             localStorage.setItem('service-compose-resources-view', mode);
                         }
                     }">
-                        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <h2 class="text-base font-semibold text-black dark:text-fg">Compose resources</h2>
-                                <p class="mt-1 text-sm text-neutral-500 dark:text-fg-dim">
-                                    Applications and databases defined in this service.
-                                </p>
-                            </div>
-                            <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                        <x-application.settings-section id="compose-resources-section" title="Compose resources"
+                            description="Applications and databases defined in this service." flush>
+                            <x-slot:actions>
                                 <x-canvas-view-toggle />
                                 <a class="button" target="_blank" href="{{ $service->documentation() }}">
                                     Documentation
                                     <x-reicon name="external-link" class="size-4" />
                                 </a>
+                            </x-slot:actions>
+
+                            <div :class="viewMode === 'grid'
+                                ? 'grid grid-cols-1 gap-3 p-3 sm:grid-cols-2'
+                                : 'overflow-x-auto rounded-lg'">
+                                @if ($applications->isNotEmpty() || $databases->isNotEmpty())
+                                    <div x-cloak x-show="viewMode === 'table'"
+                                        class="grid min-w-[48rem] grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_5rem] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                                        <div>Resource</div>
+                                        <div>Image</div>
+                                        <div class="justify-self-start">Status</div>
+                                        <div></div>
+                                    </div>
+                                @endif
+
+                                @if ($applications->isEmpty() && $databases->isEmpty())
+                                    <div class="p-4 sm:col-span-2">
+                                        <x-empty title="No compose resources"
+                                            description="No applications or databases are defined in this Docker Compose file."
+                                            icon-name="grid" />
+                                    </div>
+                                @endif
+
+                                @foreach ($applications as $application)
+                                    <livewire:project.service.resource-card :service="$service" :resource="$application"
+                                        :parameters="$parameters"
+                                        wire:key="service-application-card-{{ $application->id }}" />
+                                @endforeach
+                                @foreach ($databases as $database)
+                                    <livewire:project.service.resource-card :service="$service" :resource="$database"
+                                        :parameters="$parameters"
+                                        wire:key="service-database-card-{{ $database->id }}" />
+                                @endforeach
                             </div>
-                        </div>
-
-                        <div :class="viewMode === 'grid'
-                            ? 'grid grid-cols-1 gap-3 sm:grid-cols-2'
-                            : 'overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]'">
-                            @if ($applications->isNotEmpty() || $databases->isNotEmpty())
-                                <div x-cloak x-show="viewMode === 'table'"
-                                    class="grid min-w-[48rem] grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_5rem] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                                    <div>Resource</div>
-                                    <div>Image</div>
-                                    <div class="justify-self-start">Status</div>
-                                    <div></div>
-                                </div>
-                            @endif
-
-                            @if ($applications->isEmpty() && $databases->isEmpty())
-                                <div
-                                    class="application-settings-section overflow-hidden sm:col-span-2">
-                                    <x-empty title="No compose resources"
-                                        description="No applications or databases are defined in this Docker Compose file."
-                                        icon-name="grid" />
-                                </div>
-                            @endif
-
-                            @foreach ($applications as $application)
-                                <livewire:project.service.resource-card :service="$service" :resource="$application"
-                                    :parameters="$parameters"
-                                    wire:key="service-application-card-{{ $application->id }}" />
-                            @endforeach
-                            @foreach ($databases as $database)
-                                <livewire:project.service.resource-card :service="$service" :resource="$database"
-                                    :parameters="$parameters"
-                                    wire:key="service-database-card-{{ $database->id }}" />
-                            @endforeach
-                        </div>
+                        </x-application.settings-section>
                     </div>
                 @elseif ($currentRoute === 'project.service.analytics')
                     <livewire:project.service.analytics :service="$service"

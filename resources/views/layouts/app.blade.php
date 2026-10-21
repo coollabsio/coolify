@@ -37,8 +37,8 @@
                 :class="{ 'z-[1000]': resourceActionsOpen }"
                 class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
                 {{-- Brand (width tracks sidebar) --}}
-                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-b border-black/[0.06] bg-neutral-50 dark:border-white/[0.04] dark:bg-app transition-[width] duration-200"
-                    :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
+                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-neutral-50 dark:border-white/[0.04] dark:bg-app transition-[width] duration-200"
+                    :class="collapsed ? 'w-16 justify-center px-0 border-b' : 'w-56 px-4'">
                     <div class="flex items-baseline gap-1.5 min-w-0">
                         <a href="/" {{ wireNavigate() }} title="Coolify"
                             class="flex shrink-0 items-center hover:opacity-80 transition-opacity">

@@ -2712,6 +2712,14 @@ input[type="search"]::-webkit-search-results-decoration {
     padding: 0;
 }
 
+/* The well does not clip (floating panels must escape it), so a filled table
+   header row needs the well's inner top radius, or its corners poke out. */
+.application-settings-section-body.is-flush > :first-child,
+.application-settings-section-body.is-flush > :first-child > :first-child {
+    border-top-left-radius: calc(0.5rem - 1px);
+    border-top-right-radius: calc(0.5rem - 1px);
+}
+
 /* Empty states inside cards keep the same inset as other card content. */
 .application-settings-section-body:has(> .empty-state:only-child),
 .application-settings-section-body.is-flush:has(> .empty-state:only-child),
@@ -2847,6 +2855,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .dark .data-table-header {
     background: rgba(255, 255, 255, 0.02);
+    color: var(--color-fg-faint);
 }
 
 .data-table > .env-table-item {
@@ -2868,7 +2877,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .data-table-row:hover {
     background: rgba(0, 0, 0, 0.02);
-    color: var(--color-fg-faint);
 }
 
 .dark .data-table-row:hover {
