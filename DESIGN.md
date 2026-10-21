@@ -29,9 +29,9 @@ change.
   soft outer box with a small title row.
 - **Tactile buttons.** Buttons and navigation icon tiles have a 2px bottom
   edge. They lift 1px on hover and press down on click.
-- **Dark gray, not black.** Dark mode is a dark gray with a faint brand tint
-  (page canvas about sRGB 20,17,26, never near-black). Light mode is pure
-  neutral gray.
+- **Dark gray, not black.** Dark mode is a pure neutral dark gray (page
+  canvas about sRGB 10,10,10). Light mode is pure neutral
+  gray.
 - **One accent per theme.** Purple in light mode, yellow in dark mode (purple
   has too little contrast on dark surfaces). Everything else is neutral.
 - **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
@@ -42,7 +42,7 @@ change.
 Copy this sheet into the app's global CSS. Put the dark values on the selector
 the app uses for dark mode (here `.dark` on `<html>`). Use the tokens in every
 component; do not hard-code a gray in a component, because then it does not
-follow the theme or the tint.
+follow the theme.
 
 ```css
 :root {
@@ -93,9 +93,9 @@ follow the theme or the tint.
 }
 
 .dark {
-    /* Surfaces (dark: dark gray with a faint purple tint, hue 300) */
-    --ui-canvas: oklch(18.6% 0.018 300);    /* sRGB 20,17,26 */
-    --ui-panel: oklch(23.2% 0.03 300);      /* sRGB 31,26,41: header bar, card and table headers */
+    /* Surfaces (dark: pure neutral dark gray) */
+    --ui-canvas: oklch(14.48% 0 0);   /* sRGB 10,10,10 */
+    --ui-panel: oklch(19.13% 0 0);     /* sRGB 20,20,20: header bar, card and table headers */
     --ui-card-bg: rgb(255 255 255 / 6%);
     --ui-card-border: rgb(255 255 255 / 8%);
     --ui-well-bg: rgb(0 0 0 / 34%);
@@ -103,9 +103,9 @@ follow the theme or the tint.
     --ui-well-shadow: 0 1px 2px rgb(0 0 0 / 25%);
     --ui-control-bg: rgb(255 255 255 / 3%);
     --ui-control-border: rgb(255 255 255 / 8%);
-    --ui-menu-bg: oklch(29.2% 0.018 300);
-    --ui-menu-border: oklch(36% 0.012 300);
-    --ui-hover: oklch(33.31% 0.018 300);
+    --ui-menu-bg: oklch(25.2% 0 0);
+    --ui-menu-border: oklch(36% 0 0);
+    --ui-hover: oklch(29.31% 0 0);
     --ui-divider: rgb(255 255 255 / 7%);
     --ui-chrome-border: rgb(255 255 255 / 4%);
 
@@ -127,18 +127,14 @@ follow the theme or the tint.
 Rules for the tokens:
 
 - Translucent surfaces (`--ui-card-bg`, `--ui-well-bg`, `--ui-control-bg`) take
-  the color of what is below them. That is why the cards and inputs show the
-  dark tint without their own tint.
+  the color of what is below them.
 - Floating surfaces (menus, popovers, tooltips, modals) must be opaque. Use
   `--ui-menu-bg`, never a translucent value, or the content behind shows
   through.
-- To change the tint, change only the chroma and hue of the dark surfaces.
-  Keep it small: chroma 0.012 for borders, 0.018 for surfaces, 0.03 for the
-  header. On near-black, pick the hue by the rendered sRGB value: red must be a
-  little above green, or the tint looks blue (hue 300 renders the canvas as
-  sRGB 20,17,26).
-- **Dark lightness level.** The canvas is at 18.6% and the header panel at
-  23.2%. Do not make dark mode darker than this; the page looks too heavy. To
+- Keep the dark surfaces pure neutral (chroma 0). A brand tint on the
+  surfaces was tried and removed.
+- **Dark lightness level.** The canvas is at 14.48% and the header panel at
+  19.13%. To
   change the level, move every dark surface and border token by the same
   amount (canvas, panel, menu, hover, borders, and the Coolify surface ladder),
   so the steps between layers stay the same. If you move only some of them, a
@@ -374,7 +370,7 @@ Class names below are examples. Keep the values and structure.
 ### Logs and code
 
 - A monospace viewport on an opaque surface a little darker than the card
-  (dark: `oklch(15.91% 0.018 300)`), with one compact toolbar on top.
+  (dark: `oklch(15.91% 0 0)`), with one compact toolbar on top.
 - Code snippets: 12px mono, 8px radius, 1px border, the control fill.
 
 ## P5. Traps
@@ -514,19 +510,18 @@ The surface ladder is defined in `resources/css/app.css`.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--coollabs-canvas` | 97% off-white | 18.6% (tinted, = `--color-app`) | page canvas (kept below card fills so cards lift) |
-| `--color-panel` | white | 23.2% | topbar, top-level card outer box, table header row |
-| `--coollabs-elevated` | 98% neutral | 24% | shells and modal headers |
-| `--coollabs-base` | white | 26.6% | nested modal bodies and legacy panels |
-| `--coollabs-recessed` | 96% neutral | 29.2% | inputs and listboxes (`rgb(255 255 255 / 3%)` inside the dark card well) |
-| `--coollabs-fill` | 92.2% neutral | 33.31% | dividers, passive fills, menu hover |
+| `--coollabs-canvas` | 97% off-white | 14.48% (= `--color-app`) | page canvas (kept below card fills so cards lift) |
+| `--color-panel` | white | 19.13% | topbar, top-level card outer box, table header row |
+| `--coollabs-elevated` | 98% neutral | 20.02% | shells and modal headers |
+| `--coollabs-base` | white | 22.64% | nested modal bodies and legacy panels |
+| `--coollabs-recessed` | 96% neutral | 25.2% | inputs and listboxes (`rgb(255 255 255 / 3%)` inside the dark card well) |
+| `--coollabs-fill` | 92.2% neutral | 29.31% | dividers, passive fills, menu hover |
 | `--coollabs-line` | translucent dark | 36% | control borders (`rgb(255 255 255 / 8%)` inside the dark card well) |
 | `--coollabs-hairline` | 85.5% neutral | 36% | shell rings (crisp enough to read as a card edge, ~1.6:1) |
 
-The dark level is fixed: canvas 18.6%, panel 23.2%. Also `--color-surface`
-24.02%, `--color-raised` 26.64%, `--color-selected` 30.86%, and `--color-log`
-19.91%. All dark surfaces have hue 300 (chroma 0.018, borders 0.012, panel
-0.03). Do not make dark mode darker. To change the level, move the full ladder
+The dark level is fixed: canvas 14.48%, panel 19.13%. Also `--color-surface`
+20.02%, `--color-raised` 22.64%, `--color-selected` 26.86%, and `--color-log`
+15.91%. All dark surfaces are pure neutral (chroma 0). To change the level, move the full ladder
 by the same amount, including the opaque reset values for floating panels in
 the card well (`.dark .application-settings-section-body :is(.listbox-panel,
 ...)`).
@@ -557,10 +552,10 @@ content canvas is the base, the topbar breadcrumb bar lifts off it, and cards
 lift off the content:
 
 - **Content canvas** is the base layer: `bg-app` in dark (deepest,
-  `--color-app` `oklch(18.6% 0.018 300)`, sRGB 20,17,26), `bg-neutral-50` in light. The
+  `--color-app` `oklch(14.48% 0 0)`, sRGB 10,10,10), `bg-neutral-50` in light. The
   `<main>` content area and page body use it.
 - **Topbar chrome** uses `bg-panel` in dark (`--color-panel`
-  `oklch(23.2% 0.03 300)`, sRGB 31,26,41, a clear step lighter than the content canvas)
+  `oklch(19.13% 0 0)`, sRGB 20,20,20, a clear step lighter than the content canvas)
   and `bg-white` in light, so the header reads as a separate panel. In dark
   mode, top-level layer cards and table header rows use the same `--color-panel`.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
@@ -572,19 +567,16 @@ lift off the content:
 
 Dark surface tokens are exact oklch equivalents of chosen sRGB steps. oklch
 lightness compresses toward pure black below ~15%, so check the rendered sRGB
-value. The dark ladder is `--color-app` 20,17,26, `--color-panel` 31,26,41,
-`--coollabs-elevated` 32,29,39, `--coollabs-base` 39,36,45,
-`--coollabs-recessed` 45,42,52 (sRGB), which reads as distinct surfaces.
+value. The dark ladder is `--color-app` 10, `--color-panel` 20,
+`--coollabs-elevated` 22, `--coollabs-base` 28,
+`--coollabs-recessed` 34 (sRGB, r=g=b), which reads as distinct surfaces.
 
-Temperature: in light mode every panel is **pure neutral gray** (r=g=b). In
-dark mode, every surface token (`--color-app`, `--color-panel`, `--coollabs-*`,
-`--color-surface`, `--color-raised`, `--color-selected`, `--color-log`) has a
-very small Coolify purple tint (hue 300; chroma 0.012 on borders, 0.018 on
-surfaces, 0.03 on the topbar panel), so menus, listbox panels, modals, logs,
-and the command palette match the canvas. The table above lists the lightness only.
-The translucent cards, wells, and inputs show this tint through them. Keep the
-tint this small, and do not give one surface a different cast (blue or warm)
-from the others. The light page canvas uses `bg-neutral-50` (not
+Temperature: in both modes every panel is **pure neutral gray** (r=g=b).
+In dark mode, every surface token (`--color-app`, `--color-panel`,
+`--coollabs-*`, `--color-surface`, `--color-raised`, `--color-selected`,
+`--color-log`) has chroma 0, so menus, listbox panels, modals, logs, and the
+command palette match the canvas. Do not give one surface a cast (blue, warm,
+or purple). The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
 The only intentional color is the purple/yellow brand accent.
 - **Layer cards** use the outer box and inset well from section 5.
