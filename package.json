@@ -15,7 +15,7 @@
         "svelte": "5.57.2",
         "tailwind-scrollbar": "4.0.2",
         "tailwindcss": "4.3.3",
-        "vite": "8.2.1"
+        "vite": "8.3.4"
     },
     "dependencies": {
         "@laravel/passkeys": "^0.4.0",
