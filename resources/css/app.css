@@ -1268,15 +1268,25 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
        visible steps: content 10 -> elevated 22 -> base 28 -> recessed 34.
        Pure neutral (r=g=b), matching the neutral borders/text and the light
        ladder, so every panel shares one temperature (no blue cast). */
-    --coollabs-canvas: oklch(14.48% 0 0);
-    --coollabs-elevated: oklch(20.02% 0 0);
-    --coollabs-recessed: oklch(25.2% 0 0);
-    --coollabs-base: oklch(22.64% 0 0);
-    --coollabs-fill: oklch(29.31% 0 0);
-    --coollabs-line: oklch(32% 0 0);
+    /* A very small Coolify purple tint (hue 300) so dark mode is not pure
+       black. The translucent cards, wells, and inputs pick it up too. */
+    --color-app: oklch(14.6% 0.018 300);
+    --color-panel: oklch(19.2% 0.03 300);
+    --coollabs-canvas: var(--color-app);
+    /* The opaque surfaces (menus, listbox panels, modals, tooltips) get the
+       same tint so they match the tinted canvas. */
+    --coollabs-elevated: oklch(20.02% 0.018 300);
+    --coollabs-recessed: oklch(25.2% 0.018 300);
+    --coollabs-base: oklch(22.64% 0.018 300);
+    --coollabs-fill: oklch(29.31% 0.018 300);
+    --color-surface: oklch(20.02% 0.018 300);
+    --color-raised: oklch(22.64% 0.018 300);
+    --color-selected: oklch(26.86% 0.018 300);
+    --color-log: oklch(15.91% 0.018 300);
+    --coollabs-line: oklch(32% 0.012 300);
     /* Crisped from 26.9% (1.36:1 on canvas) to 32% (1.63:1) so dark cards
        and tables show a visible edge instead of blending into the canvas. */
-    --coollabs-hairline: oklch(32% 0 0);
+    --coollabs-hairline: oklch(32% 0.012 300);
     --coollabs-subtle: oklch(70.8% 0 0);
     /* Neutral (was #a8a8b0 / #7a7a84, both cool-tinted). Sidebar text now shares
        the same neutral temperature as the content text, so the sidebar no longer
@@ -1776,21 +1786,43 @@ html[data-theme="custom"] textarea:disabled {
     margin-top: 1.75rem;
 }
 
-/* Layer card root: elevated shell with a hairline ring. overflow stays
-   visible so floating panels (listbox, tooltips) can escape the card. */
-.application-settings-section {
+/* Layer card root: soft outer box around a darker inset well (the body).
+   overflow stays visible so floating panels (listbox, tooltips) can escape
+   the card. */
+.application-settings-section,
+.empty-state {
+    --card-bg: rgb(0 0 0 / 0.75%);
+    --card-border: rgb(0 0 0 / 9%);
+    --well-bg: #ffffff;
+    --well-border: rgb(0 0 0 / 8%);
+    --well-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+    /* Light mode has no dim/faint fg tokens; these keep WCAG AA on the card. */
+    --card-fg: oklch(14.5% 0 0);
+    --card-fg-dim: oklch(40% 0 0);
+    --card-fg-faint: var(--coollabs-subtle);
     margin: 0;
     display: flex;
     width: 100%;
     flex-direction: column;
-    border-radius: 8px;
-    border: none;
-    background: var(--coollabs-elevated);
-    /* crisp ring + a restrained lift so the card separates from the canvas
-       (shadcn-style), not a heavy floating shadow */
-    box-shadow: 0 0 0 1px var(--coollabs-hairline), 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border: 1px solid var(--card-border);
+    border-radius: 0.75rem;
+    padding: 0.375rem;
+    background: var(--card-bg);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
     /* keep anchored scrolls (scrollIntoView) clear of the fixed topbar and page padding */
     scroll-margin-top: 7rem;
+}
+
+.dark .application-settings-section,
+.dark .empty-state {
+    --card-bg: rgb(255 255 255 / 6%);
+    --card-border: rgb(255 255 255 / 8%);
+    --well-bg: rgb(0 0 0 / 34%);
+    --well-border: rgb(255 255 255 / 7%);
+    --well-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+    --card-fg: var(--color-fg);
+    --card-fg-dim: var(--color-fg-dim);
+    --card-fg-faint: var(--color-fg-faint);
 }
 
 /* Brief accent ring when a settings nav sub-item scrolls a section into view.
@@ -1827,61 +1859,81 @@ html[data-theme="custom"] textarea:disabled {
     animation: application-settings-section-highlight 500ms ease-out forwards;
 }
 
-/* Modals reuse the layer-card shell but size to content on large screens */
+/* Modals reuse the layer-card shell. The card tint is translucent, so paint it
+   over the page canvas to keep the page behind the modal hidden. */
+.application-settings-section.application-settings-form {
+    background: linear-gradient(var(--card-bg), var(--card-bg)), var(--coollabs-canvas);
+}
+
+/* Modals size to content on large screens */
 @media (min-width: 1024px) {
     .application-settings-section.application-settings-form {
         width: auto;
     }
 }
 
-/* Layer card header: compact strip on the shell, subtle title color */
+/* Layer card header: small title row on the outer box */
 .application-settings-section > :is(header, .application-settings-section-header) {
     display: flex;
-    min-height: 3rem;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.5rem 0.5rem 0.5rem 1rem;
-    border-radius: 8px 8px 0 0;
-    background: var(--coollabs-elevated);
+    gap: 1rem;
+    padding: 0.25rem 0.5rem 0.625rem;
     font-weight: 500;
-    color: var(--coollabs-subtle);
+    color: var(--card-fg-faint);
 }
 
 .application-settings-section > :is(header, .application-settings-section-header) :is(h2, h3) {
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     line-height: 1.25rem;
     letter-spacing: 0;
-    /* Card title is a heading, so give it a readable strength instead of the
-       muted --coollabs-subtle (5.66:1 light / 6.98:1 dark). ~8.7:1 in both
-       modes (comfortable AAA) while descriptions/labels stay muted. */
-    color: oklch(40% 0 0);
+    color: var(--card-fg-dim);
 }
 
-.dark .application-settings-section > :is(header, .application-settings-section-header) :is(h2, h3) {
-    color: var(--color-fg-dim);
+.application-settings-section > :is(header, .application-settings-section-header) :is(h2, h3) .info-helper {
+    color: inherit;
 }
 
 .application-settings-section > .application-settings-section-header p {
     margin-top: 0.125rem;
-    font-size: 0.75rem;
+    font-size: 11px;
     line-height: 1rem;
-    color: var(--coollabs-subtle);
+    color: var(--card-fg-faint);
 }
 
-/* Layer card body: nested rounded panel with base bg. Ring uses the same
-   --coollabs-hairline as the card shell (line ~1456) so the body edge and the
-   header edge read as one continuous border instead of two different grays
-   (fill was lighter than hairline, so the header sides and body sides did not
-   match). */
+.application-settings-section > :is(header, .application-settings-section-header) > div:nth-child(2) > a:not(.button) {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--card-fg-faint);
+}
+
+.application-settings-section > :is(header, .application-settings-section-header) > div:nth-child(2) > a:not(.button):hover {
+    color: var(--card-fg);
+}
+
+/* Layer card body: the inset well */
 .application-settings-section-body {
     position: relative;
-    border-radius: 8px;
-    background: var(--coollabs-base);
-    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+    border: 1px solid var(--well-border);
+    border-radius: 0.5rem;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
     padding: 1rem;
+}
+
+/* The dark well is darker than the canvas, so controls inside it use a darker,
+   translucent fill and border (like haruvo) instead of the global opaque ones. */
+.dark .application-settings-section-body {
+    --coollabs-recessed: rgb(255 255 255 / 3%);
+    --coollabs-line: rgb(255 255 255 / 8%);
+}
+
+/* Floating panels in the well must stay opaque: restore the global dark values. */
+.dark .application-settings-section-body :is(.listbox-panel, .searchable-listbox-panel, [role="listbox"], [role="menu"]) {
+    --coollabs-recessed: oklch(25.2% 0.018 300);
+    --coollabs-line: oklch(32% 0.012 300);
 }
 
 .settings-mobile-header {
@@ -2615,8 +2667,54 @@ input[type="search"]::-webkit-search-results-decoration {
     padding: 1rem;
 }
 
+/* Standalone empty state: the same outer box and inset well as a layer card */
 .empty-state {
-    background: var(--coollabs-base);
+    border: 1px solid var(--card-border);
+    border-radius: 0.75rem;
+    padding: 0.375rem;
+    background: var(--card-bg);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+
+.empty-state-well {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--well-border);
+    border-radius: 0.5rem;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    padding: 2rem 1.5rem;
+    text-align: center;
+}
+
+.empty-state-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: var(--card-fg);
+}
+
+.empty-state-description {
+    margin-top: 0.25rem;
+    max-width: 28rem;
+    line-height: 1.25rem;
+    color: var(--coollabs-subtle);
+}
+
+/* Inside a layer card, the card is the frame: show only the centered text. */
+.application-settings-section .empty-state,
+.application-settings-section .empty-state-well {
+    border: 0;
+    border-radius: 0;
+    padding-inline: 0;
+    background: none;
+    box-shadow: none;
+}
+
+.application-settings-section .empty-state {
+    padding: 0;
 }
 
 .loading-state-card {
@@ -5338,13 +5436,13 @@ a.command-palette-item:focus-visible {
     }
 }
 
-/* Navigation items: each sidebar icon sits in a framed 32px tile with the 3D
+/* Navigation items: each sidebar icon sits in a framed 30px tile with the 3D
    depth of .button, like the canvas tool rail. Only the tile reacts; the row
    has no background. Applies to both navigation styles. Appearance →
    Navigation items → Flat sets data-nav-items="flat" on <html> and turns these
    rules off, which brings back the plain rows. */
 html:where(:not([data-nav-items="flat"])) .menu-item:not(.sidebar-toggle) {
-    height: 2.5rem;
+    height: 2.25rem;
     padding-left: 0.25rem;
 }
 
@@ -5459,14 +5557,14 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.si
 }
 
 html:where(:not([data-nav-items="flat"])) .menu-back-icon {
-    width: calc(1rem + 0.875rem + 2px);
+    width: calc(1rem + 0.75rem + 2px);
 }
 
 html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
     box-sizing: content-box;
     width: 1rem;
     height: 1rem;
-    padding: 0.4375rem;
+    padding: 0.375rem;
     border: 1px solid oklch(0% 0 0 / 0.09);
     border-radius: 8px;
     background: #fafafa;
@@ -5556,10 +5654,10 @@ html:where(:not([data-nav-items="flat"])) nav:not(.sidebar-collapsed) .menu-sear
 }
 
 @media (min-width: 1024px) {
-    /* The collapsed rail is 64px wide with 40px of content: center the 32px tile. */
+    /* The collapsed rail is 64px wide with 40px of content: center the 30px tile. */
     html:where(:not([data-nav-items="flat"])) .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
-        padding-left: 0.25rem;
-        padding-right: 0.25rem;
+        padding-left: 0.3125rem;
+        padding-right: 0.3125rem;
     }
 }
 
@@ -5616,7 +5714,6 @@ html.dark .canvas-zoom-max {
 @media (min-width: 1024px) {
     html[data-nav-style="floating"] {
         --floating-gap: 0.5rem;
-        /* Same radius as the content cards (.application-settings-section). */
         --floating-radius: 8px;
         --floating-line: oklch(0% 0 0 / 0.09);
         /* Bottom edge of the top bar panel plus one gap. */
@@ -5672,6 +5769,10 @@ html.dark .canvas-zoom-max {
     /* The panel border replaces the inner dividers of the top bar. */
     html[data-nav-style="floating"] .app-topbar > div {
         border-bottom-width: 0;
+    }
+
+    html[data-nav-style="floating"] .app-topbar > .app-topbar-brand {
+        border-radius: calc(var(--floating-radius) - 1px) 0 0 calc(var(--floating-radius) - 1px);
     }
 
     html[data-nav-style="floating"] .app-sidebar {

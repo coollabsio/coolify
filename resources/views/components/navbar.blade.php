@@ -1,6 +1,10 @@
 @props(['desktop' => false])
 
-<nav class="sidebar-nav flex min-h-0 flex-col flex-1 bg-white border-r border-neutral-200 dark:border-white/[0.06] dark:bg-panel pt-2"
+<nav @class([
+    'sidebar-nav flex min-h-0 flex-col flex-1 border-r border-black/[0.06] dark:border-white/[0.04] pt-2',
+    'bg-neutral-50 dark:bg-app' => $desktop,
+    'bg-white dark:bg-panel' => ! $desktop,
+])
     :class="collapsed ? 'px-2 lg:px-3 sidebar-collapsed' : 'px-2 lg:px-3'"
     @mouseover="
         if (!collapsed) return;
@@ -189,7 +193,7 @@
                                 title="{{ $navMenu['backTitle'] }}" aria-label="{{ $navMenu['backTitle'] }}"
                                 class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
-                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-fg-dim" />
+                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-coollabs dark:text-fg-dim" />
                                 </span>
                                 <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
                                     :class="collapsed && 'lg:hidden'">{{ $navMenu['label'] }}</span>
@@ -214,7 +218,7 @@
                                 class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 {{-- As wide as a menu icon (with its tile), so the chevron lines up with the icons below. --}}
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
-                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-fg-dim" />
+                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-coollabs dark:text-fg-dim" />
                                 </span>
                                 <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
                                     :class="collapsed && 'lg:hidden'">{{ $submenuItem['label'] }}</span>
@@ -268,7 +272,7 @@
                                 :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <x-reicon :name="$item['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label flex-1 text-left" :class="collapsed && 'lg:hidden'">{{ $item['label'] }}</span>
-                                <x-reicon name="chevron-down" class="size-3 -rotate-90 text-fg-faint" ::class="collapsed && 'lg:hidden'" />
+                                <x-reicon name="chevron-down" class="size-3 -rotate-90 text-coollabs dark:text-fg-faint" ::class="collapsed && 'lg:hidden'" />
                             </button>
                         @else
                             <a title="{{ $item['label'] }}" href="{{ $item['href'] }}"
@@ -321,7 +325,7 @@
     </ul>
     {{-- Sidebar footer (desktop only; mobile uses a temporary slide-over). It stays visible;
          only the menu above it scrolls on short or zoomed-in screens. --}}
-    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3">
+    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-neutral-50 px-2 py-2 dark:bg-app lg:-mx-3 lg:flex lg:px-3">
         <div class="flex items-center gap-1" :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
             <x-top-user-menu sidebar />
             <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"

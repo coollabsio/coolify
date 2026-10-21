@@ -1,9 +1,402 @@
 # Coolify UI design system
 
-This document defines Coolify's UI design system for its Livewire + Blade +
-Alpine + Tailwind v4 frontend. The visual system covers the global shell,
-project and environment pages, application navigation, settings surfaces,
-tables, modals, toasts, terminals, and metrics.
+This file has two parts:
+
+- **Part 1, Portable design language:** the look and feel of the Coolify UI,
+  with no dependency on Coolify code. It has the principles, a copy-paste token
+  sheet in plain CSS, and the anatomy of each component with exact values. Use
+  it to give another app the same feel. It works with any stack (plain CSS,
+  Tailwind, React, Vue, Blade).
+- **Part 2, Coolify implementation:** how Coolify applies the language with its
+  Livewire + Blade + Alpine + Tailwind v4 frontend: the components, routes, page
+  shells, and the rules for this repository.
+
+When you change a shared value in Coolify, update Part 1 and Part 2 in the same
+change.
+
+---
+
+# Part 1. Portable design language
+
+## P1. The feel
+
+- **Compact and calm.** 13–14px UI text, 32px controls, small radii, short
+  labels. The data is the hero, not the chrome.
+- **Layers, not boxes.** Depth comes from a few surface steps (canvas, card,
+  well, control), 1px borders, and very soft shadows. Never use thick borders or
+  heavy floating shadows.
+- **Card and well.** Content sits in a darker inset panel (the well) inside a
+  soft outer box with a small title row.
+- **Tactile buttons.** Buttons and navigation icon tiles have a 2px bottom
+  edge. They lift 1px on hover and press down on click.
+- **Near-black, not black.** Dark mode is a very dark gray with a faint brand
+  tint. Light mode is pure neutral gray.
+- **One accent per theme.** Purple in light mode, yellow in dark mode (purple
+  has too little contrast on dark surfaces). Everything else is neutral.
+- **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
+  No em dashes in UI copy.
+
+## P2. Token sheet
+
+Copy this sheet into the app's global CSS. Put the dark values on the selector
+the app uses for dark mode (here `.dark` on `<html>`). Use the tokens in every
+component; do not hard-code a gray in a component, because then it does not
+follow the theme or the tint.
+
+```css
+:root {
+    /* Type */
+    --ui-font-sans: 'Geist Sans', Inter, system-ui, sans-serif;
+    --ui-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Surfaces (light: pure neutral) */
+    --ui-canvas: oklch(98.5% 0 0);          /* page background and sidebar */
+    --ui-panel: #ffffff;                    /* top header bar */
+    --ui-card-bg: rgb(0 0 0 / 0.75%);       /* card outer box */
+    --ui-card-border: rgb(0 0 0 / 9%);
+    --ui-well-bg: #ffffff;                  /* card body (inset well) */
+    --ui-well-border: rgb(0 0 0 / 8%);
+    --ui-well-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+    --ui-control-bg: oklch(96% 0 0);        /* inputs, select triggers */
+    --ui-control-border: oklch(14.5% 0 0 / 0.1);
+    --ui-menu-bg: oklch(96% 0 0);           /* dropdown, listbox, popover (opaque) */
+    --ui-menu-border: oklch(14.5% 0 0 / 0.1);
+    --ui-hover: oklch(92.2% 0 0);           /* menu option and row hover */
+    --ui-divider: oklch(92.2% 0 0);
+    --ui-chrome-border: rgb(0 0 0 / 6%);    /* sidebar and header edges */
+
+    /* Text */
+    --ui-fg: oklch(14.5% 0 0);
+    --ui-fg-dim: oklch(40% 0 0);            /* card titles */
+    --ui-fg-faint: oklch(50% 0 0);          /* labels, descriptions, meta */
+
+    /* Accent and status */
+    --ui-accent: oklch(49.65% 0.2709 289.33);     /* purple */
+    --ui-accent-top: oklch(52.34% 0.287 289.16);  /* primary button gradient */
+    --ui-accent-bottom: oklch(43.76% 0.2369 289.82);
+    --ui-accent-edge: oklch(38.04% 0.2031 290.47); /* primary button depth edge */
+    --ui-accent-fg: #ffffff;
+    --ui-success: oklch(48% 0.135 149.58);
+    --ui-warning: oklch(50% 0.105 80);
+    --ui-error: oklch(52% 0.2 27.33);
+
+    /* Depth */
+    --ui-card-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+    --ui-menu-shadow: 0 4px 12px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.08);
+    --ui-modal-shadow: 0 24px 64px rgb(0 0 0 / 0.55), 0 4px 16px rgb(0 0 0 / 0.4);
+    --ui-depth-color: rgb(0 0 0 / 0.22);    /* button and tile bottom edge */
+
+    /* Motion */
+    --ui-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ui-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.dark {
+    /* Surfaces (dark: near-black with a faint purple tint, hue 300) */
+    --ui-canvas: oklch(14.6% 0.018 300);
+    --ui-panel: oklch(19.2% 0.03 300);
+    --ui-card-bg: rgb(255 255 255 / 6%);
+    --ui-card-border: rgb(255 255 255 / 8%);
+    --ui-well-bg: rgb(0 0 0 / 34%);
+    --ui-well-border: rgb(255 255 255 / 7%);
+    --ui-well-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+    --ui-control-bg: rgb(255 255 255 / 3%);
+    --ui-control-border: rgb(255 255 255 / 8%);
+    --ui-menu-bg: oklch(25.2% 0.018 300);
+    --ui-menu-border: oklch(32% 0.012 300);
+    --ui-hover: oklch(29.31% 0.018 300);
+    --ui-divider: rgb(255 255 255 / 7%);
+    --ui-chrome-border: rgb(255 255 255 / 4%);
+
+    /* Text */
+    --ui-fg: oklch(96.12% 0 0);
+    --ui-fg-dim: oklch(76.99% 0 0);
+    --ui-fg-faint: oklch(65% 0 0);
+
+    /* Accent and status: yellow accent in dark mode */
+    --ui-accent: oklch(88.13% 0.1507 91.7);
+    --ui-success: oklch(72.27% 0.192 149.58);
+    --ui-warning: oklch(88.13% 0.1507 91.7);
+    --ui-error: oklch(66% 0.2 27.33);
+
+    --ui-depth-color: rgb(255 255 255 / 0.08);
+}
+```
+
+Rules for the tokens:
+
+- Translucent surfaces (`--ui-card-bg`, `--ui-well-bg`, `--ui-control-bg`) take
+  the color of what is below them. That is why the cards and inputs show the
+  dark tint without their own tint.
+- Floating surfaces (menus, popovers, tooltips, modals) must be opaque. Use
+  `--ui-menu-bg`, never a translucent value, or the content behind shows
+  through.
+- To change the tint, change only the chroma and hue of the dark surfaces.
+  Keep it small: chroma 0.012 for borders, 0.018 for surfaces, 0.03 for the
+  header. On near-black, pick the hue by the rendered sRGB value: red must be a
+  little above green, or the tint looks blue (hue 300 renders the canvas as
+  sRGB 11,9,17).
+- The primary buttons use purple in both themes. Only focus rings, active
+  navigation, and other accent states change to yellow in dark mode.
+
+## P3. Scales
+
+| Scale | Values | Use |
+|---|---|---|
+| Text | 11px | meta, section labels, card descriptions, header links |
+| | 12px | badges, small descriptions, code snippets |
+| | 13px | navigation, buttons, table cells, card titles (semibold) |
+| | 14px | inputs, menu options, empty-state titles |
+| | 24px | page titles (with a 13px faint summary below) |
+| Weight | 500 / 600 | 500 for labels and buttons, 600 for titles |
+| Height | 24px | badges |
+| | 32px | buttons, inputs, select triggers, menu options |
+| | 36px | navigation rows with tiles |
+| | 40px / 48px | table header / table rows |
+| Radius | 6px | menu options |
+| | 8px | buttons, inputs, card wells, navigation tiles |
+| | 10px | menus and popovers (6px options + 4px inset) |
+| | 12px | card outer box |
+| | full | badges, pills |
+| Spacing | 6px | card outer padding |
+| | 16px | well padding, page gutters on small screens |
+| | 24px | gap between cards (use a flex or grid gap, not margins) |
+| Motion | 80ms | button lift and press |
+| | 120ms | color, border, and focus changes |
+| | 150ms | menu swaps, row hover |
+
+Nested boxes normally follow `outer radius = inner radius + inset`. The card
+(12px outer, 8px well, 6px inset) is an accepted exception.
+
+## P4. Components
+
+Class names below are examples. Keep the values and structure.
+
+### App shell
+
+- Three layers: the canvas (page and sidebar, `--ui-canvas`), the top header
+  bar (`--ui-panel`, 48px high), and the cards on the canvas.
+- The sidebar is the canvas color and has a 1px `--ui-chrome-border` right
+  edge. The brand block (product name and version) at the top of the sidebar
+  column also uses the canvas color, with a 1px bottom border.
+- Keep the chrome borders faint. A strong border on near-black looks like a
+  line drawn on the page.
+
+### Sidebar navigation
+
+```css
+.nav-section { padding: 4px 10px; font-size: 11px; font-weight: 500; color: var(--ui-fg-faint); }
+.nav-item {
+    display: flex; align-items: center; gap: 10px;
+    height: 36px; padding: 0 10px 0 4px;
+    font-size: 13px; font-weight: 500; color: var(--ui-fg-dim);
+    background: transparent;                /* the row itself never fills */
+}
+.nav-item:hover, .nav-item.is-active { color: var(--ui-fg); }
+.nav-tile {                                 /* 30px tile: 16px icon + 6px padding + 1px border */
+    box-sizing: content-box; width: 16px; height: 16px; padding: 6px;
+    border: 1px solid rgb(0 0 0 / 9%); border-radius: 8px; background: #fafafa;
+    box-shadow: 0 2px 0 var(--ui-depth-color);
+    transition: transform 80ms, box-shadow 80ms, border-color 120ms, background-color 120ms;
+}
+.dark .nav-tile { border-color: rgb(255 255 255 / 9%); background: rgb(255 255 255 / 4%); }
+.nav-item:hover .nav-tile { transform: translateY(-1px); box-shadow: 0 3px 0 var(--ui-depth-color); }
+.nav-item:active .nav-tile { transform: translateY(2px); box-shadow: none; }
+.nav-item.is-active .nav-tile {
+    color: var(--ui-accent);
+    border-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
+    --ui-depth-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
+}
+```
+
+- Use outline icons (1.5px stroke) at 16px. A brand item can use a one-color
+  brand mark when it is clearer than an outline icon.
+- Rows with a submenu end in a 12px chevron: accent in light mode, faint gray
+  in dark mode.
+- Group rows under 11px section labels, and separate groups with a 1px divider.
+
+### Card (outer box, title row, well)
+
+```css
+.card {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--ui-card-border); border-radius: 12px; padding: 6px;
+    background: var(--ui-card-bg); box-shadow: var(--ui-card-shadow);
+    overflow: visible;                      /* menus and tooltips must escape */
+}
+.card-header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 4px 8px 10px;
+}
+.card-title { font-size: 13px; font-weight: 600; line-height: 20px; color: var(--ui-fg-dim); }
+.card-description { margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--ui-fg-faint); }
+.card-header a { font-size: 11px; font-weight: 500; color: var(--ui-fg-faint); }
+.card-header a:hover { color: var(--ui-fg); }
+.card-well {
+    position: relative; padding: 16px;
+    border: 1px solid var(--ui-well-border); border-radius: 8px;
+    background: var(--ui-well-bg); box-shadow: var(--ui-well-shadow);
+}
+.card-well.is-flush { padding: 0; }        /* tables and lists that touch the edge */
+```
+
+- Card actions (buttons, badges, a filter) go in the title row on the right.
+- Keep one collection in one card: its toolbar at the top of a flush well, its
+  table below, and its pagination in the same well.
+
+### Inputs and select triggers
+
+```css
+.input {
+    display: block; width: 100%; height: 32px; padding: 0 12px;
+    border: 1px solid var(--ui-control-border); border-radius: 8px;
+    background: var(--ui-control-bg); color: var(--ui-fg); font-size: 14px;
+    transition: border-color 120ms var(--ui-ease-out), box-shadow 120ms var(--ui-ease-out);
+}
+.input::placeholder { color: var(--ui-fg-faint); }
+.input:focus-visible { outline: none; border-color: var(--ui-accent); }
+.label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--ui-fg-dim); }
+```
+
+- Use a custom listbox, not the native `<select>`.
+- Show a text input and a select trigger with the same height, fill, border,
+  and radius.
+
+### Buttons
+
+```css
+.button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 10px; border-radius: 6px;
+    border: 1px solid rgb(0 0 0 / 9%); background: #ffffff; color: var(--ui-fg);
+    font-size: 13px; font-weight: 500; white-space: nowrap;
+    box-shadow: 0 2px 0 var(--ui-depth-color);
+    transition: color 120ms, background-color 120ms, border-color 120ms,
+                box-shadow 80ms, transform 80ms;
+    transition-timing-function: var(--ui-ease-out);
+}
+.dark .button:not(.button-primary) { border-color: rgb(255 255 255 / 8%); background: rgb(255 255 255 / 6%); }
+.button:hover { transform: translateY(-1px); box-shadow: 0 3px 0 var(--ui-depth-color); }
+.button:active { transform: translateY(2px); box-shadow: none; }
+.button:focus-visible { outline: none; box-shadow: 0 2px 0 var(--ui-depth-color), 0 0 0 1px var(--ui-accent); }
+.button:disabled { box-shadow: none; transform: none; opacity: 0.5; cursor: not-allowed; }
+.button-primary {
+    --ui-depth-color: var(--ui-accent-edge);
+    border-color: var(--ui-accent-bottom); color: var(--ui-accent-fg);
+    background: linear-gradient(to bottom, var(--ui-accent-top), var(--ui-accent-bottom));
+}
+```
+
+- Use one primary button per area. Other actions are neutral buttons.
+- Destructive actions use the error color for text and focus ring.
+
+### Menus, listboxes, and popovers
+
+```css
+.menu {
+    min-width: max(100%, 13rem); max-height: 16rem; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 1px; padding: 4px;
+    border: 1px solid var(--ui-menu-border); border-radius: 10px;
+    background: var(--ui-menu-bg); box-shadow: var(--ui-menu-shadow);
+}
+.menu-option {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    min-height: 32px; padding: 6px 8px; border-radius: 6px;
+    font-size: 14px; color: var(--ui-fg); white-space: nowrap; cursor: pointer;
+}
+.menu-option:hover { background: var(--ui-hover); }
+```
+
+- Mark the selected option with a check mark on the right, not with a fill.
+- Keep trigger labels static (`Filter`, `Sort`); show the selection in the menu.
+- Render menus above everything; never clip them at a card or modal edge.
+
+### Tables
+
+- Header row: 40px, 13px medium, `--ui-fg-faint`, a faint fill
+  (`rgb(0 0 0 / 2%)` light, `rgb(255 255 255 / 2%)` dark), and a 1px
+  `--ui-divider` bottom border.
+- Data rows: about 48px, 10px 16px padding, a 1px divider, and a faint hover
+  fill. Put the row action at the far right.
+- Toolbar on top (search left; filter, sort, and add right), pagination in the
+  footer. Hide the footer when there is only one page.
+- Use a table, not cards, for a collection that can grow.
+
+### Status badge
+
+```css
+.badge {
+    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px;
+    border: 1px solid rgb(0 0 0 / 9%); border-radius: 999px; background: rgb(0 0 0 / 4%);
+    font-size: 12px; font-weight: 500; line-height: 1; color: var(--ui-fg-dim);
+}
+.dark .badge { border-color: rgb(255 255 255 / 12%); background: rgb(255 255 255 / 7%); color: var(--ui-fg); }
+.badge-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+```
+
+- The pill stays neutral. Only the 6px dot has the status color (success,
+  warning, error, neutral). Use a pulsing dot for a state in progress.
+
+### Empty state
+
+- On its own: the card outer box and well, with centered text, at least 160px
+  high (128px small, 384px large).
+- Inside a card: only the centered text, because the card is the frame.
+- Optional 44px icon tile, a 14px medium title (`--ui-fg`), a 13px faint
+  description (max width 28rem), and an optional action. No dashed border.
+
+### Modals and toasts
+
+- Modals use the card anatomy (outer box, title row, well), size to their
+  content on desktop, and put the actions on the right below a divider. Use
+  `--ui-modal-shadow`.
+- Toasts are compact cards (max width 26rem) with a status icon tile, a title,
+  an optional description, and a dismiss button. They close after 4 seconds
+  and pause on hover.
+
+### Logs and code
+
+- A monospace viewport on an opaque surface a little darker than the card
+  (dark: `oklch(15.91% 0.018 300)`), with one compact toolbar on top.
+- Code snippets: 12px mono, 8px radius, 1px border, the control fill.
+
+## P5. Traps
+
+- **Translucent fills stack.** A control fill of `rgb(255 255 255 / 3%)` looks
+  right on the dark well but is invisible on a menu. If you change a control
+  token for one area, set the opaque value again on the floating panels in it.
+- **Global overrides of utility classes.** If the app has a global rule that
+  replaces a border or fill utility (for example, to make borders crisper),
+  that rule also hits new elements. Check the computed value, not the class.
+- **Dark default tokens.** Define every text token for both themes. A token
+  that has only a dark value makes light-mode text too pale.
+- **`overflow: hidden` on a card** clips menus and tooltips. Keep cards
+  visible; clip only an inner scroll area.
+- **Near-black hues.** oklch lightness below about 15% compresses toward black,
+  and a hue can render bluer than expected. Check the rendered sRGB value.
+
+## P6. Adopting the language in another app
+
+1. Copy the P2 token sheet and load the fonts (Geist Sans, Geist Mono).
+2. Set the canvas on the page and the sidebar, and the panel on the header bar.
+3. Build the card, input, button, menu, badge, and empty-state components from
+   P4 before the pages. Use only the tokens in them.
+4. Put every page section in a card. Stack cards with a 24px gap.
+5. Use a table for collections, and the status badge for states.
+6. Check in light and dark mode, with the sidebar expanded and collapsed, and
+   with a menu open inside a card. Measure the computed colors of the canvas,
+   card, well, input, and menu; they must match the token sheet.
+
+---
+
+# Part 2. Coolify implementation
+
+This part defines how Coolify applies the design language with its Livewire +
+Blade + Alpine + Tailwind v4 frontend. It covers the global shell, project and
+environment pages, application navigation, settings surfaces, tables, modals,
+toasts, terminals, and metrics. In Coolify, the tokens of Part 1 map to the
+`--coollabs-*`, `--color-*`, `--card-*`, and `--well-*` variables in
+`resources/css/app.css`.
 
 Use this file as the source of truth for frontend design work. Update it in the
 same change whenever a new shared visual pattern or component is introduced.
@@ -33,9 +426,9 @@ The interface is compact and product-focused:
 
 - near-neutral layered surfaces instead of large bordered boxes;
 - 13–14px UI typography and 32px controls;
-- crisp hairline rings plus a restrained card lift (single 1px ring +
-  `0 1px 2px rgb(0 0 0 / 0.05)`) so cards and tables separate from the canvas,
-  never heavy borders or a strong floating shadow;
+- layer cards are a soft outer box around a darker inset well (see section 5),
+  with 1px borders and a restrained `0 1px 2px rgb(0 0 0 / 0.05)` lift, never
+  heavy borders or a strong floating shadow;
 - full-width data tables for dense collections;
 - outline Reicon glyphs through `<x-reicon>`;
 - the Coolify purple brand accent in light mode;
@@ -104,12 +497,12 @@ The surface ladder is defined in `resources/css/app.css`.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--coollabs-canvas` | 97% off-white | 14.48% neutral | page canvas (kept below card fills so cards lift) |
-| `--coollabs-elevated` | 98% neutral | 20.02% neutral | shells and card headers |
-| `--coollabs-base` | white | 22.64% neutral | nested card bodies |
-| `--coollabs-recessed` | 96% neutral | 25.2% neutral | inputs and listboxes |
+| `--coollabs-canvas` | 97% off-white | 14.6% (tinted, = `--color-app`) | page canvas (kept below card fills so cards lift) |
+| `--coollabs-elevated` | 98% neutral | 20.02% neutral | shells and modal headers |
+| `--coollabs-base` | white | 22.64% neutral | nested modal bodies and legacy panels |
+| `--coollabs-recessed` | 96% neutral | 25.2% neutral | inputs and listboxes (`rgb(255 255 255 / 3%)` inside the dark card well) |
 | `--coollabs-fill` | 92.2% neutral | 29.31% neutral | dividers and passive fills |
-| `--coollabs-line` | translucent dark | 32% neutral | control borders |
+| `--coollabs-line` | translucent dark | 32% neutral | control borders (`rgb(255 255 255 / 8%)` inside the dark card well) |
 | `--coollabs-hairline` | 85.5% neutral | 32% neutral | shell rings (crisp enough to read as a card edge, ~1.5:1) |
 | `--coollabs-subtle` | 50% neutral | 70.8% neutral | labels and muted titles (light darkened for WCAG AA 4.5:1) |
 
@@ -133,15 +526,22 @@ opacity rather than a fully saturated fill.
 
 ### Shell layering
 
-The app shell is three distinct surface layers, not one flat color. Chrome
-lifts, content is the base, cards lift off the content:
+The app shell is three distinct surface layers, not one flat color. The
+content canvas is the base, the topbar breadcrumb bar lifts off it, and cards
+lift off the content:
 
 - **Content canvas** is the base layer: `bg-app` in dark (deepest,
-  `--color-app` `oklch(14.48% 0 0)`, sRGB 10), `bg-neutral-50` in light. The
+  `--color-app` `oklch(14.6% 0.018 300)`, sRGB 11,9,17), `bg-neutral-50` in light. The
   `<main>` content area and page body use it.
-- **Sidebar and topbar chrome** use `bg-panel` in dark (`--color-panel`
-  `oklch(19.13% 0 0)`, sRGB 20, a clear step lighter than the content canvas)
-  and `bg-white` in light, so the chrome reads as a separate panel from the content.
+- **Topbar chrome** uses `bg-panel` in dark (`--color-panel`
+  `oklch(19.2% 0.03 300)`, sRGB 21,16,30, a clear step lighter than the content canvas)
+  and `bg-white` in light, so the header reads as a separate panel.
+- **Desktop sidebar and the topbar brand block** (Coolify name and version)
+  use the content canvas color (`bg-neutral-50` / `dark:bg-app`). The sidebar
+  has a 1px right border, and the brand block has a 1px bottom border. These
+  chrome borders stay faint (`border-black/[0.06]`, `dark:border-white/[0.04]`);
+  do not use `dark:border-white/[0.06]`, which a global rule forces to the
+  solid hairline grey. The mobile drawer keeps `bg-panel` / `bg-white`.
 
 Dark surface tokens are exact oklch equivalents of chosen sRGB steps. oklch
 lightness compresses toward pure black below ~15%, so do not pick dark values by
@@ -149,17 +549,23 @@ round oklch percentages. The dark ladder is `--color-app` 10,
 `--coollabs-elevated` 22, `--coollabs-base` 28, `--coollabs-recessed` 34 (sRGB),
 which reads as distinct surfaces.
 
-Temperature: every panel is **pure neutral gray** (r=g=b), one consistent
-temperature across the sidebar, tables, cards, inputs, dividers, borders, and
-text, in both modes. Do not give one surface a cool (blue) or warm cast while
-the others stay neutral. The light page canvas uses `bg-neutral-50` (not
+Temperature: in light mode every panel is **pure neutral gray** (r=g=b). In
+dark mode, every surface token (`--color-app`, `--color-panel`, `--coollabs-*`,
+`--color-surface`, `--color-raised`, `--color-selected`, `--color-log`) has a
+very small Coolify purple tint (hue 300; chroma 0.012 on borders, 0.018 on
+surfaces, 0.03 on the topbar panel), so menus, listbox panels, modals, logs,
+and the command palette match the canvas. The table above lists the lightness only.
+The translucent cards, wells, and inputs show this tint through them. Keep the
+tint this small, and do not give one surface a different cast (blue or warm)
+from the others. The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
 The only intentional color is the purple/yellow brand accent.
-- **Cards, tables, and collection tiles** lift off the content canvas with
-  `dark:bg-white/[0.05]` plus the crisp `--coollabs-hairline` ring; in light
-  they are `bg-white` with the ring and the restrained card lift.
+- **Layer cards** use the outer box and inset well from section 5.
+- **Tables and collection tiles** outside a layer card lift off the content
+  canvas with `dark:bg-white/[0.05]` plus the crisp `--coollabs-hairline` ring;
+  in light they are `bg-white` with the ring and the restrained card lift.
 
-Do not paint the content area with the same `bg-panel` as the sidebar, and do
+Do not paint the content area with the same `bg-panel` as the topbar, and do
 not drop card fills below `dark:bg-white/[0.05]`; both make surfaces read as one
 color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
 
@@ -169,16 +575,26 @@ color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
 
 ### Global shell
 
-- Main sidebar groups are compact, use outline Reicons, and keep a 32px row
-  height.
-- Active sidebar rows are rounded pills (`rounded-md`) with a solid neutral
-  selected fill (`bg-black/5` light, `bg-white/6` dark) and no accent rail.
-  Hover rows use the same radius. Do not use accent-tinted gradients on nav
+- Main sidebar groups are compact and use outline Reicons. With Appearance →
+  Navigation items → Flat, rows are 32px high.
+- With the default tile items (not Appearance → Navigation items → Flat), each
+  icon sits in a 30px 3D tile (16px icon, 6px padding, 1px border) in a 36px row.
+- With tile items, the row has no fill: the current item shows through its
+  accent tile (purple light, yellow dark) and its brighter label.
+- With Flat items, active rows are rounded pills (`rounded-md`) with a solid
+  neutral selected fill (`bg-black/5` light, `bg-white/6` dark) and no accent
+  rail. Hover rows use the same radius. Do not use accent-tinted gradients on nav
   rows; yellow washes look muddy on dark UI.
 - Nested items sit behind a thin 1px guide line (`.nav-children`) and use the
   same selected pill, not a thick box border.
 - The update badge sits on the version row and uses a tiny fully rounded
   primary-action pill.
+- Submenu chevrons (the right chevron on rows that open a submenu and the back
+  chevron) are `text-coollabs` in light mode and grey in dark mode
+  (`dark:text-fg-faint` right, `dark:text-fg-dim` back).
+- Brand items use a one-color brand glyph in `<x-reicon>` instead of an outline
+  icon when the brand mark is clearer (for example `cloudflare` for Cloudflare
+  Tunnel, drawn from `public/svgs/cloudflared.svg`).
 
 ### Resource navigation
 
@@ -364,17 +780,33 @@ replace a manual shell when modifying it instead of creating another variant.
 
 Anatomy:
 
-- 8px shell radius;
-- elevated header strip;
-- no divider below the header;
-- nested base-color body with its own fill ring;
+- soft outer box: 12px radius, 1px border, 6px padding, faint fill
+  (`rgb(0 0 0 / 0.75%)` light, `rgb(255 255 255 / 6%)` dark);
+- small title row on the outer box (13px semibold title, 11px description and
+  header links), no divider below it;
+- body is an inset well: 8px radius, 1px border, white in light and
+  `rgb(0 0 0 / 34%)` in dark;
 - 16px body padding;
 - optional `flush` mode for full-bleed tables;
-- card-level actions belong in the header slot.
+- card-level actions belong in the header slot;
+- theme colors are CSS variables on the card (`--card-bg`, `--card-border`,
+  `--well-bg`, `--well-border`, `--well-shadow`, `--card-fg*`), overridden in
+  `.dark .application-settings-section`.
 
-Header actions use an 8px top/right inset while the title keeps its 16px left
-inset. Do not leave a larger empty strip between the final action and the
-card's top-right corner.
+The title row has `4px 8px 10px` padding inside the 6px outer padding, so
+header actions sit 10px from the top and 14px from the right edge.
+
+The card keeps `overflow: visible` so listbox panels and tooltips can escape
+it. Do not add `overflow: hidden` to the card or the well.
+
+Inside the dark well, controls use a darker translucent fill and border
+(`--coollabs-recessed: rgb(255 255 255 / 3%)`, `--coollabs-line:
+rgb(255 255 255 / 8%)`), set on `.dark .application-settings-section-body`.
+The global opaque values look too light on the dark well. Floating panels in
+the well (`.listbox-panel`, `.searchable-listbox-panel`, `[role="listbox"]`,
+`[role="menu"]`) set the opaque values again, so they are not see-through. A
+new floating panel that uses `--coollabs-recessed` in a card needs the same
+reset.
 
 Do not split one collection into a summary card followed by a table or log
 card. Keep its status/action in the header, its view switcher or toolbar at the
@@ -397,8 +829,14 @@ Examples:
 
 Do not give visibly inset parent and child boxes the same radius. Flush or
 edge-to-edge children are exempt because there is no visible inset to add.
+The layer card is an intentional exception: its 12px outer box and 8px well
+with a 6px inset match the reference design.
 
-Use an empty state when the section has no usable controls:
+Use an empty state when the section has no usable controls. On its own,
+`x-empty` is the layer-card outer box and inset well with a centered 14px title
+and a 13px muted description (minimum height 160px; `sm` 128px, `lg` 384px).
+Inside a layer card, the card is the frame, so it shows only the centered text.
+Do not use a dashed border for empty states.
 
 ```blade
 <x-empty size="sm" title="Nothing here" description="Explain what enables it.">
@@ -633,8 +1071,7 @@ targets.
 
 `x-modal-input` and confirmation dialogs reuse the layer-card shell:
 
-- compact elevated header;
-- nested base-color body;
+- the same outer box, title row, and inset well as layer cards;
 - content-width desktop sizing;
 - shared 32px controls;
 - no redundant description below a self-explanatory title;

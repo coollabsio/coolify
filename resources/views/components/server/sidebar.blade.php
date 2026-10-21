@@ -54,7 +54,7 @@
             'label' => 'Cloudflare Tunnel',
             'route' => 'server.cloudflare-tunnel',
             'active' => $activeMenu === 'cloudflare-tunnel',
-            'icon' => 'globe',
+            'icon' => 'cloudflare',
             'group' => 'Networking',
             'visible' => ! $server->isLocalhost(),
         ],
