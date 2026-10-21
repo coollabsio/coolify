@@ -49,10 +49,8 @@ check_installation() {
 }
 
 read_version() {
-	local image
-	image="$(docker inspect --format '{{.Image}}' coolify 2> /dev/null)" || die "the coolify container does not exist"
-	# Read from the image, because the mitigation advice was to stop the coolify container
-	current_version="$(docker run --rm --network none --entrypoint php -w /var/www/html "$image" bootstrap/getVersion.php < /dev/null 2> /dev/null)" || die "could not read the Coolify version from the coolify container"
+	# Copy the file out of the container, because this also works when the mitigation advice was followed and the container is stopped
+	current_version="$(docker cp coolify:/var/www/html/config/constants.php - 2> /dev/null | tar -xO 2> /dev/null | awk -F "'" "/'version' =>/ && !found { print \$(NF - 1); found = 1 }")" && [ -n "$current_version" ] || die "could not read the Coolify version from the coolify container"
 	ok "Coolify $BOLD$current_version$RESET is installed"
 }
 
