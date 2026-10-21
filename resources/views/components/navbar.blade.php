@@ -256,13 +256,12 @@
             <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
             @foreach ($navSections as $sectionLabel => $sectionItems)
-                @if ($loop->first)
-                    <li class="nav-section" :class="collapsed && 'lg:hidden'">{{ $sectionLabel }}</li>
-                @else
+                {{-- The first section needs no title. --}}
+                @unless ($loop->first)
                     <li class="nav-section mt-3" aria-hidden="true"
                         :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
                         {{ $sectionLabel }}</li>
-                @endif
+                @endunless
                 @foreach ($sectionItems as $item)
                     <li>
                         {{-- A parent entry is a button, not a link: wire:navigate would start a page load on mouse down. --}}
