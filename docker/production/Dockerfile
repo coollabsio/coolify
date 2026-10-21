@@ -8,6 +8,8 @@ ARG CLOUDFLARED_VERSION=2026.7.3
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.2-r1
+# https://nodejs.org/en/about/previous-releases
+ARG NODE_VERSION=24.22.1
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.0
 
@@ -48,10 +50,15 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
+# Temporary: the node:24.22.1 multi-arch manifest is not published yet, pull the per-arch image instead
+FROM amd64/node:${NODE_VERSION}-alpine3.24 AS nodejs-amd64
+FROM arm64v8/node:${NODE_VERSION}-alpine3.24 AS nodejs-arm64
+FROM nodejs-${TARGETARCH} AS nodejs
+
 # =================================================================
 # Stage 2: Frontend assets compilation
 # =================================================================
-FROM node:24-alpine AS static-assets
+FROM nodejs AS static-assets
 
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
@@ -73,7 +80,10 @@ FROM ${SERVERSIDEUP_PHP_IMAGE} AS terminal-dependencies
 USER root
 
 RUN apk upgrade && \
-    apk add --no-cache nodejs npm make g++ python3
+    apk add --no-cache make g++ python3
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 COPY docker/coolify-terminal/package*.json /terminal/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefix /terminal && \
@@ -129,7 +139,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
-    nodejs \
+    libstdc++ \
     openssh-client \
     git \
     git-lfs \
@@ -185,6 +195,7 @@ COPY --chown=www-data:www-data changelogs/ ./changelogs/
 RUN composer dump-autoload
 
 # Install terminal WebSocket server dependencies
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
 COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure Nginx and S6 overlay
