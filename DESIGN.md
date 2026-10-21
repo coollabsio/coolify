@@ -799,6 +799,15 @@ header actions sit 10px from the top and 14px from the right edge.
 The card keeps `overflow: visible` so listbox panels and tooltips can escape
 it. Do not add `overflow: hidden` to the card or the well.
 
+Some pages put a well (`.application-settings-section-body`) directly on the
+page without a card, for example the domains and environment variable tables.
+The well colors are defined on the well itself as well as on the card, so a
+standalone well keeps its background and border. In dark mode a standalone well
+uses the card outer-box surface (`--card-bg`, `--card-border`) instead of the
+black well fill, because the black fill directly on the canvas is darker than
+the page. An `x-empty` inside a
+standalone well shows only its centered text, as it does inside a card.
+
 Inside the dark well, controls use a darker translucent fill and border
 (`--coollabs-recessed: rgb(255 255 255 / 3%)`, `--coollabs-line:
 rgb(255 255 255 / 8%)`), set on `.dark .application-settings-section-body`.

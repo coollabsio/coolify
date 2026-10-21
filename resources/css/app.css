@@ -1790,6 +1790,7 @@ html[data-theme="custom"] textarea:disabled {
    overflow stays visible so floating panels (listbox, tooltips) can escape
    the card. */
 .application-settings-section,
+.application-settings-section-body,
 .empty-state {
     --card-bg: rgb(0 0 0 / 0.75%);
     --card-border: rgb(0 0 0 / 9%);
@@ -1814,6 +1815,7 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 .dark .application-settings-section,
+.dark .application-settings-section-body,
 .dark .empty-state {
     --card-bg: rgb(255 255 255 / 6%);
     --card-border: rgb(255 255 255 / 8%);
@@ -1928,6 +1930,14 @@ html[data-theme="custom"] textarea:disabled {
 .dark .application-settings-section-body {
     --coollabs-recessed: rgb(255 255 255 / 3%);
     --coollabs-line: rgb(255 255 255 / 8%);
+}
+
+/* A well without a card around it sits straight on the canvas. In dark mode its
+   black fill would make it darker than the page, so it takes the card surface. */
+.dark .application-settings-section-body:not(.application-settings-section *) {
+    --well-bg: var(--card-bg);
+    --well-border: var(--card-border);
+    --well-shadow: 0 1px 2px rgb(0 0 0 / 5%);
 }
 
 /* Floating panels in the well must stay opaque: restore the global dark values. */
@@ -2703,9 +2713,9 @@ input[type="search"]::-webkit-search-results-decoration {
     color: var(--coollabs-subtle);
 }
 
-/* Inside a layer card, the card is the frame: show only the centered text. */
-.application-settings-section .empty-state,
-.application-settings-section .empty-state-well {
+/* Inside a layer card or a well, that box is the frame: show only the centered text. */
+:is(.application-settings-section, .application-settings-section-body) .empty-state,
+:is(.application-settings-section, .application-settings-section-body) .empty-state-well {
     border: 0;
     border-radius: 0;
     padding-inline: 0;
@@ -2713,7 +2723,7 @@ input[type="search"]::-webkit-search-results-decoration {
     box-shadow: none;
 }
 
-.application-settings-section .empty-state {
+:is(.application-settings-section, .application-settings-section-body) .empty-state {
     padding: 0;
 }
 
