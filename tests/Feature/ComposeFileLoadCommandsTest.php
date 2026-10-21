@@ -46,9 +46,8 @@ test('the Compose file loads through the server commands for root and non-root u
     ]);
     $application->settings->update(['is_git_submodules_enabled' => true]);
     $uuid = 'compose-load-'.bin2hex(random_bytes(4));
-    $gitVersion = (string) str((new Process(['git', '--version']))->mustRun()->getOutput())->trim()->explode(' ')->last();
 
-    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid, $gitVersion);
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
     if ($user !== 'root') {
         $server = Mockery::mock(Server::class)->makePartial();
         $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
@@ -73,3 +72,71 @@ test('the Compose file loads through the server commands for root and non-root u
     'branch head' => [false],
     'pinned commit' => [true],
 ]);
+
+/**
+ * Commits the given symlinks to the repository, pushes them to the bare remote, and runs the
+ * Compose read commands for an application with the given base directory and Compose file location.
+ */
+function runComposeReadWithSymlinks(object $test, array $symlinks, string $baseDirectory, string $composeLocation): Process
+{
+    foreach ($symlinks as $link => $target) {
+        @mkdir(dirname($test->root.'/src/'.$link), 0755, true);
+        symlink($target, $test->root.'/src/'.$link);
+    }
+    foreach ([
+        ['git', 'add', '-A'],
+        ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'symlinks'],
+        ['git', 'push', '-q', $test->root.'/repo.git', 'main'],
+    ] as $command) {
+        (new Process($command, $test->root.'/src'))->mustRun();
+    }
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $test->root.'/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => $baseDirectory,
+        'docker_compose_location' => $composeLocation,
+    ]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $test->root.'/bin:'.getenv('PATH')]);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    return $process;
+}
+
+test('a symlinked Compose file is not followed to a file on the server', function (string $target) {
+    if ($target === 'outside') {
+        $target = $this->root.'/server-secret.yml';
+    }
+    file_put_contents($this->root.'/server-secret.yml', "services:\n  secret:\n    environment:\n      TOKEN: server-secret-value\n");
+
+    $process = runComposeReadWithSymlinks($this, ['docker-compose.yml' => $target], '/', '/docker-compose.yml');
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getOutput())->toBe('')
+        ->and($process->getErrorOutput())->toContain('symbolic link')
+        ->and($process->getErrorOutput())->not->toContain('server-secret-value')
+        ->and($process->getErrorOutput())->not->toContain('root:x:0:0');
+})->with([
+    'absolute path outside the repository' => ['outside'],
+    'system file' => ['/etc/passwd'],
+    'file in the repository' => ['apps/web/docker-compose.yml'],
+]);
+
+test('a symlinked base directory is not followed to a folder on the server', function () {
+    mkdir($this->root.'/server-app');
+    file_put_contents($this->root.'/server-app/docker-compose.yml', "services:\n  secret:\n    image: server-secret-value\n");
+
+    $process = runComposeReadWithSymlinks($this, ['linked' => $this->root.'/server-app'], '/linked', '/docker-compose.yml');
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getOutput())->toBe('')
+        ->and($process->getErrorOutput())->toContain('No such file')
+        ->and($process->getErrorOutput())->not->toContain('server-secret-value');
+});
