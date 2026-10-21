@@ -30,7 +30,10 @@ class Show extends Component
 
     private function loadPrivateKeys(): void
     {
-        $this->privateKeys = PrivateKey::where('team_id', $this->server->team_id)->get()->where('is_git_related', false);
+        $this->privateKeys = PrivateKey::where('team_id', $this->server->team_id)->get()
+            ->where('is_git_related', false)
+            ->sortBy(fn (PrivateKey $privateKey) => $privateKey->id !== $this->server->private_key_id)
+            ->values();
     }
 
     public function setPrivateKey($privateKeyId)
@@ -51,6 +54,7 @@ class Show extends Component
                     throw new \Exception($error);
                 }
             });
+            $this->loadPrivateKeys();
             $this->dispatch('success', 'Private key updated successfully.');
             $this->dispatch('refreshServerShow');
         } catch (\Exception $e) {

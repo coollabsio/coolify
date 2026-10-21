@@ -20,12 +20,16 @@
                 <x-forms.input required id="metadata.base_url" label="Base URL"
                     placeholder="https://app.infisical.com" />
                 <x-forms.input required id="metadata.client_id" label="Client ID" />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @elseif ($integrationToken->provider === 'vault')
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input required id="metadata.base_url" label="Base URL"
                     placeholder="https://vault.example.com:8200" />
                 <x-forms.input id="metadata.namespace" label="Namespace (optional)" />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @endif
 

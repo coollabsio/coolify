@@ -9,6 +9,9 @@
 #   Backup file  pg_dump custom-format backup (.dmp), optionally gzipped (.gz)
 #   APP_KEY      APP_KEY of the instance that created the backup (base64:...), not shown
 #   Version      Coolify version or image tag, e.g. 4.3.23 or sha-99c8409 (empty: latest stable)
+#   Cloud        y for a Coolify Cloud backup: starts Coolify with SELF_HOSTED=false, as Cloud runs.
+#                Self-hosted mode on a Cloud backup adds the localhost server and makes app:init
+#                try SSH to every server, so Reverb does not start and the container stays unhealthy.
 #
 # Flow:
 #   1. Base image (once per version, until destroy): a separate builder VM with internet access installs
@@ -52,7 +55,7 @@ die() {
 }
 
 usage() {
-    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
 }
 
@@ -204,6 +207,7 @@ BACKUP_FILE=${BACKUP_FILE/#\~/$HOME}
 read -r -s -p "APP_KEY of the backed-up instance (input is hidden): " APP_KEY
 echo
 read -r -p "Coolify version or image tag (empty for latest stable): " VERSION
+read -r -p "Is this a Coolify Cloud backup? [y/N]: " CLOUD_BACKUP
 
 [ -s "$BACKUP_FILE" ] || die "Backup file '$BACKUP_FILE' does not exist or is empty."
 [[ "$APP_KEY" == base64:* ]] || die "APP_KEY must start with 'base64:'."
@@ -216,6 +220,7 @@ if [ -z "$VERSION" ]; then
     VERSION=$(curl -fsSL https://cdn.coollabs.io/coolify/versions.json | jq -r '.coolify.v4.version')
     echo "Latest stable version: $VERSION"
 fi
+[[ "${CLOUD_BACKUP,,}" =~ ^(y|yes)$ ]] && SELF_HOSTED=false || SELF_HOSTED=true
 [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]] || die "Version '$VERSION' contains characters that are not allowed."
 BASE_IMAGE="$IMAGE_DIR/coolify-base-$VERSION.qcow2"
 
@@ -272,6 +277,7 @@ log "Restoring the backup and starting Coolify (migrations run on start)"
 # Send APP_KEY through stdin, so it does not show in the process list of this host or the VM.
 {
     printf 'APP_KEY=%q\n' "$APP_KEY"
+    printf 'SELF_HOSTED=%q\n' "$SELF_HOSTED"
     cat <<'REMOTE'
 set -euo pipefail
 cd /data/coolify/source
@@ -295,6 +301,8 @@ for flag in HORIZON_ENABLED SCHEDULER_ENABLED; do
     sed -i "/^${flag}=/d" .env
     echo "${flag}=false" >>.env
 done
+sed -i '/^SELF_HOSTED=/d' .env
+echo "SELF_HOSTED=${SELF_HOSTED}" >>.env
 
 # Recreate the database: tables from a newer fresh install must not remain.
 docker exec coolify-db psql -q -U coolify -d postgres -v ON_ERROR_STOP=1 \
