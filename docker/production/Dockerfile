@@ -1,8 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
-# https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-05-21T01-59-54Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2025.7.0
 # https://www.postgresql.org/support/versioning/
@@ -63,7 +61,8 @@ RUN npm run build
 # =================================================================
 # Stage 3: Get MinIO client
 # =================================================================
-FROM minio/mc:${MINIO_VERSION} AS minio-client
+# minio/mc is no longer published, reuse the AGPL client that 4.1.2 ships
+FROM ghcr.io/coollabsio/coolify:4.1.2 AS minio-client
 
 # =================================================================
 # Final Stage: Production image
