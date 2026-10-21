@@ -77,16 +77,6 @@
 
         $patchStatuses = $serverRows->pluck('patchStatus')->filter();
         $showPatches = $patchStatuses->isNotEmpty();
-        $withUpdates = $patchStatuses->where('updates', '>', 0)->count();
-        $withSecurityUpdates = $patchStatuses->where('security', '>', 0)->count();
-        $needReboot = $patchStatuses->where('rebootRequired', true)->count();
-        $failedChecks = $patchStatuses->where('failed', true)->count();
-        $patchSummary = collect([
-            $withUpdates > 0 ? $withUpdates.' '.str('server')->plural($withUpdates).' with updates' : null,
-            $withSecurityUpdates > 0 ? $withSecurityUpdates.' with security updates' : null,
-            $needReboot > 0 ? $needReboot.' '.($needReboot === 1 ? 'needs' : 'need').' a reboot' : null,
-            $failedChecks > 0 ? $failedChecks.' '.str('check')->plural($failedChecks).' failed' : null,
-        ])->filter()->join(' · ');
     @endphp
 
     <div x-data="{
@@ -125,9 +115,6 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-3 sm:justify-end">
-                    @if (filled($patchSummary))
-                        <p class="text-[12px] text-neutral-500 dark:text-fg-dim">Patches: {{ $patchSummary }}</p>
-                    @endif
                     <x-canvas-view-toggle :list-url="route('server.index')"
                         :canvas-url="route('server.canvas.index')" />
                 </div>

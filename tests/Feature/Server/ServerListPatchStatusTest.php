@@ -112,7 +112,7 @@ describe('server list', function () {
         serverListPatchServer($this, 'unchecked-host');
     });
 
-    it('shows patch badges and the team summary to an admin', function () {
+    it('shows patch badges to an admin', function () {
         serverListPatchActingAs($this, 'admin');
 
         Livewire::test(Index::class)
@@ -120,21 +120,20 @@ describe('server list', function () {
             ->assertSee('2 updates')
             ->assertSee('Reboot required')
             ->assertSee('Patch check failed')
-            ->assertSee('Patches: 2 servers with updates · 1 with security updates · 1 needs a reboot · 1 check failed');
+            ->assertDontSee('Patches:');
     });
 
-    it('hides patch badges and the summary from a member', function () {
+    it('hides patch badges from a member', function () {
         serverListPatchActingAs($this, 'member');
 
         Livewire::test(Index::class)
             ->assertSee('secure-host')
             ->assertDontSee('security update')
             ->assertDontSee('Reboot required')
-            ->assertDontSee('Patch check failed')
-            ->assertDontSee('Patches:');
+            ->assertDontSee('Patch check failed');
     });
 
-    it('hides the summary when every checked server is up to date', function () {
+    it('shows up to date when every checked server has no updates', function () {
         Server::query()->each(fn (Server $server) => $server->settings->forceFill([
             'patch_check_result' => serverListPatchResult(0, 0, false),
             'patch_check_error' => null,
@@ -143,7 +142,6 @@ describe('server list', function () {
         serverListPatchActingAs($this, 'admin');
 
         Livewire::test(Index::class)
-            ->assertSee('Up to date')
-            ->assertDontSee('Patches:');
+            ->assertSee('Up to date');
     });
 });
