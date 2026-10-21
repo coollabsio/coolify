@@ -1,17 +1,23 @@
 <?php
 
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\ResourceLink;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
@@ -25,17 +31,28 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneSqlite;
 use App\Models\Tag;
 use App\Models\Team;
+use App\Models\User;
 use App\Services\ServerTransfer\ServerTransferBundle;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    // A claim writes the owner marker on the host over SSH.
+    Process::fake();
+    Storage::fake('ssh-keys');
+    // An import validates the claimed server over SSH; the sync test queue would run it.
+    Queue::fake([ValidateAndInstallServerJob::class]);
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'fqdn' => 'https://coolify-a.test']);
 
     $this->team = Team::factory()->create();
@@ -324,11 +341,126 @@ test('round trip import preserves uuids secrets and related resources after sour
         ->and($shared->value)->toBe('shared-secret');
 });
 
+test('import validates the claimed server in the background, but a dry run does not', function () {
+    $bundle = $this->exporter->export($this->server);
+    $serverUuid = $this->server->uuid;
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: true);
+    Queue::assertNotPushed(ValidateAndInstallServerJob::class);
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    expect($result['claimed'])->toBeTrue();
+    Queue::assertPushed(ValidateAndInstallServerJob::class, 1);
+    Queue::assertPushed(ValidateAndInstallServerJob::class, fn (ValidateAndInstallServerJob $job) => $job->server->uuid === $serverUuid);
+});
+
 test('import fails when server ip already exists', function () {
     $bundle = $this->exporter->export($this->server);
 
     $this->importer->import($bundle, teamId: $this->team->id);
 })->throws(ValidationException::class);
+
+test('the Cloudflare tunnel token moves with the server by uuid and the raw token id of an old bundle is ignored', function () {
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'token' => 'cf-tunnel-token', 'capabilities' => ['dns', 'tunnel']]);
+    $this->server->settings->forceFill(['cloudflare_tunnel_integration_token_id' => $token->id])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+    expect(data_get($bundle, 'server.settings'))->not->toHaveKey('cloudflare_tunnel_integration_token_id')
+        ->and(data_get($bundle, 'server.settings.cloudflare_tunnel_integration_token_uuid'))->toBe($token->uuid)
+        ->and(data_get($bundle, 'integration_tokens.0.token'))->toBe('cf-tunnel-token')
+        ->and(implode(' ', $bundle['warnings']))->not->toContain('Cloudflare API token');
+
+    $bundle['server']['settings']['cloudflare_tunnel_integration_token_id'] = 999999;
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $token->delete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $imported = IntegrationToken::where('uuid', $token->uuid)->firstOrFail();
+    expect(Server::where('uuid', $result['server_uuid'])->first()->settings->cloudflare_tunnel_integration_token_id)->toBe($imported->id)
+        ->and($imported->team_id)->toBe($this->team->id)
+        ->and($imported->token)->toBe('cf-tunnel-token');
+});
+
+test('the patch check frequency moves with the server and the last patch check result stays on the source', function () {
+    $this->server->settings->forceFill([
+        'patch_check_frequency' => 'daily',
+        'patch_check_result' => ['osId' => 'ubuntu', 'package_manager' => 'apt', 'total_updates' => 0, 'updates' => []],
+        'patch_check_error' => 'old error',
+        'patch_checked_at' => now(),
+        'is_auto_security_updates_enabled' => true,
+        'auto_security_updates_time' => '04:30',
+    ])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+    expect(data_get($bundle, 'server.settings'))->not->toHaveKeys(['patch_check_result', 'patch_check_error', 'patch_checked_at']);
+
+    $bundle['server']['settings']['patch_check_result'] = ['osId' => 'tampered'];
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->first()->settings;
+    expect($settings->patch_check_frequency)->toBe('daily')
+        ->and($settings->is_auto_security_updates_enabled)->toBeTrue()
+        ->and($settings->auto_security_updates_time)->toBe('04:30')
+        ->and($settings->patch_check_result)->toBeNull()
+        ->and($settings->patch_checked_at)->toBeNull();
+});
+
+test('a transfer back replaces the archive of the same team in the import transaction', function () {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['server']['name'] = 'changed-on-the-other-instance';
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    $archiveId = $this->server->id;
+
+    expect(collect($this->importer->importChecks($this->server->uuid, $this->server->ip, $this->team->id))->every(fn ($check) => $check['ok']))->toBeTrue();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $this->server->uuid)->firstOrFail();
+    expect($result['claimed'])->toBeTrue()
+        ->and($server->id)->not->toBe($archiveId)
+        ->and($server->name)->toBe('changed-on-the-other-instance')
+        ->and($server->isTransferredAway())->toBeFalse()
+        ->and(Server::withTrashed()->find($archiveId))->toBeNull()
+        ->and(Application::where('uuid', $this->application->uuid)->firstOrFail()->destination->server_id)->toBe($server->id);
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'docker rm') || str_contains($process->command, 'docker stop'));
+});
+
+test('a failed transfer back keeps the archive', function () {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['projects'][0]['environments'][0]['databases'][] = [
+        'type' => 'NotARealDatabaseType', 'uuid' => 'broken-db-uuid', 'attributes' => ['name' => 'broken'], 'destination_uuid' => $this->destination->uuid,
+    ];
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))->toThrow(RuntimeException::class, 'Unsupported database type');
+
+    expect($this->server->fresh()?->isTransferredAway())->toBeTrue()
+        ->and(Application::where('uuid', $this->application->uuid)->exists())->toBeTrue();
+});
+
+test('the archive of another team is not replaced', function () {
+    $bundle = $this->exporter->export($this->server);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    $otherTeam = Team::factory()->create();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $otherTeam->id))
+        ->toThrow(ValidationException::class, 'Another team of this instance has the archived copy');
+});
 
 test('import rolls back all created rows when a later resource fails', function () {
     $bundle = $this->exporter->export($this->server);
@@ -370,6 +502,7 @@ test('import reuses existing private key fingerprint on same team', function () 
     $originalKeyId = $this->privateKey->id;
 
     // Free the IP without deleting the key.
+    $this->service->forceDelete();
     $this->application->forceDelete();
     $this->database->forceDelete();
     $this->server->forceDelete();
@@ -386,6 +519,7 @@ test('import into another team creates its own key when the same key exists in a
     $targetTeam = Team::factory()->create();
 
     // Free the IP without deleting the source team's key.
+    $this->service->forceDelete();
     $this->application->forceDelete();
     $this->database->forceDelete();
     $this->server->forceDelete();
@@ -398,21 +532,6 @@ test('import into another team creates its own key when the same key exists in a
         ->and($server->privateKey->team_id)->toBe($targetTeam->id)
         ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
         ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
-});
-
-test('encrypted export decrypts for import', function () {
-    $bundle = $this->exporter->export($this->server);
-    $encrypted = ServerTransferBundle::encryptWithPassphrase($bundle, 'transfer-pass');
-
-    $this->application->forceDelete();
-    $this->database->forceDelete();
-    $this->server->forceDelete();
-    $this->privateKey->delete();
-
-    $plain = ServerTransferBundle::decryptWithPassphrase($encrypted, 'transfer-pass');
-    $result = $this->importer->import($plain, teamId: $this->team->id);
-
-    expect(Server::where('uuid', $result['server_uuid'])->exists())->toBeTrue();
 });
 
 test('system-wide github apps are not exported and re-link on import by uuid', function () {
@@ -883,6 +1002,53 @@ test('system-wide gitlab apps are not exported and re-link on import by uuid', f
         ->and(GitlabApp::where('is_system_wide', true)->where('uuid', 'system-gitlab-public')->count())->toBe(1);
 });
 
+test('team gitea apps round-trip and the application re-links to the imported app', function () {
+    $giteaApp = new GiteaApp;
+    $giteaApp->forceFill([
+        'name' => 'Team Gitea App',
+        'api_url' => 'https://gitea.example.com/api/v1',
+        'html_url' => 'https://gitea.example.com',
+        'is_public' => false,
+        'is_system_wide' => false,
+        'team_id' => $this->team->id,
+        'client_id' => 'gitea-client',
+        'client_secret' => 'gitea-secret',
+        'webhook_secret' => 'gitea-webhook-secret',
+    ]);
+    $giteaApp->uuid = 'team-gitea-app';
+    $giteaApp->save();
+
+    $this->application->source_type = GiteaApp::class;
+    $this->application->source_id = $giteaApp->id;
+    $this->application->save();
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect($bundle['gitea_apps'])->toHaveCount(1)
+        ->and($bundle['gitea_apps'][0]['client_secret'])->toBe('gitea-secret')
+        ->and(collect($bundle['post_transfer_checklist'])->implode(' '))->toContain('{target_url}/webhooks/source/gitea/redirect');
+
+    $this->service->forceDelete();
+    Application::query()->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $this->privateKey->delete();
+    $giteaApp->delete();
+
+    $targetTeam = Team::factory()->create();
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id, preserveUuids: true, adoptMode: true);
+
+    $imported = GiteaApp::where('uuid', 'team-gitea-app')->first();
+    $application = Application::where('name', 'my-app')->first();
+
+    expect($result['created']['gitea_apps'])->toBe(1)
+        ->and($imported->team_id)->toBe($targetTeam->id)
+        ->and($imported->client_secret)->toBe('gitea-secret')
+        ->and($imported->webhook_secret)->toBe('gitea-webhook-secret')
+        ->and($application->source_type)->toBe(GiteaApp::class)
+        ->and($application->source_id)->toBe($imported->id);
+});
+
 test('import rejects unsafe host file paths before saving storage', function () {
     $importFileStorages = new ReflectionMethod(ServerTransferImporter::class, 'importFileStorages');
     $storage = [
@@ -990,7 +1156,7 @@ test('transfer keeps the link between an application volume and its sqlite datab
     ScheduledTask::query()->delete();
     $this->privateKey->delete();
 
-    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: false, adoptMode: true);
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: false, adoptMode: false);
 
     $importedSqlite = StandaloneSqlite::where('name', 'app-sqlite')->sole();
     $connectedVolume = Application::where('name', $originalAppName)->sole()
@@ -1002,23 +1168,22 @@ test('transfer keeps the link between an application volume and its sqlite datab
         ->and($importedSqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeTrue();
 });
 
-test('export warns about secret manager links without exporting the integration token', function () {
+test('secret manager links of applications and databases move with their integration token', function () {
     $token = IntegrationToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => 'vault',
         'token' => 'vault-root-token',
         'capabilities' => ['secrets'],
     ]);
-    $this->application->secretManagerLink()->create(['integration_token_id' => $token->id]);
-    $this->database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    $this->application->secretManagerLink()->create(['integration_token_id' => $token->id, 'settings' => ['mount' => 'secret', 'path' => 'app']]);
+    $this->database->secretManagerLink()->create(['integration_token_id' => $token->id, 'settings' => ['mount' => 'kv', 'path' => 'db']]);
 
     $bundle = $this->exporter->export($this->server);
-    $warning = collect($bundle['warnings'])->first(fn (string $warning) => str_contains($warning, 'secret manager'));
 
-    expect($warning)->not->toBeNull()
-        ->and($warning)->toContain('my-app')
-        ->and($warning)->toContain('app-db')
-        ->and(json_encode($bundle))->not->toContain('vault-root-token');
+    expect(collect($bundle['warnings'])->filter(fn (string $warning) => str_contains($warning, 'secret manager')))->toBeEmpty()
+        ->and($bundle['integration_tokens'])->toHaveCount(1)
+        ->and($bundle['integration_tokens'][0]['token'])->toBe('vault-root-token')
+        ->and(data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_link.integration_token_uuid'))->toBe($token->uuid);
 
     $this->service->forceDelete();
     $this->application->forceDelete();
@@ -1028,10 +1193,18 @@ test('export warns about secret manager links without exporting the integration 
     ScheduledDatabaseBackup::query()->delete();
     ScheduledTask::query()->delete();
     $this->privateKey->delete();
+    $token->delete();
 
-    $result = $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
 
-    expect($result['warnings'])->toContain($warning);
+    $imported = IntegrationToken::where('uuid', $token->uuid)->where('team_id', $this->team->id)->firstOrFail();
+    $application = Application::where('uuid', $this->application->uuid)->firstOrFail();
+    $database = StandalonePostgresql::where('uuid', $this->database->uuid)->firstOrFail();
+    expect($imported->token)->toBe('vault-root-token')
+        ->and($application->secretManagerLink->integration_token_id)->toBe($imported->id)
+        ->and($application->secretManagerLink->settings)->toBe(['mount' => 'secret', 'path' => 'app'])
+        ->and($database->secretManagerLink->integration_token_id)->toBe($imported->id)
+        ->and($database->secretManagerLink->settings)->toBe(['mount' => 'kv', 'path' => 'db']);
 });
 
 test('transfer keeps the Traefik certificate resolver of applications and service applications', function () {
@@ -1070,4 +1243,656 @@ test('transfer keeps the Traefik certificate resolver of applications and servic
 
     expect(Application::where('uuid', $originalAppUuid)->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none')
         ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
+});
+
+test('transfer keeps the cloud provider instance id of the server', function () {
+    $this->server->forceFill(['hetzner_server_id' => 4242, 'vultr_instance_id' => 'vultr-7'])->save();
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->sole();
+    expect((int) $server->hetzner_server_id)->toBe(4242)
+        ->and($server->vultr_instance_id)->toBe('vultr-7');
+});
+
+test('adopt mode stops the import when a resource uuid is already used', function () {
+    $bundle = $this->exporter->export($this->server);
+    $appUuid = $this->application->uuid;
+
+    // The server is gone, but the application row still holds its UUID on this instance.
+    $this->service->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id, adoptMode: true))
+        ->toThrow(ValidationException::class, "The application UUID {$appUuid} is already used");
+
+    expect(Server::where('uuid', $bundle['server']['uuid'])->exists())->toBeFalse();
+});
+
+test('import rejects a database model class that is not a supported database type', function () {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['projects'][0]['environments'][0]['databases'][] = [
+        'type' => 'Unknown',
+        'model' => Application::class,
+        'uuid' => 'not-a-database',
+        'attributes' => ['name' => 'not-a-database'],
+        'destination_uuid' => $this->destination->uuid,
+    ];
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))
+        ->toThrow(RuntimeException::class, 'Unsupported database type');
+
+    expect(Application::where('uuid', 'not-a-database')->exists())->toBeFalse();
+});
+
+test('import rejects unsafe server connection fields', function (string $field, mixed $value) {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['server'][$field] = $value;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    expect(fn () => $this->importer->import($bundle, teamId: $this->team->id))
+        ->toThrow(ValidationException::class);
+})->with([
+    'ip with shell characters' => ['ip', '10.0.0.1;reboot'],
+    'user with shell characters' => ['user', 'root$(id)'],
+    'port out of range' => ['port', 70000],
+]);
+
+test('export refuses credentials of another team', function () {
+    $otherKey = PrivateKey::factory()->create(['team_id' => Team::factory()->create()->id]);
+    $this->application->forceFill(['private_key_id' => $otherKey->id])->save();
+
+    expect(fn () => $this->exporter->export($this->server))
+        ->toThrow(RuntimeException::class, 'does not belong to the server team');
+});
+
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, and the Coolify default variables switch', function () {
+    $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
+    $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
+    $this->application->settings->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
+    $this->database->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
+    $this->server->forceFill(['proxy_error_page' => '<h1>Proxy error</h1>', 'swarm_cluster' => 7])->saveQuietly();
+    EnvironmentVariable::withoutEvents(function () {
+        $env = new EnvironmentVariable;
+        $env->forceFill([
+            'key' => 'COMPOSE_NULL',
+            'value' => null,
+            'preserve_compose_null' => true,
+            'version' => '4.0.0-beta.400',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $this->application->id,
+        ]);
+        $env->uuid = new_public_id();
+        $env->save();
+    });
+    $appUuid = $this->application->uuid;
+    $serviceUuid = $this->service->uuid;
+    $databaseClass = $this->database::class;
+    $databaseUuid = $this->database->uuid;
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->sole();
+    $application = Application::where('uuid', $appUuid)->sole();
+    $service = Service::where('uuid', $serviceUuid)->sole();
+    $variable = $application->environment_variables()->where('key', 'COMPOSE_NULL')->sole();
+    expect($application->is_maintenance_enabled)->toBeTrue()
+        ->and($application->maintenance_page)->toBe('<h1>App down</h1>')
+        ->and($service->is_maintenance_enabled)->toBeTrue()
+        ->and($service->maintenance_page)->toBe('<h1>Service down</h1>')
+        ->and($server->proxy_error_page)->toBe('<h1>Proxy error</h1>')
+        ->and((int) $server->swarm_cluster)->toBe(7)
+        ->and($variable->preserve_compose_null)->toBeTrue()
+        ->and($variable->value)->toBeNull()
+        ->and($variable->version)->toBe('4.0.0-beta.400')
+        ->and($application->settings->include_coolify_default_variables)->toBeFalse()
+        ->and($service->include_coolify_default_variables)->toBeFalse()
+        ->and($databaseClass::where('uuid', $databaseUuid)->sole()->include_coolify_default_variables)->toBeFalse();
+});
+
+test('transfer keeps preview, backup, GitHub App runner fields and canvas positions when uuids change', function () {
+    $githubApp = new GithubApp;
+    $githubApp->forceFill([
+        'name' => 'Runner App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'team_id' => $this->team->id,
+        'organization' => 'acme',
+        'organization_self_hosted_runners' => 'write',
+        'actions' => 'read',
+        'webhook_events' => ['workflow_job', 'push'],
+        'runner_group_id' => 12,
+    ]);
+    $githubApp->uuid = 'runner-github-app';
+    $githubApp->save();
+    $this->application->forceFill(['source_type' => GithubApp::class, 'source_id' => $githubApp->id])->saveQuietly();
+
+    $preview = new ApplicationPreview;
+    $preview->forceFill([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => 'https://github.com/example/app/pull/7',
+        'fqdn' => 'https://pr-7.app.example.com',
+        'domain_port_overrides' => ['https://pr-7.app.example.com' => 8080],
+        'max_restart_count' => 5,
+    ]);
+    $preview->uuid = 'preview-pr-7';
+    $preview->saveQuietly();
+
+    $this->backup->update(['missing_backup_notification_days' => 3]);
+    ScheduledVolumeBackup::create([
+        'backupable_type' => LocalPersistentVolume::class,
+        'backupable_id' => $this->application->persistentStorages()->sole()->id,
+        'team_id' => $this->team->id,
+        'frequency' => '0 4 * * *',
+        'missing_backup_notification_days' => 2,
+    ]);
+
+    $this->environment->forceFill(['canvas_positions' => [
+        $this->application->uuid => ['x' => 10, 'y' => -20],
+        $this->database->uuid => ['x' => 300, 'y' => 40],
+        'resource-on-another-server' => ['x' => 1, 'y' => 1],
+    ]])->save();
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect($bundle['projects'][0]['environments'][0]['canvas_positions'])->toHaveCount(2);
+
+    ApplicationPreview::withoutEvents(fn () => ApplicationPreview::withTrashed()->get()->each->forceDelete());
+    DB::table('scheduled_volume_backups')->delete();
+    DB::table('scheduled_database_backups')->delete();
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    GithubApp::where('uuid', 'runner-github-app')->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, preserveUuids: false, adoptMode: false);
+
+    $application = Application::where('name', 'my-app')->sole();
+    $database = StandalonePostgresql::where('name', 'app-db')->sole();
+    $importedPreview = $application->previews()->sole();
+    $importedGithubApp = $application->source;
+    expect($importedPreview->domain_port_overrides)->toBe(['https://pr-7.app.example.com' => 8080])
+        ->and($importedPreview->max_restart_count)->toBe(5)
+        ->and(ScheduledDatabaseBackup::where('database_id', $database->id)->sole()->missing_backup_notification_days)->toBe(3)
+        ->and(ScheduledVolumeBackup::sole()->missing_backup_notification_days)->toBe(2)
+        ->and($importedGithubApp)->toBeInstanceOf(GithubApp::class)
+        ->and($importedGithubApp->organization_self_hosted_runners)->toBe('write')
+        ->and($importedGithubApp->actions)->toBe('read')
+        ->and($importedGithubApp->webhook_events)->toBe(['workflow_job', 'push'])
+        ->and($importedGithubApp->runner_group_id)->toBe(12)
+        ->and($application->uuid)->not->toBe($this->application->uuid)
+        ->and($application->environment->canvas_positions)->toBe([
+            $application->uuid => ['x' => 10, 'y' => -20],
+            $database->uuid => ['x' => 300, 'y' => 40],
+        ]);
+});
+
+test('transfer creates the referenced team shared variables in the target team', function () {
+    $this->application->environment_variables()->where('key', 'APP_SECRET')->sole()->update(['value' => 'Bearer {{team.API_TOKEN}}']);
+    EnvironmentVariable::withoutEvents(function () {
+        $env = new EnvironmentVariable;
+        $env->forceFill([
+            'key' => 'SERVICE_URL',
+            'value' => '{{ team.SERVICE_HOST }}/api',
+            'resourceable_type' => Service::class,
+            'resourceable_id' => $this->service->id,
+        ]);
+        $env->uuid = new_public_id();
+        $env->save();
+    });
+    foreach (['API_TOKEN' => 'team-secret', 'SERVICE_HOST' => 'https://svc.example.com', 'UNUSED' => 'not-referenced'] as $key => $value) {
+        SharedEnvironmentVariable::create(['key' => $key, 'value' => $value, 'type' => 'team', 'team_id' => $this->team->id, 'is_literal' => true]);
+    }
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect(collect($bundle['shared_environment_variables']['team'])->pluck('key')->sort()->values()->all())->toBe(['API_TOKEN', 'SERVICE_HOST']);
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $targetTeam = Team::factory()->create();
+
+    $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $teamVariables = SharedEnvironmentVariable::where('type', 'team')->where('team_id', $targetTeam->id)->get()->keyBy('key');
+    expect($teamVariables->keys()->sort()->values()->all())->toBe(['API_TOKEN', 'SERVICE_HOST'])
+        ->and($teamVariables['API_TOKEN']->value)->toBe('team-secret')
+        ->and((bool) $teamVariables['API_TOKEN']->is_literal)->toBeTrue()
+        ->and($teamVariables['SERVICE_HOST']->value)->toBe('https://svc.example.com');
+});
+
+test('transfer keeps the value of a team shared variable that already exists in the target team and warns', function () {
+    $this->application->environment_variables()->where('key', 'APP_SECRET')->sole()->update(['value' => '{{team.API_TOKEN}}']);
+    $variable = SharedEnvironmentVariable::create(['key' => 'API_TOKEN', 'value' => 'source-value', 'type' => 'team', 'team_id' => $this->team->id]);
+
+    $bundle = $this->exporter->export($this->server);
+    $variable->update(['value' => 'target-value']);
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    expect(SharedEnvironmentVariable::where('type', 'team')->where('team_id', $this->team->id)->sole()->value)->toBe('target-value')
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'API_TOKEN')))->toHaveCount(1);
+});
+
+test('import warns when the git source, private key or S3 storage of a resource cannot be found', function () {
+    $githubApp = new GithubApp;
+    $githubApp->forceFill([
+        'name' => 'Team GitHub App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'team_id' => $this->team->id,
+    ]);
+    $githubApp->uuid = 'missing-github-app';
+    $githubApp->save();
+    $deployKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'deploy-key',
+        'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+    ]);
+    $this->application->forceFill([
+        'source_type' => GithubApp::class,
+        'source_id' => $githubApp->id,
+        'private_key_id' => $deployKey->id,
+    ])->saveQuietly();
+    $storage = S3Storage::create([
+        'name' => 'Backups',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://93.184.216.34',
+        'team_id' => $this->team->id,
+    ]);
+    $this->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+
+    $bundle = $this->exporter->export($this->server);
+    // The target instance cannot resolve these references.
+    $bundle['github_apps'] = [];
+    $bundle['s3_storages'] = [];
+    $bundle['private_keys'] = collect($bundle['private_keys'])->reject(fn (array $key) => $key['uuid'] === $deployKey->uuid)->values()->all();
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect($result['warnings'])->toContain('Application my-app: its GitHub App was not found on this instance; set the source again.')
+        ->and($result['warnings'])->toContain('Application my-app: its private key was not found on this instance; select the private key again.')
+        ->and($result['warnings'])->toContain('Backup of database app-db: S3 upload was turned off because its S3 storage was not found.');
+});
+
+test('export warns about DNS records of another team', function () {
+    $bundle = $this->exporter->export($this->server);
+    expect(implode(' ', $bundle['warnings']))->not->toContain('DNS record');
+
+    ManagedDnsRecord::factory()->create()->references()->create([
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->id,
+    ]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect(implode(' ', $bundle['warnings']))->toContain('because its DNS provider token belongs to another team. The target instance does not manage it.');
+});
+
+/**
+ * Removes the source copies of the resources of beforeEach, so the target can import them with their uuids.
+ */
+function removeTransferSourceResources(object $test): void
+{
+    $test->service->forceDelete();
+    $test->application->forceDelete();
+    $test->database->forceDelete();
+    $test->server->forceDelete();
+}
+
+function transferTestGithubApp(Team $team, string $uuid, string $name): GithubApp
+{
+    $githubApp = new GithubApp;
+    $githubApp->forceFill([
+        'name' => $name,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'organization' => 'acme',
+        'app_id' => 4242,
+        'installation_id' => 4343,
+        'team_id' => $team->id,
+        'is_system_wide' => false,
+        'private_key_id' => PrivateKey::factory()->create([
+            'team_id' => $team->id,
+            'name' => "{$name} key",
+            'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+        ])->id,
+    ]);
+    $githubApp->uuid = $uuid;
+    $githubApp->save();
+
+    return $githubApp;
+}
+
+test('canvas links between transferred resources move with their environment and the other links are left out', function () {
+    $user = User::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id, 'ip' => '10.55.0.11']);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+    $appOnOtherServer = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+        'name' => 'stays-here',
+    ]);
+    $link = fn (Model $source, Model $target, ?string $label) => ResourceLink::create([
+        'environment_id' => $this->environment->id,
+        'source_type' => $source->getMorphClass(),
+        'source_id' => $source->id,
+        'target_type' => $target->getMorphClass(),
+        'target_id' => $target->id,
+        'label' => $label,
+        'created_by' => $user->id,
+    ]);
+    $appToDatabase = $link($this->application, $this->database, 'reads');
+    $link($this->service, $this->application, null);
+    $link($this->application, $appOnOtherServer, 'calls');
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect($bundle['projects'][0]['environments'][0]['resource_links'])->toHaveCount(2)
+        ->and($bundle['warnings'])->toContain('1 link between resources on the environment canvas is not transferred, because one of the linked resources stays on this instance.');
+
+    removeTransferSourceResources($this);
+    ResourceLink::query()->delete();
+    $targetTeam = Team::factory()->create();
+
+    $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $environment = Project::where('team_id', $targetTeam->id)->sole()->environments()->sole();
+    $application = Application::where('uuid', $this->application->uuid)->sole();
+    $database = StandalonePostgresql::where('uuid', $this->database->uuid)->sole();
+    $service = Service::where('uuid', $this->service->uuid)->sole();
+    $links = ResourceLink::where('environment_id', $environment->id)->orderBy('id')->get();
+
+    expect($links)->toHaveCount(2)
+        ->and($links[0]->only(['uuid', 'source_type', 'source_id', 'target_type', 'target_id', 'label', 'created_by']))->toBe([
+            'uuid' => $appToDatabase->uuid,
+            'source_type' => $application->getMorphClass(),
+            'source_id' => $application->id,
+            'target_type' => $database->getMorphClass(),
+            'target_id' => $database->id,
+            'label' => 'reads',
+            'created_by' => null,
+        ])
+        ->and($links[1]->only(['source_type', 'source_id', 'target_type', 'target_id', 'label']))->toBe([
+            'source_type' => $service->getMorphClass(),
+            'source_id' => $service->id,
+            'target_type' => $application->getMorphClass(),
+            'target_id' => $application->id,
+            'label' => null,
+        ]);
+});
+
+test('the project icon moves with the project into the icon storage of the target', function () {
+    Storage::fake('images');
+    $icon = "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00transfer-icon";
+    Storage::disk('images')->put("project-icons/{$this->project->uuid}/icon.jpg", $icon);
+    $this->project->forceFill(['icon_path' => "project-icons/{$this->project->uuid}/icon.jpg", 'icon_storage_type' => 'local'])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect($bundle['projects'][0]['icon'])->toBe(['content_base64' => base64_encode($icon), 'extension' => 'jpg', 'mime' => 'image/jpeg']);
+
+    removeTransferSourceResources($this);
+    $targetTeam = Team::factory()->create();
+
+    $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $project = Project::where('team_id', $targetTeam->id)->sole();
+    expect($project->uuid)->not->toBe($this->project->uuid)
+        ->and($project->only(['icon_path', 'icon_storage_type', 'icon_s3_storage_id']))->toBe([
+            'icon_path' => "project-icons/{$project->uuid}/icon.jpg",
+            'icon_storage_type' => 'local',
+            'icon_s3_storage_id' => null,
+        ])
+        ->and(Storage::disk('images')->get($project->icon_path))->toBe($icon);
+});
+
+test('a project icon that cannot be read or is too large is not exported and the export warns', function (?string $stored, string $warning) {
+    Storage::fake('images');
+    if ($stored !== null) {
+        Storage::disk('images')->put('project-icons/transfer/icon.jpg', $stored);
+    }
+    $this->project->forceFill(['icon_path' => 'project-icons/transfer/icon.jpg', 'icon_storage_type' => 'local'])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect($bundle['projects'][0]['icon'])->toBeNull()
+        ->and($bundle['warnings'])->toContain($warning);
+})->with([
+    'missing file' => [null, 'The icon of project Transfer Project cannot be read, so it is not transferred. Upload it again on the target instance.'],
+    'larger than 2 MB' => [str_repeat('x', ServerTransferExporter::MAX_PROJECT_ICON_BYTES + 1), 'The icon of project Transfer Project is larger than 2 MB, so it is not transferred. Upload it again on the target instance.'],
+]);
+
+test('import stores only a JPEG project icon and warns about other content', function () {
+    Storage::fake('images');
+    $bundle = $this->exporter->export($this->server);
+    $bundle['projects'][0]['icon'] = ['content_base64' => base64_encode('<svg onload="alert(1)"/>'), 'extension' => 'jpg', 'mime' => 'image/jpeg'];
+    removeTransferSourceResources($this);
+    $targetTeam = Team::factory()->create();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    expect(Project::where('team_id', $targetTeam->id)->sole()->icon_path)->toBeNull()
+        ->and(Storage::disk('images')->allFiles())->toBe([])
+        ->and($result['warnings'])->toContain('The icon of project Transfer Project was not imported, because it is not a JPEG image. Upload it again in the project settings.');
+});
+
+test('only environments with a resource of the server are exported', function () {
+    SharedEnvironmentVariable::create(['key' => 'PROJECT_KEY', 'value' => 'project', 'type' => 'project', 'project_id' => $this->project->id, 'team_id' => $this->team->id]);
+    SharedEnvironmentVariable::create(['key' => 'PRODUCTION_KEY', 'value' => 'production', 'type' => 'environment', 'environment_id' => $this->environment->id, 'team_id' => $this->team->id]);
+    $staging = Environment::factory()->create(['project_id' => $this->project->id, 'name' => 'staging']);
+    SharedEnvironmentVariable::create(['key' => 'STAGING_KEY', 'value' => 'staging', 'type' => 'environment', 'environment_id' => $staging->id, 'team_id' => $this->team->id]);
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id, 'ip' => '10.55.0.11']);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+    Application::factory()->create([
+        'environment_id' => $staging->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+        'name' => 'staging-app',
+    ]);
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect(collect($bundle['projects'][0]['environments'])->pluck('name')->all())->toBe([$this->environment->name])
+        ->and(collect($bundle['projects'][0]['shared_environment_variables'])->pluck('key')->all())->toBe(['PROJECT_KEY'])
+        ->and(collect($bundle['projects'][0]['environments'][0]['shared_environment_variables'])->pluck('key')->all())->toBe(['PRODUCTION_KEY']);
+
+    removeTransferSourceResources($this);
+    $targetTeam = Team::factory()->create();
+
+    $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $project = Project::where('team_id', $targetTeam->id)->sole();
+    expect($project->environments()->pluck('name')->all())->toBe([$this->environment->name])
+        ->and(Application::where('name', 'staging-app')->count())->toBe(1)
+        ->and(SharedEnvironmentVariable::where('key', 'STAGING_KEY')->count())->toBe(1);
+});
+
+test('the GitHub runner config moves disabled with its GitHub App and the bundle lists the manual steps', function () {
+    $githubApp = transferTestGithubApp($this->team, 'runner-only-app', 'Runner App');
+    $gitlabApp = new GitlabApp;
+    $gitlabApp->forceFill(['name' => 'Team GitLab', 'api_url' => 'https://gitlab.com/api/v4', 'html_url' => 'https://gitlab.com', 'team_id' => $this->team->id, 'is_system_wide' => false]);
+    $gitlabApp->save();
+    $this->application->forceFill(['source_type' => GitlabApp::class, 'source_id' => $gitlabApp->id])->saveQuietly();
+    $config = GithubRunnerConfig::create([
+        'server_id' => $this->server->id,
+        'github_app_id' => $githubApp->id,
+        'labels' => ['coolify', 'gpu'],
+        'is_enabled' => true,
+        'is_dedicated' => true,
+        'allow_pull_requests' => true,
+        'max_runners' => 4,
+        'docker_mode' => 'dind',
+        'runner_image' => 'ghcr.io/acme/runner:1',
+        'cpu_limit' => '1.5',
+        'memory_limit' => '2g',
+        'capacity_wait_timeout' => 30,
+        'idle_timeout' => 5,
+        'job_timeout' => 120,
+    ]);
+
+    $bundle = $this->exporter->export($this->server);
+
+    expect(collect($bundle['github_apps'])->pluck('uuid')->all())->toBe(['runner-only-app'])
+        ->and(collect($bundle['private_keys'])->pluck('uuid'))->toContain($githubApp->privateKey->uuid)
+        ->and($bundle['github_runner_config']['github_app_uuid'])->toBe('runner-only-app')
+        ->and($bundle['post_transfer_checklist'])->toBe([
+            'On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to {target_url}/webhooks/source/github/events, the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.',
+            'In GitLab, open Settings > Webhooks of every project that uses GitLab App Team GitLab, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.',
+            'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. Enabling them stops runners that another Coolify instance started on this server.',
+        ])
+        ->and(implode(' ', $bundle['warnings']))->not->toContain('webhook URL')
+        ->and(implode(' ', $bundle['warnings']))->not->toContain('runner');
+
+    removeTransferSourceResources($this);
+    $githubApp->delete();
+    $gitlabApp->delete();
+    $targetTeam = Team::factory()->create();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $importedApp = GithubApp::where('uuid', 'runner-only-app')->where('team_id', $targetTeam->id)->sole();
+    $imported = GithubRunnerConfig::where('server_id', Server::where('uuid', $result['server_uuid'])->sole()->id)->sole();
+    expect($imported->uuid)->toBe($config->uuid)
+        ->and($imported->github_app_id)->toBe($importedApp->id)
+        ->and($imported->is_enabled)->toBeFalse()
+        ->and($imported->only(['labels', 'is_dedicated', 'allow_pull_requests', 'max_runners', 'runner_image', 'cpu_limit', 'memory_limit', 'capacity_wait_timeout', 'idle_timeout', 'job_timeout']))->toBe([
+            'labels' => ['coolify', 'gpu'],
+            'is_dedicated' => true,
+            'allow_pull_requests' => true,
+            'max_runners' => 4,
+            'runner_image' => 'ghcr.io/acme/runner:1',
+            'cpu_limit' => '1.5',
+            'memory_limit' => '2g',
+            'capacity_wait_timeout' => 30,
+            'idle_timeout' => 5,
+            'job_timeout' => 120,
+        ])
+        ->and($imported->docker_mode->value)->toBe('dind')
+        ->and($result['checklist'])->toContain('On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to https://coolify-a.test/webhooks/source/github/events, the Setup URL to https://coolify-a.test/webhooks/source/github/install, and the Callback URL to https://coolify-a.test/login/github/app.')
+        ->and(implode(' ', $result['warnings']))->not->toContain('webhook URL');
+});
+
+test('the GitHub runner config re-links a system-wide GitHub App of the target by uuid', function () {
+    $systemWide = transferTestGithubApp($this->team, 'system-runner-app', 'System Runner App');
+    $systemWide->forceFill(['is_system_wide' => true])->save();
+    GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $systemWide->id, 'labels' => ['coolify']]);
+
+    $bundle = $this->exporter->export($this->server);
+    expect($bundle['github_apps'])->toBe([]);
+    removeTransferSourceResources($this);
+
+    $result = $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(GithubRunnerConfig::where('server_id', Server::where('uuid', $result['server_uuid'])->sole()->id)->sole()->github_app_id)->toBe($systemWide->id);
+});
+
+test('the GitHub runner config is not imported when its GitHub App is missing on the target', function () {
+    $githubApp = transferTestGithubApp($this->team, 'missing-runner-app', 'Runner App');
+    GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $githubApp->id, 'labels' => ['coolify']]);
+
+    $bundle = $this->exporter->export($this->server);
+    $bundle['github_apps'] = [];
+    removeTransferSourceResources($this);
+    $githubApp->delete();
+
+    $result = $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(GithubRunnerConfig::count())->toBe(0)
+        ->and($result['warnings'])->toContain('The GitHub runner settings of this server were not imported, because their GitHub App was not found on this instance. Set up GitHub runners on the server again.');
+});
+
+test('the checklist asks to move manual webhooks of git applications without a private App', function () {
+    $this->application->forceFill(['source_type' => null, 'source_id' => null])->saveQuietly();
+
+    $checklist = implode("\n", $this->exporter->export($this->server)['post_transfer_checklist']);
+
+    expect($checklist)->toContain('If a repository of these applications has a manual webhook to Coolify, change its URL to the target: my-app.')
+        ->toContain('{target_url}/webhooks/source/gitea/events/manual');
+});
+
+test('the checklist does not ask about manual webhooks for an application that deploys through a private GitHub App', function () {
+    $githubApp = GithubApp::create([
+        'name' => 'private-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com',
+        'team_id' => $this->team->id, 'is_system_wide' => false, 'is_public' => false,
+    ]);
+    $this->application->forceFill(['source_type' => GithubApp::class, 'source_id' => $githubApp->id])->saveQuietly();
+
+    $checklist = implode("\n", $this->exporter->export($this->server)['post_transfer_checklist']);
+
+    expect($checklist)->not->toContain('manual webhook');
+});
+
+test('a claimed import starts the finish list and returns the server URL', function () {
+    $bundle = $this->exporter->export($this->server);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    expect($result['server_url'])->toBe('https://coolify-a.test/server/'.$server->uuid)
+        ->and(data_get($server->server_metadata, 'transfer.status'))->toBe('claimed')
+        ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain('server_connection:server');
+});
+
+test('an application with a system-wide GitHub App that the target lacks is listed for a git source check', function () {
+    $systemApp = GithubApp::create(['name' => 'Coolify GitHub', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 0, 'is_system_wide' => true]);
+    $this->application->forceFill(['source_type' => GithubApp::class, 'source_id' => $systemApp->id])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $systemApp->delete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    expect(data_get($bundle, 'projects.0.environments.0.applications.0.source.system_wide'))->toBeTrue()
+        ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
+        ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
 });

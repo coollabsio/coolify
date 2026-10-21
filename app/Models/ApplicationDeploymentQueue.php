@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -48,11 +50,20 @@ use OpenApi\Attributes as OA;
 class ApplicationDeploymentQueue extends Model
 {
     /**
-     * Kept in memory only, never saved.
+     * Log redaction variants of remote secrets. Kept in memory only, never saved.
      *
-     * @var array<array-key, mixed>
+     * @var array<int, string>
      */
     private array $remoteSecretsForRedaction = [];
+
+    public const HIDDEN_ENV_VALUES_HINT = 'Some environment variable values are hidden in this log. To show values that are not locked, go to Environment Variables > Environment values in logs and select "Hide locked values only".';
+
+    /** @var array{known: array<int, string>, locked: array<int, string>}|null */
+    private ?array $logRedactionSecrets = null;
+
+    private bool $hiddenEnvValuesHintAdded = false;
+
+    private bool $corruptedLogsWarned = false;
 
     protected static function booted(): void
     {
@@ -219,58 +230,49 @@ class ApplicationDeploymentQueue extends Model
      */
     public function redactRemoteSecrets(array $secrets): void
     {
-        $this->remoteSecretsForRedaction = $secrets;
+        $this->remoteSecretsForRedaction = EnvironmentVariable::remoteSecretLogRedactionValues($secrets);
     }
 
-    private function redactSensitiveInfo($text)
+    /**
+     * Redact a deployment log text. The application secrets are collected once per deployment.
+     */
+    public function redactLogText(string $text): string
     {
         try {
-            $text = remove_iip($text);
-
-            $app = $this->application;
-            if (! $app) {
-                return $text;
-            }
-
-            $lockedVars = collect([]);
-
-            if ($app->environment_variables) {
-                $lockedVars = $lockedVars->merge(
-                    $app->environment_variables
-                        ->where('is_shown_once', true)
-                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
-                        ->filter()
-                );
-            }
-
-            if ($this->pull_request_id !== 0 && $app->environment_variables_preview) {
-                $lockedVars = $lockedVars->merge(
-                    $app->environment_variables_preview
-                        ->where('is_shown_once', true)
-                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
-                        ->filter()
-                );
-            }
-
-            $lockedVars = $lockedVars->merge(EnvironmentVariable::remoteSecretLogRedactionValues($this->remoteSecretsForRedaction));
-
-            foreach ($lockedVars as $key => $value) {
-                $escapedValue = preg_quote($value, '/');
-                $text = preg_replace(
-                    '/'.$escapedValue.'/',
-                    REDACTED,
-                    $text
-                );
-            }
-
-            return is_string($text) ? $text : REDACTED;
+            // The deployment job registers its remote secrets with redactRemoteSecrets(), so they are not fetched again.
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor($this->application, $this->pull_request_id !== 0, resolveRemoteSecrets: false);
         } catch (\Throwable) {
             return REDACTED;
         }
+
+        return app(SensitiveDataRedactor::class)->redactText(
+            $text,
+            $this->logRedactionSecrets['known'],
+            array_merge($this->logRedactionSecrets['locked'], $this->remoteSecretsForRedaction),
+        );
     }
 
-    public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false)
+    /**
+     * Tell if the "redact all values" setting hides an environment value that is not locked in this text.
+     */
+    private function hidesUnlockedEnvValues(string $text): bool
     {
+        if ($this->logRedactionSecrets === null) {
+            return false;
+        }
+
+        $unlockedValues = array_diff($this->logRedactionSecrets['known'], $this->logRedactionSecrets['locked'], $this->remoteSecretsForRedaction);
+
+        return app(SensitiveDataRedactor::class)->containsKnownSecret($text, $unlockedValues);
+    }
+
+    public function addLogEntry(
+        string $message,
+        string $type = 'stdout',
+        bool $hidden = false,
+        ?string $command = null,
+        int $batch = 1,
+    ): void {
         if ($type === 'error') {
             $type = 'stderr';
         }
@@ -279,30 +281,62 @@ class ApplicationDeploymentQueue extends Model
             $message = "\n".$message;
         }
         $newLogEntry = [
-            'command' => null,
-            'output' => $this->redactSensitiveInfo($message),
+            'command' => $command === null ? null : $this->redactLogText($command),
+            'output' => $this->redactLogText($message),
             'type' => $type,
             'timestamp' => Carbon::now('UTC'),
             'hidden' => $hidden,
-            'batch' => 1,
+            'batch' => $batch,
         ];
 
-        // Use a transaction to ensure atomicity
-        DB::transaction(function () use ($newLogEntry) {
-            // Reload the model to get the latest logs
-            $this->refresh();
+        $addHiddenEnvValuesHint = ! $this->hiddenEnvValuesHintAdded && $this->hidesUnlockedEnvValues($message.' '.$command);
 
-            if ($this->logs) {
-                $previousLogs = json_decode($this->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                $newLogEntry['order'] = count($previousLogs) + 1;
-                $previousLogs[] = $newLogEntry;
-                $this->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
-            } else {
-                $this->logs = json_encode([$newLogEntry], flags: JSON_THROW_ON_ERROR);
+        DB::transaction(function () use ($newLogEntry, $addHiddenEnvValuesHint): void {
+            $storedLogs = static::query()->whereKey($this->getKey())->lockForUpdate()->value('logs');
+            $previousLogs = $this->decodeLogs($storedLogs);
+            if ($previousLogs === null) {
+                // Keep the stored log history instead of overwriting it with a new list.
+                if (! $this->corruptedLogsWarned) {
+                    $this->corruptedLogsWarned = true;
+                    Log::warning('Skipped a deployment log entry because the stored deployment logs cannot be decoded.', [
+                        'deployment_uuid' => $this->deployment_uuid,
+                    ]);
+                }
+
+                return;
             }
+            $newLogEntry['order'] = count($previousLogs) + 1;
+            $previousLogs[] = $newLogEntry;
+            if ($addHiddenEnvValuesHint) {
+                $this->hiddenEnvValuesHintAdded = true;
+                if (! collect($previousLogs)->contains('output', self::HIDDEN_ENV_VALUES_HINT)) {
+                    $previousLogs[] = [...$newLogEntry, 'command' => null, 'output' => self::HIDDEN_ENV_VALUES_HINT, 'type' => 'stdout', 'hidden' => false, 'order' => $newLogEntry['order'] + 1];
+                }
+            }
+            $logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
 
-            // Save without triggering events to prevent potential race conditions
-            $this->saveQuietly();
+            // Update only the logs column without model events to prevent race conditions.
+            static::query()->whereKey($this->getKey())->update(['logs' => $logs]);
+            $this->logs = $logs;
+            $this->syncOriginalAttribute('logs');
         });
+    }
+
+    /**
+     * @return array<int, mixed>|null Null when the stored logs are not blank and cannot be decoded.
+     */
+    private function decodeLogs(?string $logs): ?array
+    {
+        if (blank($logs)) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($logs, associative: true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($decoded) ? array_values($decoded) : null;
     }
 }

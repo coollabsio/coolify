@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -38,6 +39,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -701,14 +703,8 @@ function get_route_parameters(): array
 
 function get_latest_sentinel_version(): string
 {
-    try {
-        $response = Http::get(config('constants.coolify.versions_url'));
-        $versions = $response->json();
-
-        return data_get($versions, 'coolify.sentinel.version');
-    } catch (Throwable) {
-        return '0.0.0';
-    }
+    // Read the local versions.json, which CheckForUpdatesJob refreshes every hour. Do not ask the CDN for each server.
+    return data_get(get_versions_data(), 'coolify.sentinel.version') ?? '0.0.0';
 }
 function get_latest_version_of_coolify(): string
 {
@@ -891,6 +887,10 @@ function profile_avatar_url(User $user): string
         }
     }
 
+    if (auth()->check() && $user->id !== auth()->id()) {
+        return route('team.member.avatar', ['user_id' => $user->id, 'v' => $user->updated_at->timestamp]);
+    }
+
     return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
 }
 
@@ -906,6 +906,21 @@ function project_icon_url(Project $project): string
     return route('project.icon', [
         'project_uuid' => $project->uuid,
         'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function team_avatar_url(Team $team): string
+{
+    if ($team->avatar_storage_type === 's3') {
+        $url = s3_image_url($team->avatar_s3_storage_id, $team->avatar_path, $team->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('team.avatar', [
+        'team_id' => $team->id,
+        'v' => $team->updated_at->timestamp,
     ]);
 }
 
@@ -1741,10 +1756,14 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
-function sanitizeLogsForExport(string $text): string
+/**
+ * Redact log text before it leaves Coolify (copy, download, API, MCP).
+ *
+ * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Resource values to hide, usually from EnvironmentVariable::logRedactionSecretsFor().
+ */
+function sanitizeLogsForExport(string $text, array $secrets = []): string
 {
-    // All sanitization is now handled by remove_iip()
-    return remove_iip($text);
+    return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
 }
 
 function getTopLevelNetworks(Service|Application $resource): Collection
@@ -3588,7 +3607,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
-                    data_set($service, 'logging', generate_fluentd_configuration());
+                    data_set($service, 'logging', generate_log_drain_configuration($resource->server));
                 }
                 if ($serviceLabels->count() > 0) {
                     if ($resource->is_container_label_escape_enabled) {
@@ -4413,7 +4432,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             if ($server->isLogDrainEnabled()) {
                 if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
-                    data_set($service, 'logging', generate_fluentd_configuration());
+                    data_set($service, 'logging', generate_log_drain_configuration($server));
                 }
             }
             if ($serviceLabels->count() > 0) {
@@ -4470,6 +4489,31 @@ function generate_fluentd_configuration(): array
             // env vars are used in the LogDrain configurations
             'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
         ],
+    ];
+}
+
+function generate_log_drain_configuration(Server $server): array
+{
+    if ($server->isFluentBitLogDrainEnabled()) {
+        return generate_fluentd_configuration();
+    }
+
+    $settings = $server->settings;
+    $options = [
+        'awslogs-region' => $settings->logdrain_cloudwatch_region,
+        'awslogs-group' => $settings->logdrain_cloudwatch_group,
+        'awslogs-create-group' => 'true',
+        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
+        'mode' => 'non-blocking',
+        // The stream is named after the container; awslogs-stream is never set because it would override this tag.
+        'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
+    ];
+
+    return [
+        'driver' => 'awslogs',
+        'options' => collect($options)
+            ->reject(fn ($value) => blank($value))
+            ->all(),
     ];
 }
 
@@ -4579,6 +4623,20 @@ function wireNavigate(): string
 }
 
 /**
+ * Registers a resource menu that the main sidebar shows in place of its main menu on wide screens
+ * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
+ * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
+ */
+function registerMainNavContext(int $depth, string $label, string $backTitle): void
+{
+    $levels = request()->attributes->get('mainNavContext', []);
+    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle];
+    ksort($levels);
+
+    request()->attributes->set('mainNavContext', $levels);
+}
+
+/**
  * Flattens a grouped settings sidebar into the items that the command palette
  * shows for the current page: every page, its child pages, and its in-page sections.
  *
@@ -4603,6 +4661,10 @@ function settingsSearchItems(iterable $groupedItems, array $routeParameters, arr
 
     foreach ($groupedItems as $groupLabel => $groupItems) {
         foreach ($groupItems as $item) {
+            if ($item['disabled'] ?? false) {
+                continue;
+            }
+
             $href = route($item['route'], $routeParameters);
             $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
 
@@ -4856,7 +4918,7 @@ function gitRepositorySlug(?string $gitRepository): string
     return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
 }
 
-function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|null $source = null): array
+function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|GiteaApp|null $source = null): array
 {
     $repository = $gitRepository;
     $providerInfo = [
@@ -4876,6 +4938,7 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         switch ($source->getMorphClass()) {
             case GithubApp::class:
             case GitlabApp::class:
+            case GiteaApp::class:
                 $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
                 $providerInfo['port'] = $source->custom_port;
                 $providerInfo['user'] = $source->custom_user;
@@ -5712,6 +5775,115 @@ function deviceLabel(?string $device): string
         'crawler' => 'Bot',
         default => Str::title($value),
     };
+}
+
+/**
+ * Prepare aggregated `city` breakdown rows (`CC|subdivision|City`, from
+ * TrafficAnalyticsAggregator::breakdowns(), not raw Sentinel rows) for display,
+ * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
+ * "BE, Germany"). `CC||` (sent by older Sentinel builds) is an unknown city of
+ * that country. `__other__` and malformed values are merged into one "Other"
+ * row, which stays last. Returns [] when no row has a real city.
+ *
+ * @param  iterable<int, array{value?: string, requests?: int, bytesOut?: int, lat?: float, lon?: float}>  $rows
+ * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
+ */
+function trafficCityRows(iterable $rows): array
+{
+    $out = [];
+    $hasCity = false;
+
+    foreach ($rows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests <= 0) {
+            continue;
+        }
+
+        $value = (string) data_get($row, 'value', '');
+        $parts = explode('|', $value, 3);
+        $parts[0] = strtoupper($parts[0]);
+        $isCityKey = count($parts) === 3 && preg_match('/^[A-Z]{2}$/', $parts[0]) === 1;
+
+        $key = '__other__';
+        $country = '';
+        $label = 'Other';
+        $name = 'Other';
+        $detail = '';
+        $lat = null;
+        $lon = null;
+
+        if ($isCityKey) {
+            [$country, $subdivision, $city] = array_map('trim', $parts);
+            $key = $value;
+
+            if ($city === '') {
+                $label = 'Unknown, '.$country;
+                $name = 'Unknown';
+                $detail = countryName($country);
+            } else {
+                $hasCity = true;
+                $region = preg_match('/^[A-Z]{2,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
+                $label = $city.', '.$region.$country;
+                $name = $city;
+                $detail = $region.countryName($country);
+
+                $rawLat = data_get($row, 'lat');
+                $rawLon = data_get($row, 'lon');
+                if (is_numeric($rawLat) && is_numeric($rawLon)) {
+                    $lat = (float) $rawLat;
+                    $lon = (float) $rawLon;
+                }
+            }
+        }
+
+        $out[$key] ??= ['key' => $key, 'country' => $country, 'label' => $label, 'name' => $name, 'detail' => $detail, 'requests' => 0, 'bytesOut' => 0, 'lat' => $lat, 'lon' => $lon];
+        $out[$key]['requests'] += $requests;
+        $out[$key]['bytesOut'] += (int) data_get($row, 'bytesOut', 0);
+    }
+
+    if (! $hasCity) {
+        return [];
+    }
+
+    $other = $out['__other__'] ?? null;
+    unset($out['__other__']);
+    $out = array_values($out);
+    usort($out, fn (array $a, array $b): int => $b['requests'] <=> $a['requests']);
+
+    return $other === null ? $out : [...$out, $other];
+}
+
+/**
+ * Marker data for the analytics globe, one set for each view of the Locations
+ * card: a marker per country with a valid ISO-A2 code, and a marker per city
+ * that has coordinates.
+ *
+ * @param  iterable<int, mixed>  $countryRows
+ * @param  iterable<int, mixed>  $cityRows
+ * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
+ */
+function trafficGeoMarkers(iterable $countryRows, iterable $cityRows): array
+{
+    $countries = [];
+    foreach ($countryRows as $row) {
+        $code = strtoupper((string) data_get($row, 'value', ''));
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests > 0 && preg_match('/^[A-Z]{2}$/', $code) === 1) {
+            $countries[] = ['code' => $code, 'requests' => $requests];
+        }
+    }
+
+    $cities = [];
+    foreach ($cityRows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        $lat = data_get($row, 'lat');
+        $lon = data_get($row, 'lon');
+        if ($requests > 0 && is_numeric($lat) && is_numeric($lon)) {
+            $cities[] = ['lat' => (float) $lat, 'lon' => (float) $lon, 'requests' => $requests];
+        }
+    }
+
+    return ['countries' => $countries, 'cities' => $cities];
 }
 
 /**

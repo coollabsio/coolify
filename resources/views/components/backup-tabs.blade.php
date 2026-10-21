@@ -8,21 +8,15 @@
     $routes = match ($context) {
         'service-schedule' => [
             'general' => true,
-            's3' => true,
-            'retention' => true,
             'danger' => true,
         ],
         'service' => [
             'general' => 'project.service.database.backup.show',
-            's3' => 'project.service.database.backup.s3',
-            'retention' => 'project.service.database.backup.retention',
             'executions' => 'project.service.database.backup.executions',
             'danger' => 'project.service.database.backup.danger',
         ],
         'service-volume' => [
             'general' => 'project.service.volume-backups.show',
-            's3' => 'project.service.volume-backups.s3',
-            'retention' => 'project.service.volume-backups.retention',
             'executions' => 'project.service.volume-backups.executions',
             'danger' => 'project.service.volume-backups.danger',
         ],
@@ -30,8 +24,6 @@
 
     $items = collect([
         ['key' => 'general', 'label' => 'General'],
-        ['key' => 's3', 'label' => 'S3 storage'],
-        ['key' => 'retention', 'label' => 'Retention'],
         ['key' => 'executions', 'label' => 'Executions'],
         ['key' => 'danger', 'label' => 'Danger Zone'],
     ])->filter(fn (array $item): bool => isset($routes[$item['key']]));

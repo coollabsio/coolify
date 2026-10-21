@@ -2,22 +2,31 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\GithubRunnerDockerMode;
 use App\Enums\ServerRole;
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
+use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\ResourceLink;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\SecretManagerLink;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -37,9 +46,18 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
+use App\Notifications\Internal\GeneralNotification;
+use App\Rules\DockerImageFormat;
+use App\Rules\ValidServerIp;
+use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\ProjectIconStorageService;
+use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
@@ -70,11 +88,36 @@ class ServerTransferImporter
     /** @var array<string, GitlabApp> */
     private array $gitlabAppMap = [];
 
+    /** @var array<string, GiteaApp> */
+    private array $giteaAppMap = [];
+
     /** @var array<string, S3Storage> */
     private array $s3StorageMap = [];
 
     /** @var array<string, CloudProviderToken> */
     private array $cloudTokenMap = [];
+
+    /** @var array<string, IntegrationToken> */
+    private array $integrationTokenMap = [];
+
+    /** @var array<string, DnsProviderZone> */
+    private array $dnsZoneMap = [];
+
+    /**
+     * Imported owned DNS records that carry the ownership comment of the source instance. This instance takes
+     * ownership at the provider after the import transaction commits.
+     *
+     * @var list<array{record_id: int, previous_comment: string}>
+     */
+    private array $pendingDnsAdoptions = [];
+
+    /**
+     * Icons of imported projects. They are stored after the import transaction commits, so a storage error
+     * cannot roll back DB rows.
+     *
+     * @var list<array{project: Project, icon: array<string, mixed>}>
+     */
+    private array $pendingProjectIcons = [];
 
     /** @var array<string, LocalPersistentVolume|LocalFileVolume> */
     private array $volumeMap = [];
@@ -82,8 +125,14 @@ class ServerTransferImporter
     /** @var array<string, Application> */
     private array $applicationMap = [];
 
+    /** @var array<string, ApplicationPreview> */
+    private array $previewMap = [];
+
     /** @var array<string, Service> */
     private array $serviceMap = [];
+
+    /** @var array<string, ServiceApplication> */
+    private array $serviceApplicationMap = [];
 
     /** @var array<string, Model> */
     private array $databaseMap = [];
@@ -96,6 +145,21 @@ class ServerTransferImporter
     private array $pendingSqliteLinks = [];
 
     /**
+     * Warnings about references of imported resources that this instance cannot resolve.
+     *
+     * @var list<string>
+     */
+    private array $importWarnings = [];
+
+    /**
+     * Applications whose git source needs a check after the transfer: a system-wide source of the source
+     * instance, or a source that this instance does not have.
+     *
+     * @var list<string>
+     */
+    private array $gitSourceApplications = [];
+
+    /**
      * @param  array<string, mixed>  $bundle
      * @return array{
      *     dry_run: bool,
@@ -106,7 +170,8 @@ class ServerTransferImporter
      *     preserved_uuids: bool,
      *     export_id: string|null,
      *     claimed: bool,
-     *     claim: array<string, mixed>|null
+     *     claim: array<string, mixed>|null,
+     *     checklist: list<string>
      * }
      */
     public function import(
@@ -117,6 +182,13 @@ class ServerTransferImporter
         bool $adoptMode = true,
     ): array {
         ServerTransferBundle::assertValid($bundle);
+        $this->assertValidServerPayload((array) data_get($bundle, 'server', []));
+
+        if ($adoptMode && ! $preserveUuids) {
+            throw ValidationException::withMessages([
+                'preserve_uuids' => ['Adopt mode keeps the running containers, so it needs the original UUIDs. Import with preserve_uuids=true.'],
+            ]);
+        }
 
         $validation = ServerTransferBundle::validate($bundle);
         $warnings = $validation['warnings'];
@@ -127,27 +199,20 @@ class ServerTransferImporter
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $serverIp = (string) data_get($bundle, 'server.ip');
 
-        $uuidConflict = Server::withTrashed()->where('uuid', $serverUuid)->exists() && $preserveUuids;
-        $existingIp = Server::where('ip', Server::normalizeIp($serverIp))->first();
-        $ipConflict = $existingIp !== null;
+        // A server that comes back replaces the archived copy that this instance kept from the first transfer.
+        $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
+        $uuidConflict = $archive === null && $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
+        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
 
-        if (! $dryRun && $uuidConflict) {
-            throw ValidationException::withMessages([
-                'server.uuid' => ["A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false."],
-            ]);
-        }
-
-        if (! $dryRun && $ipConflict) {
-            throw ValidationException::withMessages([
-                'server.ip' => ["A server with IP/domain {$serverIp} already exists (uuid={$existingIp->uuid}). Complete handoff on the source instance first."],
-            ]);
+        if (! $dryRun) {
+            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
         }
 
         if ($uuidConflict) {
             $warnings[] = "A server with UUID {$serverUuid} already exists on this instance.";
         }
         if ($ipConflict) {
-            $warnings[] = "A server with IP/domain {$serverIp} already exists (uuid={$existingIp->uuid}).";
+            $warnings[] = "A server with IP/domain {$serverIp} already exists on this instance.";
         }
 
         $created = [
@@ -160,8 +225,11 @@ class ServerTransferImporter
             'private_keys' => 0,
             'github_apps' => 0,
             'gitlab_apps' => 0,
+            'gitea_apps' => 0,
             's3_storages' => 0,
             'cloud_provider_tokens' => 0,
+            'integration_tokens' => 0,
+            'managed_dns_records' => 0,
             'ssl_certificates' => 0,
             'volume_backups' => 0,
             'previews' => 0,
@@ -187,19 +255,13 @@ class ServerTransferImporter
             );
             $created['github_apps'] = count(data_get($bundle, 'github_apps', []));
             $created['gitlab_apps'] = count(data_get($bundle, 'gitlab_apps', []));
+            $created['gitea_apps'] = count(data_get($bundle, 'gitea_apps', []));
             $created['s3_storages'] = count(data_get($bundle, 's3_storages', []));
             $created['cloud_provider_tokens'] = count(data_get($bundle, 'cloud_provider_tokens', []));
+            $created['integration_tokens'] = count(data_get($bundle, 'integration_tokens', []));
+            $created['managed_dns_records'] = count(data_get($bundle, 'managed_dns_records', []));
             $created['ssl_certificates'] = count(data_get($bundle, 'ssl_certificates', []));
             $created['volume_backups'] = count(data_get($bundle, 'volume_backups', []));
-
-            // Append transfer hints for the target instance FQDN.
-            $targetUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
-            if (count(data_get($bundle, 'github_apps', [])) > 0) {
-                $warnings[] = "After import, set GitHub App webhook URL to {$targetUrl}/webhooks/source/github/events (and update setup/callback URLs in GitHub if needed) so automations work on this instance.";
-            }
-            if (count(data_get($bundle, 'gitlab_apps', [])) > 0) {
-                $warnings[] = "After import, set GitLab webhook URL to {$targetUrl}/webhooks/source/gitlab/events so automations work on this instance.";
-            }
 
             return [
                 'dry_run' => true,
@@ -211,22 +273,36 @@ class ServerTransferImporter
                 'export_id' => data_get($bundle, 'export_id'),
                 'claimed' => false,
                 'claim' => null,
+                'checklist' => $this->postTransferChecklist($bundle),
             ];
         }
 
-        $result = DB::transaction(function () use ($bundle, $teamId, $preserveUuids, $adoptMode, $warnings, &$created) {
+        $result = DB::transaction(function () use ($bundle, $teamId, $preserveUuids, $adoptMode, $warnings, $archive, &$created) {
+            // Removed in the same transaction as the import, so a failed import keeps the archive.
+            if ($archive) {
+                app(ServerTransferClaimer::class)->deleteArchive($archive);
+            }
             Team::ensureServerCapacity($teamId);
 
             $this->privateKeyMap = [];
             $this->githubAppMap = [];
             $this->gitlabAppMap = [];
+            $this->giteaAppMap = [];
             $this->s3StorageMap = [];
             $this->cloudTokenMap = [];
+            $this->integrationTokenMap = [];
+            $this->dnsZoneMap = [];
+            $this->pendingDnsAdoptions = [];
+            $this->pendingProjectIcons = [];
             $this->volumeMap = [];
             $this->applicationMap = [];
+            $this->previewMap = [];
             $this->serviceMap = [];
+            $this->serviceApplicationMap = [];
             $this->databaseMap = [];
             $this->pendingSqliteLinks = [];
+            $this->importWarnings = [];
+            $this->gitSourceApplications = [];
 
             // Import shared dependencies first
             $keyPayloads = data_get($bundle, 'private_keys', []);
@@ -262,6 +338,17 @@ class ServerTransferImporter
                 $created['gitlab_apps']++;
             }
 
+            foreach (data_get($bundle, 'gitea_apps', []) as $gtPayload) {
+                // Defensive: never import system-wide Gitea Apps from a bundle.
+                if ((bool) data_get($gtPayload, 'is_system_wide', false)) {
+                    continue;
+                }
+                $gt = $this->importGiteaApp($gtPayload, $teamId, $preserveUuids);
+                $this->giteaAppMap[(string) data_get($gtPayload, 'uuid', $gt->uuid)] = $gt;
+                $this->giteaAppMap[$gt->uuid] = $gt;
+                $created['gitea_apps']++;
+            }
+
             foreach (data_get($bundle, 's3_storages', []) as $s3Payload) {
                 $s3 = $this->importS3Storage($s3Payload, $teamId, $preserveUuids);
                 $this->s3StorageMap[(string) data_get($s3Payload, 'uuid', $s3->uuid)] = $s3;
@@ -276,6 +363,13 @@ class ServerTransferImporter
                 $created['cloud_provider_tokens']++;
             }
 
+            foreach (data_get($bundle, 'integration_tokens', []) as $tokenPayload) {
+                $token = $this->importIntegrationToken($tokenPayload, $teamId, $preserveUuids);
+                $this->integrationTokenMap[(string) data_get($tokenPayload, 'uuid', $token->uuid)] = $token;
+                $this->integrationTokenMap[$token->uuid] = $token;
+                $created['integration_tokens']++;
+            }
+
             $serverKeyUuid = (string) data_get($bundle, 'private_key.uuid', '');
             $privateKey = $this->privateKeyMap[$serverKeyUuid]
                 ?? $this->importPrivateKey(data_get($bundle, 'private_key', []), $teamId, $preserveUuids);
@@ -283,8 +377,10 @@ class ServerTransferImporter
             $server = $this->importServer(data_get($bundle, 'server', []), $privateKey, $teamId, $preserveUuids, $adoptMode);
             $destinationMap = $this->importDestinations(data_get($bundle, 'destinations', []), $server, $preserveUuids);
             $created['destinations'] = count($destinationMap);
+            $this->importGithubRunnerConfig(data_get($bundle, 'github_runner_config'), $server, $teamId, $preserveUuids);
 
             $this->importServerSharedEnvVars(data_get($bundle, 'shared_environment_variables.server', []), $server, $teamId);
+            $this->importTeamSharedEnvVars(data_get($bundle, 'shared_environment_variables.team', []), $teamId);
 
             foreach (data_get($bundle, 'projects', []) as $projectPayload) {
                 $project = $this->importProject($projectPayload, $teamId, $preserveUuids, $created);
@@ -311,21 +407,20 @@ class ServerTransferImporter
                         $this->serviceMap[(string) data_get($servicePayload, 'uuid', $service->uuid)] = $service;
                         $created['services']++;
                     }
+
+                    $this->importCanvasPositions((array) data_get($environmentPayload, 'canvas_positions', []), $environment);
+                    $this->importResourceLinks((array) data_get($environmentPayload, 'resource_links', []), $environment, $preserveUuids);
                 }
             }
 
             $warnings = array_merge($warnings, $this->linkSqliteVolumes());
 
+            $this->importDnsZones(data_get($bundle, 'dns_zones', []), $preserveUuids);
+            $created['managed_dns_records'] = $this->importManagedDnsRecords(data_get($bundle, 'managed_dns_records', []), $teamId, $preserveUuids);
+
             $created['ssl_certificates'] = $this->importSslCertificates(data_get($bundle, 'ssl_certificates', []), $server);
             $created['volume_backups'] = $this->importVolumeBackups(data_get($bundle, 'volume_backups', []), $teamId);
-
-            $targetUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
-            if ($created['github_apps'] > 0) {
-                $warnings[] = "GitHub Apps imported. Update webhook URL to {$targetUrl}/webhooks/source/github/events (and setup/callback URLs in GitHub) so automations work on this instance.";
-            }
-            if ($created['gitlab_apps'] > 0) {
-                $warnings[] = "GitLab sources imported. Update webhook URL to {$targetUrl}/webhooks/source/gitlab/events so automations work on this instance.";
-            }
+            $warnings = array_merge($warnings, $this->importWarnings);
 
             $metadata = $server->server_metadata ?? [];
             $metadata['transfer'] = [
@@ -334,6 +429,7 @@ class ServerTransferImporter
                 'source_instance_url' => data_get($bundle, 'source_instance.url'),
                 'imported_at' => now()->toIso8601String(),
                 'adopt_mode' => $adoptMode,
+                'git_source_applications' => array_values(array_unique($this->gitSourceApplications)),
             ];
             $server->server_metadata = $metadata;
             $server->save();
@@ -348,8 +444,12 @@ class ServerTransferImporter
                 'export_id' => data_get($bundle, 'export_id'),
                 'claimed' => false,
                 'claim' => null,
+                'checklist' => $this->postTransferChecklist($bundle),
             ];
         });
+
+        // Provider and storage calls run after the import transaction commits, so an error cannot roll back DB rows.
+        $result['warnings'] = array_values(array_unique(array_merge($result['warnings'], $this->adoptManagedDnsRecords(), $this->storeProjectIcons())));
 
         // Claim after the import transaction commits so a claim failure cannot roll back DB rows.
         if (filled(data_get($result, 'server_uuid'))) {
@@ -358,6 +458,10 @@ class ServerTransferImporter
                 try {
                     $result['claim'] = app(ServerTransferClaimer::class)->claim($server);
                     $result['claimed'] = true;
+                    // Same check as the Validate button. A running proxy and Docker are kept as they are.
+                    ValidateAndInstallServerJob::dispatch($server);
+                    $this->startFinishChecklist($server);
+                    $result['server_url'] = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/').'/server/'.$server->uuid;
                 } catch (Throwable $e) {
                     $result['claimed'] = false;
                     $result['claim'] = null;
@@ -367,6 +471,130 @@ class ServerTransferImporter
         }
 
         return $result;
+    }
+
+    /**
+     * Check the server connection fields with the same rules as the create server API.
+     *
+     * @param  array<string, mixed>  $server
+     */
+    private function assertValidServerPayload(array $server): void
+    {
+        Validator::make($server, [
+            'name' => 'nullable|string|max:255',
+            'ip' => ['required', 'string', new ValidServerIp],
+            'port' => 'required|integer|between:1,65535',
+            'user' => ValidationPatterns::serverUsernameRules(required: false),
+        ], [], [
+            'ip' => 'server.ip',
+            'port' => 'server.port',
+            'user' => 'server.user',
+        ])->validate();
+    }
+
+    /**
+     * Checks that a server can be imported into the team, without the bundle. Every check runs, so the
+     * source instance can show which checks are OK and which failed.
+     *
+     * @return list<array{field: string, label: string, ok: bool, message: string|null}>
+     */
+    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): array
+    {
+        $team = Team::find($teamId);
+        $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
+        // The archive is replaced, so the import does not add a server.
+        $limitReached = ! $team || ($archive === null && Team::serverLimitReached($team));
+
+        $existingServer = $preserveUuids && $archive === null ? Server::withTrashed()->where('uuid', $serverUuid)->first() : null;
+        $uuidMessage = match (true) {
+            $existingServer === null => null,
+            $existingServer->trashed() => "The server with UUID {$serverUuid} is still being deleted on this instance. Wait a minute, then transfer again.",
+            $existingServer->isTransferredAway() => "Another team of this instance has the archived copy of server {$existingServer->name}. Transfer the server into that team, or delete the archive there first.",
+            default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
+        };
+
+        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+
+        return [
+            [
+                'field' => 'server',
+                'label' => 'the team can have one more server',
+                'ok' => ! $limitReached,
+                'message' => $limitReached ? 'Server limit reached for your subscription.' : null,
+            ],
+            [
+                'field' => 'server.uuid',
+                'label' => $archive ? 'the archived copy of this server on this instance is replaced' : 'no server with the same UUID exists',
+                'ok' => $uuidMessage === null,
+                'message' => $uuidMessage,
+            ],
+            [
+                'field' => 'server.ip',
+                'label' => 'no server with the same IP exists',
+                'ok' => ! $ipExists,
+                'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
+            ],
+        ];
+    }
+
+    /**
+     * The steps that finish the transfer here, and one notification that points the team to them.
+     * A failure here never fails the import: the server is imported and claimed already.
+     */
+    private function startFinishChecklist(Server $server): void
+    {
+        try {
+            $items = app(TransferFinishChecklist::class)->start($server);
+            $server->team?->notify(new GeneralNotification(
+                "Server '{$server->name}' was transferred to this instance. Open the server to finish the transfer: ".count($items).' steps to check.'
+            ));
+        } catch (Throwable $e) {
+            Log::warning('Could not start the transfer finish checklist', ['server_uuid' => $server->uuid, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * The archive that this instance kept when it transferred the server away. A transfer back into the same team
+     * replaces it.
+     */
+    private function replaceableArchive(string $serverUuid, int $teamId): ?Server
+    {
+        $server = Server::query()->where('uuid', $serverUuid)->where('team_id', $teamId)->first();
+
+        return $server?->isTransferredAway() ? $server : null;
+    }
+
+    /**
+     * @throws ValidationException with the first failed import check
+     */
+    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): void
+    {
+        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids) as $check) {
+            if (! $check['ok']) {
+                throw ValidationException::withMessages([$check['field'] => [$check['message']]]);
+            }
+        }
+    }
+
+    /**
+     * Running containers are found by the resource UUID. In adopt mode a new UUID would leave them
+     * without a resource, so a conflict stops the import instead.
+     *
+     * @param  class-string<Model>  $modelClass
+     */
+    private function resolveResourceUuid(string $modelClass, string $uuid, bool $adoptMode, string $label): string
+    {
+        if (! $modelClass::withTrashed()->where('uuid', $uuid)->exists()) {
+            return $uuid;
+        }
+
+        if ($adoptMode) {
+            throw ValidationException::withMessages([
+                'bundle' => ["The {$label} UUID {$uuid} is already used on this instance. Delete that {$label} permanently first, because adopt mode needs the same UUID to keep the running containers."],
+            ]);
+        }
+
+        return new_public_id();
     }
 
     /**
@@ -450,6 +678,12 @@ class ServerTransferImporter
             'private_key_id' => $privateKey->id,
             'team_id' => $teamId,
             'cloud_provider_token_id' => $cloudTokenId,
+            'hetzner_server_id' => data_get($payload, 'hetzner_server_id'),
+            'vultr_instance_id' => data_get($payload, 'vultr_instance_id'),
+            'digitalocean_droplet_id' => data_get($payload, 'digitalocean_droplet_id'),
+            'hostinger_virtual_machine_id' => data_get($payload, 'hostinger_virtual_machine_id'),
+            'proxy_error_page' => data_get($payload, 'proxy_error_page'),
+            'swarm_cluster' => data_get($payload, 'swarm_cluster'),
         ]);
         $server->uuid = $uuid;
         $server->save();
@@ -479,9 +713,17 @@ class ServerTransferImporter
                     'id', 'server_id', 'created_at', 'updated_at',
                     'is_reachable', 'is_usable', 'force_disabled',
                     'sentinel_token', 'sentinel_custom_url',
+                    // A foreign key of the source instance; older bundles still contain it.
+                    'cloudflare_tunnel_integration_token_id',
+                    'cloudflare_tunnel_integration_token_uuid',
+                    'patch_check_result', 'patch_check_error', 'patch_checked_at',
                 ])
                 ->all();
             $server->settings->fill($safe);
+            $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(
+                data_get($settingsPayload, 'cloudflare_tunnel_integration_token_uuid'),
+                'The Cloudflare tunnel of this server: its Cloudflare API token was not found on this instance; select it again in the Cloudflare tunnel settings.',
+            );
             // Imported servers start not validated; claim will rebind sentinel.
             $server->settings->is_reachable = false;
             $server->settings->is_usable = false;
@@ -594,6 +836,38 @@ class ServerTransferImporter
     }
 
     /**
+     * A team variable that already exists keeps the value of this instance.
+     *
+     * @param  list<array<string, mixed>>  $variables
+     */
+    private function importTeamSharedEnvVars(array $variables, int $teamId): void
+    {
+        foreach ($variables as $variable) {
+            $key = (string) data_get($variable, 'key');
+            $exists = SharedEnvironmentVariable::query()
+                ->where('type', 'team')
+                ->where('team_id', $teamId)
+                ->where('key', $key)
+                ->exists();
+            if ($exists) {
+                $this->importWarnings[] = "Team shared variable {$key} already exists on this instance. It keeps its value here, which can differ from the value on the source instance.";
+
+                continue;
+            }
+            SharedEnvironmentVariable::create([
+                'key' => $key,
+                'value' => data_get($variable, 'value'),
+                'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
+                'is_literal' => (bool) data_get($variable, 'is_literal', false),
+                'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
+                'comment' => data_get($variable, 'comment'),
+                'type' => 'team',
+                'team_id' => $teamId,
+            ]);
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, int>  $created
      */
@@ -603,9 +877,14 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
+        $icon = data_get($payload, 'icon');
         $existing = Project::where('uuid', $uuid)->where('team_id', $teamId)->first();
         if ($existing) {
             $this->importProjectSharedEnvVars(data_get($payload, 'shared_environment_variables', []), $existing, $teamId);
+            // An icon that the project already has on this instance is kept.
+            if (is_array($icon) && blank($existing->icon_path)) {
+                $this->pendingProjectIcons[] = ['project' => $existing, 'icon' => $icon];
+            }
 
             return $existing;
         }
@@ -624,7 +903,124 @@ class ServerTransferImporter
 
         $this->importProjectSharedEnvVars(data_get($payload, 'shared_environment_variables', []), $project, $teamId);
 
-        return $project->fresh(['environments']);
+        $project = $project->fresh(['environments']);
+        if (is_array($icon)) {
+            $this->pendingProjectIcons[] = ['project' => $project, 'icon' => $icon];
+        }
+
+        return $project;
+    }
+
+    /**
+     * Stores the icons of the imported projects in the icon storage of this instance. Coolify stores every
+     * icon as a JPEG file and serves it as one, so other content is not stored.
+     *
+     * @return list<string> warnings
+     */
+    private function storeProjectIcons(): array
+    {
+        $warnings = [];
+        foreach ($this->pendingProjectIcons as ['project' => $project, 'icon' => $icon]) {
+            $contents = base64_decode((string) data_get($icon, 'content_base64', ''), true);
+            $problem = match (true) {
+                ! is_string($contents) || $contents === '' => 'its content is not valid',
+                strlen($contents) > ServerTransferExporter::MAX_PROJECT_ICON_BYTES => 'it is larger than 2 MB',
+                (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents) !== 'image/jpeg' => 'it is not a JPEG image',
+                default => null,
+            };
+            if ($problem === null) {
+                try {
+                    app(ProjectIconStorageService::class)->storeProjectContents($project, $contents);
+
+                    continue;
+                } catch (Throwable) {
+                    $problem = 'the icon storage of this instance is not available';
+                }
+            }
+            $warnings[] = "The icon of project {$project->name} was not imported, because {$problem}. Upload it again in the project settings.";
+        }
+        $this->pendingProjectIcons = [];
+
+        return $warnings;
+    }
+
+    /**
+     * Manual steps after the transfer, with the URL of this instance in place of {target_url}.
+     *
+     * @param  array<string, mixed>  $bundle
+     * @return list<string>
+     */
+    private function postTransferChecklist(array $bundle): array
+    {
+        $targetUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
+
+        return array_values(array_unique(array_map(
+            fn (string $step) => str_replace('{target_url}', $targetUrl, $step),
+            array_filter((array) data_get($bundle, 'post_transfer_checklist', []), 'is_string'),
+        )));
+    }
+
+    /**
+     * The config is imported disabled: an enabled config makes this instance remove every runner container on
+     * the server that it does not know, also the runners that the source started. The user enables it after
+     * the GitHub App sends its webhooks here.
+     */
+    private function importGithubRunnerConfig(mixed $payload, Server $server, int $teamId, bool $preserveUuids): void
+    {
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $appUuid = (string) data_get($payload, 'github_app_uuid', '');
+        $githubApp = $appUuid === '' ? null : ($this->githubAppMap[$appUuid]
+            ?? GithubApp::query()->where('uuid', $appUuid)->where('is_system_wide', true)->first()
+            ?? GithubApp::query()->where('uuid', $appUuid)->where('team_id', $teamId)->first());
+        if (! $githubApp) {
+            $this->importWarnings[] = 'The GitHub runner settings of this server were not imported, because their GitHub App was not found on this instance. Set up GitHub runners on the server again.';
+
+            return;
+        }
+
+        $validator = Validator::make($payload, [
+            'labels' => ['required', 'array', 'min:1'],
+            'labels.*' => ['string', 'regex:/\A[a-z0-9][a-z0-9._-]{0,99}\z/'],
+            'max_runners' => ['required', 'integer', 'min:1', 'max:32'],
+            'docker_mode' => ['required', Rule::enum(GithubRunnerDockerMode::class)],
+            'runner_image' => ['nullable', 'string', 'max:255', new DockerImageFormat],
+            'cpu_limit' => ['nullable', 'string', 'regex:/\A\d+(\.\d+)?\z/'],
+            'memory_limit' => ['nullable', 'string', 'regex:/\A\d+[bkmg]?\z/i'],
+            'capacity_wait_timeout' => ['required', 'integer', 'min:1', 'max:1440'],
+            'idle_timeout' => ['required', 'integer', 'min:1', 'max:1440'],
+            'job_timeout' => ['required', 'integer', 'min:1', 'max:7200'],
+        ]);
+        if ($validator->fails()) {
+            $this->importWarnings[] = 'The GitHub runner settings of this server were not imported, because they are not valid: '.$validator->errors()->first().' Set up GitHub runners on the server again.';
+
+            return;
+        }
+
+        $uuid = (string) data_get($payload, 'uuid', '');
+        $config = new GithubRunnerConfig;
+        $config->forceFill([
+            'server_id' => $server->id,
+            'github_app_id' => $githubApp->id,
+            'labels' => array_values($payload['labels']),
+            'is_enabled' => false,
+            'is_dedicated' => (bool) data_get($payload, 'is_dedicated', false),
+            'allow_pull_requests' => (bool) data_get($payload, 'allow_pull_requests', false),
+            'max_runners' => (int) $payload['max_runners'],
+            'docker_mode' => GithubRunnerDockerMode::from($payload['docker_mode']),
+            'runner_image' => data_get($payload, 'runner_image'),
+            'cpu_limit' => data_get($payload, 'cpu_limit'),
+            'memory_limit' => data_get($payload, 'memory_limit'),
+            'capacity_wait_timeout' => (int) $payload['capacity_wait_timeout'],
+            'idle_timeout' => (int) $payload['idle_timeout'],
+            'job_timeout' => (int) $payload['job_timeout'],
+        ]);
+        if ($preserveUuids && $uuid !== '' && ! GithubRunnerConfig::where('uuid', $uuid)->exists()) {
+            $config->uuid = $uuid;
+        }
+        $config->save();
     }
 
     /**
@@ -734,6 +1130,86 @@ class ServerTransferImporter
     }
 
     /**
+     * Canvas positions are keyed by resource uuid. Resources may get a new uuid on import.
+     *
+     * @param  array<string, mixed>  $positions
+     */
+    private function importCanvasPositions(array $positions, Environment $environment): void
+    {
+        $imported = [];
+        foreach ($positions as $uuid => $position) {
+            $resource = $this->applicationMap[$uuid] ?? $this->databaseMap[$uuid] ?? $this->serviceMap[$uuid] ?? null;
+            if ($resource) {
+                $imported[$resource->uuid] = $position;
+            }
+        }
+        if ($imported === []) {
+            return;
+        }
+
+        $environment->canvas_positions = array_merge($environment->canvas_positions ?? [], $imported);
+        $environment->save();
+    }
+
+    /**
+     * Links between two imported resources of the environment. The user who drew the link is a user of the
+     * source instance, so created_by stays empty.
+     *
+     * @param  list<array<string, mixed>>  $links
+     */
+    private function importResourceLinks(array $links, Environment $environment, bool $preserveUuids): void
+    {
+        foreach ($links as $link) {
+            $source = $this->linkedResource(data_get($link, 'source'));
+            $target = $this->linkedResource(data_get($link, 'target'));
+            if (! $source || ! $target || $source->is($target)
+                || (int) $source->environment_id !== $environment->id || (int) $target->environment_id !== $environment->id) {
+                $this->importWarnings[] = "A link between resources on the canvas of environment {$environment->name} was not imported, because one of its resources was not imported.";
+
+                continue;
+            }
+
+            $attributes = [
+                'environment_id' => $environment->id,
+                'source_type' => $source->getMorphClass(),
+                'source_id' => $source->getKey(),
+                'target_type' => $target->getMorphClass(),
+                'target_id' => $target->getKey(),
+            ];
+            if (ResourceLink::query()->where($attributes)->exists()) {
+                continue;
+            }
+
+            $label = data_get($link, 'label');
+            $resourceLink = new ResourceLink([
+                ...$attributes,
+                'label' => is_string($label) && trim($label) !== '' ? mb_substr(trim($label), 0, 64) : null,
+                'created_by' => null,
+            ]);
+            $uuid = (string) data_get($link, 'uuid', '');
+            if ($preserveUuids && $uuid !== '' && ! ResourceLink::where('uuid', $uuid)->exists()) {
+                $resourceLink->uuid = $uuid;
+            }
+            $resourceLink->save();
+        }
+    }
+
+    /**
+     * An end of a canvas link: the kind and the original uuid of an imported resource.
+     */
+    private function linkedResource(mixed $end): ?Model
+    {
+        $uuid = (string) data_get($end, 'uuid', '');
+
+        return match (data_get($end, 'kind')) {
+            'application' => $this->applicationMap[$uuid] ?? null,
+            'database' => $this->databaseMap[$uuid] ?? null,
+            'service' => $this->serviceMap[$uuid] ?? null,
+            default => null,
+        };
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, StandaloneDocker|SwarmDocker>  $destinationMap
      */
@@ -750,9 +1226,7 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
-        if (Application::withTrashed()->where('uuid', $uuid)->exists()) {
-            $uuid = new_public_id();
-        }
+        $uuid = $this->resolveResourceUuid(Application::class, $uuid, $adoptMode, 'application');
 
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type'], $attributes['source_id'], $attributes['source_type'], $attributes['private_key_id']);
@@ -762,6 +1236,8 @@ class ServerTransferImporter
         $attributes['environment_id'] = $environment->id;
         $attributes['destination_id'] = $destination->id;
         $attributes['destination_type'] = $destination->getMorphClass();
+
+        $name = (string) data_get($attributes, 'name', $uuid);
 
         // Re-link git source
         $source = data_get($payload, 'source');
@@ -784,13 +1260,37 @@ class ServerTransferImporter
                     $attributes['source_type'] = GitlabApp::class;
                     $attributes['source_id'] = $gl->id;
                 }
+            } elseif ($sourceType === 'gitea_app') {
+                $gt = $this->giteaAppMap[$sourceUuid]
+                    ?? GiteaApp::query()->where('uuid', $sourceUuid)->where('is_system_wide', true)->first()
+                    ?? GiteaApp::query()->where('uuid', $sourceUuid)->where('team_id', $teamId)->first();
+                if ($gt) {
+                    $attributes['source_type'] = GiteaApp::class;
+                    $attributes['source_id'] = $gt->id;
+                }
             }
+        }
+        $sourceMissing = data_get($payload, 'had_git_source') && ! isset($attributes['source_id']);
+        if ($sourceMissing || data_get($payload, 'source.system_wide') === true) {
+            $this->gitSourceApplications[] = $uuid;
+        }
+        if ($sourceMissing) {
+            $sourceLabel = match (data_get($payload, 'source.type')) {
+                'github_app' => 'GitHub App',
+                'gitlab_app' => 'GitLab App',
+                'gitea_app' => 'Gitea App',
+                default => 'git source',
+            };
+            $this->importWarnings[] = "Application {$name}: its {$sourceLabel} was not found on this instance; set the source again.";
         }
 
         // Re-link deploy key
         $appKeyUuid = data_get($payload, 'private_key_uuid');
         if ($appKeyUuid && isset($this->privateKeyMap[$appKeyUuid])) {
             $attributes['private_key_id'] = $this->privateKeyMap[$appKeyUuid]->id;
+        }
+        if (data_get($payload, 'had_private_key') && ! isset($attributes['private_key_id'])) {
+            $this->importWarnings[] = "Application {$name}: its private key was not found on this instance; select the private key again.";
         }
 
         if ($adoptMode) {
@@ -800,7 +1300,10 @@ class ServerTransferImporter
             $attributes['status'] = 'exited';
         }
 
-        $application = Application::create($attributes);
+        $application = new Application($attributes);
+        // Maintenance mode is not fillable.
+        $application->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page'])->all());
+        $application->save();
 
         $settings = (array) data_get($payload, 'settings', []);
         if ($settings !== [] && $application->settings) {
@@ -815,6 +1318,7 @@ class ServerTransferImporter
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $application, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $application, $teamId);
         $this->importPreviews(data_get($payload, 'previews', []), $application, $preserveUuids, $adoptMode, $teamId);
+        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $application, "Application {$name}");
 
         return $application;
     }
@@ -832,12 +1336,9 @@ class ServerTransferImporter
         int $teamId = 0,
     ): ?Model {
         $type = (string) data_get($payload, 'type', 'StandalonePostgresql');
-        $modelClass = self::DATABASE_MODELS[$type]
-            ?? (is_string(data_get($payload, 'model')) && class_exists((string) data_get($payload, 'model'))
-                ? (string) data_get($payload, 'model')
-                : null);
+        $modelClass = self::DATABASE_MODELS[$type] ?? null;
 
-        if (! $modelClass || ! class_exists($modelClass)) {
+        if (! $modelClass) {
             throw new RuntimeException("Unsupported database type: {$type}");
         }
 
@@ -846,9 +1347,7 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
-        if ($modelClass::withTrashed()->where('uuid', $uuid)->exists()) {
-            $uuid = new_public_id();
-        }
+        $uuid = $this->resolveResourceUuid($modelClass, $uuid, $adoptMode, 'database');
 
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type']);
@@ -878,6 +1377,7 @@ class ServerTransferImporter
             $this->importTags(data_get($payload, 'tags', []), $database, $teamId);
         }
         $this->importScheduledBackups(data_get($payload, 'scheduled_backups', []), $database, $teamId);
+        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $database, "Database {$database->name}");
 
         return $database;
     }
@@ -900,9 +1400,7 @@ class ServerTransferImporter
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
 
-        if (Service::withTrashed()->where('uuid', $uuid)->exists()) {
-            $uuid = new_public_id();
-        }
+        $uuid = $this->resolveResourceUuid(Service::class, $uuid, $adoptMode, 'service');
 
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type'], $attributes['server_id']);
@@ -913,14 +1411,19 @@ class ServerTransferImporter
         $attributes['destination_id'] = $destination->id;
         $attributes['destination_type'] = $destination->getMorphClass();
 
-        $service = Service::create($attributes);
+        $service = new Service($attributes);
+        // Maintenance mode and the Coolify default variables switch are not fillable.
+        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'])->all());
+        $service->save();
 
         $this->importEnvVars(data_get($payload, 'environment_variables', []), $service, false);
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $service, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $service, $teamId);
+        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $service, "Service {$service->name}");
 
         foreach (data_get($payload, 'applications', []) as $appPayload) {
-            $this->importServiceApplication($appPayload, $service, $preserveUuids, $adoptMode);
+            $serviceApp = $this->importServiceApplication($appPayload, $service, $preserveUuids, $adoptMode);
+            $this->serviceApplicationMap[(string) data_get($appPayload, 'uuid', $serviceApp->uuid)] = $serviceApp;
         }
 
         foreach (data_get($payload, 'databases', []) as $dbPayload) {
@@ -1033,11 +1536,16 @@ class ServerTransferImporter
                     'is_required' => (bool) data_get($variable, 'is_required', false),
                     // Exports from older versions have no flag; their values use the old escaping.
                     'uses_legacy_escaping' => (bool) data_get($variable, 'uses_legacy_escaping', true),
+                    'preserve_compose_null' => (bool) data_get($variable, 'preserve_compose_null', false),
                     'comment' => data_get($variable, 'comment'),
                     'order' => data_get($variable, 'order'),
                     'resourceable_type' => $resource->getMorphClass(),
                     'resourceable_id' => $resource->id,
                 ]);
+                // Older bundles have no version; the column default applies.
+                if (filled(data_get($variable, 'version'))) {
+                    $env->version = (string) data_get($variable, 'version');
+                }
                 $env->uuid = $uuid;
                 $env->save();
             });
@@ -1239,13 +1747,11 @@ class ServerTransferImporter
                 $uuid = new_public_id();
             }
 
-            $s3Id = null;
-            $s3Uuid = data_get($backup, 's3_storage_uuid');
-            if ($s3Uuid && isset($this->s3StorageMap[$s3Uuid])) {
-                $s3Id = $this->s3StorageMap[$s3Uuid]->id;
-            }
+            $s3Ids = $this->importedBackupS3StorageIds($backup);
+            $s3Id = $s3Ids[0] ?? null;
+            $this->warnAboutMissingS3Storage($backup, $s3Id, "database {$database->name}");
 
-            ScheduledDatabaseBackup::create([
+            $importedBackup = ScheduledDatabaseBackup::create([
                 'uuid' => $uuid,
                 'team_id' => $teamId,
                 'description' => data_get($backup, 'description'),
@@ -1262,11 +1768,43 @@ class ServerTransferImporter
                 'database_backup_retention_max_storage_s3' => data_get($backup, 'database_backup_retention_max_storage_s3'),
                 'timeout' => data_get($backup, 'timeout'),
                 'disable_local_backup' => (bool) data_get($backup, 'disable_local_backup', false),
+                'missing_backup_notification_days' => (int) data_get($backup, 'missing_backup_notification_days', 0),
                 's3_storage_id' => $s3Id,
                 'database_type' => $database->getMorphClass(),
                 'database_id' => $database->id,
             ]);
+            $importedBackup->syncS3Storages($s3Ids);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $backup
+     */
+    private function warnAboutMissingS3Storage(array $backup, ?int $s3Id, string $backupOf): void
+    {
+        if (! data_get($backup, 'had_s3_storage') || $s3Id !== null) {
+            return;
+        }
+
+        $this->importWarnings[] = data_get($backup, 'save_s3')
+            ? "Backup of {$backupOf}: S3 upload was turned off because its S3 storage was not found."
+            : "Backup of {$backupOf}: its S3 storage was not found; select it again.";
+    }
+
+    /**
+     * Maps the exported S3 destinations of a backup to imported storages, primary first. Older bundles only have
+     * `s3_storage_uuid`.
+     *
+     * @param  array<string, mixed>  $backup
+     * @return list<int>
+     */
+    private function importedBackupS3StorageIds(array $backup): array
+    {
+        $uuids = collect(data_get($backup, 's3_storage_uuids', []))
+            ->prepend(data_get($backup, 's3_storage_uuid'))
+            ->filter(fn ($uuid): bool => is_string($uuid) && isset($this->s3StorageMap[$uuid]));
+
+        return $uuids->map(fn (string $uuid): int => $this->s3StorageMap[$uuid]->id)->unique()->values()->all();
     }
 
     /**
@@ -1313,6 +1851,10 @@ class ServerTransferImporter
             'metadata' => data_get($payload, 'metadata'),
             'pull_requests' => data_get($payload, 'pull_requests'),
             'administration' => data_get($payload, 'administration'),
+            'organization_self_hosted_runners' => data_get($payload, 'organization_self_hosted_runners'),
+            'actions' => data_get($payload, 'actions'),
+            'webhook_events' => data_get($payload, 'webhook_events'),
+            'runner_group_id' => data_get($payload, 'runner_group_id'),
         ]);
         $app->uuid = $uuid;
         $app->save();
@@ -1368,6 +1910,55 @@ class ServerTransferImporter
             'public_key' => data_get($payload, 'public_key'),
             'webhook_token' => data_get($payload, 'webhook_token'),
             'deploy_key_id' => data_get($payload, 'deploy_key_id'),
+        ]);
+        $app->uuid = $uuid;
+        $app->save();
+
+        return $app;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function importGiteaApp(array $payload, int $teamId, bool $preserveUuids): GiteaApp
+    {
+        $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
+            ? (string) data_get($payload, 'uuid')
+            : new_public_id();
+
+        $existing = GiteaApp::where('uuid', $uuid)->where('team_id', $teamId)->first();
+        if ($existing) {
+            return $existing;
+        }
+        if (GiteaApp::where('uuid', $uuid)->exists()) {
+            $uuid = new_public_id();
+        }
+
+        $privateKeyId = null;
+        $keyUuid = data_get($payload, 'private_key_uuid');
+        if ($keyUuid && isset($this->privateKeyMap[$keyUuid])) {
+            $privateKeyId = $this->privateKeyMap[$keyUuid]->id;
+        }
+
+        $app = new GiteaApp;
+        $app->forceFill([
+            'team_id' => $teamId,
+            'private_key_id' => $privateKeyId,
+            'name' => data_get($payload, 'name') ?: 'Imported Gitea App',
+            'organization' => data_get($payload, 'organization'),
+            'api_url' => data_get($payload, 'api_url'),
+            'html_url' => data_get($payload, 'html_url'),
+            'custom_port' => data_get($payload, 'custom_port') ?? 22,
+            'custom_user' => data_get($payload, 'custom_user') ?? 'git',
+            'is_system_wide' => false,
+            'is_public' => (bool) data_get($payload, 'is_public', false),
+            'client_id' => data_get($payload, 'client_id'),
+            'client_secret' => data_get($payload, 'client_secret'),
+            'access_token' => data_get($payload, 'access_token'),
+            'refresh_token' => data_get($payload, 'refresh_token'),
+            'expires_at' => data_get($payload, 'expires_at'),
+            'redirect_uri' => data_get($payload, 'redirect_uri'),
+            'webhook_secret' => data_get($payload, 'webhook_secret'),
         ]);
         $app->uuid = $uuid;
         $app->save();
@@ -1451,6 +2042,222 @@ class ServerTransferImporter
     }
 
     /**
+     * A token with the same UUID in the target team is reused. A UUID that another team uses gets a new UUID.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function importIntegrationToken(array $payload, int $teamId, bool $preserveUuids): IntegrationToken
+    {
+        $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
+            ? (string) data_get($payload, 'uuid')
+            : new_public_id();
+
+        $existing = IntegrationToken::where('uuid', $uuid)->where('team_id', $teamId)->first();
+        if ($existing) {
+            return $existing;
+        }
+        if (IntegrationToken::where('uuid', $uuid)->exists()) {
+            $uuid = new_public_id();
+        }
+
+        $token = new IntegrationToken;
+        $token->forceFill([
+            'team_id' => $teamId,
+            'provider' => (string) data_get($payload, 'provider'),
+            'name' => data_get($payload, 'name') ?: 'Imported integration token',
+            'token' => (string) data_get($payload, 'token'),
+            'capabilities' => (array) data_get($payload, 'capabilities', []),
+            'metadata' => data_get($payload, 'metadata'),
+        ]);
+        $token->uuid = $uuid;
+        $token->save();
+
+        return $token;
+    }
+
+    /**
+     * The ID of the imported token, or null with a warning when the bundle names a token that it does not contain.
+     */
+    private function importedIntegrationTokenId(mixed $tokenUuid, string $missingWarning): ?int
+    {
+        if (! is_string($tokenUuid) || $tokenUuid === '') {
+            return null;
+        }
+        if (! isset($this->integrationTokenMap[$tokenUuid])) {
+            $this->importWarnings[] = $missingWarning;
+
+            return null;
+        }
+
+        return $this->integrationTokenMap[$tokenUuid]->id;
+    }
+
+    private function importSecretManagerLink(mixed $payload, Model $resource, string $label): void
+    {
+        if (! is_array($payload) || ! method_exists($resource, 'secretManagerLink')) {
+            return;
+        }
+
+        $tokenId = $this->importedIntegrationTokenId(
+            data_get($payload, 'integration_token_uuid'),
+            "{$label}: its secret manager token was not found on this instance; link the secret manager source again.",
+        );
+        if ($tokenId === null) {
+            return;
+        }
+
+        $uuid = filled(data_get($payload, 'uuid')) ? (string) data_get($payload, 'uuid') : new_public_id();
+        if (SecretManagerLink::where('uuid', $uuid)->exists()) {
+            $uuid = new_public_id();
+        }
+
+        $link = new SecretManagerLink;
+        $link->forceFill([
+            'resourceable_type' => $resource->getMorphClass(),
+            'resourceable_id' => $resource->getKey(),
+            'integration_token_id' => $tokenId,
+            'settings' => data_get($payload, 'settings'),
+        ]);
+        $link->uuid = $uuid;
+        $link->save();
+    }
+
+    /**
+     * A zone of the same token and provider zone that the target team already has is reused.
+     *
+     * @param  list<array<string, mixed>>  $zones
+     */
+    private function importDnsZones(array $zones, bool $preserveUuids): void
+    {
+        foreach ($zones as $payload) {
+            $token = $this->integrationTokenMap[(string) data_get($payload, 'integration_token_uuid')] ?? null;
+            if (! $token) {
+                continue;
+            }
+
+            $zone = DnsProviderZone::query()
+                ->where('integration_token_id', $token->id)
+                ->where('provider_zone_id', (string) data_get($payload, 'provider_zone_id'))
+                ->first();
+            if (! $zone) {
+                $uuid = $preserveUuids && filled(data_get($payload, 'uuid')) ? (string) data_get($payload, 'uuid') : new_public_id();
+                if (DnsProviderZone::where('uuid', $uuid)->exists()) {
+                    $uuid = new_public_id();
+                }
+                $zone = new DnsProviderZone;
+                $zone->forceFill([
+                    'integration_token_id' => $token->id,
+                    'provider_zone_id' => (string) data_get($payload, 'provider_zone_id'),
+                    'name' => strtolower((string) data_get($payload, 'name')),
+                    'account_id' => data_get($payload, 'account_id'),
+                    'account_name' => data_get($payload, 'account_name'),
+                ]);
+                $zone->uuid = $uuid;
+                $zone->save();
+            }
+
+            $this->dnsZoneMap[(string) data_get($payload, 'uuid', $zone->uuid)] = $zone;
+        }
+    }
+
+    /**
+     * Imports the managed DNS records and links them to the imported resources. An owned record keeps the ownership
+     * comment of the source at the provider until adoptManagedDnsRecords() replaces it.
+     *
+     * @param  list<array<string, mixed>>  $records
+     */
+    private function importManagedDnsRecords(array $records, int $teamId, bool $preserveUuids): int
+    {
+        $count = 0;
+        foreach ($records as $payload) {
+            $name = (string) data_get($payload, 'name');
+            $zone = $this->dnsZoneMap[(string) data_get($payload, 'dns_provider_zone_uuid')] ?? null;
+            $resources = collect(data_get($payload, 'references', []))
+                ->map(fn ($reference) => match (data_get($reference, 'kind')) {
+                    'application' => $this->applicationMap[(string) data_get($reference, 'uuid')] ?? null,
+                    'preview' => $this->previewMap[(string) data_get($reference, 'uuid')] ?? null,
+                    'service_application' => $this->serviceApplicationMap[(string) data_get($reference, 'uuid')] ?? null,
+                    default => null,
+                })
+                ->filter()
+                ->values();
+            if (! $zone || $resources->isEmpty()) {
+                $this->importWarnings[] = "DNS record {$name}: its DNS zone or resources were not imported, so this instance does not manage it.";
+
+                continue;
+            }
+
+            $record = ManagedDnsRecord::query()
+                ->where('dns_provider_zone_id', $zone->id)
+                ->where('provider_record_id', (string) data_get($payload, 'provider_record_id'))
+                ->first();
+            if (! $record) {
+                $uuid = $preserveUuids && filled(data_get($payload, 'uuid')) ? (string) data_get($payload, 'uuid') : new_public_id();
+                if (ManagedDnsRecord::where('uuid', $uuid)->exists()) {
+                    $uuid = new_public_id();
+                }
+                $previousComment = data_get($payload, 'ownership_comment');
+                // Without the source comment there is no proof of ownership at the provider.
+                $owned = (bool) data_get($payload, 'owned', false) && is_string($previousComment) && $previousComment !== '';
+
+                $record = ManagedDnsRecord::query()->create([
+                    'uuid' => $uuid,
+                    'team_id' => $teamId,
+                    'integration_token_id' => $zone->integration_token_id,
+                    'dns_provider_zone_id' => $zone->id,
+                    'provider_record_id' => (string) data_get($payload, 'provider_record_id'),
+                    'type' => (string) data_get($payload, 'type'),
+                    'name' => $name,
+                    'content' => (string) data_get($payload, 'content'),
+                    'owned' => $owned,
+                ]);
+                if ($owned && $previousComment !== $record->ownershipComment()) {
+                    $this->pendingDnsAdoptions[] = ['record_id' => $record->id, 'previous_comment' => $previousComment];
+                }
+                $count++;
+            }
+
+            foreach ($resources as $resource) {
+                $record->addReference($resource);
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Replaces the ownership comment of the source instance with the comment of this instance at the provider.
+     * A record that cannot be adopted is no longer owned, so this instance never changes or deletes it.
+     *
+     * @return list<string> warnings
+     */
+    private function adoptManagedDnsRecords(): array
+    {
+        $warnings = [];
+        foreach ($this->pendingDnsAdoptions as $adoption) {
+            $record = ManagedDnsRecord::query()->find($adoption['record_id']);
+            if (! $record) {
+                continue;
+            }
+
+            try {
+                $adopted = app(CloudflareDnsProvider::class)->adoptRecord($record, $adoption['previous_comment']);
+            } catch (Throwable) {
+                $adopted = false;
+            }
+            if ($adopted) {
+                continue;
+            }
+
+            $record->forceFill(['owned' => false])->save();
+            $warnings[] = "DNS record {$record->name}: this instance could not take ownership; it will not change or delete it.";
+        }
+        $this->pendingDnsAdoptions = [];
+
+        return $warnings;
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $previews
      */
     private function importPreviews(array $previews, Application $application, bool $preserveUuids, bool $adoptMode, int $teamId): void
@@ -1517,6 +2324,8 @@ class ServerTransferImporter
                 'git_type' => data_get($previewPayload, 'git_type'),
                 'docker_compose_domains' => data_get($previewPayload, 'docker_compose_domains'),
                 'docker_registry_image_tag' => data_get($previewPayload, 'docker_registry_image_tag'),
+                'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
+                'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
             ];
 
             if ($preview) {
@@ -1536,6 +2345,8 @@ class ServerTransferImporter
                 $preview->uuid = $uuid;
                 $preview->save();
             }
+
+            $this->previewMap[(string) data_get($previewPayload, 'uuid', $preview->uuid)] = $preview;
 
             // Avoid duplicating volumes when re-importing the same preview.
             if ($preview->wasRecentlyCreated || $preview->persistentStorages()->count() === 0) {
@@ -1614,13 +2425,11 @@ class ServerTransferImporter
                 $uuid = new_public_id();
             }
 
-            $s3Id = null;
-            $s3Uuid = data_get($backupPayload, 's3_storage_uuid');
-            if ($s3Uuid && isset($this->s3StorageMap[$s3Uuid])) {
-                $s3Id = $this->s3StorageMap[$s3Uuid]->id;
-            }
+            $s3Ids = $this->importedBackupS3StorageIds($backupPayload);
+            $s3Id = $s3Ids[0] ?? null;
+            $this->warnAboutMissingS3Storage($backupPayload, $s3Id, 'volume '.($volume->name ?? $volume->mount_path));
 
-            ScheduledVolumeBackup::create([
+            $importedBackup = ScheduledVolumeBackup::create([
                 'uuid' => $uuid,
                 'backupable_type' => $volume->getMorphClass(),
                 'backupable_id' => $volume->id,
@@ -1638,7 +2447,9 @@ class ServerTransferImporter
                 'retention_days_s3' => data_get($backupPayload, 'retention_days_s3'),
                 'retention_max_storage_s3' => data_get($backupPayload, 'retention_max_storage_s3'),
                 'timeout' => data_get($backupPayload, 'timeout'),
+                'missing_backup_notification_days' => (int) data_get($backupPayload, 'missing_backup_notification_days', 0),
             ]);
+            $importedBackup->syncS3Storages($s3Ids);
             $count++;
         }
 

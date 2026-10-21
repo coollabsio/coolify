@@ -5,8 +5,9 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.4.7',
-        'helper_version' => '1.0.17',
+        'version' => env('COOLIFY_VERSION') ?: '4.5.0',
+        'helper_version' => '1.0.18',
+        'railpack_version' => '0.40.1',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -49,6 +50,12 @@ return [
         'host' => env('TERMINAL_HOST'),
         'port' => env('TERMINAL_PORT'),
         'command_timeout' => 0,
+        // Docker's default detach escape for `docker attach`. Pressing this
+        // sequence (Ctrl-P, Ctrl-Q) leaves the container's main process running.
+        'detach_keys' => 'ctrl-p,ctrl-q',
+        // Recent log lines shown when a console (attach) session opens, so the
+        // screen is not blank until the next line of live output arrives.
+        'console_history_lines' => 200,
     ],
 
     'pusher' => [

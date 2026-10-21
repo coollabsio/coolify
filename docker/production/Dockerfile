@@ -1,6 +1,6 @@
 # Versions
-# Temporary: serversideup/php v4.5.1 (8.4-fpm-nginx-alpine) rebuilt on the patched PHP 8.4 release
-ARG SERVERSIDEUP_PHP_IMAGE=ghcr.io/coollabsio/serversideup-php:8.4-fpm-nginx-alpine-v4.5.1-hotfix
+# https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.0.2
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.10.3
 # https://www.postgresql.org/support/versioning/
@@ -20,7 +20,7 @@ ARG GROUP_ID=9999
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
-FROM ${SERVERSIDEUP_PHP_IMAGE} AS base
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 
 USER root
 
@@ -75,7 +75,7 @@ FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 # =================================================================
 # Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM ${SERVERSIDEUP_PHP_IMAGE} AS terminal-dependencies
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
 
 USER root
 
@@ -96,7 +96,7 @@ COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM ${SERVERSIDEUP_PHP_IMAGE}
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -169,6 +169,11 @@ RUN mkdir -p /usr/local/bin && \
 # Configure PHP
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=1
+# v5 defaults this to 0. Keep 1: app:init rebuilds the Laravel caches while php-fpm already runs.
+ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
+# v5 defaults to 256 MB with 32 MB interned strings. Every PHP CLI process has its own cache, so keep it small.
+ENV PHP_OPCACHE_MEMORY_CONSUMPTION=128
+ENV PHP_OPCACHE_INTERNED_STRINGS_BUFFER=16
 
 # Configure entrypoint
 COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d

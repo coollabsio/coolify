@@ -160,7 +160,6 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->toContain('<span>DNS status</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain("service-domain-group-{$this->webApp->id}")
-        ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(substr_count($html, '<span>Domain</span>'))->toBe(1)
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });

@@ -145,7 +145,8 @@ return [
     'subnet' => $developmentQemuInstance === null ? '192.168.122.0/24' : "10.221.{$developmentQemuSlot}.0/24",
     'prefix' => 24,
     'dns' => '1.1.1.1',
-    'memory' => 2048,
+    // MiB per VM. Many dev instances share one host, so keep this small; existing VMs get it on their next start.
+    'memory' => (int) env('DEVELOPMENT_QEMU_MEMORY', 1024),
     'vcpus' => 2,
     'disk_size' => '20G',
     'libvirt_network' => $developmentQemuInstance === null ? 'default' : "coolify-dev-{$developmentQemuSlot}",

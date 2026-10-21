@@ -324,6 +324,7 @@ class ServicesController extends Controller
                         ],
                         'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                         'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'],
+                        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'default' => true, 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                         'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the service.'],
                     ],
                 ),
@@ -391,7 +392,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'redact_all_env_values_in_logs', 'tags'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -426,6 +427,7 @@ class ServicesController extends Controller
             'urls.*.url' => ValidationPatterns::applicationDomainRules(),
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
+            'redact_all_env_values_in_logs' => 'boolean',
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
         ];
@@ -558,6 +560,9 @@ class ServicesController extends Controller
                 if ($request->has('is_container_label_escape_enabled')) {
                     $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
                 }
+                if ($request->has('redact_all_env_values_in_logs')) {
+                    $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
+                }
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
@@ -626,7 +631,7 @@ class ServicesController extends Controller
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
-            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
+            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'redact_all_env_values_in_logs', 'tags'];
 
             $validationRules = [
                 'project_uuid' => 'string|required',
@@ -645,6 +650,7 @@ class ServicesController extends Controller
                 'urls.*.url' => ValidationPatterns::applicationDomainRules(),
                 'force_domain_override' => 'boolean',
                 'is_container_label_escape_enabled' => 'boolean',
+                'redact_all_env_values_in_logs' => 'boolean',
                 'tags' => 'array|nullable',
                 'tags.*' => 'string|min:2',
             ];
@@ -760,6 +766,9 @@ class ServicesController extends Controller
             $service->connect_to_docker_network = $connectToDockerNetwork;
             if ($request->has('is_container_label_escape_enabled')) {
                 $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
+            }
+            if ($request->has('redact_all_env_values_in_logs')) {
+                $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
             }
             $service->save();
 
@@ -989,7 +998,10 @@ class ServicesController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = getContainerLogs($service->destination->server, $container['ID'], $lines, $showTimestamps);
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($service->destination->server, $container['ID'], $lines, $showTimestamps),
+            EnvironmentVariable::logRedactionSecretsFor($service),
+        );
 
         return response()->json([
             'logs' => $logs,
@@ -1137,6 +1149,7 @@ class ServicesController extends Controller
                             ],
                             'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'default' => true, 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                         ],
                     )
                 ),
@@ -1225,12 +1238,16 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
+        if ($request->has('redact_all_env_values_in_logs')) {
+            $this->authorize('manageEnvironment', $service);
+        }
+
         if ($request->boolean('instant_deploy')) {
             abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
             $this->authorize('deploy', $service);
         }
 
-        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled'];
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'redact_all_env_values_in_logs'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -1244,6 +1261,7 @@ class ServicesController extends Controller
             'urls.*.url' => ValidationPatterns::applicationDomainRules(),
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
+            'redact_all_env_values_in_logs' => 'boolean',
         ];
         $validationMessages = [
             'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
@@ -1310,6 +1328,9 @@ class ServicesController extends Controller
         }
         if ($request->has('is_container_label_escape_enabled')) {
             $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
+        }
+        if ($request->has('redact_all_env_values_in_logs')) {
+            $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
         }
         $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
         $service->save();
@@ -3416,7 +3437,7 @@ class ServicesController extends Controller
             }
 
             foreach ($sourceDatabase->scheduledBackups()->get() as $backup) {
-                $backup->replicate([
+                $newBackup = $backup->replicate([
                     'id',
                     'created_at',
                     'updated_at',
@@ -3425,7 +3446,9 @@ class ServicesController extends Controller
                     'database_id' => $database->id,
                     'database_type' => $database->getMorphClass(),
                     'team_id' => $teamId,
-                ])->save();
+                ]);
+                $newBackup->save();
+                $backup->copyS3StoragesTo($newBackup);
             }
         }
 

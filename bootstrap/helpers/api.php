@@ -2,6 +2,7 @@
 
 use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
 use App\Models\Application;
@@ -202,6 +203,7 @@ function sharedDataApplications(?Application $application = null): array
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
@@ -211,9 +213,13 @@ function sharedDataApplications(?Application $application = null): array
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
         'gpu_driver' => 'string|nullable',
-        'gpu_count' => 'string|nullable',
+        'gpu_count' => ['string', 'nullable', 'regex:'.ApplicationSetting::GPU_COUNT_PATTERN],
         'gpu_device_ids' => 'string|nullable',
-        'gpu_options' => 'string|nullable',
+        'gpu_options' => ['string', 'nullable', function (string $attribute, mixed $value, Closure $fail): void {
+            if (ApplicationSetting::parseGpuOptions($value) === null) {
+                $fail('The gpu_options must be key=value pairs or a YAML mapping.');
+            }
+        }],
         'is_consistent_container_name_enabled' => 'boolean',
         'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
@@ -283,6 +289,10 @@ function sharedDataApplications(?Application $application = null): array
         'docker_compose_custom_build_command' => ValidationPatterns::shellSafeCommandRules(),
         'is_container_label_escape_enabled' => 'boolean',
         'is_preserve_repository_enabled' => 'boolean',
+        'http_basic_auth_hash_algorithm' => Rule::enum(HttpBasicAuthHashAlgorithm::class),
+        'http_basic_auth_bcrypt_cost' => 'integer|min:4|max:14',
+        'http_basic_auth_argon2id_memory_cost' => 'integer|min:8192|max:262144',
+        'http_basic_auth_argon2id_time_cost' => 'integer|min:1|max:12',
     ];
 }
 
@@ -474,6 +484,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('disable_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
+    $request->offsetUnset('redact_all_env_values_in_logs');
     $request->offsetUnset('is_pr_deployments_public_enabled');
     $request->offsetUnset('stop_grace_period');
     $request->offsetUnset('docker_images_to_keep');

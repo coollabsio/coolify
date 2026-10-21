@@ -145,5 +145,13 @@ class AppServiceProvider extends ServiceProvider
 
             return $access_token ? $client->withToken($access_token) : $client;
         });
+
+        Http::macro('Gitea', function (string $api_url, ?string $access_token = null) {
+            $client = Http::GitSource($api_url)->withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+
+            return $access_token ? $client->withToken($access_token) : $client;
+        });
     }
 }

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\Server;
+use App\Rules\ValidServerIp;
 use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
-use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
 use Illuminate\Http\JsonResponse;
@@ -18,17 +20,14 @@ use Throwable;
 class ServerTransferController extends Controller
 {
     public function __construct(
-        private ServerTransferExporter $exporter,
         private ServerTransferImporter $importer,
         private ServerTransferClaimer $claimer,
         private ServerTransferMigrator $migrator,
-    ) {
-        abort_unless(isDev(), 404);
-    }
+    ) {}
 
     #[OA\Post(
         summary: 'Migrate server to another Coolify instance',
-        description: 'One-shot handoff: export this server, import+claim on the target instance (using the provided token), then disable automations here. Requires read:sensitive and write.',
+        description: 'Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. Follow the progress with GET /servers/{uuid}/transfer. The target URL must use https. Requires read:sensitive and write.',
         path: '/servers/{uuid}/migrate',
         operationId: 'migrate-server-between-instances',
         security: [['bearerAuth' => []]],
@@ -43,13 +42,11 @@ class ServerTransferController extends Controller
                 properties: [
                     new OA\Property(property: 'target_url', type: 'string', example: 'https://coolify-b.example.com'),
                     new OA\Property(property: 'target_token', type: 'string', description: 'API token on the target instance (root or write)'),
-                    new OA\Property(property: 'preserve_uuids', type: 'boolean', default: true),
-                    new OA\Property(property: 'adopt_mode', type: 'boolean', default: true),
                 ]
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: 'Migrated'),
+            new OA\Response(response: 202, description: 'Transfer started'),
             new OA\Response(response: 403, description: 'Missing sensitive permission'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, description: 'Validation or remote import failed'),
@@ -83,10 +80,8 @@ class ServerTransferController extends Controller
         $validator = customApiValidator($request->all(), [
             'target_url' => 'required|string|url',
             'target_token' => 'required|string',
-            'preserve_uuids' => 'boolean|nullable',
-            'adopt_mode' => 'boolean|nullable',
         ]);
-        $allowedFields = ['target_url', 'target_token', 'preserve_uuids', 'adopt_mode'];
+        $allowedFields = ['target_url', 'target_token'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
@@ -101,57 +96,50 @@ class ServerTransferController extends Controller
         }
 
         try {
-            $result = $this->migrator->migrate(
+            $this->migrator->start(
                 server: $server,
                 targetUrl: $request->string('target_url')->toString(),
                 targetToken: $request->string('target_token')->toString(),
-                preserveUuids: $request->boolean('preserve_uuids', true),
-                adoptMode: $request->boolean('adopt_mode', true),
             );
         } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        $server->refresh();
         auditLog('api.server.migrate', [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
-            'export_id' => $result['export_id'],
-            'target_url' => $result['target_url'],
+            'target_url' => data_get($server->server_metadata, 'migration.target_url'),
         ]);
 
-        return response()->json($result);
+        return response()->json([
+            'server_uuid' => $server->uuid,
+            'migration' => data_get($server->server_metadata, 'migration'),
+            'message' => 'Transfer started. Follow it with GET /api/v1/servers/'.$server->uuid.'/transfer.',
+        ], 202);
     }
 
     #[OA\Get(
-        summary: 'Export server transfer bundle',
-        description: 'Export a server and all resources hosted on it as a versioned transfer bundle for moving between Coolify instances. Requires read:sensitive.',
-        path: '/servers/{uuid}/export',
-        operationId: 'export-server-transfer-bundle',
+        summary: 'Get server transfer status',
+        description: 'Show the transfer state of a server on this instance: the import/claim state (transfer) and the state of a running or finished transfer to another instance (migration).',
+        path: '/servers/{uuid}/transfer',
+        operationId: 'get-server-transfer-status',
         security: [['bearerAuth' => []]],
         tags: ['Servers'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'encrypt', in: 'query', required: false, description: 'If true and passphrase is provided, return an encrypted envelope.', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'passphrase', in: 'query', required: false, description: 'Passphrase used when encrypt=true.', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Transfer bundle'),
+            new OA\Response(response: 200, description: 'Transfer status'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Missing sensitive permission'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
-    public function export(Request $request, string $uuid): JsonResponse
+    public function status(string $uuid): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
-        }
-
-        if (! $this->canReadSensitive($request)) {
-            return response()->json([
-                'message' => 'Exporting a server requires a token with read:sensitive (or root) ability and an admin/owner team role.',
-            ], 403);
         }
 
         $server = Server::whereTeamId($teamId)->whereUuid($uuid)->first();
@@ -161,25 +149,106 @@ class ServerTransferController extends Controller
 
         $this->authorize('view', $server);
 
-        try {
-            $bundle = $this->exporter->export($server, includeSensitive: true);
-        } catch (Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        auditLog('api.server.export', [
-            'team_id' => $teamId,
+        return response()->json([
             'server_uuid' => $server->uuid,
-            'export_id' => data_get($bundle, 'export_id'),
+            'transfer' => collect((array) data_get($server->server_metadata, 'transfer', []))
+                ->only(['status', 'export_id', 'imported_at', 'claimed_at', 'transferred_at', 'target_instance_url'])
+                ->all(),
+            'migration' => data_get($server->server_metadata, 'migration'),
         ]);
+    }
 
-        if ($request->boolean('encrypt') && $request->filled('passphrase')) {
-            return response()->json(
-                ServerTransferBundle::encryptWithPassphrase($bundle, $request->string('passphrase')->toString())
-            );
+    #[OA\Get(
+        summary: 'Check server import',
+        description: 'Check that this instance can import a server, before the source instance starts the transfer. It checks the token, the bundle version, the server limit, servers with the same UUID or IP, and that this instance can reach the SSH port of the server.',
+        path: '/servers/import/check',
+        operationId: 'check-server-import',
+        security: [['bearerAuth' => []]],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'server_uuid', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'ip', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'port', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 22)),
+            new OA\Parameter(name: 'schema_version', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'system_github_apps[]', in: 'query', required: false, description: 'UUIDs of system-wide GitHub Apps that the server uses. The response lists the ones this instance does not have.', schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'))),
+            new OA\Parameter(name: 'system_gitlab_apps[]', in: 'query', required: false, description: 'UUIDs of system-wide GitLab Apps that the server uses. The response lists the ones this instance does not have.', schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'))),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'The server can be imported. Lists every check with its result.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 422, description: 'One or more checks failed. Lists every check with its result.'),
+        ]
+    )]
+    public function check(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
         }
 
-        return response()->json($bundle);
+        $this->authorize('create', Server::class);
+
+        $validator = customApiValidator($request->query(), [
+            'server_uuid' => 'required|string',
+            'ip' => ['required', 'string', new ValidServerIp],
+            'port' => 'nullable|integer|between:1,65535',
+            'schema_version' => 'nullable|integer',
+            'system_github_apps' => 'nullable|array|max:100',
+            'system_github_apps.*' => 'string|max:64',
+            'system_gitlab_apps' => 'nullable|array|max:100',
+            'system_gitlab_apps.*' => 'string|max:64',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // System-wide git sources are not transferred. Applications re-link only to one with the same uuid here.
+        $missingSystemSources = [
+            'github' => array_values(array_diff((array) $request->query('system_github_apps', []), GithubApp::query()->where('is_system_wide', true)->whereIn('uuid', (array) $request->query('system_github_apps', []))->pluck('uuid')->all())),
+            'gitlab' => array_values(array_diff((array) $request->query('system_gitlab_apps', []), GitlabApp::query()->where('is_system_wide', true)->whereIn('uuid', (array) $request->query('system_gitlab_apps', []))->pluck('uuid')->all())),
+        ];
+
+        $schemaVersion = (int) $request->query('schema_version', ServerTransferBundle::SCHEMA_VERSION);
+        $ip = trim((string) $request->query('ip'));
+        $port = (int) $request->query('port', 22);
+
+        // The target connects to the server over SSH when it takes over management, so an unreachable
+        // server would leave an imported server here that this instance cannot manage.
+        $connection = @fsockopen($ip, $port, timeout: 5);
+        if ($connection !== false) {
+            fclose($connection);
+        }
+
+        $checks = [
+            [
+                'label' => 'the transfer bundle version is supported',
+                'ok' => $schemaVersion === ServerTransferBundle::SCHEMA_VERSION,
+                'message' => $schemaVersion === ServerTransferBundle::SCHEMA_VERSION ? null
+                    : 'This instance reads transfer bundle version '.ServerTransferBundle::SCHEMA_VERSION.", but the source sends version {$schemaVersion}. Upgrade both instances to the same Coolify version.",
+            ],
+            ...collect($this->importer->importChecks((string) $request->query('server_uuid'), $ip, $teamId))
+                ->map(fn (array $check) => collect($check)->only(['label', 'ok', 'message'])->all())
+                ->all(),
+            [
+                'label' => "the target can reach the SSH port of the server ({$ip}:{$port})",
+                'ok' => $connection !== false,
+                'message' => $connection !== false ? null
+                    : "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
+            ],
+        ];
+
+        $failed = collect($checks)->where('ok', false);
+
+        return response()->json([
+            'message' => $failed->isEmpty()
+                ? 'This instance can import the server.'
+                : $failed->pluck('message')->implode(' '),
+            'checks' => $checks,
+            'missing_system_sources' => $missingSystemSources,
+        ], $failed->isEmpty() ? 200 : 422);
     }
 
     #[OA\Post(
@@ -193,8 +262,7 @@ class ServerTransferController extends Controller
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'bundle', type: 'object', description: 'Plain or encrypted transfer bundle'),
-                    new OA\Property(property: 'passphrase', type: 'string', nullable: true),
+                    new OA\Property(property: 'bundle', type: 'object', description: 'Transfer bundle'),
                     new OA\Property(property: 'dry_run', type: 'boolean', default: false),
                     new OA\Property(property: 'preserve_uuids', type: 'boolean', default: true),
                     new OA\Property(property: 'adopt_mode', type: 'boolean', default: true, description: 'Import without forcing redeploy; keep statuses for adoption'),
@@ -225,12 +293,11 @@ class ServerTransferController extends Controller
 
         $validator = customApiValidator($request->all(), [
             'bundle' => 'required|array',
-            'passphrase' => 'string|nullable',
             'dry_run' => 'boolean|nullable',
             'preserve_uuids' => 'boolean|nullable',
             'adopt_mode' => 'boolean|nullable',
         ]);
-        $allowedFields = ['bundle', 'passphrase', 'dry_run', 'preserve_uuids', 'adopt_mode'];
+        $allowedFields = ['bundle', 'dry_run', 'preserve_uuids', 'adopt_mode'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
@@ -244,34 +311,21 @@ class ServerTransferController extends Controller
             ], 422);
         }
 
-        $bundle = $request->input('bundle', []);
-        if (data_get($bundle, 'encrypted')) {
-            if (! $request->filled('passphrase')) {
-                return response()->json(['message' => 'Passphrase is required for encrypted bundles.'], 422);
-            }
-            try {
-                $bundle = ServerTransferBundle::decryptWithPassphrase($bundle, $request->string('passphrase')->toString());
-            } catch (Throwable $e) {
-                return response()->json(['message' => $e->getMessage()], 422);
-            }
-        }
-
         try {
             $result = $this->importer->import(
-                bundle: $bundle,
+                bundle: $request->input('bundle', []),
                 teamId: $teamId,
                 dryRun: $request->boolean('dry_run', false),
                 preserveUuids: $request->boolean('preserve_uuids', true),
                 adoptMode: $request->boolean('adopt_mode', true),
             );
         } catch (Throwable $e) {
-            $status = $e instanceof ValidationException ? 422 : 422;
             $payload = ['message' => $e->getMessage()];
             if ($e instanceof ValidationException) {
                 $payload['errors'] = $e->errors();
             }
 
-            return response()->json($payload, $status);
+            return response()->json($payload, 422);
         }
 
         auditLog('api.server.import', [
@@ -286,7 +340,7 @@ class ServerTransferController extends Controller
 
     #[OA\Post(
         summary: 'Mark server transferred',
-        description: 'Source-instance step: disable automations after a successful export/import handoff.',
+        description: 'Source-instance recovery step: disable automations here when the target already manages the server but the transfer could not finish on this instance.',
         path: '/servers/{uuid}/transfer/complete',
         operationId: 'complete-server-transfer',
         security: [['bearerAuth' => []]],
@@ -349,77 +403,6 @@ class ServerTransferController extends Controller
         ]);
 
         return response()->json($result);
-    }
-
-    #[OA\Post(
-        summary: 'Write transfer bundle to server mailbox',
-        description: 'Write an export bundle to /data/coolify/exports on the managed host for air-gapped import.',
-        path: '/servers/{uuid}/export/mailbox',
-        operationId: 'export-server-transfer-mailbox',
-        security: [['bearerAuth' => []]],
-        tags: ['Servers'],
-        parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
-        requestBody: new OA\RequestBody(
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'passphrase', type: 'string', nullable: true),
-                ]
-            )
-        ),
-        responses: [
-            new OA\Response(response: 200, description: 'Mailbox write result'),
-            new OA\Response(response: 403, description: 'Missing sensitive permission'),
-            new OA\Response(response: 404, ref: '#/components/responses/404'),
-        ]
-    )]
-    public function writeMailbox(Request $request, string $uuid): JsonResponse
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-
-        if (! $this->canReadSensitive($request)) {
-            return response()->json([
-                'message' => 'Writing a transfer mailbox requires read:sensitive (or root) ability and an admin/owner team role.',
-            ], 403);
-        }
-
-        $server = Server::whereTeamId($teamId)->whereUuid($uuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-
-        $this->authorize('view', $server);
-
-        try {
-            $bundle = $this->exporter->export($server, includeSensitive: true);
-            $result = $this->claimer->writeMailbox(
-                $server,
-                $bundle,
-                $request->filled('passphrase') ? $request->string('passphrase')->toString() : null,
-            );
-        } catch (Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        auditLog('api.server.export_mailbox', [
-            'team_id' => $teamId,
-            'server_uuid' => $server->uuid,
-            'export_id' => data_get($bundle, 'export_id'),
-            'path' => $result['path'],
-        ]);
-
-        return response()->json([
-            'export_id' => data_get($bundle, 'export_id'),
-            'path' => $result['path'],
-            'written' => $result['written'],
-            'message' => $result['written']
-                ? 'Transfer bundle written to server mailbox.'
-                : 'Failed to write mailbox on remote host.',
-        ], $result['written'] ? 200 : 422);
     }
 
     private function canReadSensitive(Request $request): bool

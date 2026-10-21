@@ -205,7 +205,7 @@ test('cloudflare dns scope guidance and token creation link are shown', function
         ->set('capabilities', ['dns'])
         ->assertSee('Zone - DNS - Edit')
         ->assertSee('Zone - Zone - Read')
-        ->assertSeeHtml('https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management');
+        ->assertSeeHtml(e(IntegrationToken::cloudflareTokenTemplateUrl(['dns'])));
 });
 
 test('saved integration token rows render modal editors with a gear button', function () {
@@ -502,3 +502,21 @@ test('a request timeout outside 1 to 300 seconds is rejected', function (string 
 
     Http::assertNothingSent();
 })->with(['0', '301', 'abc']);
+
+test('the token list shows its empty state after the editor deletes the last token', function () {
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'secret',
+        'capabilities' => ['dns'],
+    ]);
+    $list = Livewire::test(IntegrationTokens::class)->assertDontSee('No integration tokens');
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->call('delete')
+        ->assertDispatched('integration-token-deleted', uuid: $token->uuid);
+
+    $list->dispatch('integration-token-deleted', uuid: $token->uuid)
+        ->assertSee('No integration tokens');
+});

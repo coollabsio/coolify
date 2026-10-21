@@ -1,5 +1,5 @@
 <div x-data
-    x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif">
+    x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif @if ($server->hostinger_virtual_machine_id && $server->cloudProviderToken && !$hostingerVirtualMachineStatus) $wire.checkHostingerVirtualMachineStatus(); @endif">
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(24) }} | Server | Coolify
     </x-slot>
@@ -18,23 +18,26 @@
                         filled($server->hetzner_server_id) => 'Hetzner',
                         filled($server->digitalocean_droplet_id) => 'DigitalOcean',
                         filled($server->vultr_instance_id) => 'Vultr',
+                        filled($server->hostinger_virtual_machine_id) => 'Hostinger',
                         default => null,
                     };
                     $providerStatus = match ($provider) {
                         'Hetzner' => $hetznerServerStatus,
                         'DigitalOcean' => $digitalOceanDropletStatus,
                         'Vultr' => $vultrInstanceStatus,
+                        'Hostinger' => $hostingerVirtualMachineStatus,
                         default => null,
                     };
                     $providerStatusType = match (true) {
                         in_array($providerStatus, ['running', 'active']) => 'success',
-                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new']) => 'warning',
-                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted']) => 'error',
+                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'initial', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
+                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted', 'destroyed', 'error']) => 'error',
                         default => 'neutral',
                     };
                     $hasLinkableCloudProviders = (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
                         || (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
-                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty());
+                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty())
+                        || (!$server->hostinger_virtual_machine_id && $availableHostingerTokens->isNotEmpty());
                     $hetznerMatch = $matchedHetznerServer
                         ? [
                             'name' => $matchedHetznerServer['name'] ?? 'Hetzner server',
@@ -56,6 +59,13 @@
                             'status' => $matchedVultrInstance['status'] ?? null,
                         ]
                         : null;
+                    $hostingerMatch = $matchedHostingerVirtualMachine
+                        ? [
+                            'name' => $matchedHostingerVirtualMachine['hostname'] ?? 'Hostinger VPS',
+                            'id' => $matchedHostingerVirtualMachine['id'] ?? null,
+                            'status' => $matchedHostingerVirtualMachine['state'] ?? null,
+                        ]
+                        : null;
                 @endphp
 
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
@@ -65,6 +75,14 @@
 
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies, reaches, and validates this server.">
+                        <x-slot:badges>
+                            @if ($server->isTransferredAway())
+                                <x-status-badge label="Transferred away" type="warning" />
+                            @else
+                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @endif
+                        </x-slot:badges>
                         <x-slot:actions>
                             @if ($hasLinkableCloudProviders)
                                 <div x-data="{ open: false }" class="relative" @click.outside="open = false">
@@ -107,6 +125,18 @@
                                                 :searchError="$vultrSearchError" :noMatch="$vultrNoMatchFound"
                                                 :matched="$vultrMatch" />
                                         @endif
+                                        @if (!$server->hostinger_virtual_machine_id && $availableHostingerTokens->isNotEmpty())
+                                            <x-server.provider-link-modal :server="$server" provider="hostinger"
+                                                providerLabel="Hostinger" tokenModel="selectedHostingerTokenId"
+                                                :tokens="$availableHostingerTokens"
+                                                manualModel="manualHostingerVirtualMachineId"
+                                                manualLabel="Virtual Machine ID" manualPlaceholder="17923"
+                                                searchByIdMethod="searchHostingerVirtualMachineById"
+                                                searchByIpMethod="searchHostingerVirtualMachine"
+                                                linkMethod="linkToHostinger"
+                                                :searchError="$hostingerSearchError" :noMatch="$hostingerNoMatchFound"
+                                                :matched="$hostingerMatch" />
+                                        @endif
                                     </div>
                                 </div>
                             @endif
@@ -125,63 +155,48 @@
                                     </x-forms.button>
                                 </x-process-dialog>
                             @endif
-                            @if (isDev())
-                                <div wire:key="server-management-{{ $server->isTransferredAway() ? 'enable' : 'disable' }}">
-                                    @if ($server->isTransferredAway())
-                                        <x-modal-confirmation title="Enable management on this instance?"
-                                            submitAction="toggleManagement" :confirmWithText="false"
-                                            :confirmWithPassword="false" step2ButtonText="Enable management"
-                                            warningMessage="Before you continue, disable this server on every other Coolify instance. Two active instances can cause conflicting deployments, proxy changes, backups, and restarts."
-                                            :actions="['This instance will run deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server.']">
-                                            <x-slot:trigger>
-                                                <x-forms.button type="button" canGate="update" :canResource="$server">
-                                                    <x-reicon name="play-circle" class="size-3.5" />
-                                                    Enable management
-                                                </x-forms.button>
-                                            </x-slot:trigger>
-                                        </x-modal-confirmation>
-                                    @else
-                                        <x-modal-confirmation title="Disable management on this instance?"
-                                            submitAction="toggleManagement" :confirmWithText="false"
-                                            :confirmWithPassword="false" step2ButtonText="Disable management"
-                                            :actions="[
-                                                'Deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring will stop on this instance for this server.',
-                                                'Existing workloads continue to run on the server.',
-                                            ]">
-                                            <x-slot:trigger>
-                                                <x-forms.button type="button" canGate="update" :canResource="$server">
-                                                    <x-reicon name="stop-circle" class="size-3.5" />
-                                                    Disable management
-                                                </x-forms.button>
-                                            </x-slot:trigger>
-                                        </x-modal-confirmation>
-                                    @endif
-                                </div>
-                            @endif
-                            @if (isDev() && $server->isTransferredAway())
-                                @unless ($server->isManagementDisabled())
-                                    <x-status-badge label="Transferred away" type="warning" />
-                                @endunless
-                            @else
-                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @if ($server->isTransferredAway() && ! $server->isLocalhost())
+                                @php
+                                    $transferTarget = data_get($server->server_metadata, 'transfer.target_instance_url') ?: 'another Coolify instance';
+                                    $transferredAt = data_get($server->server_metadata, 'transfer.transferred_at');
+                                    $transferredAt = $transferredAt ? \Illuminate\Support\Carbon::parse($transferredAt)->toDayDateTimeString().' UTC' : 'the transfer';
+                                @endphp
+                                <x-modal-confirmation title="Take back a transferred server?"
+                                    submitAction="enableManagement" :confirmWithPassword="false"
+                                    temporaryDisableTwoStepConfirmation
+                                    step2ButtonText="I understand, enable management"
+                                    :confirmationText="$server->name"
+                                    confirmationLabel="Enter the server name to take the server back."
+                                    shortConfirmationLabel="Server name"
+                                    :warningMessage="'<strong>Changes made on '.e($transferTarget).' after '.e($transferredAt).' are lost.</strong> This instance uses its copy of the settings and resources from the time of the transfer. Use this only when '.e($transferTarget).' is lost or cannot transfer the server back. Otherwise use Transfer back, which keeps those changes.'"
+                                    :actions="[
+                                        'This instance starts to run deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server again.',
+                                        'The server records that this instance owns it. The next time the other instance connects to the server, it stops managing it automatically.',
+                                        'Sentinel on the server is reconfigured to send its data to this instance.',
+                                        'This instance takes back its DNS records and shows the steps that finish the take back: webhooks, DNS, Sentinel, backups, and runners.',
+                                    ]">
+                                    <x-slot:trigger>
+                                        <x-forms.button type="button" isError canGate="update" :canResource="$server">
+                                            <x-reicon name="alert-triangle" class="size-3.5" />
+                                            Enable management
+                                        </x-forms.button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
                             @endif
                         </x-slot:actions>
 
-                        @if (isDev() && $server->isManagementDisabled())
-                            <x-callout type="warning" title="Transferable to another instance" class="mb-4">
-                                Management of this server is disabled on this Coolify instance. You can now
-                                <a href="{{ route('server.transfer', ['server_uuid' => $server->uuid]) }}"
-                                    {{ wireNavigate() }} class="underline">transfer it to another instance</a>, or enable
-                                management again to manage it here.
-                            </x-callout>
-                        @elseif (isDev() && $server->isTransferredAway())
-                            <x-callout type="warning" title="Transferred to another instance" class="mb-4">
-                                This server was migrated away from this Coolify instance. It cannot be revalidated or
-                                managed here. Use the target instance, or delete this server when you no longer need the
-                                archive.
+                        @if ($server->isTransferredAway())
+                            <x-callout type="danger" title="Transferred to another instance" class="mb-4">
+                                This server was transferred to
+                                <strong>{{ data_get($server->server_metadata, 'transfer.target_instance_url') ?: 'another Coolify instance' }}</strong>,
+                                which manages it now. Use that instance. To undo the transfer, use
+                                <a href="{{ route('server.transfer', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                                    class="underline">Transfer back</a>. Keep this archive until you are sure: it is the copy
+                                that an undo uses.
                             </x-callout>
                         @endif
+
+                        <livewire:server.transfer-finish :server="$server" :key="'transfer-finish-'.$server->uuid" />
 
                         @if ($this->limaStartCommand)
                             <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
@@ -272,6 +287,12 @@
                                         title="Refresh provider status">
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </x-forms.button>
+                                @elseif ($provider === 'Hostinger')
+                                    <x-forms.button type="button" class="size-8! px-0!"
+                                        wire:click.prevent="checkHostingerVirtualMachineStatus(true)"
+                                        title="Refresh provider status">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                    </x-forms.button>
                                 @endif
                                 @if ($server->cloudProviderToken)
                                     @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
@@ -292,12 +313,12 @@
                                     @endif
                                 @endif
                             @endif
-                            @if ($server->server_metadata)
-                                <x-forms.button type="button" class="size-8! px-0!"
-                                    wire:click="refreshServerMetadata" title="Refresh server details">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                </x-forms.button>
-                            @endif
+                            <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                :disabled="! $server->isFunctional()"
+                                :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                {{ $server->server_metadata ? 'Refresh details' : 'Fetch server details' }}
+                            </x-forms.button>
                         </x-slot:actions>
 
                         <div class="flex items-start gap-3">
@@ -310,9 +331,7 @@
                                     {{ $server->name }}
                                 </p>
                                 <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                                    @if (isDev() && $server->isManagementDisabled())
-                                        Management is disabled on this Coolify instance. You can transfer this server to another instance.
-                                    @elseif (isDev() && $server->isTransferredAway())
+                                    @if ($server->isTransferredAway())
                                         This server was migrated away from this Coolify instance and cannot be managed here.
                                     @elseif ($server->isFunctional())
                                         The server is reachable, validated, and ready to host resources.
@@ -325,13 +344,6 @@
 
                         @if ($server->server_metadata)
                             @include('livewire.server.partials.server-details', ['server' => $server])
-                        @else
-                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Fetch server details
-                                </x-forms.button>
-                            </div>
                         @endif
                     </x-application.settings-section>
 

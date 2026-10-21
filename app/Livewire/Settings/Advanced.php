@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
+use App\Services\FileDownloadStorageService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -42,6 +43,9 @@ class Advanced extends Component
     public bool $disable_two_step_confirmation;
 
     #[Validate('boolean')]
+    public bool $is_passkey_enabled;
+
+    #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
     #[Validate('boolean')]
@@ -60,6 +64,8 @@ class Advanced extends Component
 
     public array $avatar_storage_options = [];
 
+    public string $file_download_storage = 'stream';
+
     public function rules()
     {
         return [
@@ -72,6 +78,7 @@ class Advanced extends Component
             'allowed_ips' => ['nullable', 'string', new ValidIpOrCidr],
             'is_sponsorship_popup_enabled' => 'boolean',
             'disable_two_step_confirmation' => 'boolean',
+            'is_passkey_enabled' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
             'is_mcp_server_enabled' => 'boolean',
             'webhook_allowed_internal_hosts' => 'nullable|string',
@@ -95,6 +102,7 @@ class Advanced extends Component
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
+        $this->is_passkey_enabled = $this->settings->is_passkey_enabled ?? true;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
@@ -118,6 +126,9 @@ class Advanced extends Component
                     'label' => $storage->name.' (S3)',
                 ])->all(),
         ];
+        $this->file_download_storage = $this->settings->file_download_s3_storage_id
+            ? 's3:'.$this->settings->file_download_s3_storage_id
+            : 'stream';
     }
 
     public function submit()
@@ -216,12 +227,14 @@ class Advanced extends Component
             $this->settings->allowed_ips = $this->allowed_ips;
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
+            $this->settings->is_passkey_enabled = $this->is_passkey_enabled;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
             $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
+            $this->saveFileDownloadStorageSetting();
             $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
@@ -250,6 +263,48 @@ class Advanced extends Component
 
         $this->settings->avatar_storage_type = 's3';
         $this->settings->avatar_s3_storage_id = $storage->id;
+    }
+
+    /**
+     * Selecting a storage adds the auto-delete lifecycle rule to its bucket.
+     * The setting is refused when the bucket is listable by anonymous users
+     * or does not accept the rule.
+     */
+    private function saveFileDownloadStorageSetting(): void
+    {
+        if ($this->file_download_storage === 'stream') {
+            $this->settings->file_download_s3_storage_id = null;
+
+            return;
+        }
+
+        $storageId = (int) str($this->file_download_storage)->after('s3:')->value();
+        if ($storageId === $this->settings->file_download_s3_storage_id) {
+            return;
+        }
+
+        $storage = S3Storage::query()
+            ->whereTeamId(0)
+            ->where('is_usable', true)
+            ->find($storageId);
+
+        if (! $storage || $this->file_download_storage !== 's3:'.$storage->id) {
+            $this->file_download_storage = 'stream';
+            throw new \InvalidArgumentException('The selected file download storage is not available.');
+        }
+
+        try {
+            $downloads = app(FileDownloadStorageService::class);
+            $downloads->ensureBucketIsPrivate($storage);
+            $downloads->ensureLifecycleRule($storage);
+        } catch (\RuntimeException $e) {
+            $this->file_download_storage = $this->settings->file_download_s3_storage_id
+                ? 's3:'.$this->settings->file_download_s3_storage_id
+                : 'stream';
+            throw $e;
+        }
+
+        $this->settings->file_download_s3_storage_id = $storage->id;
     }
 
     public function clearDomainConnectPrivateKey(): void

@@ -93,6 +93,6 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
             $payload['message_thread_id'] = $this->threadId;
         }
 
-        return Http::post($url, $payload);
+        return $this->sendNotificationRequest('Telegram', $url, fn () => Http::post($url, $payload));
     }
 }

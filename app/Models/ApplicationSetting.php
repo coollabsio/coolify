@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Application settings.',
@@ -45,6 +47,7 @@ use OpenApi\Attributes as OA;
         'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
         'use_build_secrets' => ['type' => 'boolean'],
+        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'inject_build_args_to_dockerfile' => ['type' => 'boolean'],
         'include_source_commit_in_build' => ['type' => 'boolean'],
         'docker_images_to_keep' => ['type' => 'integer'],
@@ -58,6 +61,8 @@ class ApplicationSetting extends Model
      * 63 character DNS label limit, with room for a longer suffix in the future.
      */
     public const MAX_CONTAINER_NAME_PREFIX_LENGTH = 30;
+
+    public const GPU_COUNT_PATTERN = '/^(all|\d+)$/';
 
     protected $casts = [
         'is_static' => 'boolean',
@@ -91,6 +96,7 @@ class ApplicationSetting extends Model
         'connect_to_docker_network' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
         'include_coolify_default_variables' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
         'disable_build_cache' => 'boolean',
     ];
 
@@ -131,6 +137,7 @@ class ApplicationSetting extends Model
         'is_git_shallow_clone_enabled',
         'is_pr_deployments_public_enabled',
         'use_build_secrets',
+        'redact_all_env_values_in_logs',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
         'docker_images_to_keep',
@@ -168,6 +175,81 @@ class ApplicationSetting extends Model
         }
 
         return $this->stopGracePeriodSeconds();
+    }
+
+    /**
+     * The compose device request (deploy.resources.reservations.devices item) for the GPU settings.
+     * A count wins over device IDs. Options that cannot be parsed are left out.
+     *
+     * @return array{capabilities: list<string>, driver?: string, count?: int|string, device_ids?: list<string>, options?: array<string, string>}
+     */
+    public function gpuDeviceReservation(): array
+    {
+        $device = ['capabilities' => ['gpu']];
+        $driver = trim((string) $this->gpu_driver);
+        if ($driver !== '') {
+            $device['driver'] = $driver;
+        }
+
+        $count = trim((string) $this->gpu_count);
+        $deviceIds = str((string) $this->gpu_device_ids)->explode(',')->map(fn (string $id) => trim($id))->filter(fn (string $id) => $id !== '')->values()->all();
+        if ($count !== '') {
+            $device['count'] = $count === 'all' ? 'all' : (int) $count;
+        } elseif ($deviceIds !== []) {
+            $device['device_ids'] = $deviceIds;
+        }
+
+        $options = self::parseGpuOptions($this->gpu_options);
+        if ($options) {
+            $device['options'] = $options;
+        }
+
+        return $device;
+    }
+
+    /**
+     * Parse GPU driver options written as a YAML/JSON mapping or as key=value pairs, one per line.
+     *
+     * @return array<string, string>|null null when the value is not a flat mapping
+     */
+    public static function parseGpuOptions(?string $options): ?array
+    {
+        $options = trim((string) $options);
+        if ($options === '') {
+            return [];
+        }
+
+        try {
+            $parsed = Yaml::parse($options);
+        } catch (ParseException) {
+            $parsed = null;
+        }
+        if (is_array($parsed) && $parsed !== [] && ! array_is_list($parsed)) {
+            $mapping = [];
+            foreach ($parsed as $key => $value) {
+                if (! is_scalar($value)) {
+                    return null;
+                }
+                $mapping[(string) $key] = is_bool($value) ? ($value ? 'true' : 'false') : (string) $value;
+            }
+
+            return $mapping;
+        }
+
+        $mapping = [];
+        foreach (preg_split('/\R/', $options) as $pair) {
+            $pair = trim($pair);
+            if ($pair === '') {
+                continue;
+            }
+            [$key, $value] = array_pad(explode('=', $pair, 2), 2, null);
+            if ($value === null || trim($key) === '') {
+                return null;
+            }
+            $mapping[trim($key)] = trim($value);
+        }
+
+        return $mapping;
     }
 
     public function isStatic(): Attribute

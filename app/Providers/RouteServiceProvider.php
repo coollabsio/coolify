@@ -74,6 +74,10 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
 
+        RateLimiter::for('passkeys', function (Request $request) {
+            return Limit::perMinute(30)->by('passkeys:'.auth_rate_limit_ip($request));
+        });
+
         RateLimiter::for('forgot-password', function (Request $request) {
             $limits = [
                 Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1(auth_rate_limit_ip($request))),

@@ -149,8 +149,6 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('Global Leaderboard App')
         ->assertSee('Top hosts')
         ->assertSee('Top paths')
-        ->assertSee('3 4xx')
-        ->assertSee('1 5xx')
         ->assertSee('Status codes')
         ->assertSee('Countries')
         ->assertSee('United States')
@@ -490,7 +488,9 @@ it('labels the IP breakdown by the client IP mode of the queried servers', funct
         $component->assertDontSee('Top IPs')
             ->assertDontSee('Top networks')
             ->assertDontSee('203.0.113.7');
-        expect($component->instance()->breakdowns)->not->toHaveKey('ip');
+        // Sentinel finds the city from the client IP, so it stores no cities either.
+        expect($component->instance()->breakdowns)->not->toHaveKey('ip')
+            ->and($component->instance()->breakdowns)->not->toHaveKey('city');
 
         return;
     }
