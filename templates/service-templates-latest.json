@@ -125,7 +125,7 @@
         "category": "productivity",
         "logo": "svgs/appflowy.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "80"
     },
     "apprise-api": {
@@ -239,6 +239,23 @@
         "template_last_updated_at": "2026-09-27T23:49:51+02:00",
         "port": "80"
     },
+    "babybuddy": {
+        "documentation": "https://docs.baby-buddy.net?utm_source=coolify.io",
+        "slogan": "It helps parents track their baby's daily activities, growth, and health with ease.",
+        "compose": "c2VydmljZXM6CiAgYmFieWJ1ZGR5OgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL2JhYnlidWRkeTpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9CQUJZQlVERFkKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSBUWj1FdXJvcGUvTWFkcmlkCiAgICAgIC0gQ1NSRl9UUlVTVEVEX09SSUdJTlM9JFNFUlZJQ0VfVVJMX0JBQllCVUREWQogICAgdm9sdW1lczoKICAgICAgLSAnYmFieWJ1ZGR5LWNvbmZpZzovY29uZmlnJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwMDAnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "baby",
+            "parents",
+            "health",
+            "growth",
+            "activities"
+        ],
+        "category": "productivity",
+        "logo": "svgs/babybuddy.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "8000"
+    },
     "bento-pdf": {
         "documentation": "https://bentopdf.com/docs?utm_source=coolify.io",
         "slogan": "Process PDFs entirely in your browser. No uploads. No servers. Complete privacy.",
@@ -318,6 +335,26 @@
         "template_last_updated_at": "2026-05-09T19:19:48+05:30",
         "port": "3000"
     },
+    "bookstack": {
+        "documentation": "https://www.bookstackapp.com/docs/?utm_source=coolify.io",
+        "slogan": "BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information",
+        "compose": "c2VydmljZXM6CiAgYm9va3N0YWNrOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL2Jvb2tzdGFjazpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9CT09LU1RBQ0tfODAKICAgICAgLSAnQVBQX1VSTD0ke1NFUlZJQ0VfVVJMX0JPT0tTVEFDS30nCiAgICAgIC0gJ0FQUF9LRVk9JHtTRVJWSUNFX1BBU1NXT1JEX0FQUEtFWX0nCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUV1cm9wZS9CZXJsaW59JwogICAgICAtIERCX0hPU1Q9bWFyaWFkYgogICAgICAtIERCX1BPUlQ9MzMwNgogICAgICAtICdEQl9VU0VSTkFNRT0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ0RCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICAgIC0gJ0RCX0RBVEFCQVNFPSR7TVlTUUxfREFUQUJBU0U6LWJvb2tzdGFja2FwcH0nCiAgICAgIC0gJ1FVRVVFX0NPTk5FQ1RJT049JHtRVUVVRV9DT05ORUNUSU9OfScKICAgICAgLSAnR0lUSFVCX0FQUF9JRD0ke0dJVEhVQl9BUFBfSUR9JwogICAgICAtICdHSVRIVUJfQVBQX1NFQ1JFVD0ke0dJVEhVQl9BUFBfU0VDUkVUfScKICAgICAgLSAnTUFJTF9EUklWRVI9JHtNQUlMX0RSSVZFUjotc210cH0nCiAgICAgIC0gJ01BSUxfSE9TVD0ke01BSUxfSE9TVH0nCiAgICAgIC0gJ01BSUxfUE9SVD0ke01BSUxfUE9SVDotNTg3fScKICAgICAgLSAnTUFJTF9FTkNSWVBUSU9OPSR7TUFJTF9FTkNSWVBUSU9OOi10bHN9JwogICAgICAtICdNQUlMX1VTRVJOQU1FPSR7TUFJTF9VU0VSTkFNRX0nCiAgICAgIC0gJ01BSUxfUEFTU1dPUkQ9JHtNQUlMX1BBU1NXT1JEfScKICAgICAgLSAnTUFJTF9GUk9NPSR7TUFJTF9GUk9NfScKICAgICAgLSAnTUFJTF9GUk9NX05BTUU9JHtNQUlMX0ZST01fTkFNRTotQm9va1N0YWNrfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2Jvb2tzdGFjay1kYXRhOi9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ2N1cmwgLWYgaHR0cDovLzEyNy4wLjAuMTo4MC8nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICAgIGRlcGVuZHNfb246CiAgICAgIG1hcmlhZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL21hcmlhZGI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUV1cm9wZS9CZXJsaW59JwogICAgICAtICdNWVNRTF9ST09UX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTFJPT1R9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1ib29rc3RhY2t9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX01ZU1FMfScKICAgICAgLSAnTVlTUUxfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2Jvb2tzdGFjay1tYXJpYWRiLWRhdGE6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBteXNxbGFkbWluCiAgICAgICAgLSBwaW5nCiAgICAgICAgLSAnLWgnCiAgICAgICAgLSAxMjcuMC4wLjEKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "free-and-open-source",
+            "mfa",
+            "dark-light-themes",
+            "searchable",
+            "connected",
+            "simple-interface",
+            "diagramms",
+            "notes"
+        ],
+        "category": "cms",
+        "logo": "svgs/bookstack.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "browserless": {
         "documentation": "https://docs.browserless.io/?utm_source=coolify.io",
         "slogan": "A headless Chrome browser as a service.",
@@ -354,7 +391,7 @@
         "category": "automation",
         "logo": "svgs/budibase.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "10000"
     },
     "bugsink": {
@@ -407,7 +444,7 @@
         "category": "messaging",
         "logo": "svgs/buzz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "3000"
     },
     "calibre-web-automated-book-downloader": {
@@ -618,6 +655,54 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
+    "classicpress-with-mariadb": {
+        "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
+        "slogan": "A lightweight, stable, instantly familiar free open-source content management system, based on WordPress without the block editor (Gutenberg).",
+        "compose": "c2VydmljZXM6CiAgY2xhc3NpY3ByZXNzOgogICAgaW1hZ2U6ICdjbGFzc2ljcHJlc3MvY2xhc3NpY3ByZXNzOmxhdGVzdCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2NsYXNzaWNwcmVzcy1maWxlczovdmFyL3d3dy9odG1sJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfQ0xBU1NJQ1BSRVNTCiAgICAgIC0gQ0xBU1NJQ1BSRVNTX0RCX0hPU1Q9bWFyaWFkYgogICAgICAtIENMQVNTSUNQUkVTU19EQl9VU0VSPSRTRVJWSUNFX1VTRVJfQ0xBU1NJQ1BSRVNTCiAgICAgIC0gQ0xBU1NJQ1BSRVNTX0RCX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX0NMQVNTSUNQUkVTUwogICAgICAtIENMQVNTSUNQUkVTU19EQl9OQU1FPWNsYXNzaWNwcmVzcwogICAgZGVwZW5kc19vbjoKICAgICAgLSBtYXJpYWRiCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTAKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgdm9sdW1lczoKICAgICAgLSAnbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTVlTUUxfUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9ST09UCiAgICAgIC0gTVlTUUxfREFUQUJBU0U9Y2xhc3NpY3ByZXNzCiAgICAgIC0gTVlTUUxfVVNFUj0kU0VSVklDRV9VU0VSX0NMQVNTSUNQUkVTUwogICAgICAtIE1ZU1FMX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX0NMQVNTSUNQUkVTUwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management"
+        ],
+        "category": "cms",
+        "logo": "svgs/classicpress.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "classicpress-with-mysql": {
+        "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
+        "slogan": "A lightweight, stable, instantly familiar free open-source content management system, based on WordPress without the block editor (Gutenberg).",
+        "compose": "c2VydmljZXM6CiAgY2xhc3NpY3ByZXNzOgogICAgaW1hZ2U6ICdjbGFzc2ljcHJlc3MvY2xhc3NpY3ByZXNzOmxhdGVzdCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2NsYXNzaWNwcmVzcy1maWxlczovdmFyL3d3dy9odG1sJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfQ0xBU1NJQ1BSRVNTCiAgICAgIC0gQ0xBU1NJQ1BSRVNTX0RCX0hPU1Q9bXlzcWwKICAgICAgLSBDTEFTU0lDUFJFU1NfREJfVVNFUj0kU0VSVklDRV9VU0VSX0NMQVNTSUNQUkVTUwogICAgICAtIENMQVNTSUNQUkVTU19EQl9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9DTEFTU0lDUFJFU1MKICAgICAgLSBDTEFTU0lDUFJFU1NfREJfTkFNRT1jbGFzc2ljcHJlc3MKICAgIGRlcGVuZHNfb246CiAgICAgIC0gbXlzcWwKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAogIG15c3FsOgogICAgaW1hZ2U6ICdteXNxbDo4JwogICAgdm9sdW1lczoKICAgICAgLSAnbXlzcWwtZGF0YTovdmFyL2xpYi9teXNxbCcKICAgIGVudmlyb25tZW50OgogICAgICAtIE1ZU1FMX1JPT1RfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUk9PVAogICAgICAtIE1ZU1FMX0RBVEFCQVNFPWNsYXNzaWNwcmVzcwogICAgICAtIE1ZU1FMX1VTRVI9JFNFUlZJQ0VfVVNFUl9DTEFTU0lDUFJFU1MKICAgICAgLSBNWVNRTF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9DTEFTU0lDUFJFU1MKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBteXNxbGFkbWluCiAgICAgICAgLSBwaW5nCiAgICAgICAgLSAnLWgnCiAgICAgICAgLSAxMjcuMC4wLjEKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management"
+        ],
+        "category": "cms",
+        "logo": "svgs/classicpress.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "classicpress-without-database": {
+        "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
+        "slogan": "A lightweight, stable, instantly familiar free open-source content management system, based on WordPress without the block editor (Gutenberg).",
+        "compose": "c2VydmljZXM6CiAgY2xhc3NpY3ByZXNzOgogICAgaW1hZ2U6ICdjbGFzc2ljcHJlc3MvY2xhc3NpY3ByZXNzOmxhdGVzdCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2NsYXNzaWNwcmVzcy1maWxlczovdmFyL3d3dy9odG1sJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfQ0xBU1NJQ1BSRVNTCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management"
+        ],
+        "category": "cms",
+        "logo": "svgs/classicpress.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "cloudbeaver": {
         "documentation": "https://dbeaver.com/docs/cloudbeaver/?utm_source=coolify.io",
         "slogan": "CloudBeaver is a lightweight web application designed for comprehensive data management.",
@@ -677,6 +762,23 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-03-03T11:20:40+05:30",
         "port": "5212"
+    },
+    "cockpit": {
+        "documentation": "https://getcockpit.com/documentation/?utm_source=coolify.io",
+        "slogan": "Cockpit is a headless content platform that is lightweight, fast and ready for takeoff.",
+        "compose": "c2VydmljZXM6CiAgY29ja3BpdDoKICAgIGltYWdlOiAnY29ja3BpdGhxL2NvY2twaXQ6Y29yZS1sYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdjb2NrcGl0LWNvbmZpZzovdmFyL3d3dy9odG1sL2NvbmZpZycKICAgICAgLSAnY29ja3BpdC1zcGFjZXM6L3Zhci93d3cvaHRtbC8uc3BhY2VzJwogICAgICAtICdjb2NrcGl0LXN0b3JhZ2U6L3Zhci93d3cvaHRtbC9zdG9yYWdlJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xL2FwaS9zeXN0ZW0vaGVhbHRoY2hlY2snCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "cockpit",
+            "headless",
+            "cms",
+            "database",
+            "nosql"
+        ],
+        "category": "cms",
+        "logo": "svgs/cockpit.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "code-server": {
         "documentation": "https://coder.com/docs/code-server/latest?utm_source=coolify.io",
@@ -968,6 +1070,36 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
+    "dokuwiki": {
+        "documentation": "https://www.dokuwiki.org/?utm_source=coolify.io",
+        "slogan": "A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases.",
+        "compose": "c2VydmljZXM6CiAgZG9rdXdpa2k6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvZG9rdXdpa2k6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfRE9LVVdJS0kKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSBUWj1FdXJvcGUvTWFkcmlkCiAgICB2b2x1bWVzOgogICAgICAtICdkb2t1d2lraS1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "wiki",
+            "documentation",
+            "knowledge",
+            "base"
+        ],
+        "category": "cms",
+        "logo": "svgs/dokuwiki.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "dolibarr": {
+        "documentation": "https://www.dolibarr.org/documentation-home.php?utm_source=coolify.io",
+        "slogan": "Dolibarr is a modern software package to manage your organization's activity (contacts, quotes, invoices, orders, stocks, agenda, hr, expense reports, accountancy, ecm, manufacturing, ...).",
+        "compose": "c2VydmljZXM6CiAgZG9saWJhcnI6CiAgICBpbWFnZTogJ2RvbGliYXJyL2RvbGliYXJyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0RPTElCQVJSXzgwCiAgICAgIC0gJ1dXV19VU0VSX0lEPSR7V1dXX1VTRVJfSUQ6LTEwMDB9JwogICAgICAtICdXV1dfR1JPVVBfSUQ9JHtXV1dfR1JPVVBfSUQ6LTEwMDB9JwogICAgICAtIERPTElfREJfSE9TVD1tYXJpYWRiCiAgICAgIC0gJ0RPTElfREJfTkFNRT0ke01ZU1FMX0RBVEFCQVNFOi1kb2xpYmFyci1kYn0nCiAgICAgIC0gJ0RPTElfREJfVVNFUj0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ0RPTElfREJfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMfScKICAgICAgLSAnRE9MSV9VUkxfUk9PVD0ke1NFUlZJQ0VfVVJMX0RPTElCQVJSfScKICAgICAgLSAnRE9MSV9BRE1JTl9MT0dJTj0ke1NFUlZJQ0VfVVNFUl9ET0xJQkFSUn0nCiAgICAgIC0gJ0RPTElfQURNSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0RPTElCQVJSfScKICAgICAgLSAnRE9MSV9DUk9OPSR7RE9MSV9DUk9OOi0wfScKICAgICAgLSAnRE9MSV9JTklUX0RFTU89JHtET0xJX0lOSVRfREVNTzotMH0nCiAgICAgIC0gJ0RPTElfQ09NUEFOWV9OQU1FPSR7RE9MSV9DT01QQU5ZX05BTUU6LU15QmlnQ29tcGFueX0nCiAgICB2b2x1bWVzOgogICAgICAtICdkb2xpYmFycl9kb2NzOi92YXIvd3d3L2RvY3VtZW50cycKICAgICAgLSAnZG9saWJhcnJfY3VzdG9tOi92YXIvd3d3L2h0bWwvY3VzdG9tJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1CiAgbWFyaWFkYjoKICAgIGltYWdlOiAnbWFyaWFkYjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTVlTUUxfREFUQUJBU0U9JHtNWVNRTF9EQVRBQkFTRTotZG9saWJhcnItZGJ9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX01ZU1FMfScKICAgICAgLSAnTVlTUUxfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMfScKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUk9PVH0nCiAgICB2b2x1bWVzOgogICAgICAtICdkb2xpYmFycl9tYXJpYWRiX2RhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "crm",
+            "erp"
+        ],
+        "category": "productivity",
+        "logo": "svgs/dolibarr.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "dozzle-with-auth": {
         "documentation": "https://dozzle.dev/?utm_source=coolify.io",
         "slogan": "Dozzle is a simple and lightweight web UI for Docker logs.",
@@ -1017,6 +1149,23 @@
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "4983"
     },
+    "drupal-with-postgresql": {
+        "documentation": "https://www.drupal.org/about?utm_source=coolify.io",
+        "slogan": "Drupal is a free and open-source web content management system written in PHP and distributed under the GNU General Public License.",
+        "compose": "c2VydmljZXM6CiAgZHJ1cGFsOgogICAgaW1hZ2U6ICdkcnVwYWw6MTAtYXBhY2hlJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfRFJVUEFMCiAgICAgIC0gREJfSE9TVD1wb3N0Z3JlcwogICAgICAtIERCX05BTUU9cG9zdGdyZXMKICAgICAgLSBEQl9VU0VSPXBvc3RncmVzCiAgICAgIC0gREJfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgIHZvbHVtZXM6CiAgICAgIC0KICAgICAgICB0eXBlOiB2b2x1bWUKICAgICAgICBzb3VyY2U6IGRydXBhbF9tb2R1bGVzCiAgICAgICAgdGFyZ2V0OiAvdmFyL3d3dy9odG1sL21vZHVsZXMKICAgICAgICBpc19kaXJlY3Rvcnk6IHRydWUKICAgICAgLQogICAgICAgIHR5cGU6IHZvbHVtZQogICAgICAgIHNvdXJjZTogZHJ1cGFsX3Byb2ZpbGVzCiAgICAgICAgdGFyZ2V0OiAvdmFyL3d3dy9odG1sL3Byb2ZpbGVzCiAgICAgICAgaXNfZGlyZWN0b3J5OiB0cnVlCiAgICAgIC0KICAgICAgICB0eXBlOiB2b2x1bWUKICAgICAgICBzb3VyY2U6IGRydXBhbF90aGVtZXMKICAgICAgICB0YXJnZXQ6IC92YXIvd3d3L2h0bWwvdGhlbWVzCiAgICAgICAgaXNfZGlyZWN0b3J5OiB0cnVlCiAgICAgIC0KICAgICAgICB0eXBlOiB2b2x1bWUKICAgICAgICBzb3VyY2U6IGRydXBhbF9zaXRlcwogICAgICAgIHRhcmdldDogL3Zhci93d3cvaHRtbC9zaXRlcwogICAgICAgIGlzX2RpcmVjdG9yeTogdHJ1ZQogICAgZGVwZW5kc19vbjoKICAgICAgLSBwb3N0Z3JlcwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdjdXJsIC1mIGh0dHA6Ly9sb2NhbGhvc3Q6ODAgfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiA1CiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfREI9cG9zdGdyZXMKICAgICAgLSBQT1NUR1JFU19VU0VSPXBvc3RncmVzCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMjAK",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "postgresql"
+        ],
+        "category": "cms",
+        "logo": "svgs/drupal.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "duplicati": {
         "documentation": "https://duplicati.readthedocs.io?utm_source=coolify.io",
         "slogan": "Duplicati is a backup solution, allowing you to make scheduled backups with encryption.",
@@ -1030,6 +1179,21 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8200"
+    },
+    "easyappointments": {
+        "documentation": "https://easyappointments.org/?utm_source=coolify.io",
+        "slogan": "Schedule Anything. Let's start with easy! Get the best free online appointment scheduler on your server, today.",
+        "compose": "c2VydmljZXM6CiAgZWFzeWFwcG9pbnRtZW50czoKICAgIGltYWdlOiAnYWxleHRzZWxlZ2lkaXMvZWFzeWFwcG9pbnRtZW50czpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9FQVNZQVBQT0lOVE1FTlRTXzgwCiAgICAgIC0gJ0JBU0VfVVJMPSR7U0VSVklDRV9VUkxfRUFTWUFQUE9JTlRNRU5UU30nCiAgICAgIC0gREJfSE9TVD1teXNxbAogICAgICAtIERCX05BTUU9ZWFzeWFwcG9pbnRtZW50cwogICAgICAtIERCX1VTRVJOQU1FPXJvb3QKICAgICAgLSAnREJfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0VBU1lBUFBPSU5UTUVOVFN9JwogICAgZGVwZW5kc19vbjoKICAgICAgLSBteXNxbAogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMwCiAgbXlzcWw6CiAgICBpbWFnZTogJ215c3FsOjgnCiAgICB2b2x1bWVzOgogICAgICAtICdlYXN5YXBwb2ludG1lbnRzLW15c3FsLWRhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfRUFTWUFQUE9JTlRNRU5UU30nCiAgICAgIC0gTVlTUUxfREFUQUJBU0U9ZWFzeWFwcG9pbnRtZW50cwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIG15c3FsYWRtaW4KICAgICAgICAtIHBpbmcKICAgICAgICAtICctaCcKICAgICAgICAtIDEyNy4wLjAuMQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "calendar",
+            "scheduling",
+            "database"
+        ],
+        "category": "productivity",
+        "logo": "svgs/easyappointments.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "elasticsearch-with-kibana": {
         "documentation": "https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install-kibana-with-docker?utm_source=coolify.io",
@@ -1176,7 +1340,7 @@
         "category": "media",
         "logo": "svgs/ente-photos.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "8080"
     },
     "ente-photos": {
@@ -1214,6 +1378,24 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-01-05T14:20:17+01:00",
         "port": "6052"
+    },
+    "espocrm": {
+        "documentation": "https://docs.espocrm.com?utm_source=coolify.io",
+        "slogan": "EspoCRM is a free and open-source CRM platform.",
+        "compose": "c2VydmljZXM6CiAgZXNwb2NybToKICAgIGltYWdlOiAnZXNwb2NybS9lc3BvY3JtOjEwJwogICAgY29udGFpbmVyX25hbWU6IGVzcG9jcm0KICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0VTUE9DUk0KICAgICAgLSAnRVNQT0NSTV9BRE1JTl9VU0VSTkFNRT0ke0VTUE9DUk1fQURNSU5fVVNFUk5BTUU6LWFkbWlufScKICAgICAgLSAnRVNQT0NSTV9BRE1JTl9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfQURNSU59JwogICAgICAtIEVTUE9DUk1fREFUQUJBU0VfUExBVEZPUk09TXlzcWwKICAgICAgLSBFU1BPQ1JNX0RBVEFCQVNFX0hPU1Q9ZXNwb2NybS1kYgogICAgICAtICdFU1BPQ1JNX0RBVEFCQVNFX05BTUU9JHtNQVJJQURCX0RBVEFCQVNFOi1lc3BvY3JtfScKICAgICAgLSAnRVNQT0NSTV9EQVRBQkFTRV9VU0VSPSR7U0VSVklDRV9VU0VSX01BUklBREJ9JwogICAgICAtICdFU1BPQ1JNX0RBVEFCQVNFX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NQVJJQURCfScKICAgICAgLSAnRVNQT0NSTV9TSVRFX1VSTD0ke1NFUlZJQ0VfVVJMX0VTUE9DUk19JwogICAgdm9sdW1lczoKICAgICAgLSAnZXNwb2NybS1kYXRhOi92YXIvd3d3L2h0bWwvZGF0YScKICAgICAgLSAnZXNwb2NybS1jdXN0b206L3Zhci93d3cvaHRtbC9jdXN0b20nCiAgICAgIC0gJ2VzcG9jcm0tY3VzdG9tLWNsaWVudDovdmFyL3d3dy9odG1sL2NsaWVudC9jdXN0b20nCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgZGVwZW5kc19vbjoKICAgICAgZXNwb2NybS1kYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGJpbi9jb21tYW5kCiAgICAgICAgLSBhcHAtY2hlY2sKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMKICAgICAgaW50ZXJ2YWw6IDYwcwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMwogIGVzcG9jcm0tZGFlbW9uOgogICAgaW1hZ2U6ICdlc3BvY3JtL2VzcG9jcm06MTAnCiAgICBjb250YWluZXJfbmFtZTogZXNwb2NybS1kYWVtb24KICAgIHZvbHVtZXNfZnJvbToKICAgICAgLSBlc3BvY3JtCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgZW50cnlwb2ludDogZG9ja2VyLWRhZW1vbi5zaAogICAgZGVwZW5kc19vbjoKICAgICAgZXNwb2NybToKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGJpbi9jb21tYW5kCiAgICAgICAgLSBhcHAtY2hlY2sKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMKICAgICAgaW50ZXJ2YWw6IDE4MHMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDMKICBlc3BvY3JtLXdlYnNvY2tldDoKICAgIGltYWdlOiAnZXNwb2NybS9lc3BvY3JtOjEwJwogICAgY29udGFpbmVyX25hbWU6IGVzcG9jcm0td2Vic29ja2V0CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9FU1BPQ1JNX1dFQlNPQ0tFVF84MDgwCiAgICAgIC0gRVNQT0NSTV9DT05GSUdfVVNFX1dFQl9TT0NLRVQ9dHJ1ZQogICAgICAtIEVTUE9DUk1fQ09ORklHX1dFQl9TT0NLRVRfVVJMPSRTRVJWSUNFX1VSTF9FU1BPQ1JNX1dFQlNPQ0tFVAogICAgICAtICdFU1BPQ1JNX0NPTkZJR19XRUJfU09DS0VUX1pFUk9fTV9RX1NVQlNDUklCRVJfRFNOPXRjcDovLyo6Nzc3NycKICAgICAgLSAnRVNQT0NSTV9DT05GSUdfV0VCX1NPQ0tFVF9aRVJPX01fUV9TVUJNSVNTSU9OX0RTTj10Y3A6Ly9lc3BvY3JtLXdlYnNvY2tldDo3Nzc3JwogICAgdm9sdW1lc19mcm9tOgogICAgICAtIGVzcG9jcm0KICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBlbnRyeXBvaW50OiBkb2NrZXItd2Vic29ja2V0LnNoCiAgICBkZXBlbmRzX29uOgogICAgICBlc3BvY3JtOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gYmluL2NvbW1hbmQKICAgICAgICAtIGFwcC1jaGVjawogICAgICBzdGFydF9wZXJpb2Q6IDIwcwogICAgICBpbnRlcnZhbDogMTgwcwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMwogIGVzcG9jcm0tZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTIuMycKICAgIGNvbnRhaW5lcl9uYW1lOiBlc3BvY3JtLWRiCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTUFSSUFEQl9EQVRBQkFTRT0ke01BUklBREJfREFUQUJBU0U6LWVzcG9jcm19JwogICAgICAtICdNQVJJQURCX1VTRVI9JHtTRVJWSUNFX1VTRVJfTUFSSUFEQn0nCiAgICAgIC0gJ01BUklBREJfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01BUklBREJ9JwogICAgICAtICdNQVJJQURCX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JPT1R9JwogICAgdm9sdW1lczoKICAgICAgLSAnZXNwb2NybS1kYjovdmFyL2xpYi9teXNxbCcKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiAyMHMKICAgICAgc3RhcnRfcGVyaW9kOiAxMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMK",
+        "tags": [
+            "crm",
+            "self-hosted",
+            "open-source",
+            "workflow",
+            "automation",
+            "project management"
+        ],
+        "category": "productivity",
+        "logo": "svgs/espocrm.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "evolution-api": {
         "documentation": "https://doc.evolution-api.com/v2/en/get-started/introduction?utm_source=coolify.io",
@@ -1330,6 +1512,22 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5000"
+    },
+    "firefly": {
+        "documentation": "https://firefly-iii.org?utm_source=coolify.io",
+        "slogan": "A personal finances manager that can help you save money.",
+        "compose": "c2VydmljZXM6CiAgZmlyZWZseToKICAgIGltYWdlOiAnZmlyZWZseWlpaS9jb3JlOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0ZJUkVGTFlfODA4MAogICAgICAtIEFQUF9LRVk9JFNFUlZJQ0VfQkFTRTY0X0FQUEtFWQogICAgICAtIERCX0hPU1Q9bXlzcWwKICAgICAgLSBEQl9QT1JUPTMzMDYKICAgICAgLSBEQl9DT05ORUNUSU9OPW15c3FsCiAgICAgIC0gJ0RCX0RBVEFCQVNFPSR7TVlTUUxfREFUQUJBU0U6LWZpcmVmbHl9JwogICAgICAtIERCX1VTRVJOQU1FPSRTRVJWSUNFX1VTRVJfTVlTUUwKICAgICAgLSBEQl9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9NWVNRTAogICAgICAtIFNUQVRJQ19DUk9OX1RPS0VOPSRTRVJWSUNFX0JBU0U2NF9DUk9OVE9LRU4KICAgICAgLSAnVFJVU1RFRF9QUk9YSUVTPSonCiAgICB2b2x1bWVzOgogICAgICAtICdmaXJlZmx5LXVwbG9hZDovdmFyL3d3dy9odG1sL3N0b3JhZ2UvdXBsb2FkJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwODAvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgICBkZXBlbmRzX29uOgogICAgICBteXNxbDoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogIG15c3FsOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUx9JwogICAgICAtICdNWVNRTF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUx9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1maXJlZmx5fScKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUxST09UfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBtYXJpYWRiLWFkbWluCiAgICAgICAgLSBwaW5nCiAgICAgICAgLSAnLWgnCiAgICAgICAgLSAxMjcuMC4wLjEKICAgICAgICAtICctdXJvb3QnCiAgICAgICAgLSAnLXAke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUxST09UfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogICAgdm9sdW1lczoKICAgICAgLSAnZmlyZWZseS1teXNxbC1kYXRhOi92YXIvbGliL215c3FsJwogIGNyb246CiAgICBpbWFnZTogYWxwaW5lCiAgICBlbnRyeXBvaW50OgogICAgICAtIC9lbnRyeXBvaW50LnNoCiAgICB2b2x1bWVzOgogICAgICAtCiAgICAgICAgdHlwZTogYmluZAogICAgICAgIHNvdXJjZTogLi9lbnRyeXBvaW50LnNoCiAgICAgICAgdGFyZ2V0OiAvZW50cnlwb2ludC5zaAogICAgICAgIGNvbnRlbnQ6ICIjIS9iaW4vc2hcbiMgU3Vic3RpdHV0ZSB0aGUgZW52aXJvbm1lbnQgdmFyaWFibGUgaW50byB0aGUgY3JvbiBjb21tYW5kXG5DUk9OX0NPTU1BTkQ9XCIwIDMgKiAqICogd2dldCAtcU8tIGh0dHA6Ly9maXJlZmx5OjgwODAvYXBpL3YxL2Nyb24vJHtTVEFUSUNfQ1JPTl9UT0tFTn1cIlxuIyBBZGQgdGhlIGNyb24gY29tbWFuZCB0byB0aGUgY3JvbnRhYlxuZWNobyBcIiRDUk9OX0NPTU1BTkRcIiB8IGNyb250YWIgLVxuIyBTdGFydCB0aGUgY3JvbiBkYWVtb24gaW4gdGhlIGZvcmVncm91bmQgd2l0aCBsb2dnaW5nIHRvIHN0ZG91dFxuY3JvbmQgLWYgLUwgL2Rldi9zdGRvdXRcbiIKICAgIGVudmlyb25tZW50OgogICAgICAtIFNUQVRJQ19DUk9OX1RPS0VOPSRTRVJWSUNFX0JBU0U2NF9DUk9OVE9LRU4KICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnbHMgL2VudHJ5cG9pbnQuc2ggfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAzCiAgICAgIHN0YXJ0X3BlcmlvZDogNDBzCg==",
+        "tags": [
+            "finance",
+            "money",
+            "personal",
+            "manager"
+        ],
+        "category": "finance",
+        "logo": "svgs/firefly.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "8080"
     },
     "firefox": {
         "documentation": "https://github.com/jlesage/docker-firefox?utm_source=coolify.io",
@@ -1448,7 +1646,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo-with-mysql": {
@@ -1466,7 +1664,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo-with-postgresql": {
@@ -1484,7 +1682,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo-with-runner-with-mariadb": {
@@ -1506,7 +1704,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo-with-runner-with-mysql": {
@@ -1528,7 +1726,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo-with-runner-with-postgresql": {
@@ -1550,7 +1748,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo-with-runner": {
@@ -1571,7 +1769,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "forgejo": {
@@ -1588,7 +1786,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-18T12:45:49+02:00",
         "port": "3000"
     },
     "formbricks": {
@@ -1604,7 +1802,7 @@
         "category": "productivity",
         "logo": "svgs/formbricks.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "3000"
     },
     "foundryvtt": {
@@ -1623,6 +1821,62 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "30000"
+    },
+    "freshrss-with-mariadb": {
+        "documentation": "https://freshrss.org/index.html?utm_source=coolify.io",
+        "slogan": "A free, self-hostable feed aggregator.",
+        "compose": "c2VydmljZXM6CiAgZnJlc2hyc3M6CiAgICBpbWFnZTogJ2ZyZXNocnNzL2ZyZXNocnNzOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0ZSRVNIUlNTXzgwCiAgICAgIC0gJ0NST05fTUlOPSR7Q1JPTl9NSU46LTEsMzF9JwogICAgICAtICdNQVJJQURCX0RCPSR7TUFSSUFEQl9EQVRBQkFTRTotZnJlc2hyc3N9JwogICAgICAtICdNQVJJQURCX1VTRVI9JHtTRVJWSUNFX1VTRVJfTUFSSUFEQn0nCiAgICAgIC0gJ01BUklBREJfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01BUklBREJ9JwogICAgdm9sdW1lczoKICAgICAgLSAnZnJlc2hyc3MtZGF0YTovdmFyL3d3dy9GcmVzaFJTUy9kYXRhJwogICAgICAtICdmcmVzaHJzcy1leHRlbnNpb25zOi92YXIvd3d3L0ZyZXNoUlNTL2V4dGVuc2lvbnMnCiAgICBkZXBlbmRzX29uOgogICAgICBmcmVzaHJzcy1kYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICJiYXNoIC1jICc6PiAvZGV2L3RjcC8xMjcuMC4wLjEvODAnIHx8IGV4aXQgMSIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAzCiAgZnJlc2hyc3MtZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICB2b2x1bWVzOgogICAgICAtICdtYXJpYWRiLWRhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBNWVNRTF9ST09UX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1JPT1QKICAgICAgLSAnTVlTUUxfREFUQUJBU0U9JHtNQVJJQURCX0RBVEFCQVNFOi1mcmVzaHJzc30nCiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTUFSSUFEQn0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NQVJJQURCfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBoZWFsdGhjaGVjay5zaAogICAgICAgIC0gJy0tY29ubmVjdCcKICAgICAgICAtICctLWlubm9kYl9pbml0aWFsaXplZCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "rss",
+            "feed"
+        ],
+        "category": "RSS",
+        "logo": "svgs/freshrss.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "freshrss-with-mysql": {
+        "documentation": "https://freshrss.org/index.html?utm_source=coolify.io",
+        "slogan": "A free, self-hostable feed aggregator.",
+        "compose": "c2VydmljZXM6CiAgZnJlc2hyc3M6CiAgICBpbWFnZTogJ2ZyZXNocnNzL2ZyZXNocnNzOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0ZSRVNIUlNTXzgwCiAgICAgIC0gJ0NST05fTUlOPSR7Q1JPTl9NSU46LTEsMzF9JwogICAgICAtICdNWVNRTF9EQj0ke01ZU1FMX0RBVEFCQVNFOi1mcmVzaHJzc30nCiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUx9JwogICAgICAtICdNWVNRTF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUx9JwogICAgdm9sdW1lczoKICAgICAgLSAnZnJlc2hyc3MtZGF0YTovdmFyL3d3dy9GcmVzaFJTUy9kYXRhJwogICAgICAtICdmcmVzaHJzcy1leHRlbnNpb25zOi92YXIvd3d3L0ZyZXNoUlNTL2V4dGVuc2lvbnMnCiAgICBkZXBlbmRzX29uOgogICAgICBmcmVzaHJzcy1kYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICJiYXNoIC1jICc6PiAvZGV2L3RjcC8xMjcuMC4wLjEvODAnIHx8IGV4aXQgMSIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAzCiAgZnJlc2hyc3MtZGI6CiAgICBpbWFnZTogJ215c3FsOjgnCiAgICB2b2x1bWVzOgogICAgICAtICdteXNxbC1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTVlTUUxfUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9ST09UCiAgICAgIC0gJ01ZU1FMX0RBVEFCQVNFPSR7TVlTUUxfREFUQUJBU0U6LWZyZXNocnNzfScKICAgICAgLSBNWVNRTF9VU0VSPSRTRVJWSUNFX1VTRVJfTVlTUUwKICAgICAgLSBNWVNRTF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9NWVNRTAogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIG15c3FsYWRtaW4KICAgICAgICAtIHBpbmcKICAgICAgICAtICctaCcKICAgICAgICAtIDEyNy4wLjAuMQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "rss",
+            "feed"
+        ],
+        "category": "RSS",
+        "logo": "svgs/freshrss.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "freshrss-with-postgresql": {
+        "documentation": "https://freshrss.org/index.html?utm_source=coolify.io",
+        "slogan": "A free, self-hostable feed aggregator.",
+        "compose": "c2VydmljZXM6CiAgZnJlc2hyc3M6CiAgICBpbWFnZTogJ2ZyZXNocnNzL2ZyZXNocnNzOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0ZSRVNIUlNTXzgwCiAgICAgIC0gJ0NST05fTUlOPSR7Q1JPTl9NSU46LTEsMzF9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTUUxfREFUQUJBU0U6LWZyZXNocnNzfScKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU1FMfScKICAgICAgLSAnUE9TVEdSRVNfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTUUx9JwogICAgICAtIFBPU1RHUkVTX0hPU1Q9ZnJlc2hyc3MtZGIKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2ZyZXNocnNzLWRhdGE6L3Zhci93d3cvRnJlc2hSU1MvZGF0YScKICAgICAgLSAnZnJlc2hyc3MtZXh0ZW5zaW9uczovdmFyL3d3dy9GcmVzaFJTUy9leHRlbnNpb25zJwogICAgZGVwZW5kc19vbjoKICAgICAgZnJlc2hyc3MtZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAiYmFzaCAtYyAnOj4gL2Rldi90Y3AvMTI3LjAuMC4xLzgwJyB8fCBleGl0IDEiCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMwogIGZyZXNocnNzLWRiOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNicKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2ZyZXNocnNzLXBvc3RncmVzcWwtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU1FMfScKICAgICAgLSAnUE9TVEdSRVNfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTUUx9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTUUxfREFUQUJBU0U6LWZyZXNocnNzfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "rss",
+            "feed"
+        ],
+        "category": "RSS",
+        "logo": "svgs/freshrss.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "freshrss": {
+        "documentation": "https://freshrss.org/index.html?utm_source=coolify.io",
+        "slogan": "A free, self-hostable feed aggregator.",
+        "compose": "c2VydmljZXM6CiAgZnJlc2hyc3M6CiAgICBpbWFnZTogJ2ZyZXNocnNzL2ZyZXNocnNzOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0ZSRVNIUlNTXzgwCiAgICAgIC0gJ0NST05fTUlOPSR7Q1JPTl9NSU46LTEsMzF9JwogICAgdm9sdW1lczoKICAgICAgLSAnZnJlc2hyc3MtZGF0YTovdmFyL3d3dy9GcmVzaFJTUy9kYXRhJwogICAgICAtICdmcmVzaHJzcy1leHRlbnNpb25zOi92YXIvd3d3L0ZyZXNoUlNTL2V4dGVuc2lvbnMnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gImJhc2ggLWMgJzo+IC9kZXYvdGNwLzEyNy4wLjAuMS84MCcgfHwgZXhpdCAxIgogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDMK",
+        "tags": [
+            "rss",
+            "feed"
+        ],
+        "category": "RSS",
+        "logo": "svgs/freshrss.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "garage": {
         "documentation": "https://garagehq.deuxfleurs.fr/documentation/?utm_source=coolify.io",
@@ -1848,6 +2102,22 @@
         "template_last_updated_at": "2026-02-10T11:22:57+05:30",
         "port": "8000"
     },
+    "glpi": {
+        "documentation": "https://help.glpi-project.org/documentation?utm_source=coolify.io",
+        "slogan": "GLPI (Gestionnaire Libre de Parc Informatique) is a free, open-source IT Service Management (ITSM) platform used for IT asset management, helpdesk, and service desk operations.",
+        "compose": "c2VydmljZXM6CiAgZ2xwaToKICAgIGltYWdlOiAnZ2xwaS9nbHBpOjExJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfR0xQSV84MAogICAgICAtIEdMUElfREJfSE9TVD1nbHBpLWRiCiAgICAgIC0gR0xQSV9EQl9QT1JUPTMzMDYKICAgICAgLSAnR0xQSV9EQl9OQU1FPSR7TVlTUUxfREFUQUJBU0U6LWdscGktZGJ9JwogICAgICAtICdHTFBJX0RCX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUx9JwogICAgICAtICdHTFBJX0RCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICB2b2x1bWVzOgogICAgICAtICdnbHBpLWRhdGE6L3Zhci9nbHBpOnJ3JwogICAgZGVwZW5kc19vbjoKICAgICAgZ2xwaS1kYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0LycKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMwogIGdscGktZGI6CiAgICBpbWFnZTogJ215c3FsOjgnCiAgICB2b2x1bWVzOgogICAgICAtICdteXNxbC1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JPT1R9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1nbHBpLWRifScKICAgICAgLSAnTVlTUUxfVVNFUj0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gbXlzcWxhZG1pbgogICAgICAgIC0gcGluZwogICAgICAgIC0gJy1oJwogICAgICAgIC0gMTI3LjAuMC4xCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "helpdesk",
+            "ticketing",
+            "support",
+            "open-source"
+        ],
+        "category": "helpdesk",
+        "logo": "svgs/glpi.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "goatcounter": {
         "documentation": "https://www.goatcounter.com/help?utm_source=coolify.io",
         "slogan": "Lightweight web analytics platform.",
@@ -2004,7 +2274,7 @@
         "category": "automation",
         "logo": "svgs/hatchet.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:30:10+02:00",
         "port": "80"
     },
     "healthchecks": {
@@ -2026,6 +2296,22 @@
         "template_last_updated_at": "2026-05-25T13:06:59-04:00",
         "port": "80000"
     },
+    "heimdall": {
+        "documentation": "https://github.com/linuxserver/Heimdall?utm_source=coolify.io",
+        "slogan": "Heimdall is a dashboard for managing and organizing your server applications.",
+        "compose": "c2VydmljZXM6CiAgaGVpbWRhbGw6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvaGVpbWRhbGw6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfSEVJTURBTEwKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSBUWj1FdXJvcGUvTWFkcmlkCiAgICB2b2x1bWVzOgogICAgICAtICdoZWltZGFsbC1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "dashboard",
+            "server",
+            "applications",
+            "interface"
+        ],
+        "category": "productivity",
+        "logo": "svgs/heimdall.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "hermes-agent-with-webui": {
         "documentation": "https://github.com/nesquena/hermes-webui?utm_source=coolify.io",
         "slogan": "Hermes Agent - autonomous AI agent with persistent memory, scheduling, and a self-hosted web chat UI.",
@@ -2043,7 +2329,7 @@
         "category": "ai",
         "logo": "svgs/hermes-agent.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-16T21:48:29+02:00",
         "port": "8787"
     },
     "hermes-agent": {
@@ -2282,6 +2568,23 @@
         "template_last_updated_at": "2026-07-02T13:25:47+02:00",
         "port": "8288"
     },
+    "invoice-ninja": {
+        "documentation": "https://invoiceninja.github.io/selfhost.html?utm_source=coolify.io",
+        "slogan": "The leading open-source invoicing platform",
+        "compose": "c2VydmljZXM6CiAgaW52b2ljZS1uaW5qYToKICAgIGltYWdlOiAnaW52b2ljZW5pbmphL2ludm9pY2VuaW5qYTo1JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfSU5WT0lDRU5JTkpBCiAgICAgIC0gJ0FQUF9OQU1FPSR7QVBQX05BTUU6LSJJbnZvaWNlIE5pbmphIn0nCiAgICAgIC0gJ0FQUF9FTlY9JHtBUFBfRU5WOi1wcm9kdWN0aW9ufScKICAgICAgLSAnQVBQX1VSTD0ke1NFUlZJQ0VfVVJMX0lOVk9JQ0VOSU5KQX0nCiAgICAgIC0gJ0FQUF9LRVk9YmFzZTY0OiR7U0VSVklDRV9SRUFMQkFTRTY0X0lOVk9JQ0VOSU5KQX0nCiAgICAgIC0gJ0FQUF9ERUJVRz0ke0FQUF9ERUJVRzotZmFsc2V9JwogICAgICAtICdSRVFVSVJFX0hUVFBTPSR7UkVRVUlSRV9IVFRQUzotZmFsc2V9JwogICAgICAtICdQSEFOVE9NSlNfUERGX0dFTkVSQVRJT049JHtQSEFOVE9NSlNfUERGX0dFTkVSQVRJT046LWZhbHNlfScKICAgICAgLSAnUERGX0dFTkVSQVRPUj0ke1BERl9HRU5FUkFUT1I6LWhvc3RlZF9uaW5qYX0nCiAgICAgIC0gJ1RSVVNURURfUFJPWElFUz0ke1RSVVNURURfUFJPWElFUzotKn0nCiAgICAgIC0gQ0FDSEVfRFJJVkVSPXJlZGlzCiAgICAgIC0gJ1FVRVVFX0NPTk5FQ1RJT049JHtRVUVVRV9DT05ORUNUSU9OOi1yZWRpc30nCiAgICAgIC0gU0VTU0lPTl9EUklWRVI9cmVkaXMKICAgICAgLSAnUkVESVNfSE9TVD0ke1JFRElTX0hPU1Q6LXJlZGlzfScKICAgICAgLSAnUkVESVNfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JFRElTfScKICAgICAgLSAnUkVESVNfUE9SVD0ke1JFRElTX1BPUlQ6LTYzNzl9JwogICAgICAtICdEQl9IT1NUPSR7REJfSE9TVDotbWFyaWFkYn0nCiAgICAgIC0gJ0RCX1BPUlQ9JHtEQl9QT1JUOi0zMzA2fScKICAgICAgLSAnREJfREFUQUJBU0U9JHtEQl9EQVRBQkFTRTotaW52b2ljZW5pbmphfScKICAgICAgLSAnREJfVVNFUk5BTUU9JHtTRVJWSUNFX1VTRVJfTUFSSUFEQn0nCiAgICAgIC0gJ0RCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NQVJJQURCfScKICAgICAgLSAnSU5fVVNFUl9FTUFJTD0ke0lOX1VTRVJfRU1BSUw6LWFkbWluQGV4YW1wbGUuY29tfScKICAgICAgLSAnSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0lOVk9JQ0VOSU5KQVVTRVJ9JwogICAgICAtICdNQUlMX01BSUxFUj0ke01BSUxfTUFJTEVSOi1sb2d9JwogICAgICAtICdNQUlMX0hPU1Q9JHtNQUlMX0hPU1R9JwogICAgICAtICdNQUlMX1BPUlQ9JHtNQUlMX1BPUlR9JwogICAgICAtICdNQUlMX1VTRVJOQU1FPSR7TUFJTF9VU0VSTkFNRX0nCiAgICAgIC0gJ01BSUxfUEFTU1dPUkQ9JHtNQUlMX1BBU1NXT1JEfScKICAgICAgLSAnTUFJTF9FTkNSWVBUSU9OPSR7TUFJTF9FTkNSWVBUSU9OfScKICAgICAgLSAnTUFJTF9GUk9NX0FERFJFU1M9JHtNQUlMX0ZST01fQUREUkVTU30nCiAgICAgIC0gJ01BSUxfRlJPTV9OQU1FPSR7TUFJTF9GUk9NX05BTUV9JwogICAgICAtICdBV1NfQUNDRVNTX0tFWV9JRD0ke0FXU19BQ0NFU1NfS0VZX0lEfScKICAgICAgLSAnQVdTX1NFQ1JFVF9BQ0NFU1NfS0VZPSR7QVdTX1NFQ1JFVF9BQ0NFU1NfS0VZfScKICAgICAgLSAnQVdTX0RFRkFVTFRfUkVHSU9OPSR7QVdTX0RFRkFVTFRfUkVHSU9OfScKICAgICAgLSAnQVdTX0JVQ0tFVD0ke0FXU19CVUNLRVR9JwogICAgICAtICdBV1NfVVJMPSR7QVdTX1VSTH0nCiAgICAgIC0gJ0FXU19FTkRQT0lOVD0ke0FXU19FTkRQT0lOVH0nCiAgICAgIC0gJ05PUkRJR0VOX1NFQ1JFVF9JRD0ke05PUkRJR0VOX1NFQ1JFVF9JRH0nCiAgICAgIC0gJ05PUkRJR0VOX1NFQ1JFVF9LRVk9JHtOT1JESUdFTl9TRUNSRVRfS0VZfScKICAgICAgLSBJU19ET0NLRVI9dHJ1ZQogICAgICAtICdTQ09VVF9EUklWRVI9JHtTQ09VVF9EUklWRVJ9JwogICAgICAtICdMSUNFTlNFX0tFWT0ke0xJQ0VOU0VfS0VZfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBlY2hvCiAgICAgICAgLSBvawogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgICB2b2x1bWVzOgogICAgICAtICdpbnZvaWNlLW5pbmphLXB1YmxpYzovdmFyL3d3dy9hcHAvcHVibGljJwogICAgICAtICdpbnZvaWNlLW5pbmphLXN0b3JhZ2U6L3Zhci93d3cvYXBwL3N0b3JhZ2UnCiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL3N1cGVydmlzb3JkLmNvbmYKICAgICAgICB0YXJnZXQ6IC9ldGMvc3VwZXJ2aXNvcmQuY29uZgogICAgICAgIGNvbnRlbnQ6ICJbc3VwZXJ2aXNvcmRdXG5ub2RhZW1vbj10cnVlXG5waWRmaWxlPS90bXAvc3VwZXJ2aXNvcmQucGlkXG5sb2dmaWxlPS9kZXYvbnVsbCA7IG5vZGFlbW9uIHdpbGwgY2F1c2UgbG9ncyB0byBnbyB0byBzdGRvdXRcbmxvZ2ZpbGVfbWF4Ynl0ZXM9MFxubG9nbGV2ZWw9aW5mb1xuXG5bcHJvZ3JhbTpwaHAtZnBtXVxucmVkaXJlY3Rfc3RkZXJyPXRydWVcbnN0ZG91dF9sb2dmaWxlPS9kZXYvc3Rkb3V0XG5zdGRvdXRfbG9nZmlsZV9tYXhieXRlcz0wXG5zdGRlcnJfbG9nZmlsZT0vZGV2L3N0ZGVyclxuc3RkZXJyX2xvZ2ZpbGVfbWF4Ynl0ZXM9MFxuY29tbWFuZD1waHAgYXJ0aXNhbiBzZXJ2ZSAtLWhvc3QgMC4wLjAuMCAtLXBvcnQgOTAwMFxuXG5bcHJvZ3JhbTpzY2hlZHVsZXJdXG5hdXRvcmVzdGFydD10cnVlXG5yZWRpcmVjdF9zdGRlcnI9dHJ1ZVxuc3Rkb3V0X2xvZ2ZpbGU9L2Rldi9zdGRvdXRcbnN0ZG91dF9sb2dmaWxlX21heGJ5dGVzPTBcbnN0ZGVycl9sb2dmaWxlPS9kZXYvc3RkZXJyXG5zdGRlcnJfbG9nZmlsZV9tYXhieXRlcz0wXG5jb21tYW5kPXBocCBhcnRpc2FuIHNjaGVkdWxlOndvcmtcblxuW3Byb2dyYW06cXVldWUtd29ya2VyXVxucHJvY2Vzc19uYW1lPSUocHJvZ3JhbV9uYW1lKXNfJShwcm9jZXNzX251bSkwMmRcbmF1dG9yZXN0YXJ0PXRydWVcbnJlZGlyZWN0X3N0ZGVycj10cnVlXG5zdGRvdXRfbG9nZmlsZT0vZGV2L3N0ZG91dFxuc3Rkb3V0X2xvZ2ZpbGVfbWF4Ynl0ZXM9MFxuc3RkZXJyX2xvZ2ZpbGU9L2Rldi9zdGRlcnJcbnN0ZGVycl9sb2dmaWxlX21heGJ5dGVzPTBcbm51bXByb2NzPTJcbmNvbW1hbmQ9cGhwIGFydGlzYW4gcXVldWU6d29yayAtLXNsZWVwPTMgLS10cmllcz0xIC0tbWVtb3J5PTI1NiAtLXRpbWVvdXQ9MzYwMFxuXG5bZXZlbnRsaXN0ZW5lcjpzaHV0ZG93bl1cbmNvbW1hbmQ9c2h1dGRvd24uc2hcbmV2ZW50cz1QUk9DRVNTX1NUQVRFX1NUT1BQRUQsIFBST0NFU1NfU1RBVEVfRVhJVEVELCBQUk9DRVNTX1NUQVRFX0ZBVEFMXG5zdGRvdXRfbG9nZmlsZT0vZGV2L3N0ZG91dFxuc3Rkb3V0X2xvZ2ZpbGVfbWF4Ynl0ZXM9MFxuc3RkZXJyX2xvZ2ZpbGU9L2Rldi9zdGRlcnJcbnN0ZGVycl9sb2dmaWxlX21heGJ5dGVzPTBcbiIKICAgICAgLQogICAgICAgIHR5cGU6IGJpbmQKICAgICAgICBzb3VyY2U6IC4vcGhwLmluaQogICAgICAgIHRhcmdldDogL3Vzci9sb2NhbC9ldGMvcGhwL3BocC5pbmkKICAgICAgICBjb250ZW50OiAic2Vzc2lvbi5hdXRvX3N0YXJ0ID0gT2ZmXG5zaG9ydF9vcGVuX3RhZyA9IE9mZlxuXG5lcnJvcl9yZXBvcnRpbmcgPSBFX0FMTCAmIH5FX05PVElDRSAmIH5FX1dBUk5JTkcgJiB+RV9TVFJJQ1QgJiB+RV9ERVBSRUNBVEVEXG5cbjsgb3BjYWNoZS5lbmFibGU9MVxuOyBvcGNhY2hlLnByZWxvYWQ9L3Nydi93d3cvaW52b2ljZW5pbmphL2N1cnJlbnQvcHJlbG9hZC5waHBcbjsgb3BjYWNoZS5wcmVsb2FkX3VzZXI9d3d3LWRhdGFcblxuOyA7IFRoZSBPUGNhY2hlIHNoYXJlZCBtZW1vcnkgc3RvcmFnZSBzaXplLlxuOyBvcGNhY2hlLm1heF9hY2NlbGVyYXRlZF9maWxlcz0zMDAwMDBcbjsgb3BjYWNoZS52YWxpZGF0ZV90aW1lc3RhbXBzPTFcbjsgb3BjYWNoZS5yZXZhbGlkYXRlX2ZyZXE9MzBcbjsgb3BjYWNoZS5qaXRfYnVmZmVyX3NpemU9MjU2TVxuOyBvcGNhY2hlLmppdD0xMjA1XG47IG9wY2FjaGUubWVtb3J5X2NvbnN1bXB0aW9uPTEwMjRNXG5cbnBvc3RfbWF4X3NpemUgPSA2ME1cbnVwbG9hZF9tYXhfZmlsZXNpemUgPSA1ME1cbm1lbW9yeV9saW1pdD01MTJNXG4iCiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL3BocC1jbGkuaW5pCiAgICAgICAgdGFyZ2V0OiAvdXNyL2xvY2FsL2V0Yy9waHAvcGhwLWNsaS5pbmkKICAgICAgICBjb250ZW50OiAic2Vzc2lvbi5hdXRvX3N0YXJ0ID0gT2ZmXG5zaG9ydF9vcGVuX3RhZyA9IE9mZlxuXG5lcnJvcl9yZXBvcnRpbmcgPSBFX0FMTCAmIH5FX05PVElDRSAmIH5FX1dBUk5JTkcgJiB+RV9TVFJJQ1QgJiB+RV9ERVBSRUNBVEVEXG5cbjsgb3BjYWNoZS5lbmFibGVfY2xpPTFcbjsgb3BjYWNoZS5mYXN0X3NodXRkb3duPTFcbjsgb3BjYWNoZS5tZW1vcnlfY29uc3VtcHRpb249MjU2XG47IG9wY2FjaGUuaW50ZXJuZWRfc3RyaW5nc19idWZmZXI9OFxuOyBvcGNhY2hlLm1heF9hY2NlbGVyYXRlZF9maWxlcz00MDAwXG47IG9wY2FjaGUucmV2YWxpZGF0ZV9mcmVxPTYwXG47ICMgaHR0cDovL3N5bWZvbnkuY29tL2RvYy9jdXJyZW50L3BlcmZvcm1hbmNlLmh0bWxcbjsgcmVhbHBhdGhfY2FjaGVfc2l6ZSA9IDQwOTZLXG47IHJlYWxwYXRoX2NhY2hlX3R0bCA9IDYwMFxuXG5tZW1vcnlfbGltaXQgPSAyR1xucG9zdF9tYXhfc2l6ZSA9IDYwTVxudXBsb2FkX21heF9maWxlc2l6ZSA9IDUwTVxuIgogICAgZGVwZW5kc19vbjoKICAgICAgbWFyaWFkYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogIG1hcmlhZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICB2b2x1bWVzOgogICAgICAtICdtYXJpYWRiLWRhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTUFSSUFEQlJPT1R9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke0RCX0RBVEFCQVNFOi1pbnZvaWNlbmluamF9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX01BUklBREJ9JwogICAgICAtICdNWVNRTF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTUFSSUFEQn0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICByZWRpczoKICAgIGltYWdlOiAncmVkaXM6Ny40LWFscGluZScKICAgIGNvbW1hbmQ6ICdyZWRpcy1zZXJ2ZXIgLS1yZXF1aXJlcGFzcyAke1NFUlZJQ0VfUEFTU1dPUkRfUkVESVN9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1JFRElTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9SRURJU30nCiAgICB2b2x1bWVzOgogICAgICAtICdpbnZvaWNlLW5pbmphLXJlZGlzLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gcmVkaXMtY2xpCiAgICAgICAgLSAnLWEnCiAgICAgICAgLSAnJHtTRVJWSUNFX1BBU1NXT1JEX1JFRElTfScKICAgICAgICAtIHBpbmcKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1Cg==",
+        "tags": [
+            "invoicing",
+            "billing",
+            "accounting",
+            "finance",
+            "self-hosted"
+        ],
+        "category": "finance",
+        "logo": "svgs/invoiceninja.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "9000"
+    },
     "it-tools": {
         "documentation": "https://github.com/corentinth/it-tools?utm_source=coolify.io",
         "slogan": "IT Tools is a self-hosted solution for managing various IT tasks.",
@@ -2364,6 +2667,23 @@
         "logo": "svgs/jitsi.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-04-24T09:40:01+05:30",
+        "port": "80"
+    },
+    "joomla-with-mariadb": {
+        "documentation": "https://joomla.org?utm_source=coolify.io",
+        "slogan": "Joomla! is the mobile-ready and user-friendly way to build your website. Choose from thousands of features and designs. Joomla! is free and open source.",
+        "compose": "c2VydmljZXM6CiAgam9vbWxhOgogICAgaW1hZ2U6ICdqb29tbGE6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnam9vbWxhX2RhdGE6L3Zhci93d3cvaHRtbCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0pPT01MQQogICAgICAtIEpPT01MQV9EQl9IT1NUPW1hcmlhZGIKICAgICAgLSAnSk9PTUxBX0RCX1VTRVI9JHtTRVJWSUNFX1VTRVJfSk9PTUxBfScKICAgICAgLSAnSk9PTUxBX0RCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9KT09NTEF9JwogICAgICAtICdKT09NTEFfREJfTkFNRT0ke01ZU1FMX0RBVEFCQVNFOi1qb29tbGEtZGJ9JwogICAgZGVwZW5kc19vbjoKICAgICAgbWFyaWFkYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDEwCiAgbWFyaWFkYjoKICAgIGltYWdlOiAnbWFyaWFkYjoxMScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2pvb21sYV9tYXJpYWRiX2RhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUk9PVH0nCiAgICAgIC0gJ01ZU1FMX0RBVEFCQVNFPSR7TVlTUUxfREFUQUJBU0U6LWpvb21sYS1kYn0nCiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfSk9PTUxBfScKICAgICAgLSAnTVlTUUxfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0pPT01MQX0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "mariadb"
+        ],
+        "category": "cms",
+        "logo": "svgs/joomla.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
         "port": "80"
     },
     "joplin": {
@@ -2470,6 +2790,20 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
+    "kimai": {
+        "documentation": "https://www.kimai.org/?utm_source=coolify.io",
+        "slogan": "Open source time-tracking app.",
+        "compose": "c2VydmljZXM6CiAgbXlzcWw6CiAgICBpbWFnZTogJ215c3FsOjgnCiAgICB2b2x1bWVzOgogICAgICAtICdraW1haS1teXNxbC1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX0RBVEFCQVNFPSR7TVlTUUxfREFUQUJBU0U6LWtpbWFpfScKICAgICAgLSAnTVlTUUxfVVNFUj0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JPT1R9JwogICAgY29tbWFuZDogJy0tZGVmYXVsdC1zdG9yYWdlLWVuZ2luZSBpbm5vZGInCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gbXlzcWxhZG1pbgogICAgICAgIC0gcGluZwogICAgICAgIC0gJy1oJwogICAgICAgIC0gMTI3LjAuMC4xCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBraW1haToKICAgIGltYWdlOiAna2ltYWkva2ltYWkyOmFwYWNoZScKICAgIGNvbnRhaW5lcl9uYW1lOiBraW1haQogICAgZGVwZW5kc19vbjoKICAgICAgbXlzcWw6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2tpbWFpLWRhdGE6L29wdC9raW1haS92YXIvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0tJTUFJXzgwMDEKICAgICAgLSAnQVBQX1NFQ1JFVD0ke1NFUlZJQ0VfUEFTU1dPUkRfQVBQU0VDUkVUfScKICAgICAgLSAnTUFJTEVSX0ZST009JHtNQUlMRVJfRlJPTTota2ltYWlAZXhhbXBsZS5jb219JwogICAgICAtICdNQUlMRVJfVVJMPSR7TUFJTEVSX1VSTDotbnVsbDovL251bGx9JwogICAgICAtICdBRE1JTk1BSUw9JHtBRE1JTk1BSUw6LWFkbWluQGtpbWFpLmxvY2FsfScKICAgICAgLSAnQURNSU5QQVNTPSR7U0VSVklDRV9QQVNTV09SRF9BRE1JTlBBU1N9JwogICAgICAtICdEQVRBQkFTRV9VUkw9bXlzcWw6Ly8ke1NFUlZJQ0VfVVNFUl9NWVNRTH06JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMfUBteXNxbC8ke01ZU1FMX0RBVEFCQVNFfT9jaGFyc2V0PXV0ZjhtYjQmc2VydmVyVmVyc2lvbj04LjMuMCcKICAgICAgLSAnVFJVU1RFRF9IT1NUUz0ke1RSVVNURURfSE9TVFN9fGxvY2FsaG9zdHwxMjcuMC4wLjEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODAwMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "time-tracking",
+            "open-source"
+        ],
+        "category": "productivity",
+        "logo": "svgs/kimai.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "8001"
+    },
     "kuzzle": {
         "documentation": "https://kuzzle.io?utm_source=coolify.io",
         "slogan": "Kuzzle is a generic backend offering the basic building blocks common to every application.",
@@ -2564,6 +2898,24 @@
         "template_last_updated_at": "2026-10-19T17:18:16+02:00",
         "port": "3000"
     },
+    "leantime": {
+        "documentation": "https://leantime.io?utm_source=coolify.io",
+        "slogan": "Leantime is a goals focused project management system for non-project managers.",
+        "compose": "c2VydmljZXM6CiAgbGVhbnRpbWU6CiAgICBpbWFnZTogJ2xlYW50aW1lL2xlYW50aW1lOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0xFQU5USU1FXzgwODAKICAgICAgLSAnTEVBTl9BUFBfVVJMPSR7U0VSVklDRV9VUkxfTEVBTlRJTUV9JwogICAgICAtIExFQU5fREJfSE9TVD1teXNxbAogICAgICAtICdMRUFOX0RCX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUxEQn0nCiAgICAgIC0gJ0xFQU5fREJfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMREJ9JwogICAgICAtICdMRUFOX0RCX0RBVEFCQVNFPSR7REJfTkFNRTotbGVhbnRpbWUtZGJ9JwogICAgICAtICdMRUFOX1NFU1NJT05fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEXzY0X1NBTFR9JwogICAgICAtICdMRUFOX1NFU1NJT05fRVhQSVJBVElPTj0ke1NFU1NJT05fRVhQSVJBVElPTjotMjg4MDB9JwogICAgICAtICdMRUFOX1VTRV9SRURJUz0ke1VTRV9SRURJUzotdHJ1ZX0nCiAgICAgIC0gTEVBTl9SRURJU19IT1NUPXJlZGlzCiAgICAgIC0gJ0xFQU5fUkVESVNfUE9SVD0ke1JFRElTX1BPUlQ6LTYzNzl9JwogICAgICAtICdMRUFOX1JFRElTX1NDSEVNRT0ke1JFRElTX1NDSEVNRTotdGNwfScKICAgIGRlcGVuZHNfb246CiAgICAgIG15c3FsOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9zdGFydGVkCiAgICB2b2x1bWVzOgogICAgICAtICdwdWJsaWMtdXNlcmZpbGVzOi92YXIvd3d3L2h0bWwvcHVibGljL3VzZXJmaWxlcycKICAgICAgLSAndXNlcmZpbGVzOi92YXIvd3d3L2h0bWwvdXNlcmZpbGVzJwogICAgICAtICdwbHVnaW5zOi92YXIvd3d3L2h0bWwvYXBwL1BsdWdpbnMnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODA4MCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIG15c3FsOgogICAgaW1hZ2U6ICdteXNxbDo4LjQnCiAgICB2b2x1bWVzOgogICAgICAtICdsZWFudGltZV9teXNxbF9kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMUk9PVH0nCiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUxEQn0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTERCfScKICAgICAgLSAnTVlTUUxfREFUQUJBU0U9JHtEQl9OQU1FOi1sZWFudGltZS1kYn0nCiAgICBjb21tYW5kOiAnLS1jaGFyYWN0ZXItc2V0LXNlcnZlcj1VVEY4TUI0IC0tY29sbGF0aW9uLXNlcnZlcj1VVEY4TUI0X3VuaWNvZGVfY2knCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gbXlzcWxhZG1pbgogICAgICAgIC0gcGluZwogICAgICAgIC0gJy1oJwogICAgICAgIC0gbG9jYWxob3N0CiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMKICByZWRpczoKICAgIGltYWdlOiAncmVkaXM6Ny1hbHBpbmUnCiAgICBjb21tYW5kOiAncmVkaXMtc2VydmVyIC0tYXBwZW5kb25seSB5ZXMnCiAgICB2b2x1bWVzOgogICAgICAtICdsZWFudGltZV9yZWRpc19kYXRhOi9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHJlZGlzLWNsaQogICAgICAgIC0gcGluZwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMwo=",
+        "tags": [
+            "project management",
+            "productivity",
+            "php",
+            "mysql",
+            "laravel",
+            "open source"
+        ],
+        "category": "productivity",
+        "logo": "svgs/leantime.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "8080"
+    },
     "librechat": {
         "documentation": "https://docs.librechat.ai/install/configuration/dotenv.html?utm_source=coolify.io",
         "slogan": "Self-hosted, powerful, and privacy-focused chat UI for multiple AI models",
@@ -2604,6 +2956,20 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
+    "librespeed": {
+        "documentation": "https://github.com/librespeed/speedtest?utm_source=coolify.io",
+        "slogan": "Self-hosted lightweight Speed Test.",
+        "compose": "c2VydmljZXM6CiAgbGlicmVzcGVlZDoKICAgIGNvbnRhaW5lcl9uYW1lOiBsaWJyZXNwZWVkCiAgICBpbWFnZTogJ2doY3IuaW8vbGlicmVzcGVlZC9zcGVlZHRlc3Q6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfTElCUkVTUEVFRF84MgogICAgICAtIE1PREU9c3RhbmRhbG9uZQogICAgICAtIFRFTEVNRVRSWT1mYWxzZQogICAgICAtIERJU1RBTkNFPWttCiAgICAgIC0gV0VCUE9SVD04MgogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6ICdjdXJsIDEyNy4wLjAuMTo4MiB8fCBleGl0IDEnCiAgICAgIHRpbWVvdXQ6IDFzCiAgICAgIGludGVydmFsOiAxbTBzCiAgICAgIHJldHJpZXM6IDEK",
+        "tags": [
+            "speedtest",
+            "internet-speed"
+        ],
+        "category": "devtools",
+        "logo": "svgs/librespeed.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "82"
+    },
     "libretranslate": {
         "documentation": "https://libretranslate.com/docs/?utm_source=coolify.io",
         "slogan": "Free and open-source machine translation API, entirely self-hosted.",
@@ -2617,6 +2983,22 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5000"
+    },
+    "limesurvey": {
+        "documentation": "https://www.limesurvey.org/manual/?utm_source=coolify.io",
+        "slogan": "Simple, quick and anonymous online survey tool that's bursting with juicy insights.",
+        "compose": "c2VydmljZXM6CiAgbGltZXN1cnZleToKICAgIGltYWdlOiAnYWRhbXphbW1pdC9saW1lc3VydmV5OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0xJTUVTVVJWRVlfODAKICAgICAgLSBMSU1FU1VSVkVZX0RCX0hPU1Q9bWFyaWFkYgogICAgICAtICdMSU1FU1VSVkVZX0RCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICAgIC0gJ0xJTUVTVVJWRVlfREJfVVNFUj0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ0xJTUVTVVJWRVlfREJfTkFNRT0ke01ZU1FMX0RBVEFCQVNFOi1saW1lc3VydmV5LWRifScKICAgICAgLSAnTElNRVNVUlZFWV9BRE1JTl9VU0VSPSR7TElNRVNVUlZFWV9BRE1JTl9VU0VSOi1hZG1pbn0nCiAgICAgIC0gJ0xJTUVTVVJWRVlfQURNSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0FETUlOfScKICAgICAgLSAnTElNRVNVUlZFWV9BRE1JTl9OQU1FPSR7TElNRVNVUlZFWV9BRE1JTl9OQU1FOi1BZG1pbn0nCiAgICAgIC0gJ0xJTUVTVVJWRVlfQURNSU5fRU1BSUw9JHtMSU1FU1VSVkVZX0FETUlOX0VNQUlMOi1hZG1pbkBleGFtcGxlLmNvbX0nCiAgICAgIC0gJ0xJTUVTVVJWRVlfRlJPTV9FTUFJTD0ke0xJTUVTVVJWRVlfRlJPTV9FTUFJTH0nCiAgICAgIC0gJ0xJTUVTVVJWRVlfU01UUF9IT1NUPSR7TElNRVNVUlZFWV9TTVRQX0hPU1R9JwogICAgICAtICdMSU1FU1VSVkVZX1NNVFBfVVNFUj0ke0xJTUVTVVJWRVlfU01UUF9VU0VSfScKICAgICAgLSAnTElNRVNVUlZFWV9TTVRQX1BBU1NXT1JEPSR7TElNRVNVUlZFWV9TTVRQX1BBU1NXT1JEfScKICAgICAgLSAnTElNRVNVUlZFWV9TTVRQX1NTTD0ke0xJTUVTVVJWRVlfU01UUF9TU0x9JwogICAgICAtIExJTUVTVVJWRVlfUEhQX1NFU1NJT05fU0FWRV9IQU5ETEVSPXJlZGlzCiAgICAgIC0gJ0xJTUVTVVJWRVlfUEhQX1NFU1NJT05fU0FWRV9QQVRIPXRjcDovL3JlZGlzOjYzNzknCiAgICAgIC0gJ1RaPSR7VFo6LUFtZXJpY2EvSmFtYWljYX0nCiAgICB2b2x1bWVzOgogICAgICAtICdsaW1lc3VydmV5X3BsdWdpbnNfZGF0YTovdmFyL3d3dy9odG1sL3BsdWdpbnMnCiAgICAgIC0gJ2xpbWVzdXJ2ZXlfdXBsb2FkX2RhdGE6L3Zhci93d3cvaHRtbC91cGxvYWQnCiAgICAgIC0gJ2xpbWVzdXJ2ZXlfY29uZmlnX2RhdGE6L3Zhci93d3cvaHRtbC9hcHBsaWNhdGlvbi9jb25maWcnCiAgICAgIC0gJ2xpbWVzdXJ2ZXlfc2Vzc2lvbnNfZGF0YTovdmFyL2xpbWUvc2Vzc2lvbnMnCiAgICBkZXBlbmRzX29uOgogICAgICBtYXJpYWRiOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTAKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUx9JwogICAgICAtICdNWVNRTF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUx9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1saW1lc3VydmV5LWRifScKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUxST09UfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2xpbWVzdXJ2ZXlfbWFyaWFkYl9kYXRhOi92YXIvbGliL215c3FsJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgcmVkaXM6CiAgICBpbWFnZTogJ3JlZGlzOjctYWxwaW5lJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHJlZGlzLWNsaQogICAgICAgIC0gcGluZwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogM3MKICAgICAgcmV0cmllczogMwo=",
+        "tags": [
+            "online survey",
+            "forms",
+            "no code",
+            "open source"
+        ],
+        "category": "productivity",
+        "logo": "svgs/limesurvey.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "linkding-plus": {
         "documentation": "https://linkding.link/?utm_source=coolify.io",
@@ -2884,6 +3266,21 @@
         "template_last_updated_at": "2026-05-12T09:22:15+02:00",
         "port": "9000"
     },
+    "mediawiki": {
+        "documentation": "https://www.mediawiki.org?utm_source=coolify.io",
+        "slogan": "MediaWiki is a collaboration and documentation platform brought to you by a vibrant community.",
+        "compose": "c2VydmljZXM6CiAgbWVkaWF3aWtpOgogICAgaW1hZ2U6ICdtZWRpYXdpa2k6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfTUVESUFXSUtJXzgwCiAgICB2b2x1bWVzOgogICAgICAtICdtZWRpYXdpa2ktaW1hZ2VzOi92YXIvd3d3L2h0bWwvaW1hZ2VzJwogICAgICAtICdtZWRpYXdpa2ktc3FsaXRlOi92YXIvd3d3L2h0bWwvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "wiki",
+            "collaboration",
+            "documentation"
+        ],
+        "category": "cms",
+        "logo": "svgs/mediawiki.ico",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "meilisearch": {
         "documentation": "https://www.meilisearch.com?utm_source=coolify.io",
         "slogan": "MeiliSearch is a powerful, fast, easy to use and deploy search engine.",
@@ -3013,6 +3410,24 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
+    },
+    "mixpost": {
+        "documentation": "https://docs.mixpost.app/lite?utm_source=coolify.io",
+        "slogan": "Mixpost is a robust and versatile social media management software, designed to streamline social media operations and enhance content marketing strategies.",
+        "compose": "c2VydmljZXM6CiAgbWl4cG9zdDoKICAgIGltYWdlOiAnaW5vdmVjdG9yL21peHBvc3Q6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfTUlYUE9TVAogICAgICAtIEFQUF9OQU1FPU1peHBvc3QKICAgICAgLSAnQVBQX0tFWT0ke1NFUlZJQ0VfQkFTRTY0X01JWFBPU1R9JwogICAgICAtIEFQUF9ERUJVRz1mYWxzZQogICAgICAtICdBUFBfRE9NQUlOPSR7U0VSVklDRV9VUkxfTUlYUE9TVH0nCiAgICAgIC0gJ0FQUF9VUkw9JHtTRVJWSUNFX1VSTF9NSVhQT1NUfScKICAgICAgLSAnREJfREFUQUJBU0U9JHtNWVNRTF9EQVRBQkFTRTotbWl4cG9zdF9kYn0nCiAgICAgIC0gJ0RCX1VTRVJOQU1FPSR7U0VSVklDRV9VU0VSX01ZU1FMfScKICAgICAgLSAnREJfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMfScKICAgICAgLSAnU1NMX0VNQUlMPSR7U1NMX0VNQUlMOi11c2VyQGV4YW1wbGUuY29tfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ21peHBvc3Qtc3RvcmFnZTovdmFyL3d3dy9odG1sL3N0b3JhZ2UvYXBwJwogICAgICAtICdtaXhwb3N0LWxvZ3M6L3Zhci93d3cvaHRtbC9zdG9yYWdlL2xvZ3MnCiAgICBkZXBlbmRzX29uOgogICAgICAtIG15c3FsCiAgICAgIC0gcmVkaXMKICBteXNxbDoKICAgIGltYWdlOiAnbXlzcWwvbXlzcWwtc2VydmVyOjguMCcKICAgIGVudmlyb25tZW50OgogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1taXhwb3N0X2RifScKICAgICAgLSAnTVlTUUxfVVNFUj0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMUk9PVH0nCiAgICB2b2x1bWVzOgogICAgICAtICdtaXhwb3N0LW15c3FsOi92YXIvbGliL215c3FsJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIG15c3FsYWRtaW4KICAgICAgICAtIHBpbmcKICAgICAgICAtICctaCcKICAgICAgICAtIDEyNy4wLjAuMQogICAgICAgIC0gJy11cm9vdCcKICAgICAgICAtICctcCR7U0VSVklDRV9QQVNTV09SRF9NWVNRTFJPT1R9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgcmVkaXM6CiAgICBpbWFnZTogJ3JlZGlzOmFscGluZScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSByZWRpcy1jbGkKICAgICAgICAtICctLXJhdycKICAgICAgICAtIGluY3IKICAgICAgICAtIHBpbmcK",
+        "tags": [
+            "social media",
+            "marketing",
+            "content",
+            "management",
+            "automation",
+            "self-hosted"
+        ],
+        "category": "analytics",
+        "logo": "svgs/mixpost.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "mosquitto": {
         "documentation": "https://mosquitto.org/documentation/?utm_source=coolify.io",
@@ -3183,6 +3598,74 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
+    },
+    "nextcloud-with-mariadb": {
+        "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
+        "slogan": "NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.",
+        "compose": "c2VydmljZXM6CiAgbmV4dGNsb3VkOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL25leHRjbG91ZDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9ORVhUQ0xPVURfODAKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSAnVFo9JHtUWjotRXVyb3BlL1BhcmlzfScKICAgICAgLSAnTVlTUUxfREFUQUJBU0U9JHtNQVJJQURCX0RBVEFCQVNFOi1uZXh0Y2xvdWR9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX01BUklBREJ9JwogICAgICAtICdNWVNRTF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTUFSSUFEQn0nCiAgICAgIC0gTVlTUUxfSE9TVD1uZXh0Y2xvdWQtZGIKICAgICAgLSBSRURJU19IT1NUPXJlZGlzCiAgICAgIC0gUkVESVNfUE9SVD02Mzc5CiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtY29uZmlnOi9jb25maWcnCiAgICAgIC0gJ25leHRjbG91ZC1kYXRhOi9kYXRhJwogICAgZGVwZW5kc19vbjoKICAgICAgbmV4dGNsb3VkLWRiOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODAvc3RhdHVzLnBocCcKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUKICBuZXh0Y2xvdWQtZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JPT1R9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01BUklBREJfREFUQUJBU0U6LW5leHRjbG91ZH0nCiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTUFSSUFEQn0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NQVJJQURCfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBoZWFsdGhjaGVjay5zaAogICAgICAgIC0gJy0tY29ubmVjdCcKICAgICAgICAtICctLWlubm9kYl9pbml0aWFsaXplZCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIHJlZGlzOgogICAgaW1hZ2U6ICdyZWRpczo3LjQtYWxwaW5lJwogICAgdm9sdW1lczoKICAgICAgLSAnbmV4dGNsb3VkLXJlZGlzLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gcmVkaXMtY2xpCiAgICAgICAgLSBQSU5HCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMjAK",
+        "tags": [
+            "cloud",
+            "collaboration",
+            "communication",
+            "filestorage",
+            "data"
+        ],
+        "category": "storage",
+        "logo": "svgs/nextcloud.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "nextcloud-with-mysql": {
+        "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
+        "slogan": "NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.",
+        "compose": "c2VydmljZXM6CiAgbmV4dGNsb3VkOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL25leHRjbG91ZDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9ORVhUQ0xPVURfODAKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSAnVFo9JHtUWjotRXVyb3BlL1BhcmlzfScKICAgICAgLSAnTVlTUUxfREFUQUJBU0U9JHtNWVNRTF9EQVRBQkFTRTotbmV4dGNsb3VkfScKICAgICAgLSAnTVlTUUxfVVNFUj0ke1NFUlZJQ0VfVVNFUl9NWVNRTH0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICAgIC0gTVlTUUxfSE9TVD1uZXh0Y2xvdWQtZGIKICAgICAgLSBSRURJU19IT1NUPXJlZGlzCiAgICAgIC0gUkVESVNfUE9SVD02Mzc5CiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtY29uZmlnOi9jb25maWcnCiAgICAgIC0gJ25leHRjbG91ZC1kYXRhOi9kYXRhJwogICAgZGVwZW5kc19vbjoKICAgICAgbmV4dGNsb3VkLWRiOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODAvc3RhdHVzLnBocCcKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUKICBuZXh0Y2xvdWQtZGI6CiAgICBpbWFnZTogJ215c3FsOjguNC4yJwogICAgdm9sdW1lczoKICAgICAgLSAnbmV4dGNsb3VkLW15c3FsLWRhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUk9PVH0nCiAgICAgIC0gJ01ZU1FMX0RBVEFCQVNFPSR7TVlTUUxfREFUQUJBU0U6LW5leHRjbG91ZH0nCiAgICAgIC0gJ01ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUx9JwogICAgICAtICdNWVNRTF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfTVlTUUx9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIG15c3FsYWRtaW4KICAgICAgICAtIHBpbmcKICAgICAgICAtICctaCcKICAgICAgICAtIDEyNy4wLjAuMQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgcmVkaXM6CiAgICBpbWFnZTogJ3JlZGlzOjcuNC1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtcmVkaXMtZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSByZWRpcy1jbGkKICAgICAgICAtIFBJTkcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAyMAo=",
+        "tags": [
+            "cloud",
+            "collaboration",
+            "communication",
+            "filestorage",
+            "data"
+        ],
+        "category": "storage",
+        "logo": "svgs/nextcloud.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "nextcloud-with-postgres": {
+        "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
+        "slogan": "NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.",
+        "compose": "c2VydmljZXM6CiAgbmV4dGNsb3VkOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL25leHRjbG91ZDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9ORVhUQ0xPVURfODAKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSAnVFo9JHtUWjotRXVyb3BlL1BhcmlzfScKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotbmV4dGNsb3VkfScKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU30nCiAgICAgIC0gJ1BPU1RHUkVTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU30nCiAgICAgIC0gUE9TVEdSRVNfSE9TVD1uZXh0Y2xvdWQtZGIKICAgICAgLSBSRURJU19IT1NUPXJlZGlzCiAgICAgIC0gUkVESVNfUE9SVD02Mzc5CiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtY29uZmlnOi9jb25maWcnCiAgICAgIC0gJ25leHRjbG91ZC1kYXRhOi9kYXRhJwogICAgZGVwZW5kc19vbjoKICAgICAgbmV4dGNsb3VkLWRiOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODAvc3RhdHVzLnBocCcKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUKICBuZXh0Y2xvdWQtZGI6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2LWFscGluZScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ25leHRjbG91ZC1wb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTX0RCOi1uZXh0Y2xvdWR9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIHJlZGlzOgogICAgaW1hZ2U6ICdyZWRpczo3LjQtYWxwaW5lJwogICAgdm9sdW1lczoKICAgICAgLSAnbmV4dGNsb3VkLXJlZGlzLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gcmVkaXMtY2xpCiAgICAgICAgLSBQSU5HCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMjAK",
+        "tags": [
+            "cloud",
+            "collaboration",
+            "communication",
+            "filestorage",
+            "data"
+        ],
+        "category": "storage",
+        "logo": "svgs/nextcloud.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "nextcloud": {
+        "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
+        "slogan": "NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.",
+        "compose": "c2VydmljZXM6CiAgbmV4dGNsb3VkOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL25leHRjbG91ZDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9ORVhUQ0xPVURfODAKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSAnVFo9JHtUWjotRXVyb3BlL01hZHJpZH0nCiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtY29uZmlnOi9jb25maWcnCiAgICAgIC0gJ25leHRjbG91ZC1kYXRhOi9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwL3N0YXR1cy5waHAnCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "cloud",
+            "collaboration",
+            "communication",
+            "filestorage",
+            "data"
+        ],
+        "category": "storage",
+        "logo": "svgs/nextcloud.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "nexus-arm": {
         "documentation": "https://help.sonatype.com/en/sonatype-nexus-repository.html?utm_source=coolify.io",
@@ -3591,6 +4074,19 @@
         "template_last_updated_at": "2026-09-28T00:20:58+02:00",
         "port": "2785"
     },
+    "organizr": {
+        "documentation": "https://docs.organizr.app/?utm_source=coolify.io",
+        "slogan": "Homelab Services Organizer",
+        "compose": "c2VydmljZXM6CiAgb3JnYW5penI6CiAgICBpbWFnZTogJ29yZ2FuaXpyL29yZ2FuaXpyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX09SR0FOSVpSXzgwCiAgICAgIC0gJ2JyYW5jaD0ke2JyYW5jaDotdjItbWFzdGVyfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ29yZ2FuaXpyLWRhdGE6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnY3VybCAtc2YgaHR0cDovL2xvY2FsaG9zdDo4MCB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogMXMKICAgICAgcmV0cmllczogMwo=",
+        "tags": [
+            "tool"
+        ],
+        "category": "productivity",
+        "logo": "svgs/organizr.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "overseerr": {
         "documentation": "https://docs.overseerr.dev/getting-started/installation#docker?utm_source=coolify.io",
         "slogan": "Overseerr is a request management and media discovery tool built to work with your existing Plex ecosystem.",
@@ -3645,6 +4141,22 @@
         "template_last_updated_at": "2025-12-02T12:07:14+01:00",
         "port": "8000"
     },
+    "passbolt": {
+        "documentation": "https://www.passbolt.com/ce/docker?utm_source=coolify.io",
+        "slogan": "Passbolt Community Edition (CE) API. The JSON API for the open source password manager for teams!",
+        "compose": "c2VydmljZXM6CiAgcGFzc2JvbHQ6CiAgICBpbWFnZTogJ3Bhc3Nib2x0L3Bhc3Nib2x0OmxhdGVzdC1jZScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX1BBU1NCT0xUCiAgICAgIC0gJ0FQUF9GVUxMX0JBU0VfVVJMPSR7U0VSVklDRV9VUkxfUEFTU0JPTFR9JwogICAgICAtIERBVEFTT1VSQ0VTX0RFRkFVTFRfSE9TVD1tYXJpYWRiCiAgICAgIC0gJ0RBVEFTT1VSQ0VTX0RFRkFVTFRfVVNFUk5BTUU9JHtTRVJWSUNFX1VTRVJfUEFTU0JPTFR9JwogICAgICAtICdEQVRBU09VUkNFU19ERUZBVUxUX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QQVNTQk9MVH0nCiAgICAgIC0gJ0RBVEFTT1VSQ0VTX0RFRkFVTFRfREFUQUJBU0U9JHtNWVNRTF9EQjotcGFzc2JvbHQtZGJ9JwogICAgdm9sdW1lczoKICAgICAgLSAnZ3BnX3ZvbHVtZTovZXRjL3Bhc3Nib2x0L2dwZycKICAgICAgLSAnand0X3ZvbHVtZTovZXRjL3Bhc3Nib2x0L2p3dCcKICAgIGNvbW1hbmQ6CiAgICAgIC0gL3Vzci9iaW4vd2FpdC1mb3Iuc2gKICAgICAgLSAnLXQnCiAgICAgIC0gJzAnCiAgICAgIC0gJ21hcmlhZGI6MzMwNicKICAgICAgLSAnLS0nCiAgICAgIC0gL2RvY2tlci1lbnRyeXBvaW50LnNoCiAgICBkZXBlbmRzX29uOgogICAgICBtYXJpYWRiOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODAnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01BUklBREJfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUk9PVE1BUklBREJ9JwogICAgICAtICdNQVJJQURCX0RBVEFCQVNFPSR7TVlTUUxfREI6LXBhc3Nib2x0LWRifScKICAgICAgLSAnTUFSSUFEQl9VU0VSPSR7U0VSVklDRV9VU0VSX1BBU1NCT0xUfScKICAgICAgLSAnTUFSSUFEQl9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUEFTU0JPTFR9JwogICAgdm9sdW1lczoKICAgICAgLSAncGFzc2JvbHRfbWFyaWFkYl9kYXRhOi92YXIvbGliL215c3FsJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "security",
+            "credentials",
+            "password-manager",
+            "open source"
+        ],
+        "category": "auth",
+        "logo": "svgs/passbolt.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "peertube": {
         "documentation": "https://docs.joinpeertube.org/install/docker?utm_source=coolify.io",
         "slogan": "Free, open-source and decentralized video platform.",
@@ -3678,7 +4190,7 @@
         "category": "productivity",
         "logo": "svgs/penpot.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "8080"
     },
     "penpot": {
@@ -3727,6 +4239,19 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8085"
     },
+    "phpmyadmin": {
+        "documentation": "https://phpmyadmin.net?utm_source=coolify.io",
+        "slogan": "phpMyAdmin is a web-based database management tool for administering your MySQL and MariaDB databases through a user-friendly interface.",
+        "compose": "c2VydmljZXM6CiAgcGhwbXlhZG1pbjoKICAgIGltYWdlOiAnbHNjci5pby9saW51eHNlcnZlci9waHBteWFkbWluOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX1BIUE1ZQURNSU4KICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSBUWj1FdXJvcGUvTWFkcmlkCiAgICAgIC0gUE1BX0FSQklUUkFSWT0xCiAgICAgIC0gUE1BX0FCU09MVVRFX1VSST0kU0VSVklDRV9VUkxfUEhQTVlBRE1JTgogICAgdm9sdW1lczoKICAgICAgLSAncGhwbXlhZG1pbi1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "database management"
+        ],
+        "category": "database",
+        "logo": "svgs/phpmyadmin.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
     "pi-hole": {
         "documentation": "https://pi-hole.net/?utm_source=coolify.io",
         "slogan": "Network-wide Ad Blocking",
@@ -3764,7 +4289,7 @@
         "category": "productivity",
         "logo": "svgs/plane.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "80"
     },
     "plex": {
@@ -3924,6 +4449,20 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "4200"
     },
+    "privatebin": {
+        "documentation": "https://github.com/PrivateBin/PrivateBin/blob/master/doc/README.md?utm_source=coolify.io",
+        "slogan": "PrivateBin is a minimalist, open source online pastebin where the server has zero knowledge of pasted data.",
+        "compose": "c2VydmljZXM6CiAgcHJpdmF0ZWJpbjoKICAgIGltYWdlOiBwcml2YXRlYmluL25naW54LWZwbS1hbHBpbmUKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX1BSSVZBVEVCSU5fODA4MAogICAgdm9sdW1lczoKICAgICAgLSAncHJpdmF0ZWJpbl9kYXRhOi9zcnYvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnd2dldCAtcU8tIGh0dHA6Ly8xMjcuMC4wLjE6ODA4MC8nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "text",
+            "sharing"
+        ],
+        "category": "security",
+        "logo": "svgs/privatebin.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "8080"
+    },
     "prowlarr": {
         "documentation": "https://hub.docker.com/r/linuxserver/prowlarr?utm_source=coolify.io",
         "slogan": "Prowlarr\u2060 is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps.",
@@ -4010,7 +4549,7 @@
         "category": "messaging",
         "logo": "svgs/rabbitmq.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T22:51:15+02:00",
         "port": "15672"
     },
     "radarr": {
@@ -4058,7 +4597,7 @@
         "category": "productivity",
         "logo": "svgs/rxresume.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "3000"
     },
     "readeck": {
@@ -4225,7 +4764,7 @@
         "category": "storage",
         "logo": "svgs/seafile.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:27:15+02:00",
         "port": "80"
     },
     "searxng": {
@@ -4315,6 +4854,25 @@
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
+    "shlink": {
+        "documentation": "https://shlink.io/?utm_source=coolify.io",
+        "slogan": "The definitive self-hosted URL shortener",
+        "compose": "c2VydmljZXM6CiAgc2hsaW5rOgogICAgaW1hZ2U6ICdzaGxpbmtpby9zaGxpbms6c3RhYmxlJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfU0hMSU5LXzgwODAKICAgICAgLSAnREVGQVVMVF9ET01BSU49JHtTRVJWSUNFX0ZRRE5fU0hMSU5LfScKICAgICAgLSBJU19IVFRQU19FTkFCTEVEPWZhbHNlCiAgICAgIC0gJ0lOSVRJQUxfQVBJX0tFWT0ke1NFUlZJQ0VfQkFTRTY0X1NITElOS0FQSUtFWX0nCiAgICB2b2x1bWVzOgogICAgICAtICdzaGxpbmstZGF0YTovZXRjL3NobGluay9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwODAvcmVzdC92My9oZWFsdGgnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUKICBzaGxpbmstd2ViOgogICAgaW1hZ2U6IHNobGlua2lvL3NobGluay13ZWItY2xpZW50CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9TSExJTktXRUJfODA4MAogICAgICAtICdTSExJTktfU0VSVkVSX0FQSV9LRVk9JHtTRVJWSUNFX0JBU0U2NF9TSExJTktBUElLRVl9JwogICAgICAtICdTSExJTktfU0VSVkVSX1VSTD0ke1NFUlZJQ0VfVVJMX1NITElOS30nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODA4MCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "links",
+            "shortener",
+            "sharing",
+            "url",
+            "short",
+            "link",
+            "sharing"
+        ],
+        "category": "productivity",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "8080"
+    },
     "signoz": {
         "documentation": "https://signoz.io/docs/introduction/?utm_source=coolify.io",
         "slogan": "An observability platform native to OpenTelemetry with logs, traces and metrics.",
@@ -4332,7 +4890,7 @@
         "category": "monitoring",
         "logo": "svgs/signoz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T22:46:19+02:00",
         "port": "8080"
     },
     "silverbullet": {
@@ -4557,7 +5115,7 @@
         "category": "backend",
         "logo": "svgs/supabase.svg",
         "minversion": "4.0.0-beta.228",
-        "template_last_updated_at": "2026-10-18T23:43:20+02:00",
+        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
         "port": "8000"
     },
     "superset-with-postgresql": {
@@ -5233,6 +5791,56 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-01-05T15:54:25+01:00",
         "port": "8000"
+    },
+    "wordpress-with-mariadb": {
+        "documentation": "https://wordpress.org?utm_source=coolify.io",
+        "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",
+        "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9XT1JEUFJFU1MKICAgICAgLSBXT1JEUFJFU1NfREJfSE9TVD1tYXJpYWRiCiAgICAgIC0gV09SRFBSRVNTX0RCX1VTRVI9JFNFUlZJQ0VfVVNFUl9XT1JEUFJFU1MKICAgICAgLSBXT1JEUFJFU1NfREJfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfV09SRFBSRVNTCiAgICAgIC0gV09SRFBSRVNTX0RCX05BTUU9d29yZHByZXNzCiAgICBkZXBlbmRzX29uOgogICAgICAtIG1hcmlhZGIKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAogIG1hcmlhZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICB2b2x1bWVzOgogICAgICAtICdtYXJpYWRiLWRhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBNWVNRTF9ST09UX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1JPT1QKICAgICAgLSBNWVNRTF9EQVRBQkFTRT13b3JkcHJlc3MKICAgICAgLSBNWVNRTF9VU0VSPSRTRVJWSUNFX1VTRVJfV09SRFBSRVNTCiAgICAgIC0gTVlTUUxfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfV09SRFBSRVNTCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "mariadb"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "wordpress-with-mysql": {
+        "documentation": "https://wordpress.org?utm_source=coolify.io",
+        "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",
+        "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9XT1JEUFJFU1MKICAgICAgLSBXT1JEUFJFU1NfREJfSE9TVD1teXNxbAogICAgICAtIFdPUkRQUkVTU19EQl9VU0VSPSRTRVJWSUNFX1VTRVJfV09SRFBSRVNTCiAgICAgIC0gV09SRFBSRVNTX0RCX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgICAtIFdPUkRQUkVTU19EQl9OQU1FPXdvcmRwcmVzcwogICAgZGVwZW5kc19vbjoKICAgICAgLSBteXNxbAogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDEwCiAgbXlzcWw6CiAgICBpbWFnZTogJ215c3FsOjgnCiAgICB2b2x1bWVzOgogICAgICAtICdteXNxbC1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTVlTUUxfUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9ST09UCiAgICAgIC0gTVlTUUxfREFUQUJBU0U9d29yZHByZXNzCiAgICAgIC0gTVlTUUxfVVNFUj0kU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICAtIE1ZU1FMX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIG15c3FsYWRtaW4KICAgICAgICAtIHBpbmcKICAgICAgICAtICctaCcKICAgICAgICAtIDEyNy4wLjAuMQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "mysql"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
+    },
+    "wordpress-without-database": {
+        "documentation": "https://wordpress.org?utm_source=coolify.io",
+        "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",
+        "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9XT1JEUFJFU1MKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "port": "80"
     },
     "yamtrack-with-postgresql": {
         "documentation": "https://github.com/FuzzyGrim/Yamtrack/wiki?utm_source=coolify.io",
