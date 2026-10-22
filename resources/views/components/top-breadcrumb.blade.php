@@ -116,7 +116,7 @@
             this.titleRepeats = expected !== '' && title === expected;
         },
     }"
-    x-init="syncTitle()" @livewire:navigated.window="$nextTick(() => syncTitle())">
+    x-init="syncTitle()" x-on:livewire:navigated.window="$nextTick(() => syncTitle())">
     {{-- Team --}}
     <div class="shrink-0" x-data="{ collapsed: false }">
         <livewire:switch-team />
