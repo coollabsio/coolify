@@ -104,15 +104,27 @@
         default => null,
     };
 @endphp
-<div class="flex min-w-0 items-center gap-0.5 text-[13px]">
+<div class="flex min-w-0 items-center gap-0.5 text-[13px]" data-page-context="{{ $dashboardContext }}"
+    x-data="{
+        titleRepeats: false,
+        syncTitle() {
+            const expected = this.$el.dataset.pageContext || '';
+            const heading = document.querySelector('.app-main h1');
+            const title = heading && heading.offsetHeight > 0 && heading.getBoundingClientRect().top < 140
+                ? heading.textContent.trim()
+                : '';
+            this.titleRepeats = expected !== '' && title === expected;
+        },
+    }"
+    x-init="syncTitle()" @livewire:navigated.window="$nextTick(() => syncTitle())">
     {{-- Team --}}
     <div class="shrink-0" x-data="{ collapsed: false }">
         <livewire:switch-team />
     </div>
 
     @if (!$currentProject && $dashboardContext)
-        <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
-        <span
+        <span x-show="!titleRepeats" x-cloak class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
+        <span x-show="!titleRepeats" x-cloak
             class="flex h-8 min-w-0 items-center truncate px-2 font-semibold text-black opacity-70 dark:text-fg">{{ $dashboardContext }}</span>
     @endif
 

@@ -142,7 +142,7 @@
 }
 
 @utility loading-indicator {
-    @apply text-coollabs dark:text-warning;
+    @apply text-coollabs dark:text-brand-light;
 }
 
 /* Compact icon-only control (gear, chevrons, etc.) */
@@ -162,7 +162,7 @@
 
 /* Active resource tab (used with aria-current="page") */
 @utility app-tab-active {
-    @apply bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20;
+    @apply bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25 dark:hover:bg-brand/20;
 }
 
 @utility auth-tooltip {
@@ -271,7 +271,7 @@
 }
 
 @utility heading-item-active {
-    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning;
+    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-brand-light;
 }
 
 @utility icon {
@@ -299,7 +299,7 @@
 }
 
 @utility kbd-custom {
-    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-warning;
+    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-brand-light;
 }
 
 @utility box {

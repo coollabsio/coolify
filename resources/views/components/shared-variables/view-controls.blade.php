@@ -13,12 +13,14 @@
         </button>
     </div>
 
-    {{-- Only the view you can switch to, with its name (as components/canvas-view-toggle.blade.php). --}}
+    {{-- Every view stays visible. The current one is the selected pill. --}}
     <div class="view-toggle w-fit">
         @foreach (['list' => ['List view', 'unordered-list'], 'grid' => ['Grid view', 'grid']] as $mode => [$viewLabel, $icon])
             <button type="button" @click="viewMode = '{{ $mode }}'; localStorage.setItem('{{ $storageKey }}', '{{ $mode }}')"
-                x-show="viewMode !== '{{ $mode }}'" x-cloak title="{{ $viewLabel }}"
-                class="relative flex h-7.5 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                title="{{ $viewLabel }}"
+                class="relative flex h-7.5 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors"
+                :class="viewMode === '{{ $mode }}' ? 'is-selected' : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:hover:text-white'"
+                :aria-pressed="(viewMode === '{{ $mode }}').toString()">
                 <x-reicon :name="$icon" class="size-3.5" />
                 {{ $viewLabel }}
             </button>

@@ -120,7 +120,7 @@
                 @foreach ($items as $item)
                     <a @class([
                         'app-tab shrink-0',
-                        'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $item['active'],
+                        'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25 dark:hover:bg-brand/20' => $item['active'],
                     ])
                         {{ wireNavigate() }} href="{{ route($item['route'], $parameters) }}">
                         @if ($item['icon'] ?? null)
