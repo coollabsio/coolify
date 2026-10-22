@@ -5693,7 +5693,7 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.si
     box-shadow: none;
 }
 
-html.dark:where(:not([data-nav-items="flat"])) .app-sidebar :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon {
+html.dark:where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon {
     border-color: rgb(163 145 255 / 0.13);
     background: rgb(107 22 237 / 0.07);
     color: #b9adff;
@@ -5713,7 +5713,7 @@ html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):no
 }
 
 /* Admin stays a neutral tile unless it is the current page. */
-html.dark .app-sidebar .nav-admin:not(.menu-item-active) .menu-item-icon {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .nav-admin:not(.menu-item-active) .menu-item-icon {
     color: oklch(72% 0 0);
     background: rgb(255 255 255 / 0.03);
     border-color: rgb(255 255 255 / 0.07);
@@ -6023,24 +6023,24 @@ html.dark .app-topbar-brand {
     border-right-color: rgb(163 145 255 / 0.10);
 }
 
-html.dark .app-sidebar .sidebar-footer {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer {
     background-color: transparent;
 }
 
-html.dark .app-sidebar .menu-search {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search {
     background-color: rgb(163 145 255 / 0.06) !important;
     box-shadow: inset 0 0 0 1px rgb(163 145 255 / 0.10) !important;
 }
 
-html.dark .app-sidebar .menu-search:hover {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search:hover {
     background-color: rgb(163 145 255 / 0.10) !important;
 }
 
-html.dark .app-sidebar .menu-search kbd {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search kbd {
     border-color: rgb(163 145 255 / 0.18) !important;
 }
 
-html.dark .app-sidebar nav:not(.sidebar-collapsed) .nav-section {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) nav:not(.sidebar-collapsed) .nav-section {
     font-family: var(--font-mono);
     font-size: 10.5px;
     font-weight: 500;
