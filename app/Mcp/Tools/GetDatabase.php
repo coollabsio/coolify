@@ -8,12 +8,14 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetDatabase extends Tool
 {
     protected string $name = 'get_database';
 
-    protected string $description = 'Get full details for a standalone database by UUID. Detects type across postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse.';
+    protected string $description = 'Get full details for a standalone database by UUID. Detects type across postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse, sqlite.';
 
     use BuildsResponse;
     use ResolvesTeam;

@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Enums\ServerRole;
+use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
@@ -21,9 +23,11 @@ use OpenApi\Attributes as OA;
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
+        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use server_role instead. true when server_role is build.'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
+        'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean'],
         'is_logdrain_custom_enabled' => ['type' => 'boolean'],
         'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
@@ -35,6 +39,8 @@ use OpenApi\Attributes as OA;
         'traffic_retention_1d_days' => ['type' => 'integer'],
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
+        'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
+        'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -43,6 +49,9 @@ use OpenApi\Attributes as OA;
         'is_usable' => ['type' => 'boolean'],
         'logdrain_axiom_api_key' => ['type' => 'string'],
         'logdrain_axiom_dataset_name' => ['type' => 'string'],
+        'logdrain_cloudwatch_region' => ['type' => 'string'],
+        'logdrain_cloudwatch_group' => ['type' => 'string'],
+        'logdrain_cloudwatch_stream_prefix' => ['type' => 'string'],
         'logdrain_custom_config' => ['type' => 'string'],
         'logdrain_custom_config_parser' => ['type' => 'string'],
         'logdrain_highlight_project_id' => ['type' => 'string'],
@@ -68,6 +77,16 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    /**
+     * Allowed Traefik certificate resolver names; also keeps the value safe inside generated labels.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_PATTERN = '/^[A-Za-z0-9_-]+$/';
+
+    /**
+     * Resolver value that turns the resolver off (no certresolver label) on a resource or server.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_NONE = 'none';
+
     public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
 
     public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
@@ -84,6 +103,9 @@ class ServerSetting extends Model
         'is_usable',
         'wildcard_domain',
         'is_cloudflare_tunnel',
+        'cloudflare_tunnel_id',
+        'cloudflare_tunnel_account_id',
+        'cloudflare_tunnel_integration_token_id',
         'is_logdrain_newrelic_enabled',
         'logdrain_newrelic_license_key',
         'logdrain_newrelic_base_uri',
@@ -96,6 +118,10 @@ class ServerSetting extends Model
         'is_logdrain_custom_enabled',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'is_logdrain_cloudwatch_enabled',
+        'logdrain_cloudwatch_region',
+        'logdrain_cloudwatch_group',
+        'logdrain_cloudwatch_stream_prefix',
         'concurrent_builds',
         'dynamic_timeout',
         'force_disabled',
@@ -116,6 +142,7 @@ class ServerSetting extends Model
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
         'server_disk_usage_check_frequency',
+        'server_disk_usage_notification_interval_hours',
         'is_terminal_enabled',
         'deployment_queue_limit',
         'backup_compression_cpu_percentage',
@@ -129,10 +156,28 @@ class ServerSetting extends Model
         'is_geoip_enabled',
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
+        'traffic_ip_mode',
+        'traefik_certificate_resolver',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
         'compose_version_checked_at',
+        'patch_check_frequency',
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
+        'is_auto_security_updates_enabled',
+        'auto_security_updates_time',
+    ];
+
+    /**
+     * Model-level defaults that mirror database column defaults, so a freshly
+     * created instance exposes them without a refresh.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_traffic_analytics_enabled' => false,
     ];
 
     protected $casts = [
@@ -155,9 +200,16 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
+        'logdrain_custom_config' => 'encrypted',
+        'traffic_ip_mode' => TrafficIpMode::class,
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
+        'server_disk_usage_notification_interval_hours' => 'integer',
+        'patch_check_result' => 'array',
+        'patch_checked_at' => 'datetime',
+        'is_auto_security_updates_enabled' => 'boolean',
+        'is_logdrain_cloudwatch_enabled' => 'boolean',
     ];
 
     /**
@@ -194,6 +246,8 @@ class ServerSetting extends Model
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('is_metrics_enabled') ||
+                $settings->wasChanged('is_sentinel_debug_enabled') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
                 $settings->wasChanged('sentinel_push_interval_seconds') ||
@@ -203,7 +257,8 @@ class ServerSetting extends Model
                 $settings->wasChanged('traffic_retention_1d_days') ||
                 $settings->wasChanged('is_geoip_enabled') ||
                 $settings->wasChanged('geoip_refresh_days') ||
-                $settings->wasChanged('geoip_maxmind_license_key')
+                $settings->wasChanged('geoip_maxmind_license_key') ||
+                $settings->wasChanged('traffic_ip_mode')
             ) {
                 // Only recreate Sentinel when it is already enabled. Otherwise a change to a
                 // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
@@ -287,7 +342,9 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
-        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+        // The local Sentinel runs on the coolify network. A host gateway URL leaves that network
+        // through the host INPUT chain, where host firewalls such as UFW drop it.
+        if ($this->server->isLocalhost() && strtolower((string) parse_url((string) $url, PHP_URL_HOST)) === 'host.docker.internal') {
             $url = null;
         }
 
@@ -302,6 +359,38 @@ class ServerSetting extends Model
         return $url;
     }
 
+    /**
+     * The Sentinel push URL that the instance URL or public IP gives to a remote server.
+     */
+    public static function instanceSentinelUrl(?string $fqdn, ?string $publicIpv4, ?string $publicIpv6): ?string
+    {
+        return match (true) {
+            filled($fqdn) => $fqdn,
+            filled($publicIpv4) => 'http://'.$publicIpv4.':8000',
+            filled($publicIpv6) => 'http://'.formatHostForUrl($publicIpv6).':8000',
+            default => null,
+        };
+    }
+
+    /**
+     * Move remote servers that use the generated Sentinel URL to the new instance URL. Saving the
+     * new URL restarts their Sentinel. Servers with a custom URL keep it.
+     */
+    public static function followInstanceUrlChange(?string $oldUrl, ?string $newUrl): void
+    {
+        if (blank($oldUrl) || blank($newUrl) || $oldUrl === $newUrl) {
+            return;
+        }
+
+        self::query()
+            ->where('sentinel_custom_url', $oldUrl)
+            ->where('server_id', '!=', 0)
+            ->each(function (ServerSetting $setting) use ($newUrl) {
+                $setting->sentinel_custom_url = $newUrl;
+                $setting->save();
+            });
+    }
+
     public function restoreDefaultSentinelConfiguration(): void
     {
         $this->generateSentinelUrl(save: false, ignoreEvent: true);
@@ -314,18 +403,12 @@ class ServerSetting extends Model
 
     public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
-        $domain = null;
         $settings = InstanceSettings::get();
         if ($this->server->isLocalhost()) {
             $domain = 'http://coolify:8080';
-        } elseif ($settings->fqdn) {
-            $domain = $settings->fqdn;
-        } elseif ($settings->public_ipv4) {
-            $domain = 'http://'.$settings->public_ipv4.':8000';
-        } elseif ($settings->public_ipv6) {
-            $domain = 'http://'.$settings->public_ipv6.':8000';
         } else {
-            $domain = $this->sentinelUrlFromCurrentRequest();
+            $domain = self::instanceSentinelUrl($settings->fqdn, $settings->public_ipv4, $settings->public_ipv6)
+                ?? $this->sentinelUrlFromCurrentRequest();
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
@@ -346,7 +429,7 @@ class ServerSetting extends Model
         }
 
         $request = request();
-        $host = strtolower($request->getHost());
+        $host = normalizeIpAddress(strtolower($request->getHost()));
 
         if (
             $host === 'localhost' ||
@@ -377,5 +460,28 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    /**
+     * Summary of the saved patch check, or null when the server was never checked.
+     * Results saved before security and reboot detection count as 0 and false.
+     *
+     * @return array{updates: int, security: int, reboot_required: bool, error: ?string, checked_at: Carbon}|null
+     */
+    public function patchStatus(): ?array
+    {
+        if ($this->patch_checked_at === null) {
+            return null;
+        }
+
+        $result = $this->patch_check_result ?? [];
+
+        return [
+            'updates' => (int) ($result['total_updates'] ?? 0),
+            'security' => (int) ($result['security_updates'] ?? 0),
+            'reboot_required' => ($result['reboot_required'] ?? null) === true,
+            'error' => filled($this->patch_check_error) ? $this->patch_check_error : null,
+            'checked_at' => $this->patch_checked_at,
+        ];
     }
 }

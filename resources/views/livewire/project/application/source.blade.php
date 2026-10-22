@@ -74,11 +74,14 @@
                 $currentSourceMorph = $currentSource?->getMorphClass();
                 $currentSourceIsGithub = $currentSourceMorph === \App\Models\GithubApp::class;
                 $currentSourceIsGitlab = $currentSourceMorph === \App\Models\GitlabApp::class;
+                $currentSourceIsGitea = $currentSourceMorph === \App\Models\GiteaApp::class;
                 $currentSourceSubtitle = match (true) {
                     $currentSourceIsGithub && filled(data_get($currentSource, 'organization')) => 'GitHub · '.$currentSource->organization,
                     $currentSourceIsGithub => data_get($currentSource, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
                     $currentSourceIsGitlab && filled(data_get($currentSource, 'group_name')) => 'GitLab · '.$currentSource->group_name,
                     $currentSourceIsGitlab => 'GitLab · Personal account',
+                    $currentSourceIsGitea && filled(data_get($currentSource, 'organization')) => 'Gitea · '.$currentSource->organization,
+                    $currentSourceIsGitea => 'Gitea · Personal account',
                     default => 'Connected source',
                 };
             @endphp
@@ -104,7 +107,7 @@
                                 </p>
                             </div>
                             <x-reicon name="check"
-                                class="size-4 shrink-0 text-coollabs dark:text-warning" />
+                                class="size-4 shrink-0 text-black dark:text-fg" />
                         </div>
                     @endif
 
@@ -113,11 +116,14 @@
                             $sourceMorph = $source->getMorphClass();
                             $sourceIsGithub = $sourceMorph === \App\Models\GithubApp::class;
                             $sourceIsGitlab = $sourceMorph === \App\Models\GitlabApp::class;
+                            $sourceIsGitea = $sourceMorph === \App\Models\GiteaApp::class;
                             $sourceSubtitle = match (true) {
                                 $sourceIsGithub && filled($source->organization) => 'GitHub · '.$source->organization,
                                 $sourceIsGithub => data_get($source, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
                                 $sourceIsGitlab && filled($source->group_name) => 'GitLab · '.$source->group_name,
                                 $sourceIsGitlab => 'GitLab · Personal account',
+                                $sourceIsGitea && filled($source->organization) => 'Gitea · '.$source->organization,
+                                $sourceIsGitea => 'Gitea · Personal account',
                                 default => 'Git source',
                             };
                         @endphp

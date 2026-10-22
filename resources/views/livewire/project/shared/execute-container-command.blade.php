@@ -41,10 +41,6 @@
         $consoleThemeKeys = collect($consoleThemes)->pluck('key')->values();
         $consoleThemeNames = collect($consoleThemes)->pluck('name', 'key');
         $consoleThemeAccents = collect($consoleThemes)->pluck('accent', 'key');
-        $containerOptions = $containers->map(fn ($container) => [
-            'value' => data_get($container, 'server.uuid').':'.data_get($container, 'container.Names'),
-            'label' => data_get($container, 'container.Names').' · '.data_get($container, 'server.name'),
-        ])->values();
     @endphp
 
     @if (in_array($type, ['application', 'database', 'service', 'server', 'node'], true))
@@ -82,15 +78,20 @@
         <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-none xl:mt-0"
             x-on:terminal-theme-selected="setTheme($event.detail.theme)"
             x-on:terminal-starting.window="syncTheme()"
+            x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode; hasShell = $event.detail.hasShell"
             x-data="{
                 themeKeys: @js($consoleThemeKeys),
                 themeAccents: @js($consoleThemeAccents),
                 consoleTheme: 'system',
                 themeOpen: false,
+                attachAvailable: false,
+                hasShell: true,
+                terminalMode: 'shell',
+                modeOpen: false,
                 containerOpen: false,
                 targetChosen: @js($selected_container !== 'default'),
                 selectedContainer: @entangle('selected_container').live,
-                containerOptions: @js($containerOptions),
+                containerOptions: @entangle('containerOptions'),
                 init() {
                     const savedTheme = localStorage.getItem('coolify-console-theme');
                     this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
@@ -101,6 +102,15 @@
                     this.themeOpen = false;
                     localStorage.setItem('coolify-console-theme', theme);
                     window.dispatchEvent(new CustomEvent('terminal-theme-change', { detail: { theme } }));
+                },
+                setTerminalMode(mode) {
+                    this.modeOpen = false;
+                    if (this.terminalMode === mode || (mode === 'shell' && !this.hasShell)) {
+                        return;
+                    }
+                    this.terminalMode = mode;
+                    window.dispatchEvent(new CustomEvent('terminal-starting'));
+                    Livewire.dispatch('set-terminal-mode', { mode });
                 },
                 syncTheme() {
                     const savedTheme = localStorage.getItem('coolify-console-theme');
@@ -183,8 +193,11 @@
                         </div>
                     @endif
 
-                    <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
-                        :theme-accents="$consoleThemeAccents" />
+                    <div class="ml-auto flex items-center gap-2">
+                        <x-terminal.mode-selector />
+                        <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
+                            :theme-accents="$consoleThemeAccents" />
+                    </div>
                 </header>
 
                 <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">

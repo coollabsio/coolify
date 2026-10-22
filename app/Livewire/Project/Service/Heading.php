@@ -10,14 +10,16 @@ use App\Enums\ProcessStatus;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ResourceStartActivity;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Service $service;
 
@@ -47,13 +49,13 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
             'refresh' => '$refresh',
             'envsUpdated' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => 'serviceChecked',
+            ]),
         ];
     }
 
@@ -103,15 +105,9 @@ class Heading extends Component
         $this->authorizeService('view');
 
         try {
-            $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
-                $this->isDeploymentProgress = true;
-                $this->runningActivityId = $activity->id;
-            } else {
-                $this->isDeploymentProgress = false;
-                $this->runningActivityId = null;
-            }
+            $activity = ResourceStartActivity::latestRunning($this->service->uuid);
+            $this->isDeploymentProgress = $activity !== null;
+            $this->runningActivityId = $activity?->id;
         } catch (\Throwable) {
             $this->isDeploymentProgress = false;
             $this->runningActivityId = null;

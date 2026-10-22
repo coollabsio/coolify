@@ -5,11 +5,13 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Models\ApplicationPreview;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class PreviewDomains extends Component
@@ -18,6 +20,8 @@ class PreviewDomains extends Component
 
     public ApplicationPreview $preview;
 
+    /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
@@ -339,17 +343,18 @@ class PreviewDomains extends Component
         }
 
         $row = $this->domainRows[$index];
+        $statusKey = $this->statusKey($row['url'], $row['service']);
         $checkId = new_public_id();
         $this->domainRows[$index]['dns_status'] = 'checking';
         $this->domainRows[$index]['dns_message'] = 'Checking DNS...';
         $this->domainRows[$index]['check_id'] = $checkId;
-        $this->persistDnsStatuses();
+        $this->persistDnsStatuses([$statusKey]);
 
         try {
             $server = $this->preview->application->destination?->server;
             CheckDomainDnsJob::dispatch(
                 $this->preview,
-                $this->statusKey($row['url'], $row['service']),
+                $statusKey,
                 $row['url'],
                 $server,
                 $server ? serverDnsTargetIp($server) ?? $server->ip : null,
@@ -391,7 +396,7 @@ class PreviewDomains extends Component
 
         match ($status) {
             'ok' => $this->dispatch('success', "DNS is configured correctly for {$host}."),
-            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record."),
+            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later."),
             default => $this->dispatch('info', "DNS check skipped for {$host}."),
         };
     }
@@ -445,6 +450,8 @@ class PreviewDomains extends Component
 
     private function persistDomains(): bool
     {
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($this->preview->fresh() ?? $this->preview);
         if ($this->preview->application->build_pack === 'dockercompose') {
             try {
                 $composeServices = $this->composeServices(failOnError: true);
@@ -485,7 +492,21 @@ class PreviewDomains extends Component
         foreach ($this->domainRows as $index => $row) {
             $this->domainRows[$index]['url'] = DomainPortOverrides::withoutPort($row['url']);
         }
+        $changedFields = array_values(array_intersect(
+            auditChangedFields($this->preview),
+            ['fqdn', 'docker_compose_domains', 'domain_port_overrides'],
+        ));
         $this->preview->save();
+        if ($changedFields !== []) {
+            auditLog('ui.application.preview_updated', [
+                'team_id' => $this->preview->application->team()?->id,
+                'application_uuid' => $this->preview->application->uuid,
+                'application_name' => $this->preview->application->name,
+                'pull_request_id' => $this->preview->pull_request_id,
+                'changed_fields' => $changedFields,
+            ]);
+        }
+        $dnsCleanup->queueReleaseOfRemovedHostnames($this->preview, $previousDnsHostnames, $this->preview->application->team()->id);
         $this->persistDnsStatuses();
         $this->refreshDomains();
         $this->dispatch('update_links');
@@ -494,7 +515,11 @@ class PreviewDomains extends Component
         return true;
     }
 
-    private function persistDnsStatuses(): void
+    /**
+     * @param  array<int, string>  $startingCheckKeys  Status keys whose check is being started by this call.
+     *                                                 They are allowed to replace a stored completed result.
+     */
+    private function persistDnsStatuses(array $startingCheckKeys = []): void
     {
         $statuses = [];
         foreach ($this->domainRows as $row) {
@@ -505,13 +530,13 @@ class PreviewDomains extends Component
             ];
         }
 
-        DB::transaction(function () use (&$statuses): void {
+        DB::transaction(function () use (&$statuses, $startingCheckKeys): void {
             $preview = ApplicationPreview::query()->lockForUpdate()->findOrFail($this->preview->id);
             $storedStatuses = $preview->domain_dns_statuses ?? [];
 
             foreach ($statuses as $key => $status) {
                 $storedStatus = $storedStatuses[$key] ?? null;
-                if (! is_array($storedStatus)) {
+                if (! is_array($storedStatus) || in_array($key, $startingCheckKeys, true)) {
                     continue;
                 }
 

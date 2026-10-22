@@ -32,3 +32,11 @@ test('strips custom ports when converting scp-style ssh urls to https', function
         ->assertSet('repository_url', 'https://git.example.com/organization/repository.git')
         ->assertSet('branchFound', true);
 });
+
+test('converts ssh scheme urls with custom ports to https', function () {
+    Livewire::test(PublicGitRepository::class, ['type' => 'public'])
+        ->set('repository_url', 'ssh://git@gitea.example.com:2222/organization/repository.git')
+        ->call('loadBranch')
+        ->assertSet('repository_url', 'https://gitea.example.com/organization/repository.git')
+        ->assertSet('branchFound', true);
+});

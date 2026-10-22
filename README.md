@@ -26,7 +26,7 @@ Your configurations stay on your servers. If you stop using Coolify, your runnin
 ## What can Coolify do?
 
 - **Deploy any application:** Build from GitHub, GitLab, Bitbucket, or Gitea with Nixpacks, Railpack, Dockerfile, Docker Compose, or a prebuilt Docker image.
-- **Run databases and services:** Deploy managed databases and more than 300 one-click services with persistent storage and generated credentials.
+- **Run databases and services:** Deploy managed databases and more than 360 one-click services with persistent storage and generated credentials.
 - **Automate deployments:** Deploy on every Git push, create pull-request previews, call deployment webhooks, and roll back to retained application images.
 - **Manage networking:** Configure custom domains, automatic HTTPS certificates, reverse proxies, health checks, and container networks.
 - **Operate your infrastructure:** Manage multiple servers, inspect deployment and runtime logs, open container terminals, and monitor resource status.
@@ -116,11 +116,12 @@ Thank you so much!
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
-* [PetroSky Cloud](https://petrosky.io) - Open source cloud deployment solutions
 * [QuickSrv](https://quicksrv.io/) - Fast and reliable server hosting
+* [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
 
 ### Small Sponsors
 
+<a href="https://serverside.com/?utm_source=coolify.io"><img width="60px" alt="Serverside" src="https://cdn.coollabs.io/sponsors/serverside.svg"/></a>
 <a href="https://darkvps.pro"><img width="60px" alt="DarkVPS" src="https://cdn.coollabs.io/sponsors/darkvps.png"/></a>
 <a href="https://www.opensourcealternatives.to"><img width="60px" alt="Open Source Alternatives" src="https://cdn.coollabs.io/sponsors/opensourcealternatives.png"/></a>
 <a href="https://onserva.com/"><img width="60px" alt="Onserva" src="https://onserva.com/icon.svg"/></a>

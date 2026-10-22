@@ -58,7 +58,7 @@
                 localStorage.setItem('coolify-destinations-view', mode);
             }
         }">
-            @include('livewire.shared.list-search-controls', ['placeholder' => 'Search destinations', 'singular' => 'destination', 'plural' => 'destinations'])
+            @include('livewire.shared.list-search-controls', ['placeholder' => 'Search destinations'])
 
         <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($destinations as $destination)

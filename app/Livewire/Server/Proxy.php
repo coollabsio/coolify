@@ -6,13 +6,16 @@ use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Rules\SafeExternalUrl;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Proxy extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -24,7 +27,11 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
+    public ?string $customErrorPage = null;
+
     public bool $generateExactLabels = false;
+
+    public ?string $certificateResolver = null;
 
     /**
      * Cache the versions.json file data in memory for this component instance.
@@ -34,11 +41,11 @@ class Proxy extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
             'saveConfiguration' => 'submit',
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => '$refresh',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => '$refresh',
+            ]),
         ];
     }
 
@@ -47,6 +54,8 @@ class Proxy extends Component
         return [
             'generateExactLabels' => 'required|boolean',
             'redirectUrl' => ['nullable', new SafeExternalUrl],
+            'certificateResolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
+            'customErrorPage' => ['nullable', 'string', proxyPageSizeRule('custom error page')],
         ];
     }
 
@@ -55,6 +64,7 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->customErrorPage = $this->server->proxy_error_page;
         $this->syncData(false);
         $this->clearAppliedTraefikBranchWarning();
     }
@@ -63,8 +73,10 @@ class Proxy extends Component
     {
         if ($toModel) {
             $this->server->settings->generate_exact_labels = $this->generateExactLabels;
+            $this->server->settings->traefik_certificate_resolver = $this->certificateResolver ?: null;
         } else {
             $this->generateExactLabels = $this->server->settings->generate_exact_labels ?? false;
+            $this->certificateResolver = $this->server->settings->traefik_certificate_resolver;
         }
     }
 
@@ -93,6 +105,33 @@ class Proxy extends Component
         $traefikVersions = data_get($versionsData, 'traefik');
 
         return is_array($traefikVersions) ? $traefikVersions : null;
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditProxyUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.proxy.updated', $this->proxyAuditContext([
+            'changed_fields' => $changedFields,
+        ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function proxyAuditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 
     public function getConfigurationFilePathProperty(): string
@@ -133,11 +172,24 @@ class Proxy extends Component
         try {
             $this->authorize('update', $this->server);
             $this->validate();
-            $this->syncData(true);
-            $this->server->settings->save();
+            $this->saveSettings();
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function saveSettings(): void
+    {
+        $this->syncData(true);
+        $changedFields = auditChangedFields($this->server->settings);
+        $this->server->settings->save();
+        $this->auditProxyUpdate($changedFields);
+
+        // Coolify's own dashboard and catch-all routes use the resolver too.
+        if (in_array('traefik_certificate_resolver', $changedFields, true)) {
+            $this->server->setupDynamicProxyConfiguration();
+            $this->server->setupDefaultRedirect();
         }
     }
 
@@ -145,12 +197,28 @@ class Proxy extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $redirectChanged = (bool) data_get($this->server->proxy, 'redirect_enabled', true) !== $this->redirectEnabled;
             $this->server->proxy->redirect_enabled = $this->redirectEnabled;
             $this->server->save();
+            $this->auditProxyUpdate($redirectChanged ? ['redirect_enabled'] : []);
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function resetCustomErrorPage(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy_error_page = null;
+            $this->server->save();
+            $this->customErrorPage = null;
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Default error page restored.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -161,7 +229,10 @@ class Proxy extends Component
             $this->validate();
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
+            $this->server->proxy_error_page = filled($this->customErrorPage) ? $this->customErrorPage : null;
             $this->server->save();
+            $this->saveSettings();
+            auditLog('ui.server.proxy.configuration_saved', $this->proxyAuditContext());
             $this->server->setupDefaultRedirect();
             $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration saved.');
@@ -178,6 +249,7 @@ class Proxy extends Component
             $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->save();
+            auditLog('ui.server.proxy.configuration_reset', $this->proxyAuditContext());
             $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration reset to default.');
         } catch (\Throwable $e) {
@@ -185,9 +257,18 @@ class Proxy extends Component
         }
     }
 
+    /**
+     * The file can hold secrets; non-editors get no content instead of a 403 because x-init calls this.
+     */
     public function loadProxyConfiguration()
     {
         try {
+            if (! auth()->user()?->can('update', $this->server)) {
+                $this->proxySettings = null;
+
+                return;
+            }
+
             $this->proxySettings = GetProxyConfiguration::run($this->server);
             $this->clearAppliedTraefikBranchWarning();
         } catch (\Throwable $e) {
@@ -211,6 +292,14 @@ class Proxy extends Component
         }
 
         return $matches[1];
+    }
+
+    /**
+     * The saved caddy-docker-proxy image when it is older than 2.9 (Caddy 2.7), else null.
+     */
+    public function getOutdatedCaddyImageProperty(): ?string
+    {
+        return $this->server->outdatedCaddyProxyImage();
     }
 
     /**

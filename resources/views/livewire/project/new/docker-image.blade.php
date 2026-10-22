@@ -10,15 +10,9 @@
                 <x-forms.button type="submit" isHighlighted>Create application</x-forms.button>
             </div>
             <div class="application-settings-section-body space-y-4">
-                <x-forms.select id="deploymentTarget" label="Deployment target" required
-                    helper="Choose automatic cluster placement, a specific cluster server, or the selected Docker server.">
-                    <option value="">Select a deployment target</option>
-                    @foreach ($deploymentTargets as $target)
-                        <option value="{{ $target['value'] }}" @disabled($target['disabled'])>
-                            {{ $target['label'] }}
-                        </option>
-                    @endforeach
-                </x-forms.select>
+                <x-forms.listbox id="deploymentTarget" label="Deployment target" required
+                    helper="Choose automatic cluster placement, a specific cluster server, or the selected Docker server."
+                    placeholder="Select a deployment target" :options="$deploymentTargets" />
                 <x-forms.input id="imageName" label="Image name"
                     placeholder="nginx, ghcr.io/user/app:v1.2.3, or nginx:stable@sha256:…"
                     helper="Paste a complete image reference, or enter a name and use one of the optional fields below."

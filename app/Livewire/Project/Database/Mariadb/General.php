@@ -130,10 +130,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->mariadbRootPassword = '';
-            $this->mariadbPassword = '';
-        }
     }
 
     private function syncData(bool $toModel = false): void
@@ -158,9 +154,10 @@ class General extends Component
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->mariadbRootPassword = $this->database->mariadb_root_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->mariadbRootPassword = $canSeeCredentials ? $this->database->mariadb_root_password : '';
             $this->mariadbUser = $this->database->mariadb_user;
-            $this->mariadbPassword = $this->database->mariadb_password;
+            $this->mariadbPassword = $canSeeCredentials ? $this->database->mariadb_password : '';
             $this->mariadbDatabase = $this->database->mariadb_database;
             $this->mariadbConf = $this->database->mariadb_conf;
             $this->image = $this->database->image;

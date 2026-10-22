@@ -297,7 +297,6 @@ describe('heading actions', function () {
         ]);
 
         Livewire::test(ClusterApplicationShow::class, $this->routeParameters)
-            ->assertSee('View log')
             ->assertSeeHtml(route('project.cluster-application.deployment.show', [...$this->routeParameters, 'deployment_uuid' => $operation->uuid]));
     });
 
@@ -527,10 +526,10 @@ describe('logs', function () {
             'truncated' => false,
         ])]);
 
-        ($this->getLogs)()
-            ->call('getLogs', true)
-            ->assertSet('logsUnavailableMessage', null)
-            ->assertSee(['GET / 200', 'GET /health 200', '2026-Oct-06 08:00:01']);
+        $component = ($this->getLogs)()->call('getLogs');
+
+        expect($component->effects['returns'][0])->toBe(rtrim($this->logLines, "\n"));
+        $component->assertSet('logsUnavailableMessage', null);
 
         Http::assertSent(fn ($request) => $request->url() === 'http://flux:7080/v1/commands/container.logs'
             && $request->hasHeader('Authorization', 'Bearer test-token')
@@ -542,7 +541,21 @@ describe('logs', function () {
         expect(NodeOperation::query()->count())->toBe(0);
     });
 
-    it('removes timestamps and caps the line count at the Sentinel limit', function () {
+    it('reads only new lines while streaming', function () {
+        Http::fake(['flux:7080/*' => Http::response([
+            'command_id' => 'command-1',
+            'observed_at_unix_ms' => 1_789_140_000_000,
+            'name' => 'coolify-'.$this->workload->uuid.'-main',
+            'logs' => $this->logLines,
+            'truncated' => false,
+        ])]);
+
+        ($this->getLogs)()->call('getLogs', '2026-10-06T08:00:01.000000000Z');
+
+        Http::assertSent(fn ($request) => $request['since_unix_seconds'] === 1_791_273_601);
+    });
+
+    it('removes timestamps from copied logs and caps the line count at the Sentinel limit', function () {
         Http::fake(['flux:7080/*' => Http::response([
             'command_id' => 'command-1',
             'observed_at_unix_ms' => 1_789_140_000_000,
@@ -554,9 +567,10 @@ describe('logs', function () {
         $component = ($this->getLogs)()
             ->set('showTimeStamps', false)
             ->call('showAllLogs')
-            ->assertSet('numberOfLines', FetchContainerLogs::MAX_LINES);
+            ->assertSet('numberOfLines', FetchContainerLogs::MAX_LINES)
+            ->call('copyLogs');
 
-        expect($component->get('outputs'))->toStartWith("GET / 200\nGET /health 200")
+        expect($component->effects['returns'][0])->toStartWith("GET / 200\nGET /health 200")
             ->toContain('[... Output truncated by Sentinel ...]')
             ->not->toContain('2026-10-06T08');
         Http::assertSent(fn ($request) => $request['lines'] === FetchContainerLogs::MAX_LINES);
@@ -566,11 +580,11 @@ describe('logs', function () {
         Http::fake();
         Cache::put($this->nodeA->cacheKey(), ['status' => 'connected', 'capabilities' => ['logs.read.v1']]);
 
-        ($this->getLogs)()
-            ->call('getLogs', true)
-            ->assertSet('outputs', '')
-            ->assertSet('logsUnavailableMessage', 'Upgrade Sentinel on this server to view logs.')
-            ->assertSee('Upgrade Sentinel on this server to view logs.');
+        $component = ($this->getLogs)()
+            ->call('getLogs')
+            ->assertSet('logsUnavailableMessage', 'Upgrade Sentinel on this server to view logs.');
+
+        expect($component->effects['returns'][0])->toBe('');
 
         Http::assertNothingSent();
     });
@@ -578,11 +592,11 @@ describe('logs', function () {
     it('explains Flux errors', function (int $status, mixed $body, string $message) {
         Http::fake(['flux:7080/*' => Http::response($body, $status)]);
 
-        ($this->getLogs)()
-            ->call('getLogs', true)
-            ->assertSet('outputs', '')
-            ->assertSet('logsUnavailableMessage', $message)
-            ->assertSee($message);
+        $component = ($this->getLogs)()
+            ->call('getLogs')
+            ->assertSet('logsUnavailableMessage', $message);
+
+        expect($component->effects['returns'][0])->toBe('');
     })->with([
         'capability not granted' => [409, ['message' => 'capability not granted'], 'Upgrade Sentinel on this server to view logs.'],
         'server not connected' => [404, ['message' => 'not connected'], 'Sentinel on this server is not connected.'],
@@ -606,24 +620,21 @@ describe('logs', function () {
         Http::assertSent(fn ($request) => $request['lines'] === FetchContainerLogs::MAX_LINES);
     });
 
-    it('lets members read logs like v4', function () {
-        Http::fake(['flux:7080/*' => Http::response([
-            'command_id' => 'command-1',
-            'observed_at_unix_ms' => 1_789_140_000_000,
-            'name' => 'coolify-'.$this->workload->uuid.'-main',
-            'logs' => $this->logLines,
-            'truncated' => false,
-        ])]);
+    it('hides logs from members like v4', function () {
+        Http::fake();
         ($this->actingAsMember)();
 
-        ($this->getLogs)()->call('getLogs', true)->assertSee('GET /health 200');
+        $component = ($this->getLogs)()->assertSee('Hidden (only admins can view)')->call('getLogs');
+
+        expect($component->effects['returns'][0])->toBe('Unauthorized.');
+        Http::assertNothingSent();
     });
 
     it('does not read logs from a server where the application is not placed', function () {
         Http::fake();
         $this->workload->nodes()->detach($this->nodeB->id);
 
-        ($this->getLogs)($this->nodeB)->call('getLogs', true)->assertSet('outputs', 'Unauthorized.');
+        expect(($this->getLogs)($this->nodeB)->call('getLogs')->effects['returns'][0])->toBe('Unauthorized.');
 
         Http::assertNothingSent();
     });
@@ -636,7 +647,7 @@ describe('logs', function () {
         $this->actingAs($outsider);
         session(['currentTeam' => $outsiderTeam]);
 
-        $component->call('getLogs', true)->assertSet('outputs', 'Unauthorized.');
+        expect($component->call('getLogs')->effects['returns'][0])->toBe('Unauthorized.');
         expect($component->call('downloadAllLogs')->effects['returns'][0])->toBe('');
 
         Http::assertNothingSent();

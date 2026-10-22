@@ -2,7 +2,6 @@
 
 use App\Jobs\DatabaseBackupJob;
 use App\Livewire\Project\Database\BackupEdit;
-use App\Livewire\Project\Database\BackupNow;
 use App\Livewire\Project\Service\VolumeBackup\Index;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -63,8 +62,6 @@ beforeEach(function () {
 dataset('database backup controls', [
     'standalone settings' => [BackupEdit::class, 'standalone'],
     'service settings' => [BackupEdit::class, 'service'],
-    'standalone button' => [BackupNow::class, 'standalone'],
-    'service button' => [BackupNow::class, 'service'],
     'service list' => [Index::class, 'service'],
 ]);
 
@@ -117,16 +114,23 @@ it('checks current database status before queuing from a stale page', function (
     Queue::assertNotPushed(DatabaseBackupJob::class);
 })->with('database backup controls');
 
-it('refreshes service backup buttons when the service status check completes', function () {
+it('refreshes service backup buttons when the service status changes', function (string $componentClass, string $event) {
     $database = $this->databases['service'];
     $database->update(['status' => 'exited:unhealthy']);
-    $component = Livewire::test(Index::class, ['service' => $this->service]);
+    $parameters = $componentClass === Index::class
+        ? ['service' => $this->service]
+        : ['backup' => $this->backups['service']->fresh(), 'availableS3Storages' => collect()];
+    $component = Livewire::test($componentClass, $parameters);
+    $disabledButton = '/<button\s+disabled[^>]*wire:click(\.stop)?="backupNow/s';
     $database->update(['status' => 'running:healthy']);
 
-    $component->dispatch('echo-private:team.'.currentTeam()->id.',ServiceChecked');
-    expect($component->html())->not->toMatch('/<button\s+disabled[^>]*wire:click.stop="backupNow/s');
+    $component->dispatch('echo-private:team.'.currentTeam()->id.','.$event);
+    expect($component->html())->not->toMatch($disabledButton);
 
     $database->update(['status' => 'exited:unhealthy']);
-    $component->dispatch('echo-private:team.'.currentTeam()->id.',ServiceChecked');
-    expect($component->html())->toMatch('/<button\s+disabled[^>]*wire:click.stop="backupNow/s');
-});
+    $component->dispatch('echo-private:team.'.currentTeam()->id.','.$event);
+    expect($component->html())->toMatch($disabledButton);
+})->with([
+    'service list' => Index::class,
+    'service settings' => BackupEdit::class,
+])->with(['ServiceChecked', 'ServiceStatusChanged']);

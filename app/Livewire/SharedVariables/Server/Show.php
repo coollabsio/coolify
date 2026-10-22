@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SharedVariables\Server;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Server $server;
 
@@ -39,7 +41,7 @@ class Show extends Component
                 'is_literal' => $data['is_literal'],
                 'comment' => $data['comment'] ?? null,
                 'type' => 'server',
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->server->team_id,
             ]);
             $this->server->refresh();
             $this->getDevView();
@@ -58,6 +60,9 @@ class Show extends Component
         }
         $this->authorize('view', $server);
         $this->server = $server;
+        if ($this->prefersCanvasView('server_variables')) {
+            return $this->redirectRoute('shared-variables.server.canvas', ['server_uuid' => $server->uuid], navigate: true);
+        }
         $this->getDevView();
     }
 
@@ -75,7 +80,12 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
+        $canViewValues = auth()->user()?->isAdminOfTeam($this->server->team_id) ?? false;
+
+        return $variables->map(function ($item) use ($canViewValues) {
+            if (! $canViewValues) {
+                return "$item->key=(Hidden, only admins can view)";
+            }
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }
@@ -168,7 +178,7 @@ class Show extends Component
                     'is_multiline' => false,
                     'is_literal' => false,
                     'type' => 'server',
-                    'team_id' => currentTeam()->id,
+                    'team_id' => $this->server->team_id,
                 ]);
                 $count++;
             }

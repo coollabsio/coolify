@@ -79,3 +79,15 @@ test('member cannot create a tag through resource settings', function () {
         ->assertDispatched('error');
     expect(Tag::where('name', 'member-tag')->exists())->toBeFalse();
 });
+
+test('typing the name of an existing team tag attaches that tag', function () {
+    $existing = Tag::create(['name' => 'existing-tag', 'team_id' => $this->team->id]);
+
+    Livewire::test(Tags::class, ['resource' => $this->application])
+        ->set('newTags', 'existing-tag')
+        ->call('submit')
+        ->assertNotDispatched('error');
+
+    expect($this->application->tags()->pluck('tags.id')->all())->toBe([$existing->id])
+        ->and(Tag::where('name', 'existing-tag')->count())->toBe(1);
+});

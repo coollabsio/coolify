@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\VolumeBackupJob;
 use App\Models\Application;
@@ -14,6 +15,7 @@ use App\Models\Service;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\MessageBag;
 use OpenApi\Attributes as OA;
 use RuntimeException;
@@ -26,8 +28,9 @@ use RuntimeException;
         new OA\Property(property: 'enabled', type: 'boolean', default: true),
         new OA\Property(property: 'save_s3', type: 'boolean', default: false),
         new OA\Property(property: 'disable_local_backup', type: 'boolean', default: false),
-        new OA\Property(property: 'stop_during_backup', type: 'boolean', default: false),
-        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true),
+        new OA\Property(property: 'stop_during_backup', type: 'boolean', default: false, description: 'Stop the resource containers during the backup. Needs a token with the deploy permission.'),
+        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true, description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.'),
+        new OA\Property(property: 's3_storage_uuids', type: 'array', items: new OA\Items(type: 'string'), description: 'UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.'),
         new OA\Property(property: 'retention_amount_locally', type: 'integer', default: 7, minimum: 0, maximum: 10000),
         new OA\Property(property: 'retention_days_locally', type: 'integer', default: 0, maximum: 2147483647, minimum: 0),
         new OA\Property(property: 'retention_max_storage_locally', type: 'number', format: 'float', default: 0, maximum: 9999999999, minimum: 0),
@@ -35,13 +38,14 @@ use RuntimeException;
         new OA\Property(property: 'retention_days_s3', type: 'integer', default: 0, maximum: 2147483647, minimum: 0),
         new OA\Property(property: 'retention_max_storage_s3', type: 'number', format: 'float', default: 0, maximum: 9999999999, minimum: 0),
         new OA\Property(property: 'timeout', type: 'integer', default: ScheduledVolumeBackup::DEFAULT_TIMEOUT, minimum: 60, maximum: 36000),
+        new OA\Property(property: 'missing_backup_notification_days', type: 'integer', description: 'Alert after this many days without an execution; 0 disables alerts', default: 0, minimum: 0, maximum: 365),
     ],
     type: 'object',
     additionalProperties: false,
 )]
 #[OA\Schema(
     schema: 'VolumeBackupScheduleResponse',
-    required: ['uuid', 'message', 'storage_uuid', 'storage_type', 'frequency', 'enabled', 'save_s3', 'disable_local_backup', 'stop_during_backup', 'retention_amount_locally', 'retention_days_locally', 'retention_max_storage_locally', 'retention_amount_s3', 'retention_days_s3', 'retention_max_storage_s3', 'timeout'],
+    required: ['uuid', 'message', 'storage_uuid', 'storage_type', 'frequency', 'enabled', 'save_s3', 'disable_local_backup', 'stop_during_backup', 'retention_amount_locally', 'retention_days_locally', 'retention_max_storage_locally', 'retention_amount_s3', 'retention_days_s3', 'retention_max_storage_s3', 'timeout', 'missing_backup_notification_days'],
     properties: [
         new OA\Property(property: 'uuid', type: 'string'),
         new OA\Property(property: 'message', type: 'string'),
@@ -52,7 +56,8 @@ use RuntimeException;
         new OA\Property(property: 'save_s3', type: 'boolean'),
         new OA\Property(property: 'disable_local_backup', type: 'boolean'),
         new OA\Property(property: 'stop_during_backup', type: 'boolean'),
-        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true),
+        new OA\Property(property: 's3_storage_uuid', type: 'string', nullable: true, description: 'Primary S3 destination.'),
+        new OA\Property(property: 's3_storage_uuids', type: 'array', items: new OA\Items(type: 'string'), description: 'Every S3 destination, primary first.'),
         new OA\Property(property: 'retention_amount_locally', type: 'integer'),
         new OA\Property(property: 'retention_days_locally', type: 'integer'),
         new OA\Property(property: 'retention_max_storage_locally', type: 'number', format: 'float'),
@@ -60,14 +65,17 @@ use RuntimeException;
         new OA\Property(property: 'retention_days_s3', type: 'integer'),
         new OA\Property(property: 'retention_max_storage_s3', type: 'number', format: 'float'),
         new OA\Property(property: 'timeout', type: 'integer'),
+        new OA\Property(property: 'missing_backup_notification_days', type: 'integer'),
     ],
     type: 'object',
 )]
 class VolumeBackupsController extends Controller
 {
+    use RequiresDeployAbility;
+
     #[OA\Put(
         summary: 'Set application storage backup schedule',
-        description: 'Create or replace the backup schedule for an application persistent volume or directory storage.',
+        description: 'Create or replace the backup schedule for an application persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.',
         path: '/applications/{uuid}/storages/{storage_uuid}/backups',
         operationId: 'set-application-storage-backup-schedule',
         security: [['bearerAuth' => []]],
@@ -82,14 +90,14 @@ class VolumeBackupsController extends Controller
             new OA\Response(response: 201, description: 'Backup schedule created.', content: new OA\JsonContent(ref: '#/components/schemas/VolumeBackupScheduleResponse')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 403, description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
     )]
     #[OA\Put(
         summary: 'Set database storage backup schedule',
-        description: 'Create or replace the backup schedule for a database persistent volume or directory storage.',
+        description: 'Create or replace the backup schedule for a database persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.',
         path: '/databases/{uuid}/storages/{storage_uuid}/backups',
         operationId: 'set-database-storage-backup-schedule',
         security: [['bearerAuth' => []]],
@@ -104,14 +112,14 @@ class VolumeBackupsController extends Controller
             new OA\Response(response: 201, description: 'Backup schedule created.', content: new OA\JsonContent(ref: '#/components/schemas/VolumeBackupScheduleResponse')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 403, description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
     )]
     #[OA\Put(
         summary: 'Set service storage backup schedule',
-        description: 'Create or replace the backup schedule for a service persistent volume or directory storage.',
+        description: 'Create or replace the backup schedule for a service persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.',
         path: '/services/{uuid}/storages/{storage_uuid}/backups',
         operationId: 'set-service-storage-backup-schedule',
         security: [['bearerAuth' => []]],
@@ -126,7 +134,7 @@ class VolumeBackupsController extends Controller
             new OA\Response(response: 201, description: 'Backup schedule created.', content: new OA\JsonContent(ref: '#/components/schemas/VolumeBackupScheduleResponse')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 403, description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -158,12 +166,19 @@ class VolumeBackupsController extends Controller
 
         $this->authorize('update', $resource);
 
+        if ($request->boolean('stop_during_backup')) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A backup that stops the containers needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         $storage = $this->findStorage($resource, $request->route('storage_uuid'));
         if (! $storage) {
             return response()->json(['message' => 'Storage not found.'], 404);
         }
 
-        ['errors' => $errors, 's3Storage' => $s3Storage, 'saveToS3' => $saveToS3] = $this->validateUpsertRequest($request, $storage, $teamId);
+        ['errors' => $errors, 's3Storages' => $s3Storages, 'saveToS3' => $saveToS3] = $this->validateUpsertRequest($request, $storage, $teamId);
 
         if ($errors->isNotEmpty()) {
             return response()->json([
@@ -172,11 +187,11 @@ class VolumeBackupsController extends Controller
             ], 422);
         }
 
-        return $this->persistSchedule($request, $storage, $teamId, $s3Storage, $saveToS3, $resourceType, $resource);
+        return $this->persistSchedule($request, $storage, $teamId, $s3Storages, $saveToS3, $resourceType, $resource);
     }
 
     /**
-     * @return array{errors: MessageBag, s3Storage: S3Storage|null, saveToS3: bool}
+     * @return array{errors: MessageBag, s3Storages: Collection<int, S3Storage>, saveToS3: bool}
      */
     private function validateUpsertRequest(
         Request $request,
@@ -190,6 +205,8 @@ class VolumeBackupsController extends Controller
             'disable_local_backup' => 'boolean',
             'stop_during_backup' => 'boolean',
             's3_storage_uuid' => 'nullable|string',
+            's3_storage_uuids' => 'array',
+            's3_storage_uuids.*' => 'string|distinct',
             'retention_amount_locally' => 'integer|min:0|max:10000',
             'retention_days_locally' => 'integer|min:0|max:2147483647',
             'retention_max_storage_locally' => 'numeric|min:0|max:9999999999',
@@ -197,6 +214,7 @@ class VolumeBackupsController extends Controller
             'retention_days_s3' => 'integer|min:0|max:2147483647',
             'retention_max_storage_s3' => 'numeric|min:0|max:9999999999',
             'timeout' => 'integer|min:60|max:36000',
+            'missing_backup_notification_days' => 'integer|min:0|max:365',
         ]);
         $errors = $validator->errors();
         $allowedFields = [
@@ -206,6 +224,7 @@ class VolumeBackupsController extends Controller
             'disable_local_backup',
             'stop_during_backup',
             's3_storage_uuid',
+            's3_storage_uuids',
             'retention_amount_locally',
             'retention_days_locally',
             'retention_max_storage_locally',
@@ -213,6 +232,7 @@ class VolumeBackupsController extends Controller
             'retention_days_s3',
             'retention_max_storage_s3',
             'timeout',
+            'missing_backup_notification_days',
         ];
 
         foreach (array_diff(array_keys($request->all()), $allowedFields) as $field) {
@@ -228,16 +248,24 @@ class VolumeBackupsController extends Controller
             $errors->add('disable_local_backup', 'Local backups can only be disabled when S3 backups are enabled.');
         }
 
-        $s3Storage = null;
-        if ($saveToS3) {
-            $s3Storage = S3Storage::query()
+        $s3Storages = collect();
+        if ($saveToS3 && ! $errors->hasAny(['s3_storage_uuid', 's3_storage_uuids', 's3_storage_uuids.*'])) {
+            $hasList = $request->has('s3_storage_uuids');
+            $uuids = collect($hasList ? $request->input('s3_storage_uuids') : [$request->input('s3_storage_uuid')])->filter()->unique()->values();
+            $primaryUuid = $request->input('s3_storage_uuid') ?? $uuids->first();
+
+            $s3Storages = S3Storage::query()
                 ->where('team_id', $teamId)
                 ->where('is_usable', true)
-                ->where('uuid', $request->input('s3_storage_uuid'))
-                ->first();
+                ->whereIn('uuid', $uuids->all())
+                ->get()
+                ->sortBy(fn (S3Storage $s3Storage): int => $s3Storage->uuid === $primaryUuid ? 0 : 1)
+                ->values();
 
-            if (! $s3Storage) {
-                $errors->add('s3_storage_uuid', 'Select a usable S3 storage owned by your team.');
+            if ($hasList && filled($primaryUuid) && ! $uuids->contains($primaryUuid)) {
+                $errors->add('s3_storage_uuid', 'The s3_storage_uuid must be one of the s3_storage_uuids.');
+            } elseif ($uuids->isEmpty() || $s3Storages->count() !== $uuids->count()) {
+                $errors->add($hasList ? 's3_storage_uuids' : 's3_storage_uuid', 'Select a usable S3 storage owned by your team.');
             }
         }
 
@@ -247,7 +275,7 @@ class VolumeBackupsController extends Controller
 
         return [
             'errors' => $errors,
-            's3Storage' => $s3Storage,
+            's3Storages' => $s3Storages,
             'saveToS3' => $saveToS3,
         ];
     }
@@ -256,7 +284,7 @@ class VolumeBackupsController extends Controller
         Request $request,
         LocalPersistentVolume|LocalFileVolume $storage,
         int|string $teamId,
-        ?S3Storage $s3Storage,
+        Collection $s3Storages,
         bool $saveToS3,
         string $resourceType,
         Model $resource,
@@ -268,7 +296,7 @@ class VolumeBackupsController extends Controller
             'save_s3' => $saveToS3,
             'disable_local_backup' => $saveToS3 && $request->boolean('disable_local_backup'),
             'stop_during_backup' => $request->boolean('stop_during_backup'),
-            's3_storage_id' => $s3Storage?->id,
+            's3_storage_id' => $s3Storages->first()?->id,
             'retention_amount_locally' => $request->integer('retention_amount_locally', 7),
             'retention_days_locally' => $request->integer('retention_days_locally'),
             'retention_max_storage_locally' => $request->float('retention_max_storage_locally'),
@@ -279,8 +307,12 @@ class VolumeBackupsController extends Controller
         if ($request->has('timeout')) {
             $attributes['timeout'] = $request->integer('timeout');
         }
+        if ($request->has('missing_backup_notification_days')) {
+            $attributes['missing_backup_notification_days'] = $request->integer('missing_backup_notification_days');
+        }
 
         $backup = $storage->scheduledBackups()->updateOrCreate([], $attributes);
+        $backup->syncS3Storages($s3Storages->pluck('id')->all());
         $created = $backup->wasRecentlyCreated;
 
         auditLog('api.volume_backup.schedule_set', [
@@ -291,7 +323,7 @@ class VolumeBackupsController extends Controller
             'backup_uuid' => $backup->uuid,
         ]);
 
-        return response()->json($this->responseData($backup, $storage, $s3Storage, $created), $created ? 201 : 200);
+        return response()->json($this->responseData($backup, $storage, $s3Storages, $created), $created ? 201 : 200);
     }
 
     #[OA\Delete(
@@ -424,7 +456,7 @@ class VolumeBackupsController extends Controller
     private function responseData(
         ScheduledVolumeBackup $backup,
         LocalPersistentVolume|LocalFileVolume $storage,
-        ?S3Storage $s3Storage,
+        Collection $s3Storages,
         bool $created,
     ): array {
         return [
@@ -437,7 +469,8 @@ class VolumeBackupsController extends Controller
             'save_s3' => $backup->save_s3,
             'disable_local_backup' => $backup->disable_local_backup,
             'stop_during_backup' => $backup->stop_during_backup,
-            's3_storage_uuid' => $s3Storage?->uuid,
+            's3_storage_uuid' => $s3Storages->first()?->uuid,
+            's3_storage_uuids' => $s3Storages->pluck('uuid')->all(),
             'retention_amount_locally' => $backup->retention_amount_locally,
             'retention_days_locally' => $backup->retention_days_locally,
             'retention_max_storage_locally' => $backup->retention_max_storage_locally,
@@ -445,12 +478,13 @@ class VolumeBackupsController extends Controller
             'retention_days_s3' => $backup->retention_days_s3,
             'retention_max_storage_s3' => $backup->retention_max_storage_s3,
             'timeout' => $backup->timeout,
+            'missing_backup_notification_days' => $backup->missing_backup_notification_days ?? 0,
         ];
     }
 
     #[OA\Post(
         summary: 'Run application storage backup',
-        description: 'Queue an immediate volume backup for an application storage that has a schedule.',
+        description: 'Queue an immediate volume backup for an application storage that has a schedule. Needs a token with the write and deploy permissions.',
         path: '/applications/{uuid}/storages/{storage_uuid}/backups/run',
         operationId: 'run-application-storage-backup',
         security: [['bearerAuth' => []]],
@@ -462,12 +496,13 @@ class VolumeBackupsController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'Storage backup queued.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
     #[OA\Post(
         summary: 'Run database storage backup',
-        description: 'Queue an immediate volume backup for a database storage that has a schedule.',
+        description: 'Queue an immediate volume backup for a database storage that has a schedule. Needs a token with the write and deploy permissions.',
         path: '/databases/{uuid}/storages/{storage_uuid}/backups/run',
         operationId: 'run-database-storage-backup',
         security: [['bearerAuth' => []]],
@@ -479,12 +514,13 @@ class VolumeBackupsController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'Storage backup queued.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
     #[OA\Post(
         summary: 'Run service storage backup',
-        description: 'Queue an immediate volume backup for a service storage that has a schedule.',
+        description: 'Queue an immediate volume backup for a service storage that has a schedule. Needs a token with the write and deploy permissions.',
         path: '/services/{uuid}/storages/{storage_uuid}/backups/run',
         operationId: 'run-service-storage-backup',
         security: [['bearerAuth' => []]],
@@ -496,6 +532,7 @@ class VolumeBackupsController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'Storage backup queued.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]

@@ -5,22 +5,6 @@
 
     <x-security.settings-layout>
 
-    @if (!$isApiEnabled)
-        <div class="application-settings-form">
-            <x-application.settings-section title="API disabled"
-                description="Enable the Coolify API before creating access tokens.">
-                <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
-                    size="sm">
-                    <x-slot:actions>
-                        <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                            Open settings
-                        </a>
-                    </x-slot:actions>
-                </x-empty>
-            </x-application.settings-section>
-        </div>
-    @else
         @php
             $expirationList = collect($expirationOptions)
                 ->map(fn ($label, $days) => ['value' => (string) $days, 'label' => $label])
@@ -30,6 +14,9 @@
         @endphp
 
         <div class="application-settings-form flex flex-col gap-6">
+            <x-api-disabled-callout
+                message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
+
             @can('create', App\Models\PersonalAccessToken::class)
                 <form wire:submit="addNewToken">
                     <x-application.settings-section title="New API token">
@@ -81,7 +68,7 @@
                                     <div class="listbox-option p-0!">
                                         <x-forms.checkbox id="permission-deploy" label="Deploy" fullWidth
                                             wire:model.live="permissions" domValue="deploy"
-                                            helper="Trigger deployments through webhooks."
+                                            helper="Deploy, start, stop, and restart resources. With Write, also apply changes that run on servers immediately, such as scheduled tasks, proxy configuration, and imports."
                                             :checked="in_array('deploy', $permissions)"
                                             :disabled="in_array('root', $permissions) || !$canUseDeployPermissions" />
                                     </div>
@@ -260,6 +247,5 @@
                 </div>
             </x-application.settings-section>
         </div>
-    @endif
     </x-security.settings-layout>
 </div>

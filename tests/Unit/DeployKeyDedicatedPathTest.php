@@ -1,10 +1,20 @@
 <?php
 
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
 use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Server;
+use App\Traits\ExecuteRemoteCommand;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+uses(TestCase::class, LazilyRefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();
@@ -67,13 +77,45 @@ it('skips logging the docker deploy key materialization command before ls-remote
 });
 
 it('supports skipping command log entries without adding a hidden command entry', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Traits/ExecuteRemoteCommand.php');
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+    config(['constants.ssh.mux_enabled' => false]);
+    InstanceSettings::forceCreate(['id' => 0]);
+    $privateKey = PrivateKey::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $privateKey->team_id,
+        'private_key_id' => $privateKey->id,
+    ]);
+    $application = Application::factory()->create();
+    $deployment = ApplicationDeploymentQueue::query()->create([
+        'application_id' => $application->id,
+        'deployment_uuid' => fake()->uuid(),
+    ]);
+    $payload = base64_encode('private-deploy-key-material');
+    $command = "echo '{$payload}' | base64 -d | tee /root/.ssh/id_rsa_coolify_test";
+    Process::fake(['*' => Process::result(output: "materialized {$payload}")]);
+    $job = new class($server, $application, $deployment)
+    {
+        use ExecuteRemoteCommand;
 
-    expect($source)
-        ->toContain('$skip_command_log = data_get($single_command, \'skip_command_log\', false);')
-        ->toContain('if ($command_hidden && ! $skip_command_log && isset($this->application_deployment_queue))')
-        ->toContain('use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log)')
-        ->toContain('\'command\' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),');
+        public function __construct(
+            public Server $server,
+            public Application $application,
+            public ApplicationDeploymentQueue $application_deployment_queue,
+        ) {}
+    };
+
+    (new ReflectionMethod($job, 'executeCommandWithProcess'))->invoke(
+        $job, $command, false, null, true, false, true, true,
+    );
+
+    $storedLogs = $deployment->refresh()->getRawOriginal('logs');
+    $logs = json_decode($storedLogs, true, flags: JSON_THROW_ON_ERROR);
+    expect($logs)->toHaveCount(1)
+        ->and($logs[0]['command'])->toBeNull()
+        ->and($logs[0]['output'])->toBe('materialized '.REDACTED);
+    expect($storedLogs)->not->toContain($payload)->not->toContain($command);
+    Process::assertRan(fn ($process) => str_contains($process->command, $command));
 });
 
 it('writes a deploy key to a per-deployment path and cleans it up for ls-remote on the host', function () use ($keyPath) {

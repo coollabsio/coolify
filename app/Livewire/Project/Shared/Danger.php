@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Database\FlushDatabase;
 use App\Jobs\DeleteNodeWorkloadJob;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Node;
@@ -9,6 +10,7 @@ use App\Models\NodeWorkload;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -80,7 +82,8 @@ class Danger extends Component
             'standalone-mariadb',
             'standalone-keydb',
             'standalone-dragonfly',
-            'standalone-clickhouse' => $this->resource->name ?? 'Database',
+            'standalone-clickhouse',
+            'standalone-sqlite' => $this->resource->name ?? 'Database',
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',
             'service-database' => $this->resource->name ?? 'Service Database',
@@ -104,6 +107,12 @@ class Danger extends Component
 
         if (! $this->resource) {
             return 'Resource not found.';
+        }
+
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->hasConnectedApplications()) {
+            $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
+
+            return;
         }
 
         if (! empty($selectedActions)) {
@@ -172,6 +181,31 @@ class Danger extends Component
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function flush($password)
+    {
+        try {
+            $this->authorize('manage', $this->resource);
+
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            FlushDatabase::run($this->resource);
+            auditLog('ui.database.flushed', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+            ]);
+            $this->dispatch('success', 'Database flushed.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
         }
     }
 

@@ -1,46 +1,5 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
-        $servicePageItems = [
-            [
-                'label' => 'Settings',
-                'route' => 'project.service.configuration',
-                'active' => request()->routeIs('project.service.configuration')
-                    || request()->routeIs('project.service.domains')
-                    || request()->routeIs('project.service.environment-variables')
-                    || request()->routeIs('project.service.storages')
-                    || request()->routeIs('project.service.scheduled-tasks*')
-                    || request()->routeIs('project.service.webhooks')
-                    || request()->routeIs('project.service.resource-operations')
-                    || request()->routeIs('project.service.tags')
-                    || request()->routeIs('project.service.danger')
-                    || request()->routeIs('project.service.index*')
-                    || request()->routeIs('project.service.database.*'),
-            ],
-            [
-                'label' => 'Backups',
-                'route' => 'project.service.volume-backups.index',
-                'active' => request()->routeIs('project.service.volume-backups.*'),
-            ],
-            [
-                'label' => 'Runtime Logs',
-                'route' => 'project.service.logs',
-                'active' => request()->routeIs('project.service.logs'),
-                'navigate' => false,
-            ],
-            [
-                'label' => 'Terminal',
-                'route' => 'project.service.command',
-                'active' => request()->routeIs('project.service.command'),
-                'navigate' => false,
-                'visible' => auth()->user()?->can('canAccessTerminal'),
-            ],
-        ];
-
-        $servicePageItems = array_values(array_filter(
-            $servicePageItems,
-            fn (array $item): bool => $item['visible'] ?? true,
-        ));
-
         $serviceStatus = str($service->status ?? 'exited');
         $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');
         $selectedResource = $selectedResourceUuid
@@ -73,7 +32,8 @@
                     {{ $service->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                    <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
+                        :container-name="$selectedResource ? 'Container' : 'Containers'" />
                     <x-services.links :service="$service" compact />
                     @if ($isDeploymentProgress)
                         <x-deploying-indicator />

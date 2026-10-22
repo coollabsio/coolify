@@ -22,7 +22,7 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $discordEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:discordEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $discordWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -143,13 +143,12 @@ class Discord extends Component
     public function instantSaveDiscordPingEnabled()
     {
         try {
-            $original = $this->discordPingEnabled;
             $this->validate([
                 'discordPingEnabled' => 'required',
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordPingEnabled = $original;
+            $this->discordPingEnabled = (bool) $this->settings->refresh()->discord_ping_enabled;
 
             return handleError($e, $this);
         }
@@ -158,7 +157,6 @@ class Discord extends Component
     public function instantSaveDiscordEnabled()
     {
         try {
-            $original = $this->discordEnabled;
             $this->validate([
                 'discordWebhookUrl' => 'required',
             ], [
@@ -166,7 +164,7 @@ class Discord extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordEnabled = $original;
+            $this->discordEnabled = (bool) $this->settings->refresh()->discord_enabled;
 
             return handleError($e, $this);
         }

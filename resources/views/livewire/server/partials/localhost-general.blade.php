@@ -3,15 +3,25 @@
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Operating system and hardware details for the server running this Coolify instance.">
                         <x-slot:actions>
-                            @if ($server->server_metadata)
-                                <x-forms.button type="button" class="size-8! px-0!"
-                                    wire:click="refreshServerMetadata" title="Refresh server details">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                </x-forms.button>
-                            @endif
-                            <x-status-badge :status="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                :disabled="! $server->isFunctional()"
+                                :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                {{ $server->server_metadata ? 'Refresh details' : 'Fetch server details' }}
+                            </x-forms.button>
+                            <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
+                                :isHighlighted="! $server->isFunctional()" canGate="update" :canResource="$server">
+                                <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
+                                {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
+                            </x-forms.button>
                         </x-slot:actions>
+
+                        @if ($this->limaStartCommand)
+                            <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
+                                <code
+                                    class="mt-2 block overflow-x-auto rounded-lg bg-neutral-950 px-3 py-2 font-mono text-[11px] text-neutral-200">{{ $this->limaStartCommand }}</code>
+                            </x-callout>
+                        @endif
 
                         <div class="flex items-start gap-3">
                             <div
@@ -32,13 +42,6 @@
 
                         @if ($server->server_metadata)
                             @include('livewire.server.partials.server-details', ['server' => $server])
-                        @else
-                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Fetch server details
-                                </x-forms.button>
-                            </div>
                         @endif
                     </x-application.settings-section>
 
@@ -54,14 +57,6 @@
 
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies and connects to this server.">
-                        <x-slot:actions>
-                            <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
-                                canGate="update" :canResource="$server">
-                                <x-reicon name="refresh" class="size-3.5" />
-                                Validate connection
-                            </x-forms.button>
-                        </x-slot:actions>
-
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.input canGate="update" :canResource="$server" id="name" label="Name"
                                 required :disabled="$isValidating" />
@@ -85,13 +80,13 @@
                                 id="connectionTimeout" label="Connection timeout"
                                 helper="Seconds to wait before an SSH connection fails." min="1" max="300"
                                 required :disabled="$isValidating" />
-                            <x-forms.searchable-listbox id="serverTimezone" label="Server timezone"
+                            <x-forms.listbox searchable id="serverTimezone" label="Server timezone"
                                 helper="Used for backup schedules, cron jobs, and displayed timestamps."
-                                searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                                searchPlaceholder="Search timezones" searchEmptyText="No matching timezone"
                                 :options="collect($this->timezones)->map(fn ($timezone) => [
                                     'value' => $timezone,
                                     'label' => $timezone,
-                                ])->all()" :disabled="$isValidating || !auth()->user()->can('update', $server)" />
+                                ])->all()" :disabled="$isValidating" canGate="update" :canResource="$server" />
                             <x-forms.input canGate="update" :canResource="$server"
                                 placeholder="https://example.com" id="wildcardDomain" label="Wildcard domain"
                                 helper="New resources can receive generated subdomains from this domain."

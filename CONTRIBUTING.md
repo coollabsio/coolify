@@ -197,7 +197,7 @@ Choose the branch based on the type of change:
 
 - For a fix, branch from `main` and target `main`.
 - For a feature, branch from `next` and target `next`.
-- If a fix is discovered while developing a feature, submit it separately to `main`. Maintainers will merge `main` into `next` so the fix is included there too.
+- If a fix is discovered while developing a feature, submit it separately to `main`. `main` is merged into `next` automatically, so the fix is included there too.
 - Pull requests targeting the wrong branch may be closed or asked to retarget.
 
 

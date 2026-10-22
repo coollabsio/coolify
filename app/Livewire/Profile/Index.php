@@ -2,15 +2,20 @@
 
 namespace App\Livewire\Profile;
 
+use App\Actions\User\DeleteUserAccount;
+use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
+    use WithFileUploads;
+
     public int $userId;
 
     public string $email;
@@ -218,6 +223,7 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
                 auditLog('ui.user.email_changed', $this->auditContext());
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
@@ -342,6 +348,29 @@ class Index extends Component
         }
     }
 
+    public function deleteAccount(string $password, array $selectedActions = []): mixed
+    {
+        try {
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            $deleteUserAccount = app(DeleteUserAccount::class);
+            $deleteUserAccount->handle(Auth::user(), removeTeamResources: $deleteUserAccount->removesTeamResources(Auth::user()));
+            auditLog('ui.user.account_deleted', ['resource' => 'user']);
+
+            Auth::guard('web')->logout();
+            session()->invalidate();
+            session()->regenerateToken();
+
+            $this->redirect(route('login'));
+
+            return true;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     private function providerLabel(string $provider): string
     {
         return match ($provider) {
@@ -363,6 +392,11 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.profile.index');
+        $deleteUserAccount = app(DeleteUserAccount::class);
+
+        return view('livewire.profile.index', [
+            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user(), $deleteUserAccount->removesTeamResources(Auth::user())),
+            'accountDeletionActions' => $deleteUserAccount->confirmationActions(Auth::user()),
+        ]);
     }
 }

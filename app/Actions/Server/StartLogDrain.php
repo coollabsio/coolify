@@ -4,6 +4,7 @@ namespace App\Actions\Server;
 
 use App\Models\Server;
 use App\Models\Service;
+use App\Rules\ValidFluentBitConfig;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartLogDrain
@@ -22,12 +23,21 @@ class StartLogDrain
             $type = 'axiom';
         } elseif ($server->settings->is_logdrain_custom_enabled) {
             $type = 'custom';
+        } elseif ($server->settings->is_logdrain_cloudwatch_enabled) {
+            $type = 'cloudwatch';
         } else {
             $type = 'none';
+        }
+        if ($type === 'cloudwatch') {
+            // Containers ship logs directly via Docker's awslogs driver; no Fluent Bit container is needed.
+            StopLogDrain::run($server);
+
+            return 'Amazon CloudWatch Logs uses the built-in Docker awslogs driver.';
         }
         if ($type !== 'none') {
             StopLogDrain::run($server);
         }
+        $serverName = $this->fluentBitValue((string) $server->name);
         try {
             if ($type === 'none') {
                 return 'No log drain is enabled.';
@@ -53,7 +63,7 @@ class StartLogDrain
 [FILTER]
     Name                modify
     Match               *
-    Set                 coolify.server_name {$server->name}
+    Set                 coolify.server_name {$serverName}
     Rename              COOLIFY_APP_NAME coolify.app_name
     Rename              COOLIFY_PROJECT_NAME coolify.project_name
     Rename              COOLIFY_SERVER_IP coolify.server_ip
@@ -108,7 +118,7 @@ class StartLogDrain
 [FILTER]
     Name                modify
     Match               *
-    Set                 coolify.server_name {$server->name}
+    Set                 coolify.server_name {$serverName}
     Rename              COOLIFY_APP_NAME coolify.app_name
     Rename              COOLIFY_PROJECT_NAME coolify.project_name
     Rename              COOLIFY_SERVER_IP coolify.server_ip
@@ -130,6 +140,14 @@ class StartLogDrain
             } elseif ($type === 'custom') {
                 if (! $server->settings->is_logdrain_custom_enabled) {
                     throw new \Exception('Custom log drain is not enabled.');
+                }
+                $configError = (new ValidFluentBitConfig)->check($server->settings->logdrain_custom_config);
+                if ($configError !== null) {
+                    throw new \Exception("Custom log drain config is not allowed: {$configError}");
+                }
+                $parsersError = (new ValidFluentBitConfig(parsersOnly: true))->check($server->settings->logdrain_custom_config_parser);
+                if ($parsersError !== null) {
+                    throw new \Exception("Custom log drain parser config is not allowed: {$parsersError}");
                 }
                 $config = base64_encode($server->settings->logdrain_custom_config);
                 $parsers = base64_encode($server->settings->logdrain_custom_config_parser);
@@ -153,8 +171,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./fluent-bit.conf:/fluent-bit.conf
-      - ./parsers.conf:/parsers.conf
+      - ./fluent-bit.conf:/fluent-bit.conf:ro
+      - ./parsers.conf:/parsers.conf:ro
     ports:
       - 127.0.0.1:24224:24224
     labels:
@@ -200,7 +218,7 @@ Files:
                 "echo '{$readme}' | base64 -d | tee $readme_path > /dev/null",
                 "echo '{$envEncoded}' | base64 -d | tee $config_path/.env > /dev/null",
                 "echo 'Starting Fluent Bit'",
-                "cd $config_path && docker compose up -d",
+                "docker compose -f $compose_path up -d",
             ];
             $command = array_merge($command, $this->logDrainNetworkConnectCommands($server));
 
@@ -210,9 +228,18 @@ Files:
         }
     }
 
+    /**
+     * Fluent Bit reads its config line by line, so a value with a line break could add sections,
+     * and the modify filter splits `Set` on spaces, so the value must be a single token.
+     */
+    private function fluentBitValue(string $value): string
+    {
+        return preg_replace('/[\s\x00-\x1F\x7F]+/', '-', trim($value));
+    }
+
     private function logDrainNetworkConnectCommands(Server $server): array
     {
-        if (! $server->isLogDrainEnabled()) {
+        if (! $server->isFluentBitLogDrainEnabled()) {
             return [];
         }
 

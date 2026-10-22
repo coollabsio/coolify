@@ -247,15 +247,13 @@ YAML);
     expect($application->docker_compose_raw)->toContain('appdata');
 });
 
-it('still uses oldRawParser for raw compose deployments after git compose load', function () {
-    $jobSource = file_get_contents(base_path('app/Jobs/ApplicationDeploymentJob.php'));
-    $parserSource = file_get_contents(base_path('app/Models/Application.php'));
+it('resolves parent directory segments in long-form bind sources before remote work', function () {
+    Process::fake();
 
-    expect($jobSource)
-        ->toContain('loadComposeFile(isInit: false)')
-        ->toContain('is_raw_compose_deployment_enabled')
-        ->toContain('oldRawParser()')
-        ->and($parserSource)
-        ->toContain('rawComposeBindMkdirCommand(')
-        ->toContain('escapeshellarg');
+    $application = makeRawComposeApplication(rawComposeBindSource('../../../../../../outside'));
+
+    expect(fn () => $application->oldRawParser())
+        ->toThrow(Exception::class, 'resolves to a path above /');
+
+    Process::assertNothingRan();
 });

@@ -69,3 +69,15 @@ test('RuntimeException is still reported when thrown', function () {
 
     expect($shouldReport)->toBeTrue();
 });
+
+test('DeploymentException marks a message as already logged only when asked', function () {
+    $previous = new RuntimeException('Original error');
+    $logged = DeploymentException::alreadyLogged('Shown in the log', 7, $previous);
+
+    expect($logged->isMessageAlreadyLogged())->toBeTrue()
+        ->and($logged->getMessage())->toBe('Shown in the log')
+        ->and($logged->getCode())->toBe(7)
+        ->and($logged->getPrevious())->toBe($previous)
+        ->and((new DeploymentException('Not shown yet'))->isMessageAlreadyLogged())->toBeFalse()
+        ->and(DeploymentException::fromException($previous)->isMessageAlreadyLogged())->toBeFalse();
+});

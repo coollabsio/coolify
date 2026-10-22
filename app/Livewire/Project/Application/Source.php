@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
@@ -89,14 +90,14 @@ class Source extends Component
 
     private function getPrivateKeys()
     {
-        $this->privateKeys = PrivateKey::whereTeamId(currentTeam()->id)->get()->reject(function ($key) {
+        $this->privateKeys = PrivateKey::where('team_id', $this->application->team()->id)->get()->reject(function ($key) {
             return $key->id == $this->privateKeyId;
         });
     }
 
     private function getSources()
     {
-        $this->sources = currentTeam()->sources()->filter(function ($source) {
+        $this->sources = $this->application->team()->sources()->filter(function ($source) {
             if ($source->id === $this->application->source_id
                 && $source->getMorphClass() === $this->application->source_type) {
                 return false;
@@ -104,7 +105,7 @@ class Source extends Component
             if ($source instanceof GithubApp) {
                 return ! is_null($source->app_id);
             }
-            if ($source instanceof GitlabApp) {
+            if ($source instanceof GitlabApp || $source instanceof GiteaApp) {
                 return $source->isConnected();
             }
 
@@ -116,7 +117,7 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $key = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
+            $key = PrivateKey::where('team_id', $this->application->team()->id)->findOrFail($privateKeyId);
             $this->privateKeyId = $key->id;
             $this->syncData(true);
             $this->getPrivateKeys();
@@ -149,9 +150,12 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
+            $allowedSourceTypes = [GithubApp::class, GitlabApp::class, GiteaApp::class];
             abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
-            $source = $sourceType::ownedByCurrentTeam()->findOrFail($sourceId);
+            $teamId = $this->application->team()->id;
+            $source = $sourceType::query()
+                ->where(fn ($query) => $query->where('team_id', $teamId)->orWhere('is_system_wide', true))
+                ->findOrFail($sourceId);
             $this->application->update([
                 'source_id' => $source->id,
                 'source_type' => $sourceType,
@@ -169,6 +173,12 @@ class Source extends Component
                     $encoded = urlencode($customRepository);
                     $project = gitlabApi($source, "/projects/{$encoded}");
                     $repository_project_id = data_get($project, 'data.id');
+                }
+            } elseif ($sourceType === GiteaApp::class) {
+                if ($source->isConnected()) {
+                    $repositoryPath = collect(explode('/', $customRepository, 2))->map(fn ($part) => rawurlencode($part))->implode('/');
+                    $repository = giteaApi($source, "/repos/{$repositoryPath}");
+                    $repository_project_id = data_get($repository, 'data.id');
                 }
             }
 

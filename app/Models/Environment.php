@@ -34,6 +34,18 @@ class Environment extends BaseModel
         'uuid',
     ];
 
+    /**
+     * Moving cards on the environment canvas is layout, not a change worth an audit event.
+     */
+    protected array $auditExclude = ['canvas_positions'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_positions' => 'array',
+        ];
+    }
+
     protected static function booted()
     {
         static::deleting(function ($environment) {
@@ -66,6 +78,7 @@ class Environment extends BaseModel
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
+            $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0;
     }
 
@@ -124,6 +137,11 @@ class Environment extends BaseModel
         return $this->hasMany(StandaloneClickhouse::class);
     }
 
+    public function sqlites()
+    {
+        return $this->hasMany(StandaloneSqlite::class);
+    }
+
     public function databases()
     {
         $postgresqls = $this->postgresqls;
@@ -134,8 +152,9 @@ class Environment extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($sqlites);
     }
 
     public function project()
@@ -146,6 +165,11 @@ class Environment extends BaseModel
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function resourceLinks(): HasMany
+    {
+        return $this->hasMany(ResourceLink::class);
     }
 
     protected function customizeName($value)

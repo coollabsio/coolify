@@ -81,7 +81,7 @@ class CreateNewUser implements CreatesNewUsers
             }
         }
         // Set session variable
-        session(['currentTeam' => $user->currentTeam = $team]);
+        session(['currentTeam' => $team]);
 
         return $user;
     }

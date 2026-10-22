@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +16,8 @@ use OpenApi\Attributes as OA;
 
 class ServerProxyController extends Controller
 {
+    use RequiresDeployAbility;
+
     private function teamIdOrAbort(): int|JsonResponse
     {
         $teamId = getTeamIdFromToken();
@@ -41,6 +45,7 @@ class ServerProxyController extends Controller
      *     redirect_enabled: bool,
      *     redirect_url: string|null,
      *     generate_exact_labels: bool,
+     *     traefik_certificate_resolver: string|null,
      *     configuration?: string|null
      * }
      */
@@ -52,6 +57,7 @@ class ServerProxyController extends Controller
             'redirect_enabled' => (bool) data_get($server->proxy, 'redirect_enabled', true),
             'redirect_url' => data_get($server->proxy, 'redirect_url'),
             'generate_exact_labels' => (bool) ($server->settings->generate_exact_labels ?? false),
+            'traefik_certificate_resolver' => $server->traefikCertificateResolver(),
         ];
 
         // Proxy compose can contain secrets; only expose with read:sensitive (and admin) like other APIs.
@@ -86,6 +92,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'redirect_enabled', type: 'boolean', example: true),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true, example: 'https://example.com'),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean', example: false),
+                        new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, example: 'letsencrypt', description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'),
                         new OA\Property(property: 'configuration', type: 'string', nullable: true, description: 'Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.'),
                     ]
                 )
@@ -114,7 +121,7 @@ class ServerProxyController extends Controller
 
     #[OA\Patch(
         summary: 'Update server proxy',
-        description: 'Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.',
+        description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server. Changing proxy_type needs a token with the `write` and `deploy` permissions.',
         path: '/servers/{uuid}/proxy',
         operationId: 'update-server-proxy',
         security: [['bearerAuth' => []]],
@@ -130,7 +137,8 @@ class ServerProxyController extends Controller
                     new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                     new OA\Property(property: 'redirect_url', type: 'string', nullable: true, description: 'Public http(s) redirect URL, or null to clear.'),
                     new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
-                    new OA\Property(property: 'proxy_type', type: 'string', enum: ['traefik', 'caddy', 'nginx', 'none'], description: 'Proxy type (case-insensitive).'),
+                    new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'),
+                    new OA\Property(property: 'proxy_type', type: 'string', enum: ['traefik', 'caddy', 'nginx', 'none'], description: 'Proxy type (case-insensitive). Changing it starts the new proxy on the server and needs the deploy permission.'),
                 ]
             )
         ),
@@ -146,12 +154,14 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
+                        new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true),
                         new OA\Property(property: 'configuration', type: 'string', nullable: true),
                     ]
                 )
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to change the proxy type.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -168,11 +178,12 @@ class ServerProxyController extends Controller
             return $return;
         }
 
-        $allowedFields = ['redirect_enabled', 'redirect_url', 'generate_exact_labels', 'proxy_type'];
+        $allowedFields = ['redirect_enabled', 'redirect_url', 'generate_exact_labels', 'traefik_certificate_resolver', 'proxy_type'];
         $validator = customApiValidator($request->all(), [
             'redirect_enabled' => 'boolean',
             'redirect_url' => ['nullable', 'string', new SafeExternalUrl],
             'generate_exact_labels' => 'boolean',
+            'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
             'proxy_type' => 'string|nullable',
         ]);
 
@@ -206,6 +217,12 @@ class ServerProxyController extends Controller
             }
         }
 
+        $proxyTypeChanged = $request->has('proxy_type') && filled($request->proxy_type)
+            && ! str($request->proxy_type)->lower()->exactly(str($server->proxyType())->lower());
+        if ($proxyTypeChanged && ($response = $this->deployAbilityForbiddenResponse($request, 'Changing the proxy type starts the new proxy on the server, so it needs a token with the deploy permission.'))) {
+            return $response;
+        }
+
         $changedFields = array_values(array_intersect($allowedFields, array_keys($request->all())));
         $redirectChanged = false;
 
@@ -228,14 +245,27 @@ class ServerProxyController extends Controller
             $server->settings->save();
         }
 
-        if ($request->has('proxy_type') && filled($request->proxy_type)) {
+        $certificateResolverChanged = false;
+        if ($request->exists('traefik_certificate_resolver')) {
+            $server->settings->traefik_certificate_resolver = $request->input('traefik_certificate_resolver') ?: null;
+            $certificateResolverChanged = $server->settings->isDirty('traefik_certificate_resolver');
+            $server->settings->save();
+        }
+
+        if ($proxyTypeChanged) {
             $server->changeProxy($request->proxy_type, async: true);
             $server->refresh();
         }
 
         // Apply redirect file on the server only when reachable (DB settings always saved above).
-        if ($redirectChanged && $server->isFunctional()) {
+        // The catch-all router in that file uses the certificate resolver too.
+        if (($redirectChanged || $certificateResolverChanged) && $server->isFunctional()) {
             $server->setupDefaultRedirect();
+        }
+
+        // Coolify's own dashboard routes use the resolver too.
+        if ($certificateResolverChanged && $server->isFunctional()) {
+            $server->setupDynamicProxyConfiguration();
         }
 
         auditLog('api.server.proxy.updated', [
@@ -250,7 +280,7 @@ class ServerProxyController extends Controller
 
     #[OA\Put(
         summary: 'Save server proxy configuration',
-        description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).',
+        description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).',
         path: '/servers/{uuid}/proxy/configuration',
         operationId: 'save-server-proxy-configuration',
         security: [['bearerAuth' => []]],
@@ -300,6 +330,10 @@ class ServerProxyController extends Controller
         $teamId = $this->teamIdOrAbort();
         if (! is_int($teamId)) {
             return $teamId;
+        }
+
+        if ($response = $this->deployAbilityForbiddenResponse($request, 'Coolify applies the proxy configuration on the server, so it needs a token with the deploy permission.')) {
+            return $response;
         }
 
         $return = validateIncomingRequest($request);
@@ -371,7 +405,7 @@ class ServerProxyController extends Controller
 
     #[OA\Post(
         summary: 'Restart server proxy',
-        description: 'Queue a proxy restart for a team-owned server.',
+        description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.',
         path: '/servers/{uuid}/proxy/restart',
         operationId: 'restart-server-proxy',
         security: [['bearerAuth' => []]],

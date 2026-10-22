@@ -1,5 +1,126 @@
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
+/**
+ * WebSocket close codes sent to the browser. Browsers cannot read the HTTP
+ * status of a rejected WebSocket handshake, so rejections are reported with
+ * application close codes (4000-4999) that the client can act on.
+ */
+export const TERMINAL_CLOSE_CODES = Object.freeze({
+    AUTH_REJECTED: 4401,
+    TOKEN_REJECTED: 4403,
+    AUTH_UNAVAILABLE: 1011,
+});
+
+export const TERMINAL_REJECTED_SOCKET_TERMINATE_MS = 2000;
+
+/**
+ * Authenticates a terminal WebSocket upgrade with the browser's Laravel session
+ * cookie and XSRF token. Performs the same checks as the former verifyClient
+ * callback; only the way a rejection is reported to the client differs.
+ *
+ * @param {{ laravelSession?: string, xsrfToken?: string, sessionCookieName: string }} session
+ * @param {(path: string, headers: object) => Promise<{ status: number }>} postToCoolify
+ * @returns {Promise<{ authenticated: true } | { authenticated: false, closeCode: number, reason: string, status?: number, error?: Error }>}
+ */
+export async function authenticateTerminalUpgrade({ laravelSession, xsrfToken, sessionCookieName }, postToCoolify) {
+    if (!laravelSession || !xsrfToken) {
+        return {
+            authenticated: false,
+            closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
+            reason: 'Unauthorized: Missing required tokens',
+        };
+    }
+
+    try {
+        const response = await postToCoolify('/terminal/auth', {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken,
+        });
+
+        if (response.status === 200) {
+            return { authenticated: true };
+        }
+
+        return {
+            authenticated: false,
+            closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
+            reason: 'Unauthorized: Invalid credentials',
+            status: response.status,
+        };
+    } catch (error) {
+        return {
+            authenticated: false,
+            closeCode: TERMINAL_CLOSE_CODES.AUTH_UNAVAILABLE,
+            reason: 'Internal Server Error',
+            error,
+        };
+    }
+}
+
+/**
+ * Closes a WebSocket that must not be used, optionally sending a legacy text
+ * message first for clients that predate close codes. The socket is terminated
+ * if the peer does not complete the close handshake quickly.
+ */
+export function rejectTerminalSocket(ws, closeCode, reason, { message = null, terminateAfterMs = TERMINAL_REJECTED_SOCKET_TERMINATE_MS } = {}) {
+    const terminateTimer = setTimeout(() => ws.terminate(), terminateAfterMs);
+    terminateTimer.unref?.();
+    ws.once('close', () => clearTimeout(terminateTimer));
+    // Rejected sockets have no other listeners; an unhandled 'error' (e.g. a
+    // malformed frame from an unauthenticated client) would crash the server.
+    ws.on('error', () => ws.terminate());
+
+    if (message !== null) {
+        ws.send(message);
+    }
+
+    ws.close(closeCode, reason);
+}
+
+/**
+ * Builds the HTTP `upgrade` listener for the terminal WebSocket server.
+ * Unauthenticated clients never reach the `connection` event: they are upgraded
+ * only to receive a close frame with a machine-readable code, then dropped.
+ */
+export function createTerminalUpgradeHandler({ wss, authenticate, onRejected = () => {}, terminateAfterMs = TERMINAL_REJECTED_SOCKET_TERMINATE_MS }) {
+    return (req, socket, head) => {
+        if (!wss.shouldHandle(req)) {
+            // Let ws answer unknown paths exactly as it did with the `server` option.
+            wss.handleUpgrade(req, socket, head, (ws) => ws.terminate());
+            return;
+        }
+
+        // The client may disconnect while Coolify is checking the session.
+        const destroyOnError = () => socket.destroy();
+        socket.on('error', destroyOnError);
+
+        Promise.resolve()
+            .then(() => authenticate(req))
+            .catch((error) => ({
+                authenticated: false,
+                closeCode: TERMINAL_CLOSE_CODES.AUTH_UNAVAILABLE,
+                reason: 'Internal Server Error',
+                error,
+            }))
+            .then((result) => {
+                socket.removeListener('error', destroyOnError);
+                if (socket.destroyed) {
+                    return;
+                }
+
+                wss.handleUpgrade(req, socket, head, (ws) => {
+                    if (result?.authenticated === true) {
+                        wss.emit('connection', ws, req);
+                        return;
+                    }
+
+                    onRejected(result, req);
+                    rejectTerminalSocket(ws, result.closeCode, result.reason, { terminateAfterMs });
+                });
+            });
+    };
+}
+
 const DEFAULT_TERMINAL_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
 
 export function getTerminalProcessEnv(environment = process.env) {
@@ -15,6 +136,12 @@ export function getTerminalSessionTimeout() {
 export function extractTimeout(commandString) {
     const timeoutMatch = commandString.match(/timeout (\d+)/);
     return timeoutMatch ? parseInt(timeoutMatch[1], 10) : null;
+}
+
+// A `docker attach` session shares the container's main process. On disconnect we
+// must detach from it instead of killing it, otherwise we stop the running app.
+export function isAttachCommand(commandString) {
+    return /(?:^|\s)docker\s+attach(?:\s|$)/.test(commandString || '');
 }
 
 function normalizeShellArgument(argument) {
@@ -271,4 +398,54 @@ export function sanitizeSshArgs(sshArgs) {
     }
 
     return sanitizedArgs;
+}
+
+// Wait for this PTY to exit, not for mutable session state to change.
+export function detachPtyProcess(session) {
+    const ptyProcess = session.ptyProcess;
+    if (!ptyProcess || !session.isActive) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+        let timer;
+        let attempts = 0;
+        let settled = false;
+        const finish = (exited) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            exitListener.dispose();
+            if (exited && session.ptyProcess === ptyProcess) {
+                session.isActive = false;
+                session.ptyProcess = null;
+                clearTimeout(session.terminalSessionTimer);
+                session.terminalSessionTimer = null;
+            }
+            resolve(exited);
+        };
+        const exitListener = ptyProcess.onExit(() => finish(true));
+        const attemptDetach = () => {
+            attempts++;
+            try {
+                ptyProcess.write('\x10\x11');
+            } catch (_) {
+                // An exit event is still required to confirm teardown.
+            }
+            if (settled) return;
+            timer = setTimeout(() => {
+                if (attempts < 3) {
+                    attemptDetach();
+                    return;
+                }
+                // --sig-proxy=false prevents forwarding signals to the container.
+                // Refuse a replacement if killing the local SSH client does not exit.
+                timer = setTimeout(() => finish(false), 1000);
+                try {
+                    ptyProcess.kill();
+                } catch (_) {
+                    // The bounded exit wait fails closed.
+                }
+            }, 500);
+        };
+        attemptDetach();
+    });
 }

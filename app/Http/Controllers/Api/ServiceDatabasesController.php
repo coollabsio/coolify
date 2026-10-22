@@ -8,6 +8,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +45,7 @@ class ServiceDatabasesController extends Controller
         path: '/services/{uuid}/databases/{database_uuid}/imports',
         operationId: 'create-service-database-import',
         summary: 'Import service database backup',
+        description: 'Restore a backup into the service database. Every import source requires the deploy ability.',
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')),
         security: [['bearerAuth' => []]],
         tags: ['Service databases'],
@@ -53,7 +55,8 @@ class ServiceDatabasesController extends Controller
         ],
         responses: [
             new OA\Response(response: 202, description: 'Import queued'),
-            new OA\Response(response: 409, description: 'Import already active'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability.'),
+            new OA\Response(response: 409, description: 'Another start, restart or import of this database is already in progress.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -234,7 +237,7 @@ class ServiceDatabasesController extends Controller
                     new OA\Property(property: 'image', type: 'string'),
                     new OA\Property(property: 'exclude_from_status', type: 'boolean'),
                     new OA\Property(property: 'is_log_drain_enabled', type: 'boolean'),
-                    new OA\Property(property: 'is_public', type: 'boolean'),
+                    new OA\Property(property: 'is_public', type: 'boolean', description: 'Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'),
                     new OA\Property(property: 'public_port', type: 'integer', nullable: true, minimum: 1, maximum: 65535),
                     new OA\Property(property: 'public_port_timeout', type: 'integer', nullable: true, minimum: 1),
                 ],
@@ -245,6 +248,7 @@ class ServiceDatabasesController extends Controller
             new OA\Response(response: 200, description: 'Updated service database.', content: new OA\JsonContent(type: 'object')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to change is_public.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -312,6 +316,13 @@ class ServiceDatabasesController extends Controller
             ], 422);
         }
 
+        if (array_key_exists('is_public', $payload) && (bool) $payload['is_public'] !== (bool) $serviceDatabase->is_public) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Making a database public or private starts or stops its proxy on the server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         $server = $serviceDatabase->service->destination->server;
         if (($payload['is_log_drain_enabled'] ?? false) && ! $server->isLogDrainEnabled()) {
             return response()->json([
@@ -358,7 +369,7 @@ class ServiceDatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get service database logs',
-        description: 'Get Docker logs for a compose database container.',
+        description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/databases/{database_uuid}/logs',
         operationId: 'get-service-database-logs-by-service-and-database-uuid',
         security: [['bearerAuth' => []]],
@@ -401,7 +412,10 @@ class ServiceDatabasesController extends Controller
         $lines = normalizeLogLines($request->query('lines'));
 
         return response()->json([
-            'logs' => getContainerLogs($server, $containerName, $lines),
+            'logs' => sanitizeLogsForExport(
+                getContainerLogs($server, $containerName, $lines),
+                EnvironmentVariable::logRedactionSecretsFor($serviceDatabase->service),
+            ),
         ]);
     }
 

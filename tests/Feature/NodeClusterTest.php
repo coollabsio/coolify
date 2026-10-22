@@ -585,22 +585,19 @@ it('shows cluster pages under the Servers item in the sidebar', function () {
     $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
 
     expect($navbar)
-        ->toContain('title="Servers"')
+        ->toContain("'label' => 'Servers'")
         ->toContain("request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*')")
         ->not->toContain('title="Clusters"')
         ->not->toContain("route('node-cluster.index')");
 });
 
-it('renders one page per cluster menu item with the grouped sidebar', function (string $routeName, array $expectedText) {
+it('renders one page per cluster menu item with the sidebar', function (string $routeName, array $expectedText) {
     $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Sectioned cluster');
 
     $response = $this->get(route($routeName, $cluster->uuid))
         ->assertSuccessful()
         ->assertSeeLivewire(Show::class)
         ->assertSee('Sectioned cluster')
-        ->assertSee('Settings')
-        ->assertSee('Network')
-        ->assertSee('Danger zone')
         ->assertSee(route('node-cluster.show', $cluster->uuid), escape: false)
         ->assertSee(route('node-cluster.nodes', $cluster->uuid), escape: false)
         ->assertSee(route('node-cluster.firewall', $cluster->uuid), escape: false)

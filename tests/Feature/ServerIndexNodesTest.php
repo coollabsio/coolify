@@ -35,7 +35,8 @@ function serverIndexDockerServer(int $teamId, string $name): Server
     return Server::factory()->create([
         'team_id' => $teamId,
         'name' => $name,
-        'private_key_id' => PrivateKey::factory()->create(['team_id' => $teamId])->id,
+        'private_key_id' => PrivateKey::query()->where('team_id', $teamId)->value('id')
+            ?? PrivateKey::factory()->create(['team_id' => $teamId])->id,
     ]);
 }
 

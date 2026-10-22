@@ -15,6 +15,10 @@ class TeamInvitation extends Model
         'via',
     ];
 
+    protected $casts = [
+        'link' => 'encrypted',
+    ];
+
     /**
      * Set the email attribute to lowercase.
      */

@@ -25,10 +25,8 @@
                 <x-forms.input wire:model="ip" label="IP address" placeholder="203.0.113.10" required />
                 <x-forms.input wire:model="name" label="Server name" required />
                 <div class="sm:col-span-2">
-                    <x-forms.select wire:model="privateKeyId" label="SSH private key" required>
-                        <option value="">Select a private key</option>
-                        @foreach ($privateKeys as $privateKey)<option value="{{ $privateKey->id }}">{{ $privateKey->name }}</option>@endforeach
-                    </x-forms.select>
+                    <x-forms.listbox id="privateKeyId" label="SSH private key" required placeholder="Select a private key"
+                        :options="$privateKeys->map(fn ($privateKey) => ['value' => $privateKey->id, 'label' => $privateKey->name])->values()->all()" />
                     @if ($privateKeys->isEmpty())<a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }} class="mt-2 inline-block text-[12px]">Add an SSH private key</a>@endif
                 </div>
             </div>
@@ -65,7 +63,8 @@
             @endif
             <div class="mt-4">
                 @if ($clusterMode === 'existing' && $clusters->isNotEmpty())
-                    <x-forms.select wire:model="clusterUuid" label="Cluster" required><option value="">Select a cluster</option>@foreach ($clusters as $cluster)<option value="{{ $cluster->uuid }}">{{ $cluster->name }}</option>@endforeach</x-forms.select>
+                    <x-forms.listbox id="clusterUuid" label="Cluster" required placeholder="Select a cluster"
+                        :options="$clusters->map(fn ($cluster) => ['value' => $cluster->uuid, 'label' => $cluster->name])->values()->all()" />
                 @else
                     <x-forms.input wire:model="clusterName" label="Cluster name" required />
                 @endif

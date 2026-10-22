@@ -247,6 +247,10 @@ class GitlabController extends Controller
             ], 422);
         }
 
+        if (! isCloud() && $request->boolean('is_system_wide')) {
+            $this->authorize('makeSystemWide', GitlabApp::class);
+        }
+
         try {
             $htmlUrl = rtrim((string) $request->input('html_url'), '/');
             $apiUrl = filled($request->input('api_url'))
@@ -418,6 +422,10 @@ class GitlabController extends Controller
                     'message' => 'Validation error',
                     'errors' => $validator->errors(),
                 ], 422);
+            }
+
+            if (! isCloud() && filter_var($payload['is_system_wide'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! $gitlabApp->is_system_wide) {
+                $this->authorize('makeSystemWide', GitlabApp::class);
             }
 
             if (isset($payload['html_url'])) {

@@ -17,8 +17,9 @@ class SeedDevelopmentQemuServer
     /**
      * Seed the Server (or, for Podman profiles, the worker Node) of a development QEMU profile.
      * $removeOtherServers removes other development QEMU records of the same kind; $asLocalhost reuses Server id 0.
+     * $ip and $port override the profile address, for example for a Lima VM whose SSH port is forwarded to the host.
      */
-    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false): Server|Node
+    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false, ?string $ip = null, int $port = 22): Server|Node
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
@@ -61,8 +62,8 @@ class SeedDevelopmentQemuServer
                     'name' => $profile['name'],
                     'description' => 'Development QEMU virtual machine',
                     'role' => NodeRole::WORKER,
-                    'ip' => $profile['ip'],
-                    'port' => 22,
+                    'ip' => $ip ?? $profile['ip'],
+                    'port' => $port,
                     'user' => $profile['user'],
                     'team_id' => 0,
                     'private_key_id' => $privateKey->id,
@@ -86,8 +87,8 @@ class SeedDevelopmentQemuServer
         $server->fill([
             'name' => $asLocalhost ? 'localhost' : $profile['name'],
             'description' => 'Development QEMU virtual machine',
-            'ip' => $profile['ip'],
-            'port' => 22,
+            'ip' => $ip ?? $profile['ip'],
+            'port' => $port,
             'user' => $profile['user'],
             'team_id' => 0,
             'private_key_id' => $privateKey->id,

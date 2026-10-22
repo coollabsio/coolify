@@ -8,18 +8,13 @@
 services:
   triliumnext:
     image: ghcr.io/triliumnext/trilium:stable
-    platform: linux/amd64 # https://github.com/TriliumNext/Trilium/issues/6390
     environment:
       - SERVICE_URL_TRILIUMNEXT_8080
       - TZ=${TZ:-Europe/Berlin}
     volumes:
       - triliumnext_data:/home/node/trilium-data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget --quiet --tries=1 --spider http://127.0.0.1:8080/api/health-check || exit 1",
-        ]
+      test: ["CMD", "node", "/usr/src/app/docker_healthcheck.cjs"]
       interval: 5s
       timeout: 20s
       retries: 10

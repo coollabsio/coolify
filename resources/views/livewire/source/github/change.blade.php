@@ -3,6 +3,10 @@
         {{ $github_app->name ?: 'GitHub App' }} | Sources | Coolify
     </x-slot>
 
+    @if (session('error'))
+        <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
+    @endif
+
     @if (data_get($github_app, 'app_id'))
         @php
             $githubAppRouteParameters = ['github_app_uuid' => $github_app->uuid];
@@ -30,7 +34,7 @@
                     'label' => 'Danger Zone',
                     'route' => 'source.github.danger',
                     'active' => $activeTab === 'danger',
-                    'icon' => 'shield-alert',
+                    'icon' => 'danger',
                 ],
             ];
         @endphp
@@ -43,11 +47,14 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <aside class="application-settings-navigation min-w-0 xl:self-start">
+                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations"
+                        data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                            <div class="nav-section hidden xl:block">Settings</div>
                             @foreach ($settingsMenuItems as $menuItem)
+                                @if ($menuItem['label'] === 'Danger Zone')
+                                    <div class="col-span-full my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                                @endif
                                 <a wire:key="github-app-settings-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -60,7 +67,7 @@
                                 </a>
                             @endforeach
                         </nav>
-                    </aside>
+                    </x-main-nav-menu>
 
                     <div class="min-w-0">
                         @if (!data_get($github_app, 'installation_id') && $activeTab === 'general')
@@ -104,7 +111,14 @@
                                 <x-application.settings-section title="General"
                                     description="Connection and authentication settings for this private GitHub source.">
                                     <x-slot:actions>
-                                        <x-forms.button type="button" wire:click.prevent="updateGithubAppName">
+                                        @if ($isConnected)
+                                            <x-forms.button type="button" canGate="view" :canResource="$github_app"
+                                                wire:click.prevent="testConnection">
+                                                Test connection
+                                            </x-forms.button>
+                                        @endif
+                                        <x-forms.button type="button" canGate="update" :canResource="$github_app"
+                                            wire:click.prevent="updateGithubAppName">
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Sync name
                                         </x-forms.button>
@@ -126,6 +140,7 @@
                                             label="Organization" placeholder="Personal account when empty" />
 
                                         @if (!isCloud())
+                                            @can('makeSystemWide', \App\Models\GithubApp::class)
                                             <div class="lg:col-span-2">
                                                 <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
@@ -134,6 +149,7 @@
                                                     helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
                                                     :disabled="!auth()->user()->can('update', $github_app)" />
                                             </div>
+                                            @endcan
                                             @if ($isSystemWide)
                                                 <div class="lg:col-span-2">
                                                     <x-callout type="warning" title="Shared with every team">
@@ -191,7 +207,8 @@
                                                         shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
                                                         step2ButtonText="Permanently Delete" />
                                                 @else
-                                                    <x-forms.button isError disabled tooltip="You do not have permission to delete this GitHub App.">
+                                                    <x-forms.button isError disabled canGate="delete" :canResource="$github_app"
+                                                        tooltip="You do not have permission to delete this GitHub App.">
                                                         Delete
                                                     </x-forms.button>
                                                 @endcan
@@ -252,19 +269,19 @@
             @endphp
 
             <div class="grid gap-4 lg:grid-cols-2">
-                <div class="application-settings-form"
+                <div class="application-settings-form flex"
                     x-data="{
                         webhookEndpoint: $wire.entangle('webhook_endpoint').live,
                         useCustomWebhookEndpoint: $wire.entangle('use_custom_webhook_endpoint').live,
                         customWebhookEndpoint: $wire.entangle('custom_webhook_endpoint').live,
                     }">
-                    <x-application.settings-section title="Automated installation"
+                    <x-application.settings-section title="Automated installation" class="[&>.application-settings-section-body]:flex [&>.application-settings-section-body]:flex-1 [&>.application-settings-section-body]:flex-col"
                         description="Register through GitHub's manifest flow with permissions and webhooks preconfigured.">
                         <x-slot:actions>
                             <x-status-badge label="Recommended" type="success" />
                         </x-slot:actions>
 
-                        <div class="flex min-h-[24rem] flex-col gap-4">
+                        <div class="flex min-h-[24rem] flex-1 flex-col gap-4">
                             @if (!isCloud() || isDev())
                                 <x-forms.listbox id="use_custom_webhook_endpoint" label="Webhook endpoint"
                                     :live="true" :options="[
@@ -302,23 +319,33 @@
                                 ]"
                                 helper="Write access lets Coolify post deployment status and links on pull requests." />
 
+                            <x-forms.listbox id="github_runners" label="GitHub Actions runners"
+                                :disabled="blank($github_app->organization)"
+                                :options="[
+                                    ['value' => false, 'label' => 'Do not run workflow jobs'],
+                                    ['value' => true, 'label' => 'Run workflow jobs on your servers'],
+                                ]"
+                                :helper="filled($github_app->organization)
+                                    ? 'Adds the organization Self-hosted runners (write) and Actions (read) permissions and the Workflow job webhook event.'
+                                    : 'Only GitHub Apps that belong to an organization can run workflow jobs. Delete this source and create a new one with an organization.'" />
+
                             <button type="button"
                                 class="button mt-auto w-full justify-center button-highlighted"
-                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, {{ Illuminate\Support\Js::from($preview_deployment_permissions) }}, {{ Illuminate\Support\Js::from($administration) }})">
+                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, $wire.preview_deployment_permissions, {{ Illuminate\Support\Js::from($administration) }}, $wire.github_runners)">
                                 Register with GitHub
                             </button>
                         </div>
                     </x-application.settings-section>
                 </div>
 
-                <div class="application-settings-form">
-                    <x-application.settings-section title="Manual installation"
+                <div class="application-settings-form flex">
+                    <x-application.settings-section title="Manual installation" class="[&>.application-settings-section-body]:flex [&>.application-settings-section-body]:flex-1 [&>.application-settings-section-body]:flex-col"
                         description="Enter GitHub App credentials manually for GitHub Enterprise or custom permission sets.">
                         <x-slot:actions>
                             <x-status-badge label="Advanced" type="neutral" />
                         </x-slot:actions>
 
-                        <div class="flex min-h-[24rem] flex-col">
+                        <div class="flex min-h-[24rem] flex-1 flex-col">
                             <div
                                 class="flex size-10 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
                                 <x-reicon name="settings" class="size-5" />
@@ -344,7 +371,7 @@
 
         <script>
             function createGithubApp(webhook_endpoint, use_custom_webhook_endpoint, custom_webhook_endpoint,
-                preview_deployment_permissions, administration) {
+                preview_deployment_permissions, administration, github_runners) {
                 const {
                     organization,
                     html_url
@@ -352,11 +379,11 @@
                 const selectedEndpoint = webhook_endpoint ? webhook_endpoint.trim() : '';
                 const customEndpoint = custom_webhook_endpoint ? custom_webhook_endpoint.trim() : '';
                 if (use_custom_webhook_endpoint && !customEndpoint) {
-                    alert('Please enter a custom webhook endpoint.');
+                    window.toast('Error', { type: 'danger', description: 'Please enter a custom webhook endpoint.' });
                     return;
                 }
                 if (!use_custom_webhook_endpoint && !selectedEndpoint) {
-                    alert('Please enter a webhook endpoint.');
+                    window.toast('Error', { type: 'danger', description: 'Please enter a webhook endpoint.' });
                     return;
                 }
                 let baseUrl = (use_custom_webhook_endpoint ? customEndpoint : selectedEndpoint).replace(/\/+$/, '');
@@ -383,6 +410,11 @@
                 }
                 if (administration) {
                     default_permissions.administration = 'write';
+                }
+                if (github_runners && organization) {
+                    default_permissions.organization_self_hosted_runners = 'write';
+                    default_permissions.actions = 'read';
+                    default_events.push('workflow_job');
                 }
 
                 const data = {

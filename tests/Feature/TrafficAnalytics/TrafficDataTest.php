@@ -1,5 +1,6 @@
 <?php
 
+use App\Data\Traffic\TrafficBreakdownData;
 use App\Data\Traffic\TrafficOverviewData;
 use App\Data\Traffic\TrafficPathData;
 
@@ -36,3 +37,26 @@ it('maps per-path error counters from sentinel', function () {
     expect($dto->s4xx)->toBe(3)
         ->and($dto->s5xx)->toBe(2);
 });
+
+it('maps city coordinates from sentinel', function () {
+    $dto = TrafficBreakdownData::fromSentinel([
+        'value' => 'DE|BE|Berlin', 'requests' => 9, 'bytes_out' => 900, 'lat' => 52.52, 'lon' => 13.405,
+    ]);
+
+    expect($dto->value)->toBe('DE|BE|Berlin')
+        ->and($dto->lat)->toBe(52.52)
+        ->and($dto->lon)->toBe(13.405);
+});
+
+it('leaves coordinates null when sentinel sends none or sends only one', function (array $row) {
+    $dto = TrafficBreakdownData::fromSentinel(['value' => 'DE||', 'requests' => 2, 'bytes_out' => 20] + $row);
+
+    expect($dto->lat)->toBeNull()->and($dto->lon)->toBeNull();
+})->with([
+    'none' => [[]],
+    'only lat' => [['lat' => 52.52]],
+    'not numeric' => [['lat' => 'x', 'lon' => 'y']],
+    'not finite' => [['lat' => INF, 'lon' => 13.4]],
+    'latitude out of range' => [['lat' => 91, 'lon' => 13.4]],
+    'longitude out of range' => [['lat' => 52.5, 'lon' => -181]],
+]);

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\DopplerService;
 use App\Services\InfisicalService;
 use App\Services\VaultService;
+use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -46,6 +47,10 @@ class SecretManagerLink extends BaseModel
     public function fetchSecrets(): array
     {
         $token = $this->integrationToken;
+        $teamId = $this->resourceable?->team()?->id;
+        if ($teamId === null || (int) $token->team_id !== (int) $teamId) {
+            throw new \RuntimeException('The secret manager token does not belong to the team of this resource.');
+        }
         $settings = $this->settings ?? [];
         $metadata = $token->metadata ?? [];
 
@@ -58,6 +63,7 @@ class SecretManagerLink extends BaseModel
                 data_get($metadata, 'base_url', 'https://app.infisical.com'),
                 (string) data_get($metadata, 'client_id'),
                 $token->token,
+                IntegrationToken::requestTimeout($metadata),
             ))->fetchSecrets(
                 (string) data_get($settings, 'project_id'),
                 (string) data_get($settings, 'environment'),
@@ -67,6 +73,7 @@ class SecretManagerLink extends BaseModel
                 (string) data_get($metadata, 'base_url'),
                 $token->token,
                 data_get($metadata, 'namespace'),
+                IntegrationToken::requestTimeout($metadata),
             ))->fetchSecrets(
                 (string) data_get($settings, 'mount', 'secret'),
                 (string) data_get($settings, 'path'),
@@ -77,9 +84,11 @@ class SecretManagerLink extends BaseModel
 
     /**
      * Create one {{vault.KEY}} reference variable per remote key that has no
-     * variable with that key yet. Only key names touch the database.
+     * variable with that key yet. Only key names touch the database. Remote
+     * names that are not valid variable keys (e.g. `db-password`) are skipped
+     * as they are, never renamed.
      *
-     * @return list<string> The keys that were imported
+     * @return array{imported: list<string>, skipped: list<string>}
      */
     public function importMissingReferences(): array
     {
@@ -88,8 +97,17 @@ class SecretManagerLink extends BaseModel
 
         $existing = $this->resourceable->environment_variables()->pluck('key')->flip();
         $imported = [];
+        $skipped = [];
 
         foreach ($keys as $key) {
+            $key = (string) $key;
+
+            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                $skipped[] = $key;
+
+                continue;
+            }
+
             if (isset($existing[$key])) {
                 continue;
             }
@@ -101,7 +119,7 @@ class SecretManagerLink extends BaseModel
             $imported[] = $key;
         }
 
-        return $imported;
+        return ['imported' => $imported, 'skipped' => $skipped];
     }
 
     /** Short human-readable description of the remote source for the UI. */

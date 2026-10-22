@@ -99,7 +99,9 @@ describe('InfisicalService', function () {
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/api/v4/secrets')
             && $request->hasHeader('Authorization', 'Bearer short-lived-token')
-            && str_contains($request->url(), 'projectId=project-1'));
+            && str_contains($request->url(), 'projectId=project-1')
+            && $request['expandSecretReferences'] === 'true'
+            && $request['viewSecretValue'] === 'true');
     });
 
     test('falls back to the v3 raw endpoint on older self-hosted instances', function () {
@@ -119,8 +121,24 @@ describe('InfisicalService', function () {
 
         expect($service->fetchSecrets('project-1', 'prod'))->toBe(['LEGACY_KEY' => 'legacy-value']);
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'workspaceId=project-1'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'workspaceId=project-1')
+            && $request['expandSecretReferences'] === 'true');
     });
+
+    test('uses a 5 second connect timeout and a 10 second request timeout by default', function (?int $timeout, array $expected) {
+        $timeouts = [];
+        Http::fake(function ($request, array $options) use (&$timeouts) {
+            $timeouts[] = [$options['connect_timeout'], $options['timeout']];
+
+            return Http::response(['accessToken' => 'short-lived-token']);
+        });
+
+        expect((new InfisicalService('https://example.com', 'client-id', 'client-secret', $timeout))->validate())->toBeTrue()
+            ->and($timeouts)->toBe([$expected]);
+    })->with([
+        'default' => [null, [5, 10]],
+        'custom' => [60, [60, 60]],
+    ]);
 
     test('throws when the login fails', function () {
         Http::fake([

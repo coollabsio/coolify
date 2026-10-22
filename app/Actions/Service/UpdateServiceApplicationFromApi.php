@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Models\ServiceApplication;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ServiceComposeUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ class UpdateServiceApplicationFromApi
     public function execute(ServiceApplication $serviceApplication, Request $request, string $teamId, array $payload): ?JsonResponse
     {
         $forceDomainOverride = $request->boolean('force_domain_override');
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($serviceApplication->fresh() ?? $serviceApplication);
 
         if (array_key_exists('url', $payload)) {
             $urlRaw = $payload['url'];
@@ -84,12 +87,20 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->is_gzip_enabled = filter_var($payload['is_gzip_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('traefik_certificate_resolver', $payload)) {
+            $serviceApplication->traefik_certificate_resolver = filled($payload['traefik_certificate_resolver']) ? $payload['traefik_certificate_resolver'] : null;
+        }
+
         if (array_key_exists('is_stripprefix_enabled', $payload)) {
             $serviceApplication->is_stripprefix_enabled = filter_var($payload['is_stripprefix_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('is_force_https_enabled', $payload)) {
             $serviceApplication->is_force_https_enabled = filter_var($payload['is_force_https_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (array_key_exists('is_permanent_redirect_enabled', $payload)) {
+            $serviceApplication->is_permanent_redirect_enabled = filter_var($payload['is_permanent_redirect_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('max_restart_count', $payload)) {
@@ -113,6 +124,7 @@ class UpdateServiceApplicationFromApi
 
         $serviceApplication->save();
         $serviceApplication->refresh();
+        $dnsCleanup->queueReleaseOfRemovedHostnames($serviceApplication, $previousDnsHostnames, (int) $teamId);
 
         updateCompose($serviceApplication);
 

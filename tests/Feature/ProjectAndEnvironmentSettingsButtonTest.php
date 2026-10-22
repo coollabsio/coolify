@@ -35,7 +35,7 @@ test('project show page header links to project settings', function () {
     $editUrl = route('project.edit', ['project_uuid' => $this->project->uuid]);
 
     Livewire::test(ProjectShow::class, ['project_uuid' => $this->project->uuid])
-        ->assertSee('Settings')
+        ->assertSee('Open settings for Test Project', false)
         ->assertSee('Project settings', false)
         ->assertSeeHtml($editUrl);
 });
@@ -51,25 +51,22 @@ test('environment resources page header links to environment settings', function
         'environment_uuid' => $this->environment->uuid,
     ]))
         ->assertSuccessful()
-        ->assertSee('Settings')
+        ->assertSee('Open settings for '.$this->environment->name, false)
         ->assertSee('Environment settings', false)
         ->assertSee($editUrl, false);
 });
 
-test('project show blade includes project settings route', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/show.blade.php'));
+test('empty environment resources page header links to the canvas', function () {
+    $canvasUrl = route('project.environment.canvas', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+    ]);
 
-    expect($view)
-        ->toContain("route('project.edit'")
-        ->toContain('Project settings')
-        ->toContain('name="settings"');
-});
-
-test('environment resource index blade includes environment settings route', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/resource/index.blade.php'));
-
-    expect($view)
-        ->toContain("route('project.environment.edit'")
-        ->toContain('Environment settings')
-        ->toContain('name="settings"');
+    $this->get(route('project.resource.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+    ]))
+        ->assertSuccessful()
+        ->assertSee('No resources yet')
+        ->assertSee($canvasUrl, false);
 });

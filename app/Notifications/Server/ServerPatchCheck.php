@@ -8,6 +8,7 @@ use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 
 class ServerPatchCheck extends CustomEmailNotification
 {
@@ -48,6 +49,8 @@ class ServerPatchCheck extends CustomEmailNotification
             'name' => $this->server->name,
             'total_updates' => $totalUpdates,
             'updates' => $this->patchData['updates'] ?? [],
+            'security_updates' => $this->patchData['security_updates'] ?? null,
+            'reboot_required' => $this->patchData['reboot_required'] ?? null,
             'osId' => $this->patchData['osId'] ?? 'unknown',
             'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
             'server_url' => $this->serverUrl,
@@ -101,12 +104,7 @@ class ServerPatchCheck extends CustomEmailNotification
             }
 
             // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
+            $criticalPackages = $this->criticalPackages();
 
             if ($criticalPackages->count() > 0) {
                 $description .= "\n **Critical packages detected** ({$criticalPackages->count()} packages may require restarts)";
@@ -169,12 +167,7 @@ class ServerPatchCheck extends CustomEmailNotification
             }
 
             // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
+            $criticalPackages = $this->criticalPackages();
 
             if ($criticalPackages->count() > 0) {
                 $message .= "\n⚠️ Critical packages detected: {$criticalPackages->count()} packages may require restarts\n";
@@ -247,12 +240,7 @@ class ServerPatchCheck extends CustomEmailNotification
             }
 
             // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
+            $criticalPackages = $this->criticalPackages();
 
             if ($criticalPackages->count() > 0) {
                 $message .= "\nCritical packages detected: {$criticalPackages->count()} may require restarts";
@@ -316,12 +304,7 @@ class ServerPatchCheck extends CustomEmailNotification
             }
 
             // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
+            $criticalPackages = $this->criticalPackages();
 
             if ($criticalPackages->count() > 0) {
                 $description .= "\n:warning: *Critical packages detected:* {$criticalPackages->count()} packages may require restarts\n";
@@ -364,12 +347,7 @@ class ServerPatchCheck extends CustomEmailNotification
         $updates = $this->patchData['updates'] ?? [];
 
         // Check for critical packages
-        $criticalPackages = collect($updates)->filter(function ($update) {
-            return str_contains(strtolower($update['package']), 'docker') ||
-                str_contains(strtolower($update['package']), 'kernel') ||
-                str_contains(strtolower($update['package']), 'openssh') ||
-                str_contains(strtolower($update['package']), 'ssl');
-        });
+        $criticalPackages = $this->criticalPackages();
 
         return [
             'success' => false,
@@ -382,7 +360,17 @@ class ServerPatchCheck extends CustomEmailNotification
             'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
             'updates' => $updates,
             'critical_packages_count' => $criticalPackages->count(),
+            'security_updates' => $this->patchData['security_updates'] ?? null,
+            'reboot_required' => $this->patchData['reboot_required'] ?? null,
             'url' => $this->serverUrl,
         ];
+    }
+
+    /**
+     * Updates that can restart Docker or core services, or need a reboot (see CheckUpdates::RISKY_PACKAGES).
+     */
+    private function criticalPackages(): Collection
+    {
+        return collect($this->patchData['updates'] ?? [])->filter(fn (array $update) => filled($update['risk'] ?? null))->values();
     }
 }

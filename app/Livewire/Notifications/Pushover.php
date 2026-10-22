@@ -26,10 +26,10 @@ class Pushover extends Component
     #[Validate(['boolean'])]
     public bool $pushoverEnabled = false;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:pushoverEnabled,true', 'nullable', 'string'])]
     public ?string $pushoverUserKey = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:pushoverEnabled,true', 'nullable', 'string'])]
     public ?string $pushoverApiToken = null;
 
     #[Validate(['boolean'])]
@@ -157,7 +157,7 @@ class Pushover extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->pushoverEnabled = false;
+            $this->pushoverEnabled = (bool) $this->settings->refresh()->pushover_enabled;
 
             return handleError($e, $this);
         } finally {

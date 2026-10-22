@@ -178,6 +178,9 @@ it('still offers a newer Traefik branch than the configured image', function () 
 
 it('clears the stale minor warning after the configured branch is applied', function () {
     $team = Team::factory()->create();
+    $user = User::factory()->create();
+    $team->members()->attach($user->id, ['role' => 'owner']);
+    $this->actingAs($user);
     $server = Server::factory()->create([
         'team_id' => $team->id,
         'proxy' => [

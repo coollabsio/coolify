@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
@@ -135,6 +136,42 @@ it('saves application name description and ports from the general form', functio
         ->screenshot(filename: 'application-general-reloaded');
 });
 
+it('shows the unsaved bar for a Compose location edit and saves it with the name', function () {
+    Process::fake(fn ($process) => match (true) {
+        str_contains($process->command, 'git --version') => Process::result('git version 2.43.0'),
+        str_contains($process->command, 'head -c') => Process::result("services:\n  web:\n    image: nginx\n"),
+        default => Process::result(''),
+    });
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_location' => '/docker-compose.yaml',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+    ]);
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    // The Compose location input is bound through @entangle, not wire:model.
+    $page->assertSee('Docker compose location')
+        ->type('input[placeholder="/docker-compose.yaml"]', '/compose.prod.yaml')
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('.is-dirty')].some((bar) => bar.textContent.includes('Save changes'))
+            JS)
+        ->type('name', 'Renamed Compose App')
+        ->click('button:visible:has-text("Save changes")')
+        ->wait(2)
+        ->screenshot(filename: 'application-compose-location-saved');
+
+    expect($this->application->refresh()->only(['name', 'docker_compose_location']))->toBe([
+        'name' => 'Renamed Compose App',
+        'docker_compose_location' => '/compose.prod.yaml',
+    ]);
+});
+
 it('saves custom docker run options from the UI', function () {
     loginAndSkipBoarding();
 
@@ -155,6 +192,59 @@ it('saves custom docker run options from the UI', function () {
     $page->assertValue('customDockerRunOptions', $options)
         ->screenshot(filename: 'application-docker-run-options');
 });
+
+it('warns when the Dockerfile location repeats the base directory and applies the suggested fix', function () {
+    $this->application->update([
+        'build_pack' => 'dockerfile',
+        'base_directory' => '/apps/api',
+        'dockerfile_location' => '/apps/api/Dockerfile',
+    ]);
+
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    $page->assertSee('Base directory is repeated')
+        ->assertSee('/apps/api/apps/api/Dockerfile')
+        ->screenshot(filename: 'application-dockerfile-location-repeats-base-directory')
+        ->click('Use /Dockerfile')
+        ->assertDontSee('Base directory is repeated')
+        ->assertSee('/apps/api/Dockerfile');
+
+    submitLivewireForm($page);
+
+    $page->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-dockerfile-location-fixed');
+
+    $this->application->refresh();
+    expect($this->application->base_directory)->toBe('/apps/api')
+        ->and($this->application->dockerfile_location)->toBe('/Dockerfile');
+});
+
+it('restores the default file location when the field is cleared', function (string $buildPack, string $column, string $default) {
+    $this->application->update(['build_pack' => $buildPack, $column => '/docker/custom']);
+
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    $page->clear("input[placeholder='{$default}']")
+        ->keys("input[placeholder='{$default}']", 'Tab')
+        ->assertValue("input[placeholder='{$default}']", $default)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: "application-{$buildPack}-location-cleared");
+})->with([
+    'Dockerfile' => ['dockerfile', 'dockerfile_location', '/Dockerfile'],
+    'Docker Compose' => ['dockercompose', 'docker_compose_location', '/docker-compose.yaml'],
+]);
 
 it('opens environment variables page for the application', function () {
     loginAndSkipBoarding();
@@ -363,12 +453,3 @@ it('uses compact preview domains and opens only the selected preview settings', 
         ->screenshot(filename: 'preview-domains-mobile');
     expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
 })->with(['regular application' => false, 'Compose application' => true]);
-
-it('declares the compact preview domain layout and shared save bar', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
-    expect($view)->toContain('service-domains-overview-grid')
-        ->toContain('service-domain-mobile-summary')
-        ->toContain('Domain routing summary')
-        ->toContain('<x-unsaved-bar action="updateDomain"')
-        ->toContain('$event.detail.previewId');
-});

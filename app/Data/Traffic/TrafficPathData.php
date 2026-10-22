@@ -14,8 +14,7 @@ class TrafficPathData extends Data
         public int $s5xx,
         public float $p50,
         public float $p95,
-        // Owning app key (Sentinel returns this per path row so the UI can show the
-        // domain). Empty on older Sentinel builds that predate the field.
+        // Owning app key, so the UI can show the domain of each path row.
         public string $app = '',
     ) {}
 

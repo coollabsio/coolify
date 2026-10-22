@@ -1,0 +1,142 @@
+# Reference compose for the application parser (Docker Compose build pack, applicationParser).
+# Test-only: tests/Feature/ServiceParserReferenceTest.php parses it and compares the result
+# with tests/Fixtures/parser/expected/application-*.yaml. Each service covers one group of parser features.
+services:
+  # Domain from a magic variable with a port, all environment syntaxes, magic secrets, labels, volumes.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_VERSION=${BUILD_VERSION:-1.0.0}
+    environment:
+      - SERVICE_URL_WEB_3000
+      - LITERAL=plain-value
+      - BARE_PASSTHROUGH
+      - WITH_DEFAULT=${WITH_DEFAULT:-fallback}
+      - REQUIRED=${REQUIRED:?REQUIRED must be set}
+      - NO_BRACES=$NO_BRACES_VALUE
+      - NESTED=${NESTED_OUTER:-${NESTED_INNER:-inner-default}}
+      - NESTED_NO_DEFAULT=${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}
+      - DASH_DEFAULT=${DASH_DEFAULT_VAR-dash-default}
+      - NO_BRACES_DEFAULT=$NO_BRACES_DEFAULT_VAR:-no-braces-default
+      - NO_BRACES_MAGIC=$SERVICE_PASSWORD_NOBRACES
+      - SELF_REF=${SELF_REF}
+      - SHARED={{environment.SHARED_KEY}}
+      - PASSWORD=${SERVICE_PASSWORD_WEB}
+      - BASE64_64=${SERVICE_BASE64_64_WEB}
+      - HEX_32=${SERVICE_HEX_32_WEB}
+      - USER=${SERVICE_USER_WEB}
+      - API_URL=${SERVICE_URL_API}
+    labels:
+      com.example.team: platform
+      com.example.dollar: price-$5
+    volumes:
+      - web-data:/app/data
+      - ./config:/app/config:ro
+      - ./selinux:/app/selinux:z
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - type: bind
+        source: ./web-init.sh
+        target: /docker-entrypoint.d/init.sh
+        read_only: true
+        content: |
+          #!/bin/sh
+          echo "application reference fixture"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Path value with FQDN declaration, image only, ports, map-style environment.
+  api:
+    image: node:22-alpine
+    environment:
+      SERVICE_FQDN_API: /api
+      MAP_LITERAL: map-value
+      MAP_NULL:
+    ports:
+      - "3001:3001"
+      - target: 3002
+        published: 3002
+        protocol: tcp
+    expose:
+      - 3001
+    volumes:
+      - shared-external:/shared
+      - nfs-data:/mnt/nfs
+
+  # Hyphenated and dotted service names.
+  my-app:
+    image: httpd:2.4-alpine
+    environment:
+      - SERVICE_URL_MY_APP_80
+  api.v2:
+    image: traefik/whoami
+
+  # SERVICE_FQDN_ declaration with a port.
+  admin:
+    image: nginx:alpine
+    environment:
+      - SERVICE_FQDN_ADMIN_8080
+    networks:
+      internal:
+        ipv4_address: 172.30.0.10
+
+  # Ghost image with a path domain: extra redirect labels.
+  blog:
+    image: ghost:5-alpine
+    environment:
+      - SERVICE_URL_BLOG_2368=/blog
+
+  # Database image: no domain, no proxy labels.
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
+      - POSTGRES_DB=app
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+
+  # restart "no", network_mode and a worker without a domain.
+  sidecar:
+    image: busybox
+    restart: "no"
+    network_mode: "service:web"
+    command: ["true"]
+  worker:
+    image: node:22-alpine
+    command: ["node", "worker.js"]
+    environment:
+      - APP_URL=${SERVICE_URL_WEB}
+      - APP_URL_WITH_PORT=${SERVICE_URL_WEB_3000}
+      - API_HOST=${SERVICE_FQDN_API}
+    depends_on:
+      - db
+
+volumes:
+  web-data:
+  db-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/db
+  shared-external:
+    external: true
+  nfs-data:
+    driver_opts:
+      type: nfs
+      o: addr=10.0.0.2,rw
+      device: ":/exports/data"
+
+networks:
+  internal:
+  default:
+  aliased:
+    aliases:
+      - alias-name

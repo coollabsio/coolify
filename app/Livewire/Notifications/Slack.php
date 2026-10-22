@@ -27,7 +27,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:slackEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -148,7 +148,7 @@ class Slack extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->slackEnabled = false;
+            $this->slackEnabled = (bool) $this->settings->refresh()->slack_enabled;
 
             return handleError($e, $this);
         } finally {

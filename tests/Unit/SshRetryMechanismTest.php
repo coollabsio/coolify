@@ -8,16 +8,6 @@ use Tests\TestCase;
 
 class SshRetryMechanismTest extends TestCase
 {
-    public function test_ssh_retry_handler_exists()
-    {
-        $this->assertTrue(class_exists(SshRetryHandler::class));
-    }
-
-    public function test_ssh_retryable_trait_exists()
-    {
-        $this->assertTrue(trait_exists(SshRetryable::class));
-    }
-
     public function test_retry_on_ssh_connection_errors()
     {
         $handler = new class

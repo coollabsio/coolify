@@ -17,12 +17,20 @@ class ShowHardcoded extends Component
     #[Locked]
     public ?string $value = null;
 
+    #[Locked]
+    public bool $isValueHidden = true;
+
     public ?string $comment = null;
 
     public ?string $serviceName = null;
 
     #[Locked]
     public bool $isPreview = false;
+
+    public string $composeType = 'literal';
+
+    /** @var list<string> */
+    public array $references = [];
 
     #[Locked]
     public ?string $resourceableType = null;
@@ -34,16 +42,15 @@ class ShowHardcoded extends Component
     {
         $this->key = $this->env['key'];
         $this->value = $this->env['value'] ?? null;
+        $this->isValueHidden = $this->env['is_value_hidden'] ?? true;
         $this->comment = $this->env['comment'] ?? null;
         $this->serviceName = $this->env['service_name'] ?? null;
+        $this->composeType = $this->env['compose_type'] ?? 'literal';
+        $this->references = $this->env['references'] ?? [];
     }
 
     public function copyValue(): ?string
     {
-        if (auth()->user()?->isMember() ?? true) {
-            return null;
-        }
-
         $environmentVariable = EnvironmentVariable::make([
             'value' => $this->value,
             'is_preview' => $this->isPreview,

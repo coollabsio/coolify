@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -56,11 +57,10 @@ class StartDatabaseProxy
         }
 
         $configuration_dir = database_proxy_dir($database->uuid);
-        $host_configuration_dir = $configuration_dir;
-        if (isDev()) {
-            $host_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
-        }
+        $host_configuration_dir = devHostDockerPath($server, $configuration_dir);
         $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
+        $listenConfig = $this->buildListenConfig($database->public_port, $this->isNetworkIpv6Enabled($network, $server));
+        $upstreamConfig = $this->buildUpstreamConfig($containerName, $internalPort);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -71,9 +71,10 @@ class StartDatabaseProxy
         worker_connections  1024;
     }
     stream {
+       resolver 127.0.0.11 valid=10s;
        server {
-            listen $database->public_port;
-            proxy_pass $containerName:$internalPort;
+            $listenConfig
+            $upstreamConfig
             $timeoutConfig
        }
     }
@@ -126,8 +127,9 @@ class StartDatabaseProxy
                 "mkdir -p $configuration_dir",
                 "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
                 "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
-                "docker compose --project-directory {$configuration_dir} pull",
-                "docker compose --project-directory {$configuration_dir} up -d",
+                // Pass -f so Compose uses only the file that Coolify wrote.
+                "docker compose --project-directory {$configuration_dir} -f {$configuration_dir}/docker-compose.yaml pull",
+                "docker compose --project-directory {$configuration_dir} -f {$configuration_dir}/docker-compose.yaml up -d",
             ], $server);
         } catch (\RuntimeException $e) {
             if ($this->isNonTransientError($e->getMessage())) {
@@ -165,6 +167,36 @@ class StartDatabaseProxy
         }
 
         return false;
+    }
+
+    /**
+     * Docker publishes the port on [::] too and forwards it to the container's IPv6 address
+     * when the network has IPv6 enabled, so nginx must listen there as well.
+     */
+    private function isNetworkIpv6Enabled(string $network, Server $server): bool
+    {
+        $safeNetwork = escapeshellarg($network);
+        $output = instant_remote_process(["docker network inspect {$safeNetwork} --format '{{.EnableIPv6}}'"], $server, false);
+
+        return trim((string) $output) === 'true';
+    }
+
+    private function buildListenConfig(int $port, bool $ipv6Enabled): string
+    {
+        if (! $ipv6Enabled) {
+            return "listen {$port};";
+        }
+
+        return "listen {$port};\n        listen [::]:{$port};";
+    }
+
+    /**
+     * The upstream is a variable so nginx resolves it through Docker's DNS on new connections.
+     * A literal host is resolved only once at startup, so a restarted database with a new IP would break the proxy.
+     */
+    private function buildUpstreamConfig(string $host, int $port): string
+    {
+        return "set \$upstream {$host}:{$port};\n        proxy_pass \$upstream;";
     }
 
     private function buildProxyTimeoutConfig(?int $timeout): string

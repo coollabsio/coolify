@@ -876,7 +876,7 @@ it('renders every cluster application section as its own page', function (string
     $response = $this->get(route($routeName, $routeParameters))
         ->assertOk()
         ->assertSee($deployment['workload']->name)
-        ->assertSee(['Settings', 'Observe &amp; troubleshoot', 'Operations', 'Deployment Logs'], false)
+        ->assertSee('Deployment Logs')
         ->assertDontSee('href="#', false)
         ->assertSee('menu-item menu-item-active', false);
 

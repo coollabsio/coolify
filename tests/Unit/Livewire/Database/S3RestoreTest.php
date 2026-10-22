@@ -40,6 +40,7 @@ if [ ! -t 0 ]; then
     cat >/dev/null
 fi
 printf '%s:%s\\n' '{$tool}' "\$header" >> '{$logFile}'
+case "\$*" in *rolsuper*) echo t ;; esac
 exit 0
 SH;
             $path = $binDir.'/'.$tool;
@@ -107,7 +108,7 @@ test('buildRestoreCommand handles PostgreSQL with dumpAll', function () {
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toStartWith("backup='/tmp/test.dump'");
-    expect($result)->toContain('stream | psql -U ${POSTGRES_USER} -d "$db"');
+    expect($result)->toContain('stream | psql -U "$pg_user" -d "$db"');
 });
 
 test('buildRestoreCommand dump-all PostgreSQL restore is pg_restore for PGDMP otherwise psql', function () {
@@ -118,8 +119,8 @@ test('buildRestoreCommand dump-all PostgreSQL restore is pg_restore for PGDMP ot
 
     expect($command)
         ->toContain('if [ "$(stream | head -c 5)" = PGDMP ] || is_tar; then')
-        ->toContain('stream | pg_restore -U ${POSTGRES_USER} -d "$db"')
-        ->toContain('stream | psql -U ${POSTGRES_USER} -d "$db"')
+        ->toContain('stream | pg_restore -U "$pg_user" -d "$db"')
+        ->toContain('stream | psql -U "$pg_user" -d "$db"')
         ->and(strpos($command, 'kind=archive'))->toBeLessThan(strpos($command, 'dropdb'));
 });
 
@@ -132,7 +133,7 @@ test('dump-all PostgreSQL import text shows the client chosen by the dump format
 
 test('dump-all PostgreSQL restore selects the client for the dump format', function (string $contents, bool $gzip, string $restore, array $preflight) {
     // Check the archive, terminate sessions, list databases, recreate the target database, then restore.
-    expect(invokedPostgresRestoreClients($contents, $gzip))->toBe([...$preflight, 'psql:', 'psql:', 'createdb:', $restore]);
+    expect(invokedPostgresRestoreClients($contents, $gzip))->toBe([...$preflight, 'psql:', 'psql:', 'psql:', 'createdb:', $restore]);
 })->with([
     'custom archive' => ['PGDMP'.str_repeat("\0", 16), false, 'pg_restore:PGDMP', ['pg_restore:PGDMP']],
     'gzip custom archive' => ['PGDMP'.str_repeat("\0", 16), true, 'pg_restore:PGDMP', ['pg_restore:PGDMP']],

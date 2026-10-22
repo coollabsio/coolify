@@ -4,13 +4,19 @@ import pty from 'node-pty';
 import { parseCookie } from 'cookie';
 import 'dotenv/config';
 import {
+    TERMINAL_CLOSE_CODES,
+    authenticateTerminalUpgrade,
+    createTerminalUpgradeHandler,
     extractHereDocContent,
     extractSshArgs,
     extractTargetHost,
     extractTimeout,
+    detachPtyProcess,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
+    isAttachCommand,
     isAuthorizedTargetHost,
+    rejectTerminalSocket,
     sanitizeSshArgs,
     validateSshArgs,
 } from './terminal-utils.js';
@@ -117,54 +123,44 @@ const getSessionCookie = (req) => {
     }
 }
 
-const verifyClient = async (info, callback) => {
-    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(info.req);
+const verifyClient = async (req) => {
+    const sessionCookie = getSessionCookie(req);
     const requestContext = {
-        remoteAddress: info.req.socket?.remoteAddress,
-        origin: info.origin,
-        sessionCookieName,
-        hasXsrfToken: Boolean(xsrfToken),
-        hasLaravelSession: Boolean(laravelSession),
+        remoteAddress: req.socket?.remoteAddress,
+        origin: req.headers.origin,
+        sessionCookieName: sessionCookie.sessionCookieName,
+        hasXsrfToken: Boolean(sessionCookie.xsrfToken),
+        hasLaravelSession: Boolean(sessionCookie.laravelSession),
     };
 
     logTerminal('log', 'Verifying websocket client.', requestContext);
 
-    // Verify presence of required tokens
-    if (!laravelSession || !xsrfToken) {
-        logTerminal('warn', 'Rejecting websocket client because required auth tokens are missing.', requestContext);
-        return callback(false, 401, 'Unauthorized: Missing required tokens');
-    }
+    // Authenticate with Laravel backend
+    const result = await authenticateTerminalUpgrade(sessionCookie, postToCoolify);
 
-    try {
-        // Authenticate with Laravel backend
-        const response = await postToCoolify('/terminal/auth', {
-            'Cookie': `${sessionCookieName}=${laravelSession}`,
-            'X-XSRF-TOKEN': xsrfToken
-        });
-
-        if (response.status === 200) {
-            logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
-            callback(true);
-        } else {
-            logTerminal('warn', 'Websocket client authentication returned a non-success status.', {
-                ...requestContext,
-                status: response.status,
-            });
-            callback(false, 401, 'Unauthorized: Invalid credentials');
-        }
-    } catch (error) {
+    if (result.authenticated) {
+        logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
+    } else if (result.error) {
         logTerminal('error', 'Websocket client authentication failed.', {
             ...requestContext,
-            error: error.message,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data,
+            error: result.error.message,
         });
-        callback(false, 500, 'Internal Server Error');
+    } else {
+        logTerminal('warn', 'Rejecting websocket client.', {
+            ...requestContext,
+            reason: result.reason,
+            status: result.status,
+            closeCode: result.closeCode,
+        });
     }
+
+    return result;
 };
 
-
-const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
+// Upgrades are authenticated manually (instead of ws `verifyClient`) so a
+// rejected browser receives a readable close code rather than an opaque 1006.
+const wss = new WebSocketServer({ noServer: true, path: '/terminal/ws' });
+server.on('upgrade', createTerminalUpgradeHandler({ wss, authenticate: verifyClient }));
 
 const HEARTBEAT_INTERVAL_MS = 30000;
 
@@ -220,7 +216,7 @@ wss.on('connection', async (ws, req) => {
     // Verify presence of required tokens
     if (!laravelSession || !xsrfToken) {
         logTerminal('warn', 'Closing websocket connection because required auth tokens are missing.', connectionContext);
-        ws.close(401, 'Unauthorized: Missing required tokens');
+        rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.AUTH_REJECTED, 'Unauthorized: Missing required tokens');
         return;
     }
 
@@ -429,10 +425,13 @@ async function handleCommand(ws, command, userId) {
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
+    // Attach sessions share the container's main process, so they must be detached, not killed.
+    userSession.isAttach = isAttachCommand(hereDocContent);
 
     ws.send('pty-ready');
 
     ptyProcess.onData((data) => {
+        if (userSession.ptyProcess !== ptyProcess) return;
         ws.send(data);
     });
 
@@ -443,6 +442,14 @@ async function handleCommand(ws, command, userId) {
             exitCode,
             signal,
         });
+
+        // A previous PTY can exit late (e.g. an attach session detaching during a mode
+        // switch) after its replacement is already spawned. Only mutate the shared session
+        // state when this exit belongs to the session's current PTY.
+        if (userSession.ptyProcess !== ptyProcess) {
+            return;
+        }
+
         ws.send('pty-exited');
         userSession.isActive = false;
 
@@ -457,16 +464,25 @@ async function handleCommand(ws, command, userId) {
     }, terminalSessionTimeout * 1000);
 }
 
+// The text message is kept for clients that predate the close code.
+function rejectTerminalToken(userSession, message) {
+    logTerminal('warn', 'Closing websocket connection because the terminal token was rejected.', {
+        userId: userSession.userId,
+        reason: message,
+    });
+    rejectTerminalSocket(userSession.ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, message, { message });
+}
+
 async function handleTerminalToken(userSession, token) {
     if (typeof token !== 'string' || !/^[a-zA-Z0-9]{64}$/.test(token)) {
-        userSession.ws.send('Unauthorized: Invalid terminal token');
+        rejectTerminalToken(userSession, 'Unauthorized: Invalid terminal token');
         return;
     }
 
     try {
         const response = await postToCoolify('/terminal/session', userSession.authHeaders, { token });
         if (response.status !== 200 || typeof response.data?.command !== 'string') {
-            userSession.ws.send('Unauthorized: Terminal token was rejected');
+            rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
             return;
         }
 
@@ -476,7 +492,7 @@ async function handleTerminalToken(userSession, token) {
             userId: userSession.userId,
             error: error.message,
         });
-        userSession.ws.send('Unauthorized: Terminal token was rejected');
+        rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
     }
 }
 
@@ -500,6 +516,10 @@ async function killPtyProcess(userId) {
     const session = userSessions.get(userId);
     if (!session?.ptyProcess) return false;
 
+    if (session.isAttach) {
+        return detachPtyProcess(session);
+    }
+
     return new Promise((resolve) => {
         // Loop to ensure terminal is killed before continuing
         let killAttempts = 0;
@@ -515,6 +535,8 @@ async function killPtyProcess(userId) {
 
             // session.ptyProcess.kill() wont work here because of https://github.com/moby/moby/issues/9098
             // patch with https://github.com/moby/moby/issues/9098#issuecomment-189743947
+            // Ctrl-C first so interactive programs (htop, top, less) quit instead of reading the kill command as keys.
+            session.ptyProcess.write('\x03');
             session.ptyProcess.write('set +o history\nkill -TERM -$$ && exit\nset -o history\n');
 
             setTimeout(() => {
@@ -535,10 +557,19 @@ async function killPtyProcess(userId) {
                 if (killAttempts < maxAttempts) {
                     attemptKill();
                 } else {
-                    logTerminal('warn', 'PTY process still active after maximum termination attempts.', {
+                    logTerminal('warn', 'PTY process still active after maximum termination attempts. Killing the local SSH client.', {
                         userId,
                         killAttempts,
                     });
+                    // Ending the local ssh client makes sshd hang up the remote session, so nothing keeps running there.
+                    try {
+                        session.ptyProcess.kill();
+                    } catch (error) {
+                        logTerminal('error', 'Failed to kill PTY process.', {
+                            userId,
+                            error: error.message,
+                        });
+                    }
                     resolve(false);
                 }
             }, 500);

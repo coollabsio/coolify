@@ -124,7 +124,7 @@
                                     class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="typeFilter = option.value; close()">
                                     <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
+                                    <svg x-show="typeFilter === option.value" class="size-3.5 text-black dark:text-fg"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                         <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                             stroke-linecap="round" stroke-linejoin="round" />
@@ -146,7 +146,7 @@
                                     class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="sortBy = option.value; close()">
                                     <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                         <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                             stroke-linecap="round" stroke-linejoin="round" />
@@ -167,7 +167,7 @@
                 </div>
 
                 @if ($backups->isNotEmpty())
-                    <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
+                    <div class="data-table flex w-full flex-col overflow-x-auto" x-show="filteredBackups.length > 0">
                         <div class="data-table-header backup-table-grid">
                             <span>Target</span>
                             <span>Type</span>
@@ -181,6 +181,7 @@
                         @foreach ($backups as $backup)
                             @php
                                 $latestExecution = $backup->latestExecution;
+                                $s3StorageNames = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name');
                                 $status = $latestExecution?->status;
                                 $statusLabel = match ($status) {
                                     'running' => 'In progress',
@@ -208,9 +209,9 @@
                                 <span>{{ $backup->targetType() }}</span>
                                 <span>{{ $backup->frequency }}</span>
                                 <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                                <span title="{{ $backup->save_s3 ? ($backup->s3?->name ?? 'S3 storage unavailable') : 'S3 storage is not configured' }}">
-                                    <x-status-badge :status="$backup->save_s3 ? ($backup->s3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                        :type="$backup->save_s3 ? ($backup->s3 ? 'success' : 'error') : 'neutral'" />
+                                <span title="{{ $backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? $s3StorageNames->join(', ') : 'S3 storage unavailable') : 'S3 storage is not configured' }}">
+                                    <x-status-badge :status="$backup->save_s3 ? match ($s3StorageNames->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $s3StorageNames->count().' storages' } : 'Not set'"
+                                        :type="$backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? 'success' : 'error') : 'neutral'" />
                                 </span>
                                 <span>
                                     {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}

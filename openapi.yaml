@@ -7,6 +7,244 @@ servers:
     url: 'https://app.coolify.io/api/v1'
     description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.'
 paths:
+  '/applications/{uuid}/previews':
+    get:
+      tags:
+        - Applications
+      summary: 'List Preview Deployments'
+      description: 'List the preview deployments of an application, newest pull request first.'
+      operationId: list-preview-deployments-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of preview deployments.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationPreview'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Applications
+      summary: 'Create Preview Deployment'
+      description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.'
+      operationId: create-preview-deployment-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - pull_request_id
+              properties:
+                pull_request_id:
+                  type: integer
+                  example: 42
+                  maximum: 2147483647
+                  minimum: 1
+                pull_request_html_url:
+                  type: [string, 'null']
+                  example: 'https://github.com/org/repo/pull/42'
+                git_type:
+                  description: 'Git provider that hosts the pull request. Sets the ref Coolify fetches (pull/{id}/head or merge-requests/{id}/head).'
+                  type: [string, 'null']
+                  enum: [github, gitlab, gitea, bitbucket]
+                commit:
+                  description: 'Commit SHA to deploy. Required for Bitbucket.'
+                  type: [string, 'null']
+                docker_tag:
+                  description: 'Docker image tag. Docker Image applications only.'
+                  type: [string, 'null']
+                force:
+                  description: 'Rebuild without cache.'
+                  type: boolean
+                  default: false
+                instant_deploy:
+                  description: 'Queue a deployment. Set to false to only create the preview, for example to set its domains first.'
+                  type: boolean
+                  default: true
+              type: object
+      responses:
+        '200':
+          description: 'Existing preview deployment updated.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationPreviewDeployment'
+        '201':
+          description: 'Preview deployment created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationPreviewDeployment'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          description: 'Deployment queue is full.'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/previews/{pull_request_id}':
+    get:
+      tags:
+        - Applications
+      summary: 'Get Preview Deployment'
+      description: 'Get a preview deployment by pull request ID.'
+      operationId: get-preview-deployment-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Preview deployment.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationPreview'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Preview Deployment'
+      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record. Needs a token with the write and deploy permissions.'
+      operationId: delete-preview-deployment-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview to delete.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Preview deletion queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Preview Domains'
+      description: 'Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.'
+      operationId: update-preview-domains-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                domains:
+                  type: [string, 'null']
+                  example: 'https://pr.example.com:3000'
+                docker_compose_domains:
+                  type: [array, 'null']
+                  items: { properties: { name: { type: string }, domain: { type: [string, 'null'] }, redirect: { type: [string, 'null'], enum: [www, non-www, both] } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+              type: object
+      responses:
+        '200':
+          description: 'Preview domains updated.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Domain conflict.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/secret-manager':
     patch:
       tags:
@@ -267,16 +505,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -306,7 +544,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -336,6 +574,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -356,6 +597,13 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -387,7 +635,11 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -406,6 +658,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -415,7 +690,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -440,6 +715,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -649,16 +926,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -688,7 +965,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -718,6 +995,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -738,6 +1018,13 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -769,7 +1056,11 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -788,6 +1079,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -797,7 +1111,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -822,6 +1136,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -1031,16 +1347,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -1070,7 +1386,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1100,6 +1416,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1120,6 +1439,13 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1151,7 +1477,11 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -1170,6 +1500,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1179,7 +1532,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1204,6 +1557,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -1370,16 +1725,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -1423,6 +1778,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1443,6 +1801,13 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1474,7 +1839,11 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -1493,6 +1862,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1502,7 +1894,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1523,6 +1915,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -1679,16 +2073,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -1732,6 +2126,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1752,6 +2149,13 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1783,7 +2187,11 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -1802,6 +2210,29 @@ paths:
                   type: string
                   nullable: true
                   description: 'Password for HTTP Basic Authentication'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  default: bcrypt
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  default: 10
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  default: 65536
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  default: 4
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1811,7 +2242,7 @@ paths:
                 autogenerate_domain:
                   type: boolean
                   default: true
-                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
                 is_container_label_escape_enabled:
                   type: boolean
                   default: true
@@ -1832,6 +2263,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -1882,7 +2315,7 @@ paths:
       tags:
         - Applications
       summary: Delete
-      description: 'Delete application by UUID.'
+      description: 'Delete application by UUID. Needs a token with the write and deploy permissions.'
       operationId: delete-application-by-uuid
       parameters:
         -
@@ -1911,7 +2344,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Run docker cleanup.'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           required: false
           schema:
             type: boolean
@@ -1939,6 +2372,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
       security:
         -
           bearerAuth: []
@@ -1963,15 +2398,6 @@ paths:
           application/json:
             schema:
               properties:
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name.'
                 github_app_uuid:
                   type: string
                   description: 'The Github App UUID.'
@@ -1984,9 +2410,6 @@ paths:
                 ports_exposes:
                   type: string
                   description: 'The ports to expose.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID.'
                 build_pack:
                   type: string
                   enum: [nixpacks, railpack, static, dockerfile, dockercompose]
@@ -2127,16 +2550,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -2166,7 +2589,7 @@ paths:
                   items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' }, redirect: { type: string, nullable: true, description: 'Per-service www/non-www redirect for this compose service.', enum: [www, non-www, both] } }, type: object }
                 watch_paths:
                   type: string
-                  description: 'The watch paths.'
+                  description: 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -2174,6 +2597,25 @@ paths:
                 use_build_secrets:
                   type: boolean
                   description: 'Use Docker Build Secrets for build-time environment variables.'
+                http_basic_auth_hash_algorithm:
+                  type: string
+                  enum: [bcrypt, argon2id]
+                  description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+                http_basic_auth_bcrypt_cost:
+                  type: integer
+                  minimum: 4
+                  maximum: 14
+                  description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_memory_cost:
+                  type: integer
+                  minimum: 8192
+                  maximum: 262144
+                  description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+                http_basic_auth_argon2id_time_cost:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
                 is_git_submodules_enabled:
                   type: boolean
                   description: 'Clone Git submodules.'
@@ -2195,6 +2637,9 @@ paths:
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2215,6 +2660,13 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                traefik_certificate_resolver:
+                  type: string
+                  nullable: true
+                  description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2246,7 +2698,11 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -2279,6 +2735,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '404':
@@ -2301,7 +2759,7 @@ paths:
       tags:
         - Applications
       summary: 'Get application logs.'
-      description: 'Get application logs by UUID.'
+      description: 'Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-application-logs-by-uuid
       parameters:
         -
@@ -2314,12 +2772,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
         -
           name: show_timestamps
           in: query
@@ -2328,6 +2794,13 @@ paths:
           schema:
             type: boolean
             default: false
+        -
+          name: service_name
+          in: query
+          description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.'
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: 'Get application logs by UUID.'
@@ -2351,7 +2824,7 @@ paths:
       tags:
         - Applications
       summary: 'Get preview application logs.'
-      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.'
+      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-preview-application-logs-by-pull-request-id
       parameters:
         -
@@ -2394,6 +2867,13 @@ paths:
           schema:
             type: boolean
             default: false
+        -
+          name: service_name
+          in: query
+          description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.'
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: 'Preview runtime logs.'
@@ -2409,99 +2889,6 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
-        '422':
-          $ref: '#/components/responses/422'
-      security:
-        -
-          bearerAuth: []
-  '/applications/{uuid}/previews/{pull_request_id}':
-    delete:
-      tags:
-        - Applications
-      summary: 'Delete Preview Deployment'
-      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
-      operationId: delete-preview-deployment-by-pull-request-id
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the application.'
-          required: true
-          schema:
-            type: string
-        -
-          name: pull_request_id
-          in: path
-          description: 'Pull request ID of the preview to delete.'
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: 'Preview deletion queued.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-        '422':
-          $ref: '#/components/responses/422'
-      security:
-        -
-          bearerAuth: []
-    patch:
-      tags:
-        - Applications
-      summary: 'Update Preview Domains'
-      description: 'Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.'
-      operationId: update-preview-domains-by-pull-request-id
-      parameters:
-        -
-          name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-        -
-          name: pull_request_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              properties:
-                domains:
-                  type: [string, 'null']
-                  example: 'https://pr.example.com:3000'
-                docker_compose_domains:
-                  type: [array, 'null']
-                  items: { properties: { name: { type: string }, domain: { type: [string, 'null'] }, redirect: { type: [string, 'null'], enum: [www, non-www, both] } }, type: object }
-                force_domain_override:
-                  type: boolean
-                  default: false
-              type: object
-      responses:
-        '200':
-          description: 'Preview domains updated.'
-        '401':
-          $ref: '#/components/responses/401'
-        '403':
-          $ref: '#/components/responses/403'
-        '404':
-          $ref: '#/components/responses/404'
-        '409':
-          description: 'Domain conflict.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -2578,7 +2965,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -2639,7 +3026,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -2683,7 +3070,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -2809,7 +3196,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           schema:
             type: boolean
             default: true
@@ -3031,13 +3418,13 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'File content (file only, optional).'
+                  description: 'File content (file only, optional). Needs the deploy ability when set.'
                 is_directory:
                   type: boolean
                   description: 'Whether this is a directory mount (file only, default false).'
                 fs_path:
                   type: string
-                  description: 'Host directory path (required when is_directory is true).'
+                  description: 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'
               type: object
               additionalProperties: false
       responses:
@@ -3053,6 +3440,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -3103,7 +3492,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages).'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -3119,6 +3508,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission to change the content of a file outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -3311,7 +3702,7 @@ paths:
                   description: 'Optional name for the cloned application.'
                   type: [string, 'null']
                 clone_volumes:
-                  description: 'Whether to clone volume data.'
+                  description: 'Whether to clone volume data. Needs the deploy ability.'
                   type: boolean
                   default: false
               type: object
@@ -3329,6 +3720,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to clone volume data.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -3341,7 +3734,7 @@ paths:
       tags:
         - Applications
       summary: 'List Rollback Images'
-      description: 'List available Docker images for rolling back an application. Returns an empty list when the server is unavailable or remote inspection is not possible.'
+      description: 'List available Docker images for rolling back an application: images on the server (`local`) and, when a Docker registry image name is set, images of recent successful deployments in the registry (`registry`). Returns an empty list when the server is unavailable or remote inspection is not possible.'
       operationId: list-application-rollback-images
       parameters:
         -
@@ -3359,7 +3752,7 @@ paths:
               schema:
                 properties:
                   current: { type: [string, 'null'] }
-                  images: { type: array, items: { properties: { tag: { type: string }, created_at: { type: string }, is_current: { type: boolean } }, type: object } }
+                  images: { type: array, items: { properties: { tag: { type: string }, created_at: { type: string }, is_current: { type: boolean }, source: { type: string, enum: [local, registry] } }, type: object } }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3509,6 +3902,86 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /audit-events:
+    get:
+      tags:
+        - 'Audit Events'
+      summary: List
+      description: 'List audit events of the team. Only team admins and owners can view audit events. Actor e-mail, token, metadata, changes, IP address, and user agent are returned only for tokens with the read:sensitive or root permission.'
+      operationId: list-audit-events
+      parameters:
+        -
+          name: per_page
+          in: query
+          description: 'Items per page.'
+          required: false
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+            minimum: 1
+        -
+          name: page
+          in: query
+          description: 'Page number.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: search
+          in: query
+          description: 'Search text.'
+          required: false
+          schema:
+            type: string
+            maxLength: 255
+        -
+          name: action
+          in: query
+          description: 'Filter by action. Use all for every action.'
+          required: false
+          schema:
+            type: string
+            maxLength: 255
+        -
+          name: source
+          in: query
+          description: 'Filter by source.'
+          required: false
+          schema:
+            type: string
+            enum:
+              - all
+              - ui
+              - api
+              - mcp
+              - webhook
+              - system
+              - scheduler
+      responses:
+        '200':
+          description: 'A page of audit events, newest first.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  current_page: { type: integer }
+                  data: { type: array, items: { type: object, properties: { id: { type: integer }, team_id: { type: integer, nullable: true }, event: { type: string }, source: { type: string }, action: { type: string }, level: { type: string }, actor_type: { type: string, nullable: true }, actor_id: { type: integer, nullable: true }, actor_name: { type: string, nullable: true }, resource_type: { type: string, nullable: true }, resource_uuid: { type: string, nullable: true }, resource_name: { type: string, nullable: true }, description: { type: string, nullable: true }, created_at: { type: string, format: date-time } } } }
+                  per_page: { type: integer }
+                  last_page: { type: integer }
+                  total: { type: integer }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can view audit logs.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -3668,7 +4141,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr, hostinger] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3696,7 +4169,7 @@ paths:
               properties:
                 provider:
                   type: string
-                  enum: [hetzner, digitalocean, vultr]
+                  enum: [hetzner, digitalocean, vultr, hostinger]
                   example: hetzner
                   description: 'The cloud provider.'
                 token:
@@ -3897,6 +4370,7 @@ paths:
       tags:
         - Databases
       summary: 'Import database backup'
+      description: 'Restore a backup into the database. Every import source requires the deploy ability.'
       operationId: create-database-import
       parameters:
         -
@@ -3915,8 +4389,10 @@ paths:
       responses:
         '202':
           description: 'Import queued'
+        '403':
+          description: 'The token needs the deploy ability.'
         '409':
-          description: 'Import already active'
+          description: 'Another start, restart or import of this database is already in progress.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -3994,7 +4470,7 @@ paths:
             type: string
       responses:
         '200':
-          description: 'Get all backups for a database'
+          description: 'Get all backups for a database. Each backup includes s3_storage_uuid (primary S3 destination) and s3_storage_uuids (every S3 destination, primary first).'
           content:
             application/json:
               schema:
@@ -4045,7 +4521,11 @@ paths:
                   default: false
                 s3_storage_uuid:
                   type: string
-                  description: 'S3 storage UUID (required if save_s3 is true)'
+                  description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true.'
+                s3_storage_uuids:
+                  type: array
+                  items: { type: string }
+                  description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 databases_to_backup:
                   type: string
                   description: 'Comma separated list of databases to backup'
@@ -4055,7 +4535,7 @@ paths:
                   default: false
                 backup_now:
                   type: boolean
-                  description: 'Whether to trigger backup immediately after creation'
+                  description: 'Whether to trigger backup immediately after creation. Needs a token with the deploy permission.'
                 database_backup_retention_amount_locally:
                   type: integer
                   description: 'Number of backups to retain locally'
@@ -4099,6 +4579,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to use backup_now.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -4142,7 +4624,7 @@ paths:
       tags:
         - Databases
       summary: Delete
-      description: 'Delete database by UUID.'
+      description: 'Delete database by UUID. Needs a token with the write and deploy permissions.'
       operationId: delete-database-by-uuid
       parameters:
         -
@@ -4171,7 +4653,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Run docker cleanup.'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           required: false
           schema:
             type: boolean
@@ -4199,6 +4681,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
       security:
         -
           bearerAuth: []
@@ -4234,10 +4718,10 @@ paths:
                   description: 'Docker Image of the database'
                 is_public:
                   type: boolean
-                  description: 'Is the database public?'
+                  description: 'Is the database public? Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'
                 public_port:
                   type: integer
-                  description: 'Public port of the database'
+                  description: 'Public port of the database (1024-65535)'
                 public_port_timeout:
                   type: integer
                   description: 'Public port timeout in seconds (default: 3600)'
@@ -4262,6 +4746,9 @@ paths:
                 limits_cpu_shares:
                   type: integer
                   description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Restart the database after the update. Requires the deploy ability.'
                 postgres_user:
                   type: string
                   description: 'PostgreSQL user'
@@ -4343,6 +4830,9 @@ paths:
                 mysql_conf:
                   type: string
                   description: 'MySQL conf'
+                sqlite_databases:
+                  type: string
+                  description: 'Comma-separated SQLite database file names'
                 health_check_enabled:
                   type: boolean
                   description: 'Enable the database healthcheck probe.'
@@ -4367,6 +4857,9 @@ paths:
                   description: 'Healthcheck start period in seconds.'
                   minimum: 0
                   default: 5
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'
               type: object
       responses:
         '200':
@@ -4375,6 +4868,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to change is_public or to use instant_deploy.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -4465,10 +4960,14 @@ paths:
                   description: 'Whether data is saved in s3 or not'
                 s3_storage_uuid:
                   type: string
-                  description: 'S3 storage UUID'
+                  description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay.'
+                s3_storage_uuids:
+                  type: array
+                  items: { type: string }
+                  description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 backup_now:
                   type: boolean
-                  description: 'Whether to take a backup now or not'
+                  description: 'Whether to take a backup now or not. Needs a token with the deploy permission.'
                 enabled:
                   type: boolean
                   description: 'Whether the backup is enabled or not'
@@ -4516,6 +5015,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to use backup_now.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -5342,12 +5843,99 @@ paths:
       security:
         -
           bearerAuth: []
+  /databases/sqlite:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (SQLite)'
+      description: 'Create a new SQLite database.'
+      operationId: create-database-sqlite
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+              properties:
+                server_uuid:
+                  type: string
+                  description: 'UUID of the server'
+                project_uuid:
+                  type: string
+                  description: 'UUID of the project'
+                environment_name:
+                  type: string
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                destination_uuid:
+                  type: string
+                  description: 'UUID of the destination if the server has multiple destinations'
+                sqlite_databases:
+                  type: string
+                  description: 'Comma-separated SQLite database file names'
+                name:
+                  type: string
+                  description: 'Name of the database'
+                description:
+                  type: string
+                  description: 'Description of the database'
+                image:
+                  type: string
+                  description: 'Docker Image of the database'
+                limits_memory:
+                  type: string
+                  description: 'Memory limit of the database'
+                limits_memory_swap:
+                  type: string
+                  description: 'Memory swap limit of the database'
+                limits_memory_swappiness:
+                  type: integer
+                  description: 'Memory swappiness of the database'
+                limits_memory_reservation:
+                  type: string
+                  description: 'Memory reservation of the database'
+                limits_cpus:
+                  type: string
+                  description: 'CPU limit of the database'
+                limits_cpuset:
+                  type: string
+                  description: 'CPU set of the database'
+                limits_cpu_shares:
+                  type: integer
+                  description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/databases/{uuid}/logs':
     get:
       tags:
         - Databases
       summary: 'Get database logs.'
-      description: 'Get database logs by UUID.'
+      description: 'Get database logs by UUID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-database-logs-by-uuid
       parameters:
         -
@@ -5361,12 +5949,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
         -
           name: show_timestamps
           in: query
@@ -5455,7 +6051,7 @@ paths:
       tags:
         - Databases
       summary: 'List backup executions'
-      description: 'Get all executions for a specific backup configuration.'
+      description: 'Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.'
       operationId: list-backup-executions
       parameters:
         -
@@ -5479,7 +6075,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { type: string }, status: { type: string } }, type: object } }
+                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }, type: object } }
                 type: object
         '404':
           description: 'Backup configuration not found.'
@@ -5612,6 +6208,10 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'Another start, restart or import of this database is already in progress.'
+        '422':
+          description: 'The database cannot start yet, for example because a CA certificate is missing.'
       security:
         -
           bearerAuth: []
@@ -5633,7 +6233,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           schema:
             type: boolean
             default: true
@@ -5685,6 +6285,10 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'Another start, restart or import of this database is already in progress.'
+        '422':
+          description: 'The database cannot start yet, for example because a CA certificate is missing.'
       security:
         -
           bearerAuth: []
@@ -5756,7 +6360,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -5816,7 +6420,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -5862,7 +6466,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -5994,13 +6598,13 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'File content (file only, optional).'
+                  description: 'File content (file only, optional). Needs the deploy ability when set.'
                 is_directory:
                   type: boolean
                   description: 'Whether this is a directory mount (file only, default false).'
                 fs_path:
                   type: string
-                  description: 'Host directory path (required when is_directory is true).'
+                  description: 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'
               type: object
               additionalProperties: false
       responses:
@@ -6016,6 +6620,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -6066,7 +6672,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages).'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -6082,6 +6688,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission to change the content of a file outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -6272,6 +6880,7 @@ paths:
                 name:
                   type: [string, 'null']
                 clone_volumes:
+                  description: 'Whether to clone volume data. Needs the deploy ability.'
                   type: boolean
                   default: false
               type: object
@@ -6282,6 +6891,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to clone volume data.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -6424,12 +7035,14 @@ paths:
           description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.'
           schema:
             type: integer
+            maximum: 2147483647
         -
           name: pull_request_id
           in: query
           description: 'Preview deployment identifier. Alias of pr.'
           schema:
             type: integer
+            maximum: 2147483647
         -
           name: docker_tag
           in: query
@@ -6557,7 +7170,7 @@ paths:
       tags:
         - Destinations
       summary: 'Create destination'
-      description: 'Create a Docker network destination on a server owned by the authenticated team.'
+      description: "Create a Docker network destination on a server owned by the authenticated team. The network must be new: Docker's built-in networks (bridge, host, none) and networks that already exist on a standalone server are rejected, because Coolify connects the proxy to the destination network."
       operationId: create-server-destination
       parameters:
         -
@@ -6579,9 +7192,10 @@ paths:
                   type: string
                   maxLength: 255
                 network:
+                  description: 'Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.'
                   type: string
-                  maxLength: 255
                   pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+                  maxLength: 255
                 type:
                   type: string
                   enum: [standalone, swarm]
@@ -6600,7 +7214,7 @@ paths:
         '409':
           description: 'A destination with this network already exists.'
         '422':
-          $ref: '#/components/responses/422'
+          description: 'Validation failed, the network is reserved or already exists on the server, or the server could not be checked.'
       security:
         -
           bearerAuth: []
@@ -6830,12 +7444,15 @@ paths:
       tags:
         - DigitalOcean
       summary: 'Create a server on DigitalOcean'
+      description: 'Create a DigitalOcean droplet and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.'
       operationId: create-digitalocean-server
       responses:
         '201':
           description: 'DigitalOcean droplet created and linked to a Coolify server.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'
         '422':
           description: 'Validation failed.'
         '429':
@@ -7629,7 +8246,7 @@ paths:
       tags:
         - Hetzner
       summary: 'Create Hetzner Server'
-      description: 'Create a new server on Hetzner and register it in Coolify.'
+      description: 'Create a new server on Hetzner and register it in Coolify. A cloud-init script or extra SSH key IDs need a token with the deploy permission.'
       operationId: create-hetzner-server
       requestBody:
         description: 'Hetzner server creation parameters'
@@ -7687,7 +8304,7 @@ paths:
                 hetzner_ssh_key_ids:
                   type: array
                   items: { type: integer }
-                  description: 'Additional Hetzner SSH key IDs'
+                  description: 'Additional Hetzner SSH key IDs. Needs a token with the deploy permission.'
                 hetzner_firewall_ids:
                   type: array
                   items: { type: integer }
@@ -7698,7 +8315,7 @@ paths:
                   description: 'Existing Hetzner network IDs to attach during server creation'
                 cloud_init_script:
                   type: string
-                  description: 'Cloud-init YAML script (optional)'
+                  description: 'Cloud-init YAML script (optional). Needs a token with the deploy permission.'
                 instant_validate:
                   type: boolean
                   example: false
@@ -7719,12 +8336,134 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'
         '404':
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
         '429':
           $ref: '#/components/responses/429'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/data-centers:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS data centers'
+      operationId: get-hostinger-data-centers
+      responses:
+        '200':
+          description: 'List of Hostinger VPS data centers.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/catalog:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS plans and prices'
+      operationId: get-hostinger-catalog
+      responses:
+        '200':
+          description: 'List of Hostinger VPS plans and prices.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/templates:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger VPS operating system templates'
+      operationId: get-hostinger-templates
+      responses:
+        '200':
+          description: 'List of Hostinger VPS templates.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/ssh-keys:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger account SSH keys'
+      operationId: get-hostinger-ssh-keys
+      responses:
+        '200':
+          description: 'List of Hostinger account SSH keys.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /hostinger/post-install-scripts:
+    get:
+      tags:
+        - Hostinger
+      summary: 'Get Hostinger post-install scripts'
+      operationId: get-hostinger-post-install-scripts
+      responses:
+        '200':
+          description: 'List of Hostinger post-install scripts.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /servers/hostinger:
+    post:
+      tags:
+        - Hostinger
+      summary: 'Purchase a Hostinger VPS and create a linked server'
+      operationId: create-hostinger-server
+      responses:
+        '201':
+          description: 'Hostinger VPS purchased and linked to a Coolify server.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission for a post-install script or extra SSH keys.'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -8037,35 +8776,6 @@ paths:
               schema:
                 type: string
               example: v4.0.0
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-      security:
-        -
-          bearerAuth: []
-  /enable:
-    post:
-      summary: 'Enable API'
-      description: 'Enable API (only with root permissions).'
-      operationId: enable-api
-      responses:
-        '200':
-          description: 'Enable API.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'API enabled.' }
-                type: object
-        '403':
-          description: 'You are not allowed to enable the API.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'You are not allowed to enable the API.' }
-                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -8932,9 +9642,10 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -8948,6 +9659,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9036,9 +9749,10 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9052,6 +9766,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9168,9 +9884,10 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9184,6 +9901,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9272,9 +9991,10 @@ paths:
                   type: integer
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
+                  maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9288,6 +10008,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9336,7 +10058,7 @@ paths:
       tags:
         - 'Scheduled Tasks'
       summary: 'Execute Task'
-      description: 'Queue immediate execution of a scheduled task for an application.'
+      description: 'Queue immediate execution of a scheduled task for an application. Requires the deploy ability.'
       operationId: execute-scheduled-task-by-application-uuid
       parameters:
         -
@@ -9358,6 +10080,8 @@ paths:
           description: 'Scheduled task execution queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -9368,7 +10092,7 @@ paths:
       tags:
         - 'Scheduled Tasks'
       summary: 'Execute Task'
-      description: 'Queue immediate execution of a scheduled task for a service.'
+      description: 'Queue immediate execution of a scheduled task for a service. Requires the deploy ability.'
       operationId: execute-scheduled-task-by-service-uuid
       parameters:
         -
@@ -9390,6 +10114,8 @@ paths:
           description: 'Scheduled task execution queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -9443,46 +10169,6 @@ paths:
       responses:
         '201':
           description: "The created private key's UUID."
-          content:
-            application/json:
-              schema:
-                properties:
-                  uuid: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '422':
-          $ref: '#/components/responses/422'
-      security:
-        -
-          bearerAuth: []
-    patch:
-      tags:
-        - 'Private Keys'
-      summary: Update
-      description: 'Update a private key.'
-      operationId: update-private-key
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              required:
-                - private_key
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                private_key:
-                  type: string
-              type: object
-              additionalProperties: false
-      responses:
-        '201':
-          description: "The updated private key's UUID."
           content:
             application/json:
               schema:
@@ -9566,6 +10252,54 @@ paths:
                 properties:
                   message: { type: string, example: 'Private Key is in use and cannot be deleted.' }
                 type: object
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Private Keys'
+      summary: Update
+      description: 'Update a private key.'
+      operationId: update-private-key
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Private Key UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                private_key:
+                  type: string
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: "The updated private key's UUID."
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          description: 'Private Key not found.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -9741,7 +10475,7 @@ paths:
       tags:
         - Servers
       summary: 'Update Docker cleanup settings'
-      description: 'Update Docker cleanup settings for a server owned by the authenticated team.'
+      description: 'Update Docker cleanup settings for a server owned by the authenticated team. Turning on `delete_unused_volumes` needs a token with the `deploy` permission.'
       operationId: update-server-docker-cleanup
       parameters:
         -
@@ -9791,6 +10525,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'Turning on `delete_unused_volumes` needs the deploy permission.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -9803,7 +10539,7 @@ paths:
       tags:
         - Servers
       summary: 'Run Docker cleanup'
-      description: 'Dispatch a manual Docker cleanup job for a server owned by the authenticated team.'
+      description: 'Dispatch a manual Docker cleanup job for a server owned by the authenticated team. Needs a token with the write and deploy permissions.'
       operationId: run-server-docker-cleanup
       parameters:
         -
@@ -9837,6 +10573,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -9878,6 +10616,181 @@ paths:
       security:
         -
           bearerAuth: []
+  '/servers/{uuid}/registries':
+    get:
+      tags:
+        - Servers
+      summary: 'List server registry logins'
+      description: 'List the Docker registries a server is logged in to and the registries its resources pull from or push to. Reads the Docker config of the server over SSH. Credentials are never returned, only registry names and usernames. Requires the `read:sensitive` ability.'
+      operationId: list-server-registries
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Registry logins of the server.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  registries: { type: array, items: { properties: { registry: { type: string, example: ghcr.io }, logged_in: { type: boolean, example: true }, source: { description: 'Where the Docker config stores the credentials.', type: [string, 'null'], enum: [auths, credHelpers] }, username: { type: [string, 'null'], example: octocat }, used_by: { type: array, items: { properties: { type: { type: string, example: Application }, name: { type: string }, link: { type: [string, 'null'] } }, type: object } } }, type: object } }
+                  error: { description: 'Set when the logins could not be read from the server.', type: [string, 'null'] }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Servers
+      summary: 'Log in to a registry on a server'
+      description: 'Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login. Needs a token with the write and deploy permissions.'
+      operationId: login-server-registry
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - registry
+                - username
+                - password
+              properties:
+                registry:
+                  description: 'Registry host, optionally with a port. Use docker.io for Docker Hub.'
+                  type: string
+                  example: ghcr.io
+                username:
+                  type: string
+                  example: octocat
+                password:
+                  description: 'Password or access token. Never returned.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Logged in.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Logged in to ghcr.io.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/registries/{registry}/check':
+    post:
+      tags:
+        - Servers
+      summary: 'Check a registry login on a server'
+      description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server.'
+      operationId: check-server-registry-login
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+        -
+          name: registry
+          in: path
+          description: 'Registry host, optionally with a port, for example registry.example.com:5000.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The login works.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'The login for ghcr.io works.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/registries/{registry}':
+    delete:
+      tags:
+        - Servers
+      summary: 'Log out from a registry on a server'
+      description: 'Run docker logout on the server for a registry.'
+      operationId: logout-server-registry
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+        -
+          name: registry
+          in: path
+          description: 'Registry host, optionally with a port, for example registry.example.com:5000.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Logged out.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Logged out from ghcr.io.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/servers/{uuid}/log-drains':
     get:
       tags:
@@ -9909,6 +10822,10 @@ paths:
                   is_logdrain_custom_enabled: { type: boolean }
                   logdrain_custom_config: { description: 'Only present with read:sensitive.', type: string }
                   logdrain_custom_config_parser: { description: 'Only present with read:sensitive.', type: string }
+                  is_logdrain_cloudwatch_enabled: { type: boolean }
+                  logdrain_cloudwatch_region: { type: [string, 'null'] }
+                  logdrain_cloudwatch_group: { type: [string, 'null'] }
+                  logdrain_cloudwatch_stream_prefix: { description: 'Prepended to the container name to form the log stream name.', type: [string, 'null'] }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -9923,7 +10840,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team.'
+      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -9957,6 +10874,15 @@ paths:
                   type: string
                 logdrain_custom_config_parser:
                   type: string
+                is_logdrain_cloudwatch_enabled:
+                  type: boolean
+                logdrain_cloudwatch_region:
+                  type: [string, 'null']
+                logdrain_cloudwatch_group:
+                  type: [string, 'null']
+                logdrain_cloudwatch_stream_prefix:
+                  description: 'Prepended to the container name to form the log stream name.'
+                  type: [string, 'null']
               type: object
       responses:
         '200':
@@ -9965,6 +10891,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -9999,6 +10927,7 @@ paths:
                   redirect_enabled: { type: boolean, example: true }
                   redirect_url: { type: [string, 'null'], example: 'https://example.com' }
                   generate_exact_labels: { type: boolean, example: false }
+                  traefik_certificate_resolver: { description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.', type: [string, 'null'], example: letsencrypt }
                   configuration: { description: 'Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.', type: [string, 'null'] }
                 type: object
         '401':
@@ -10014,7 +10943,7 @@ paths:
       tags:
         - Servers
       summary: 'Update server proxy'
-      description: 'Update proxy redirect settings, exact labels generation, and optionally the proxy type for a team-owned server.'
+      description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server. Changing proxy_type needs a token with the `write` and `deploy` permissions.'
       operationId: update-server-proxy
       parameters:
         -
@@ -10037,8 +10966,11 @@ paths:
                   type: [string, 'null']
                 generate_exact_labels:
                   type: boolean
+                traefik_certificate_resolver:
+                  description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'
+                  type: [string, 'null']
                 proxy_type:
-                  description: 'Proxy type (case-insensitive).'
+                  description: 'Proxy type (case-insensitive). Changing it starts the new proxy on the server and needs the deploy permission.'
                   type: string
                   enum: [traefik, caddy, nginx, none]
               type: object
@@ -10054,12 +10986,15 @@ paths:
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
+                  traefik_certificate_resolver: { type: [string, 'null'] }
                   configuration: { type: [string, 'null'] }
                 type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to change the proxy type.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10072,7 +11007,7 @@ paths:
       tags:
         - Servers
       summary: 'Save server proxy configuration'
-      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
+      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
       operationId: save-server-proxy-configuration
       parameters:
         -
@@ -10125,7 +11060,7 @@ paths:
       tags:
         - Servers
       summary: 'Restart server proxy'
-      description: 'Queue a proxy restart for a team-owned server.'
+      description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.'
       operationId: restart-server-proxy
       parameters:
         -
@@ -10175,7 +11110,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  is_sentinel_enabled: { type: boolean }
+                  is_sentinel_enabled: { description: 'Sentinel is mandatory on regular managed servers.', type: boolean, readOnly: true }
                   is_metrics_enabled: { type: boolean }
                   is_sentinel_debug_enabled: { type: boolean }
                   sentinel_token: { description: 'Only present with read:sensitive.', type: string }
@@ -10190,6 +11125,7 @@ paths:
                   traffic_retention_1d_days: { type: integer }
                   is_geoip_enabled: { type: boolean }
                   geoip_refresh_days: { type: integer }
+                  traffic_ip_mode: { description: 'How Sentinel stores client IPs for the Top IPs breakdown.', type: string, enum: [full, anonymized, 'off'] }
                   geoip_maxmind_license_key: { description: 'Only present with read:sensitive.', type: string }
                 type: object
         '401':
@@ -10205,7 +11141,7 @@ paths:
       tags:
         - Servers
       summary: 'Update Sentinel settings'
-      description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel.'
+      description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel. Needs a token with the write and deploy permissions.'
       operationId: update-server-sentinel
       parameters:
         -
@@ -10221,8 +11157,6 @@ paths:
           application/json:
             schema:
               properties:
-                is_sentinel_enabled:
-                  type: boolean
                 is_metrics_enabled:
                   type: boolean
                 is_sentinel_debug_enabled:
@@ -10242,15 +11176,18 @@ paths:
                   type: [string, 'null']
                 traffic_topn:
                   type: integer
+                  maximum: 1000
                   minimum: 1
                 traffic_sample_threshold:
                   type: integer
                   minimum: 0
                 traffic_retention_1h_days:
                   type: integer
+                  maximum: 365
                   minimum: 1
                 traffic_retention_1d_days:
                   type: integer
+                  maximum: 3650
                   minimum: 1
                 is_geoip_enabled:
                   type: boolean
@@ -10259,6 +11196,10 @@ paths:
                   minimum: 1
                 geoip_maxmind_license_key:
                   type: [string, 'null']
+                traffic_ip_mode:
+                  description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'
+                  type: string
+                  enum: [full, anonymized, 'off']
               type: object
       responses:
         '200':
@@ -10267,6 +11208,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10279,7 +11222,7 @@ paths:
       tags:
         - Servers
       summary: 'Migrate server to another Coolify instance'
-      description: 'One-shot handoff: export this server, import+claim on the target instance (using the provided token), then disable automations here. Requires read:sensitive and write.'
+      description: 'Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. Follow the progress with GET /servers/{uuid}/transfer. The target URL must use https. Requires read:sensitive and write.'
       operationId: migrate-server-between-instances
       parameters:
         -
@@ -10303,22 +11246,10 @@ paths:
                 target_token:
                   description: 'API token on the target instance (root or write)'
                   type: string
-                write_remote:
-                  type: boolean
-                  default: false
-                rebind_sentinel:
-                  type: boolean
-                  default: true
-                preserve_uuids:
-                  type: boolean
-                  default: true
-                adopt_mode:
-                  type: boolean
-                  default: true
               type: object
       responses:
-        '200':
-          description: Migrated
+        '202':
+          description: 'Transfer started'
         '403':
           description: 'Missing sensitive permission'
         '404':
@@ -10328,13 +11259,13 @@ paths:
       security:
         -
           bearerAuth: []
-  '/servers/{uuid}/export':
+  '/servers/{uuid}/transfer':
     get:
       tags:
         - Servers
-      summary: 'Export server transfer bundle'
-      description: 'Export a server and all resources hosted on it as a versioned transfer bundle for moving between Coolify instances. Requires read:sensitive.'
-      operationId: export-server-transfer-bundle
+      summary: 'Get server transfer status'
+      description: 'Show the transfer state of a server on this instance: the import/claim state (transfer) and the state of a running or finished transfer to another instance (migration).'
+      operationId: get-server-transfer-status
       parameters:
         -
           name: uuid
@@ -10342,29 +11273,74 @@ paths:
           required: true
           schema:
             type: string
-        -
-          name: encrypt
-          in: query
-          description: 'If true and passphrase is provided, return an encrypted envelope.'
-          required: false
-          schema:
-            type: boolean
-        -
-          name: passphrase
-          in: query
-          description: 'Passphrase used when encrypt=true.'
-          required: false
-          schema:
-            type: string
       responses:
         '200':
-          description: 'Transfer bundle'
+          description: 'Transfer status'
         '401':
           $ref: '#/components/responses/401'
-        '403':
-          description: 'Missing sensitive permission'
         '404':
           $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /servers/import/check:
+    get:
+      tags:
+        - Servers
+      summary: 'Check server import'
+      description: 'Check that this instance can import a server, before the source instance starts the transfer. It checks the token, the bundle version, the server limit, servers with the same UUID or IP, and that this instance can reach the SSH port of the server.'
+      operationId: check-server-import
+      parameters:
+        -
+          name: server_uuid
+          in: query
+          required: true
+          schema:
+            type: string
+        -
+          name: ip
+          in: query
+          required: true
+          schema:
+            type: string
+        -
+          name: port
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 22
+        -
+          name: schema_version
+          in: query
+          required: false
+          schema:
+            type: integer
+        -
+          name: 'system_github_apps[]'
+          in: query
+          description: 'UUIDs of system-wide GitHub Apps that the server uses. The response lists the ones this instance does not have.'
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        -
+          name: 'system_gitlab_apps[]'
+          in: query
+          description: 'UUIDs of system-wide GitLab Apps that the server uses. The response lists the ones this instance does not have.'
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: 'The server can be imported. Lists every check with its result.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'One or more checks failed. Lists every check with its result.'
       security:
         -
           bearerAuth: []
@@ -10373,7 +11349,7 @@ paths:
       tags:
         - Servers
       summary: 'Import server transfer bundle'
-      description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default).'
+      description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it. Needs a token with the write and deploy permissions.'
       operationId: import-server-transfer-bundle
       requestBody:
         required: true
@@ -10382,10 +11358,8 @@ paths:
             schema:
               properties:
                 bundle:
-                  description: 'Plain or encrypted transfer bundle'
+                  description: 'Transfer bundle'
                   type: object
-                passphrase:
-                  type: [string, 'null']
                 dry_run:
                   type: boolean
                   default: false
@@ -10396,18 +11370,6 @@ paths:
                   description: 'Import without forcing redeploy; keep statuses for adoption'
                   type: boolean
                   default: true
-                claim:
-                  description: 'Automatically claim the host for this instance after import'
-                  type: boolean
-                  default: true
-                write_remote:
-                  description: 'When claiming, write ownership file on the host via SSH'
-                  type: boolean
-                  default: false
-                rebind_sentinel:
-                  description: 'When claiming, rebind Sentinel to this instance'
-                  type: boolean
-                  default: true
               type: object
       responses:
         '200':
@@ -10416,42 +11378,10 @@ paths:
           description: Imported
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '422':
           description: 'Validation failed'
-      security:
-        -
-          bearerAuth: []
-  '/servers/{uuid}/claim':
-    post:
-      tags:
-        - Servers
-      summary: 'Claim imported server'
-      description: 'Claim a managed host for this instance: write ownership file and rebind Sentinel.'
-      operationId: claim-server
-      parameters:
-        -
-          name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                write_remote:
-                  type: boolean
-                  default: true
-                rebind_sentinel:
-                  type: boolean
-                  default: true
-              type: object
-      responses:
-        '200':
-          description: 'Claim result'
-        '404':
-          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -10460,7 +11390,7 @@ paths:
       tags:
         - Servers
       summary: 'Mark server transferred'
-      description: 'Source-instance step: disable automations after a successful export/import handoff.'
+      description: 'Source-instance recovery step: disable automations here when the target already manages the server but the transfer could not finish on this instance.'
       operationId: complete-server-transfer
       parameters:
         -
@@ -10482,38 +11412,6 @@ paths:
       responses:
         '200':
           description: 'Marked transferred'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
-  '/servers/{uuid}/export/mailbox':
-    post:
-      tags:
-        - Servers
-      summary: 'Write transfer bundle to server mailbox'
-      description: 'Write an export bundle to /data/coolify/exports on the managed host for air-gapped import.'
-      operationId: export-server-transfer-mailbox
-      parameters:
-        -
-          name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                passphrase:
-                  type: [string, 'null']
-              type: object
-      responses:
-        '200':
-          description: 'Mailbox write result'
-        '403':
-          description: 'Missing sensitive permission'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -10558,7 +11456,7 @@ paths:
                 name:
                   type: string
                   example: 'My Server'
-                  description: 'The name of the server.'
+                  description: 'The name of the server. Must not contain control characters such as new lines.'
                 description:
                   type: string
                   example: 'My Server Description'
@@ -10579,10 +11477,15 @@ paths:
                   type: string
                   example: og888os
                   description: 'The UUID of the private key.'
+                server_role:
+                  type: string
+                  enum: [deployment, build, both]
+                  example: both
+                  description: 'Server role.'
                 is_build_server:
                   type: boolean
-                  example: false
-                  description: 'Is build server.'
+                  deprecated: true
+                  description: 'Deprecated: use server_role instead. true sets server_role to build, false sets it to both. Must not conflict with server_role.'
                 instant_validate:
                   type: boolean
                   example: false
@@ -10648,7 +11551,7 @@ paths:
       tags:
         - Servers
       summary: Delete
-      description: 'Delete server by UUID.'
+      description: 'Delete server by UUID. With force or delete_from_provider, needs a token with the write and deploy permissions.'
       operationId: delete-server-by-uuid
       parameters:
         -
@@ -10658,7 +11561,25 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: force
+          in: query
+          description: 'Also delete all resources on the server. Needs the deploy permission.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+        -
+          name: delete_from_provider
+          in: query
+          description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone. Needs the deploy permission.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
+        '403':
+          description: 'The token needs the deploy permission to delete the resources or the cloud server.'
         '200':
           description: 'Server deleted.'
           content:
@@ -10682,7 +11603,7 @@ paths:
       tags:
         - Servers
       summary: Update
-      description: 'Update Server.'
+      description: 'Update Server. Changing proxy_type needs a token with the write and deploy permissions.'
       operationId: update-server-by-uuid
       parameters:
         -
@@ -10701,7 +11622,7 @@ paths:
               properties:
                 name:
                   type: string
-                  description: 'The name of the server.'
+                  description: 'The name of the server. Must not contain control characters such as new lines.'
                 description:
                   type: string
                   description: 'The description of the server.'
@@ -10717,16 +11638,21 @@ paths:
                 private_key_uuid:
                   type: string
                   description: 'The UUID of the private key.'
+                server_role:
+                  type: string
+                  enum: [deployment, build, both]
+                  description: 'Server role.'
                 is_build_server:
                   type: boolean
-                  description: 'Is build server.'
+                  deprecated: true
+                  description: 'Deprecated: use server_role instead. true sets server_role to build, false changes a build server to both and leaves other roles unchanged. Must not conflict with server_role.'
                 instant_validate:
                   type: boolean
                   description: 'Instant validate.'
                 proxy_type:
                   type: string
                   enum: [traefik, caddy, none]
-                  description: 'The proxy type.'
+                  description: 'The proxy type. Changing it starts the new proxy on the server and needs the deploy permission.'
                 concurrent_builds:
                   type: integer
                   description: 'Number of concurrent builds.'
@@ -10742,11 +11668,16 @@ paths:
                 server_disk_usage_check_frequency:
                   type: string
                   description: 'Cron expression for disk usage check frequency.'
+                server_disk_usage_notification_interval_hours:
+                  type: integer
+                  description: 'Minimum hours between high disk usage notifications (1-720). Default: 24.'
                 connection_timeout:
                   type: integer
                   description: 'SSH connection timeout in seconds (1-300). Default: 10.'
               type: object
       responses:
+        '403':
+          description: 'The token needs the deploy permission to change the proxy type.'
         '201':
           description: 'Server updated.'
           content:
@@ -10833,7 +11764,7 @@ paths:
       tags:
         - Servers
       summary: Validate
-      description: 'Validate server by UUID.'
+      description: 'Validate server by UUID. With install=true, needs a token with the write and deploy permissions.'
       operationId: validate-server-by-uuid
       parameters:
         -
@@ -10850,11 +11781,13 @@ paths:
             schema:
               properties:
                 install:
-                  description: 'Install missing prerequisites and Docker. This can restart the Docker daemon.'
+                  description: 'Install missing prerequisites and Docker, then start the proxy. This can restart the Docker daemon. Needs the deploy permission.'
                   type: boolean
                   default: false
               type: object
       responses:
+        '403':
+          description: 'The token needs the deploy permission to install the server.'
         '201':
           description: 'Server validation started.'
           content:
@@ -10994,14 +11927,20 @@ paths:
                   type: [boolean, 'null']
                 is_gzip_enabled:
                   type: [boolean, 'null']
+                traefik_certificate_resolver:
+                  description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'
+                  type: [string, 'null']
                 is_stripprefix_enabled:
+                  type: [boolean, 'null']
+                is_force_https_enabled:
+                  type: [boolean, 'null']
+                is_permanent_redirect_enabled:
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                   type: [boolean, 'null']
                 max_restart_count:
                   description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'
                   type: [integer, 'null']
                   minimum: 0
-                is_force_https_enabled:
-                  type: [boolean, 'null']
               type: object
       responses:
         '200':
@@ -11026,7 +11965,7 @@ paths:
       tags:
         - 'Service applications'
       summary: 'Get service application logs'
-      description: 'Get Docker logs for a single compose service container.'
+      description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-application-logs-by-service-and-app-uuid
       parameters:
         -
@@ -11046,12 +11985,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
       responses:
         '200':
           description: Logs.
@@ -11076,7 +12023,7 @@ paths:
       tags:
         - 'Service applications'
       summary: 'Get service application logs'
-      description: 'Get Docker logs for a single compose service container.'
+      description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.'
       operationId: post-service-application-logs-by-service-and-app-uuid
       parameters:
         -
@@ -11094,11 +12041,20 @@ paths:
         -
           name: lines
           in: query
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
       responses:
         '200':
           description: Logs.
@@ -11287,6 +12243,7 @@ paths:
       tags:
         - 'Service databases'
       summary: 'Import service database backup'
+      description: 'Restore a backup into the service database. Every import source requires the deploy ability.'
       operationId: create-service-database-import
       parameters:
         -
@@ -11312,8 +12269,10 @@ paths:
       responses:
         '202':
           description: 'Import queued'
+        '403':
+          description: 'The token needs the deploy ability.'
         '409':
-          description: 'Import already active'
+          description: 'Another start, restart or import of this database is already in progress.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -11463,6 +12422,7 @@ paths:
                 is_log_drain_enabled:
                   type: boolean
                 is_public:
+                  description: 'Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'
                   type: boolean
                 public_port:
                   type: [integer, 'null']
@@ -11484,6 +12444,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission to change is_public.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -11496,7 +12458,7 @@ paths:
       tags:
         - 'Service databases'
       summary: 'Get service database logs'
-      description: 'Get Docker logs for a compose database container.'
+      description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-database-logs-by-service-and-database-uuid
       parameters:
         -
@@ -11514,11 +12476,20 @@ paths:
         -
           name: lines
           in: query
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
       responses:
         '200':
           description: Logs.
@@ -11746,6 +12717,10 @@ paths:
                 docker_compose_raw:
                   type: string
                   description: 'The base64 encoded Docker Compose content.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'Connect the service to the predefined docker network.'
                 urls:
                   type: array
                   description: 'Array of URLs to be applied to containers of a service.'
@@ -11758,6 +12733,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  default: true
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
                 tags:
                   type: array
                   items: { type: string }
@@ -11827,7 +12806,7 @@ paths:
       tags:
         - Services
       summary: Delete
-      description: 'Delete service by UUID.'
+      description: 'Delete service by UUID. Needs a token with the write and deploy permissions.'
       operationId: delete-service-by-uuid
       parameters:
         -
@@ -11856,7 +12835,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Run docker cleanup.'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           required: false
           schema:
             type: boolean
@@ -11869,6 +12848,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_from_coolify_only
+          in: query
+          description: 'Remove only Coolify metadata without deleting Docker resources.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'
@@ -11884,6 +12871,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
       security:
         -
           bearerAuth: []
@@ -11936,6 +12925,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                redact_all_env_values_in_logs:
+                  type: boolean
+                  default: true
+                  description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
               type: object
       responses:
         '200':
@@ -11973,7 +12966,7 @@ paths:
       tags:
         - Services
       summary: 'Get service logs.'
-      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.'
+      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-logs-by-uuid
       parameters:
         -
@@ -11995,12 +12988,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
         -
           name: show_timestamps
           in: query
@@ -12098,7 +13099,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -12161,7 +13162,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -12207,7 +13208,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -12416,7 +13417,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           schema:
             type: boolean
             default: true
@@ -12552,13 +13553,13 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'File content (file only, optional).'
+                  description: 'File content (file only, optional). Needs the deploy ability when set.'
                 is_directory:
                   type: boolean
                   description: 'Whether this is a directory mount (file only, default false).'
                 fs_path:
                   type: string
-                  description: 'Host directory path (required when is_directory is true).'
+                  description: 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'
               type: object
               additionalProperties: false
       responses:
@@ -12574,6 +13575,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -12624,7 +13627,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages).'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -12640,6 +13643,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy permission to change the content of a file outside the resource directory.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -12830,6 +13835,7 @@ paths:
                 name:
                   type: [string, 'null']
                 clone_volumes:
+                  description: 'Whether to clone volume data. Needs the deploy ability.'
                   type: boolean
                   default: false
               type: object
@@ -12840,6 +13846,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to clone volume data.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -12885,8 +13893,8 @@ paths:
                 is_multiline:
                   type: boolean
                 is_shown_once:
-                  type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  type: boolean
                 comment:
                   type: [string, 'null']
               type: object
@@ -13581,6 +14589,42 @@ paths:
       security:
         -
           bearerAuth: []
+    patch:
+      tags:
+        - Teams
+      summary: 'Update authenticated team'
+      description: 'Update settings for the team bound to the API token.'
+      operationId: update-token-team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - is_build_server_fallback_enabled
+              properties:
+                is_build_server_fallback_enabled:
+                  type: boolean
+                  description: 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'
+              type: object
+      responses:
+        '200':
+          description: 'Updated team.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /team/members:
     get:
       tags:
@@ -13609,7 +14653,7 @@ paths:
       tags:
         - Applications
       summary: 'Set application storage backup schedule'
-      description: 'Create or replace the backup schedule for an application persistent volume or directory storage.'
+      description: 'Create or replace the backup schedule for an application persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.'
       operationId: set-application-storage-backup-schedule
       parameters:
         -
@@ -13650,7 +14694,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: Forbidden.
+          description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -13696,7 +14740,7 @@ paths:
       tags:
         - Databases
       summary: 'Set database storage backup schedule'
-      description: 'Create or replace the backup schedule for a database persistent volume or directory storage.'
+      description: 'Create or replace the backup schedule for a database persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.'
       operationId: set-database-storage-backup-schedule
       parameters:
         -
@@ -13737,7 +14781,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: Forbidden.
+          description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -13783,7 +14827,7 @@ paths:
       tags:
         - Services
       summary: 'Set service storage backup schedule'
-      description: 'Create or replace the backup schedule for a service persistent volume or directory storage.'
+      description: 'Create or replace the backup schedule for a service persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.'
       operationId: set-service-storage-backup-schedule
       parameters:
         -
@@ -13824,7 +14868,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: Forbidden.
+          description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -13870,7 +14914,7 @@ paths:
       tags:
         - Applications
       summary: 'Run application storage backup'
-      description: 'Queue an immediate volume backup for an application storage that has a schedule.'
+      description: 'Queue an immediate volume backup for an application storage that has a schedule. Needs a token with the write and deploy permissions.'
       operationId: run-application-storage-backup
       parameters:
         -
@@ -13890,6 +14934,8 @@ paths:
           description: 'Storage backup queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -13900,7 +14946,7 @@ paths:
       tags:
         - Databases
       summary: 'Run database storage backup'
-      description: 'Queue an immediate volume backup for a database storage that has a schedule.'
+      description: 'Queue an immediate volume backup for a database storage that has a schedule. Needs a token with the write and deploy permissions.'
       operationId: run-database-storage-backup
       parameters:
         -
@@ -13920,6 +14966,8 @@ paths:
           description: 'Storage backup queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -13930,7 +14978,7 @@ paths:
       tags:
         - Services
       summary: 'Run service storage backup'
-      description: 'Queue an immediate volume backup for a service storage that has a schedule.'
+      description: 'Queue an immediate volume backup for a service storage that has a schedule. Needs a token with the write and deploy permissions.'
       operationId: run-service-storage-backup
       parameters:
         -
@@ -13950,6 +14998,8 @@ paths:
           description: 'Storage backup queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -14028,13 +15078,15 @@ paths:
       tags:
         - Vultr
       summary: 'Create Vultr Server'
-      description: 'Create a Vultr instance and link it as a Coolify server.'
+      description: 'Create a Vultr instance and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.'
       operationId: create-vultr-server
       responses:
         '201':
           description: 'Vultr server created.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'
         '422':
           description: 'Validation failed.'
         '429':
@@ -14066,6 +15118,18 @@ components:
               description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
               type: boolean
               default: false
+            keep_owners:
+              description: 'Restore object owners and privileges from a single-database PostgreSQL archive. By default they are skipped, because the roles of another server usually do not exist.'
+              type: boolean
+              default: false
+            restore_mysql_users:
+              description: 'MySQL and MariaDB backups containing all databases: also restore the mysql system database (users, passwords, and privileges). By default the system databases are skipped, so the database keeps its own users and passwords.'
+              type: boolean
+              default: false
+            sqlite_database:
+              description: 'SQLite: the database file to restore into. Must be one of the database files. Defaults to the file named in the backup file name, else the first file.'
+              type: string
+              example: app.db
           type: object
           additionalProperties: false
         -
@@ -14089,6 +15153,18 @@ components:
               description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
               type: boolean
               default: false
+            keep_owners:
+              description: 'Restore object owners and privileges from a single-database PostgreSQL archive. By default they are skipped, because the roles of another server usually do not exist.'
+              type: boolean
+              default: false
+            restore_mysql_users:
+              description: 'MySQL and MariaDB backups containing all databases: also restore the mysql system database (users, passwords, and privileges). By default the system databases are skipped, so the database keeps its own users and passwords.'
+              type: boolean
+              default: false
+            sqlite_database:
+              description: 'SQLite: the database file to restore into. Must be one of the database files. Defaults to the file named in the backup file name, else the first file.'
+              type: string
+              example: app.db
           type: object
           additionalProperties: false
         -
@@ -14110,6 +15186,18 @@ components:
               description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
               type: boolean
               default: false
+            keep_owners:
+              description: 'Restore object owners and privileges from a single-database PostgreSQL archive. By default they are skipped, because the roles of another server usually do not exist.'
+              type: boolean
+              default: false
+            restore_mysql_users:
+              description: 'MySQL and MariaDB backups containing all databases: also restore the mysql system database (users, passwords, and privileges). By default the system databases are skipped, so the database keeps its own users and passwords.'
+              type: boolean
+              default: false
+            sqlite_database:
+              description: 'SQLite: the database file to restore into. Must be one of the database files. Defaults to the file named in the backup file name, else the first file.'
+              type: string
+              example: app.db
           type: object
           additionalProperties: false
     DatabaseImportStatus:
@@ -14144,14 +15232,79 @@ components:
             - 'null'
           format: date-time
       type: object
+    ApplicationPreview:
+      properties:
+        uuid:
+          type: string
+        pull_request_id:
+          type: integer
+        pull_request_html_url:
+          type:
+            - string
+            - 'null'
+        git_type:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+        domains:
+          type:
+            - string
+            - 'null'
+        docker_compose_domains:
+          type:
+            - array
+            - 'null'
+          items:
+            properties:
+              name:
+                type: string
+              domain:
+                type:
+                  - string
+                  - 'null'
+              redirect:
+                type:
+                  - string
+                  - 'null'
+            type: object
+        domain_port_overrides:
+          type:
+            - object
+            - 'null'
+        docker_registry_image_tag:
+          type:
+            - string
+            - 'null'
+        last_online_at:
+          type:
+            - string
+            - 'null'
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      type: object
+    ApplicationPreviewDeployment:
+      properties:
+        message:
+          type: string
+        deployment_uuid:
+          type:
+            - string
+            - 'null'
+        preview:
+          $ref: '#/components/schemas/ApplicationPreview'
+      type: object
     VolumeBackupScheduleRequest:
       required:
         - frequency
       properties:
         frequency:
           type: string
-          maxLength: 255
           example: '0 2 * * *'
+          maxLength: 255
         enabled:
           type: boolean
           default: true
@@ -14162,12 +15315,19 @@ components:
           type: boolean
           default: false
         stop_during_backup:
+          description: 'Stop the resource containers during the backup. Needs a token with the deploy permission.'
           type: boolean
           default: false
         s3_storage_uuid:
+          description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination.'
           type:
             - string
             - 'null'
+        s3_storage_uuids:
+          description: 'UUIDs of every S3 storage the backup is uploaded to. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination. save_s3 requires at least one destination.'
+          type: array
+          items:
+            type: string
         retention_amount_locally:
           type: integer
           default: 7
@@ -14205,6 +15365,12 @@ components:
           default: 36000
           maximum: 36000
           minimum: 60
+        missing_backup_notification_days:
+          description: 'Alert after this many days without an execution; 0 disables alerts'
+          type: integer
+          default: 0
+          maximum: 365
+          minimum: 0
       type: object
       additionalProperties: false
     VolumeBackupScheduleResponse:
@@ -14225,6 +15391,7 @@ components:
         - retention_days_s3
         - retention_max_storage_s3
         - timeout
+        - missing_backup_notification_days
       properties:
         uuid:
           type: string
@@ -14248,9 +15415,15 @@ components:
         stop_during_backup:
           type: boolean
         s3_storage_uuid:
+          description: 'Primary S3 destination.'
           type:
             - string
             - 'null'
+        s3_storage_uuids:
+          description: 'Every S3 destination, primary first.'
+          type: array
+          items:
+            type: string
         retention_amount_locally:
           type: integer
         retention_days_locally:
@@ -14266,6 +15439,8 @@ components:
           type: number
           format: float
         timeout:
+          type: integer
+        missing_backup_notification_days:
           type: integer
       type: object
     Application:
@@ -14585,6 +15760,27 @@ components:
           type: string
           nullable: true
           description: 'Password for HTTP Basic Authentication'
+        http_basic_auth_hash_algorithm:
+          type: string
+          enum:
+            - bcrypt
+            - argon2id
+          description: 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'
+        http_basic_auth_bcrypt_cost:
+          type: integer
+          minimum: 4
+          maximum: 14
+          description: 'Bcrypt cost for the HTTP Basic Authentication password.'
+        http_basic_auth_argon2id_memory_cost:
+          type: integer
+          minimum: 8192
+          maximum: 262144
+          description: 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'
+        http_basic_auth_argon2id_time_cost:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
         settings:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
@@ -14645,6 +15841,9 @@ components:
           type: string
         only_this_server:
           type: boolean
+        parent_deployment_uuid:
+          type: string
+          nullable: true
         rollback:
           type: boolean
         commit_message:
@@ -14695,16 +15894,28 @@ components:
           type: boolean
         is_gzip_enabled:
           type: boolean
+        traefik_certificate_resolver:
+          type: string
+          nullable: true
+          description: 'Traefik certificate resolver override. Null uses the server setting, "none" uses no resolver.'
         is_stripprefix_enabled:
           type: boolean
+        is_permanent_redirect_enabled:
+          type: boolean
+          description: 'Use permanent (301/308) instead of temporary (302/307) proxy redirects.'
         connect_to_docker_network:
           type: boolean
         custom_internal_name:
           type: string
           nullable: true
+        custom_container_name_prefix:
+          type: string
+          nullable: true
         is_container_label_escape_enabled:
           type: boolean
         is_env_sorting_enabled:
+          type: boolean
+        include_coolify_default_variables:
           type: boolean
         is_container_label_readonly_enabled:
           type: boolean
@@ -14720,6 +15931,9 @@ components:
           type: boolean
         use_build_secrets:
           type: boolean
+        redact_all_env_values_in_logs:
+          type: boolean
+          description: 'Hide every environment variable value in logs. When false, only locked values are hidden.'
         inject_build_args_to_dockerfile:
           type: boolean
         include_source_commit_in_build:
@@ -14981,13 +16195,24 @@ components:
           type: boolean
         force_server_cleanup:
           type: boolean
+        server_role:
+          type: string
+          enum:
+            - deployment
+            - build
+            - both
         is_build_server:
           type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use server_role instead. true when server_role is build.'
         is_cloudflare_tunnel:
           type: boolean
         is_jump_server:
           type: boolean
         is_logdrain_axiom_enabled:
+          type: boolean
+        is_logdrain_cloudwatch_enabled:
           type: boolean
         is_logdrain_custom_enabled:
           type: boolean
@@ -15011,6 +16236,16 @@ components:
           type: boolean
         geoip_refresh_days:
           type: integer
+        traffic_ip_mode:
+          type: string
+          enum:
+            - full
+            - anonymized
+            - 'off'
+        traefik_certificate_resolver:
+          type: string
+          nullable: true
+          description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'
         is_reachable:
           type: boolean
         is_sentinel_enabled:
@@ -15026,6 +16261,12 @@ components:
         logdrain_axiom_api_key:
           type: string
         logdrain_axiom_dataset_name:
+          type: string
+        logdrain_cloudwatch_region:
+          type: string
+        logdrain_cloudwatch_group:
+          type: string
+        logdrain_cloudwatch_stream_prefix:
           type: string
         logdrain_custom_config:
           type: string
@@ -15120,6 +16361,9 @@ components:
         is_container_label_escape_enabled:
           type: boolean
           description: 'The flag to enable the container label escape.'
+        redact_all_env_values_in_logs:
+          type: boolean
+          description: 'Hide every environment variable value in logs. When false, only locked values are hidden.'
         is_container_label_readonly_enabled:
           type: boolean
           description: 'The flag to enable the container label readonly.'
@@ -15201,6 +16445,9 @@ components:
         custom_server_limit:
           type: string
           description: 'The custom server limit.'
+        is_build_server_fallback_enabled:
+          type: boolean
+          description: 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'
         members:
           description: 'The members of the team.'
           type: array
@@ -15310,11 +16557,14 @@ components:
       scheme: bearer
 tags:
   -
+    name: Applications
+    description: Applications
+  -
     name: 'Secret Managers'
     description: 'Secret Managers'
   -
-    name: Applications
-    description: Applications
+    name: 'Audit Events'
+    description: 'Audit Events'
   -
     name: 'Cloud-init Scripts'
     description: 'Cloud-init Scripts'
@@ -15342,6 +16592,9 @@ tags:
   -
     name: Hetzner
     description: Hetzner
+  -
+    name: Hostinger
+    description: Hostinger
   -
     name: Settings
     description: Settings

@@ -4,10 +4,13 @@ namespace App\Livewire\Project\Application\Deployment;
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Traits\AuditsApplicationSettings;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuditsApplicationSettings;
+
     public Application $application;
 
     public ApplicationDeploymentQueue $application_deployment_queue;
@@ -48,7 +51,9 @@ class Show extends Component
         if (! $application) {
             return redirect()->route('dashboard');
         }
-        $application_deployment_queue = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)->first();
+        $application_deployment_queue = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)
+            ->where('application_id', $application->id)
+            ->first();
         if (! $application_deployment_queue) {
             return redirect()->route('project.application.deployment.index', [
                 'project_uuid' => $project->uuid,
@@ -71,7 +76,7 @@ class Show extends Component
         try {
             $this->authorize('update', $this->application);
             $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
             $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
             $this->application_deployment_queue->refresh();
         } catch (\Throwable $e) {

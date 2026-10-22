@@ -31,7 +31,6 @@ class StopDatabaseProxy
 
         $database->save();
 
-        DatabaseProxyStopped::dispatch();
-
+        DatabaseProxyStopped::dispatch($server->team_id);
     }
 }

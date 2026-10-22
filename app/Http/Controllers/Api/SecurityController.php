@@ -225,7 +225,7 @@ class SecurityController extends Controller
             ], 422);
         }
         $fingerPrint = PrivateKey::generateFingerprint($request->private_key);
-        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint);
+        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint, teamId: $teamId);
         if ($isFingerPrintExists) {
             return response()->json([
                 'message' => 'Private key already exists.',
@@ -253,12 +253,15 @@ class SecurityController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update a private key.',
-        path: '/security/keys',
+        path: '/security/keys/{uuid}',
         operationId: 'update-private-key',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Private Keys'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: [
@@ -266,7 +269,6 @@ class SecurityController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['private_key'],
                         properties: [
                             'name' => ['type' => 'string'],
                             'description' => ['type' => 'string'],
@@ -301,6 +303,10 @@ class SecurityController extends Controller
                 ref: '#/components/responses/400',
             ),
             new OA\Response(
+                response: 404,
+                description: 'Private Key not found.',
+            ),
+            new OA\Response(
                 response: 422,
                 ref: '#/components/responses/422',
             ),
@@ -321,7 +327,7 @@ class SecurityController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|max:255',
-            'private_key' => 'required|string',
+            'private_key' => 'string',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);

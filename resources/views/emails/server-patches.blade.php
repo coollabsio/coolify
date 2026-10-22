@@ -6,13 +6,19 @@
 - Operating System: {{ ucfirst($osId) }}
 - Package Manager: {{ $package_manager }}
 - Total Updates: {{ $total_updates }}
+@if (isset($security_updates))
+- Security Updates: {{ $security_updates }}
+@endif
+@if ($reboot_required ?? false)
+- A reboot is required to apply installed updates.
+@endif
 
 ## Available Updates
 
 @if ($total_updates > 0)
 @foreach ($updates as $update)
 
-Package: {{ $update['package'] }} ({{ $update['architecture'] }}), from version {{ $update['current_version'] }} to {{ $update['new_version'] }} at repository {{ $update['repository'] ?? 'Unknown' }}
+Package: {{ $update['package'] }}{{ ($update['security'] ?? false) ? ' [security]' : '' }} ({{ $update['architecture'] ?? 'unknown' }}), from version {{ $update['current_version'] }} to {{ $update['new_version'] }} at repository {{ $update['repository'] ?? 'Unknown' }}
 @endforeach
 
 ## Security Considerations
@@ -21,12 +27,7 @@ Some of these updates may include important security patches. We recommend revie
 
 ### Critical packages that may require container/server/service restarts:
 @php
-$criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
+$criticalPackages = collect($updates)->filter(fn ($update) => filled($update['risk'] ?? null));
 @endphp
 
 @if ($criticalPackages->count() > 0)

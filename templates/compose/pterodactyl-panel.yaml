@@ -33,7 +33,7 @@ services:
       retries: 3
 
   pterodactyl:
-    image: ghcr.io/pterodactyl/panel:v1.12.0
+    image: ghcr.io/pterodactyl/panel:v1.12.3
     volumes:
       - "panel-var:/app/var/"
       - "panel-nginx:/etc/nginx/http.d/"

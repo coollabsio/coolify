@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ServerRole;
 use App\Livewire\Analytics;
 use App\Livewire\Dashboard\TrafficAnalytics as DashboardTrafficAnalytics;
 use App\Models\PrivateKey;
@@ -55,6 +56,7 @@ it('does not count swarm or build servers in the analytics-page nudge', function
     $swarm->settings->save();
 
     $build = disabledServer();
+    $build->settings->server_role = ServerRole::BUILD;
     $build->settings->is_build_server = true;
     $build->settings->save();
 

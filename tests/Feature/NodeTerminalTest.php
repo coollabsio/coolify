@@ -7,7 +7,6 @@ use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\User;
 use App\Services\TerminalSessionService;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -51,7 +50,7 @@ it('shows an authorized terminal menu on the node view', function () {
         ->assertSee(route('node.command', $this->node->uuid), false);
 });
 
-it('renders each Node section route with the grouped sidebar', function (string $routeName, string $activeLabel, string $sectionText) {
+it('renders each Node section route with the sidebar', function (string $routeName, string $activeLabel, string $sectionText) {
     $response = $this->get(route($routeName, $this->node->uuid))
         ->assertSuccessful()
         ->assertSee($sectionText)
@@ -60,9 +59,7 @@ it('renders each Node section route with the grouped sidebar', function (string 
     foreach (['node.show', 'node.workloads', 'node.containers', 'node.internal-dns', 'node.sentinel', 'node.activity'] as $linkedRoute) {
         $response->assertSee(route($linkedRoute, $this->node->uuid), false);
     }
-    foreach (['Settings', 'Applications', 'Networking', 'Operations', $activeLabel] as $label) {
-        $response->assertSee($label);
-    }
+    $response->assertSee($activeLabel);
 })->with([
     'general' => ['node.show', 'General', 'Resource usage'],
     'workloads' => ['node.workloads', 'Applications', 'No applications on this server'],
@@ -201,7 +198,8 @@ it('rejects terminal commands for a node that is not ready', function () {
             serverUuid: $this->node->uuid,
             targetType: 'node',
         )
-        ->assertForbidden();
+        ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: 'Terminal access is unavailable while this server is not ready.')
+        ->assertNotDispatched('send-terminal-token');
 });
 
 it('rejects terminal commands for a foreign node', function () {
@@ -211,13 +209,16 @@ it('rejects terminal commands for a foreign node', function () {
         'is_usable' => true,
     ]);
 
-    expect(fn () => Livewire::test(Terminal::class)->dispatch(
-        'send-terminal-command',
-        isContainer: false,
-        identifier: $foreignNode->name,
-        serverUuid: $foreignNode->uuid,
-        targetType: 'node',
-    ))->toThrow(ModelNotFoundException::class);
+    Livewire::test(Terminal::class)
+        ->dispatch(
+            'send-terminal-command',
+            isContainer: false,
+            identifier: $foreignNode->name,
+            serverUuid: $foreignNode->uuid,
+            targetType: 'node',
+        )
+        ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: Terminal::NOT_ALLOWED_MESSAGE)
+        ->assertNotDispatched('send-terminal-token');
 });
 
 it('rejects container terminal commands for a node', function () {
@@ -229,7 +230,8 @@ it('rejects container terminal commands for a node', function () {
             serverUuid: $this->node->uuid,
             targetType: 'node',
         )
-        ->assertNotFound();
+        ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: Terminal::NOT_ALLOWED_MESSAGE)
+        ->assertNotDispatched('send-terminal-token');
 });
 
 it('rejects unknown terminal target types', function () {
@@ -241,7 +243,8 @@ it('rejects unknown terminal target types', function () {
             serverUuid: $this->node->uuid,
             targetType: 'unknown',
         )
-        ->assertNotFound();
+        ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: Terminal::NOT_ALLOWED_MESSAGE)
+        ->assertNotDispatched('send-terminal-token');
 });
 
 it('lists only ready current-team node addresses for terminal authorization', function () {

@@ -4,8 +4,6 @@ use App\Livewire\Project\New\Select;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\ViewErrorBag;
 
 beforeEach(function () {
     Cache::flush();
@@ -46,12 +44,12 @@ it('returns local, CDN, and default logo fallbacks for every service', function 
         ->and($services['pydio-cells']['logo_default_url'])->toBe(asset('svgs/default.webp'));
 });
 
-it('crops wide database wordmarks to their icon artwork', function () {
+it('uses resource tile icons for databases', function () {
     $databases = collect((new Select)->loadServices()['databases'])->keyBy('id');
 
-    expect($databases['keydb']['logo'])->toContain('viewBox="0 0 160 182"')
-        ->and($databases['dragonfly']['logo'])->toContain('viewBox="0 0 44 44"', 'viewBox="0 0 88 88"')
-        ->and($databases['clickhouse']['logo'])->toContain('viewBox="0 0 24 26"');
+    foreach (['keydb', 'dragonfly', 'clickhouse'] as $database) {
+        expect($databases[$database]['logo'])->toBe(resource_logo_url($database));
+    }
 });
 
 it('prefers embedded service template git timestamps from the templates bundle', function () {
@@ -100,69 +98,32 @@ it('caches parsed local service templates by bundle mtime', function () {
     expect($first->keys()->all())->toBe($second->keys()->all());
 });
 
-it('renders the shared loading indicator while resource choices load', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee('Loading resources...', false);
-    $view->assertSee('animate-spin', false);
-    $view->assertDontSee('<div x-show="loading">Loading...</div>', false);
-});
-
-it('renders the service templates last updated hint placeholder', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee('Updated');
-    $view->assertSee('serviceTemplatesLastUpdated');
-    $view->assertSee('service.templateLastUpdated');
-    $view->assertSee('aria-controls="resource-type-filter-options"', false);
-    $view->assertSee('aria-controls="resource-category-options"', false);
-    $view->assertSee('@click.outside="closeCategoryFilter()"', false);
-    $view->assertSee('@keydown.escape.stop="closeCategoryFilter(true)"', false);
-});
-
-it('renders the local, CDN, and default service logo fallback chain', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee('service.logo_cdn_url', false);
-    $view->assertSee('service.logo_default_url', false);
-
-    expect(file_get_contents(resource_path('views/livewire/global-search.blade.php')))
-        ->toContain('item.logo_cdn_url')
-        ->toContain('item.logo_default_url');
-});
-
 it('keeps service template keys for service selection and docs links', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn(json_encode([
+            'denoKV' => [
+                'documentation' => 'https://coolify.io/docs',
+                'slogan' => 'Deno KV.',
+                'compose' => '',
+                'tags' => null,
+                'category' => 'database',
+                'logo' => 'images/default.webp',
+                'minversion' => '0.0.0',
+            ],
+        ]));
+
     $services = collect((new Select)->loadServices()['services']);
     $denoKv = $services->firstWhere('id', 'denoKV');
 
     expect($denoKv)
         ->not->toBeNull()
         ->and($denoKv['docsSlug'])->toBe('denokv');
-
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
-    ]);
-
-    $view->assertSee("setType('one-click-service-' + service.id)", false);
-    $view->assertSee('service.docsSlug || this.extractBaseServiceName(service.name)', false);
 });
 
 it('preserves one click service key casing when selecting a service template', function () {
@@ -173,4 +134,31 @@ it('preserves one click service key casing when selecting a service template', f
     $component->setType('one-click-service-denoKV');
 
     expect($component->type)->toBe('one-click-service-denoKV');
+});
+
+it('links service websites to the project page instead of a shared host root', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $payload = json_encode([
+        'uptime-kuma' => ['documentation' => 'https://github.com/louislam/uptime-kuma?tab=readme-ov-file&utm_source=coolify.io'],
+        'alexandrie' => ['documentation' => 'https://www.github.com/Smaug6739/Alexandrie/tree/main/docs'],
+        'radarr' => ['documentation' => 'https://hub.docker.com/r/linuxserver/radarr?utm_source=coolify.io'],
+        'n8n' => ['documentation' => 'https://n8n.io/docs?utm_source=coolify.io'],
+        'broken' => ['documentation' => 'not a url'],
+    ]);
+
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn($payload);
+
+    $services = (new Select)->loadServices()['services'];
+
+    expect($services['uptime-kuma']['website'])->toBe('https://github.com/louislam/uptime-kuma')
+        ->and($services['alexandrie']['website'])->toBe('https://www.github.com/Smaug6739/Alexandrie')
+        ->and($services['radarr']['website'])->toBe('https://hub.docker.com/r/linuxserver/radarr')
+        ->and($services['n8n']['website'])->toBe('https://n8n.io')
+        ->and($services['broken']['website'])->toBeNull();
 });

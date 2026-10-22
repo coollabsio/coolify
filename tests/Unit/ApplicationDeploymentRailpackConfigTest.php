@@ -260,6 +260,23 @@ it('pins docker config while running railpack buildx commands', function () {
         ->toContain('DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack');
 });
 
+it('stops the railpack builder after the build when no other build uses it', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'uuid' => 'application-uuid',
+    ]);
+
+    $command = invokeRailpackMethod($job, $reflection, 'railpack_build_command', ['coollabsio/coolify:test', collect([])]);
+
+    $sharedLock = strpos($command, 'flock -s 9');
+    $build = strpos($command, 'docker buildx build --builder coolify-railpack');
+    $stop = strpos($command, 'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack');
+
+    expect($sharedLock)->not->toBeFalse()
+        ->and($build)->toBeGreaterThan($sharedLock)
+        ->and($stop)->toBeGreaterThan($build)
+        ->and($command)->toEndWith('exit $status');
+});
+
 it('filters reserved docker client variables from railpack build secrets', function () {
     [$job, $reflection] = makeRailpackDeploymentJob([
         'uuid' => 'application-uuid',
@@ -323,7 +340,69 @@ it('builds railpack docker command with matching env and secret flags for all ra
     expect($command)->toContain("--secret 'id=RAILPACK_DEPLOY_APT_PACKAGES,env=RAILPACK_DEPLOY_APT_PACKAGES'");
     expect($command)->toContain("--secret 'id=SECRET_JSON,env=SECRET_JSON'");
     expect($command)->toContain(' --build-arg secrets-hash=');
-    expect($command)->toContain('--build-arg BUILDKIT_SYNTAX="ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version').'"');
+    expect($command)->toContain('--build-arg BUILDKIT_SYNTAX="ghcr.io/railwayapp/railpack-frontend:v${RAILPACK_VERSION:-$(railpack --version | cut -d " " -f 3)}"');
+});
+
+/**
+ * Runs a railpack build command in bash with stub docker and railpack binaries and returns the docker arguments.
+ *
+ * @param  array<string, string>  $environment
+ * @return array{exitCode: int, output: string}
+ */
+function runRailpackBuildCommandWithStubDocker(string $command, array $environment): array
+{
+    $binDirectory = sys_get_temp_dir().'/railpack-stub-'.uniqid();
+    mkdir($binDirectory);
+    file_put_contents($binDirectory.'/docker', "#!/bin/sh\nprintf '%s\\n' \"\$@\"\n");
+    file_put_contents($binDirectory.'/railpack', "#!/bin/sh\necho 'railpack version 0.30.0'\n");
+    chmod($binDirectory.'/docker', 0755);
+    chmod($binDirectory.'/railpack', 0755);
+
+    $process = proc_open(
+        ['bash', '-c', 'exec 2>&1; cd() { :; }; source() { :; }; '.$command],
+        [1 => ['pipe', 'w']],
+        $pipes,
+        null,
+        ['PATH' => $binDirectory.':'.getenv('PATH'), ...$environment],
+    );
+    $output = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $exitCode = proc_close($process);
+
+    unlink($binDirectory.'/docker');
+    unlink($binDirectory.'/railpack');
+    rmdir($binDirectory);
+
+    return ['exitCode' => $exitCode, 'output' => $output];
+}
+
+it('uses the railpack frontend version from the helper environment', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob(['uuid' => 'application-uuid']);
+
+    $command = invokeRailpackMethod($job, $reflection, 'railpack_build_command', [
+        'coollabsio/coolify:test',
+        collect(['RAILPACK_VERSION' => '9.9.9']),
+    ]);
+
+    $result = runRailpackBuildCommandWithStubDocker($command, ['RAILPACK_VERSION' => '0.26.1']);
+
+    expect($result['exitCode'])->toBe(0)
+        ->and($result['output'])->toContain('BUILDKIT_SYNTAX=ghcr.io/railwayapp/railpack-frontend:v0.26.1')
+        ->and($result['output'])->not->toContain('railpack-frontend:v9.9.9');
+});
+
+it('falls back to the railpack CLI version when the helper does not set RAILPACK_VERSION', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob(['uuid' => 'application-uuid']);
+
+    $command = invokeRailpackMethod($job, $reflection, 'railpack_build_command', [
+        'coollabsio/coolify:test',
+        collect(),
+    ]);
+
+    $result = runRailpackBuildCommandWithStubDocker($command, []);
+
+    expect($result['exitCode'])->toBe(0)
+        ->and($result['output'])->toContain('BUILDKIT_SYNTAX=ghcr.io/railwayapp/railpack-frontend:v0.30.0');
 });
 
 it('interpolates build-time variable references for railpack by sourcing the build-time env file', function () {
@@ -377,7 +456,7 @@ it('creates an empty build-time env file for railpack when there are no generate
     foreach ([
         'application_deployment_queue' => new class extends ApplicationDeploymentQueue
         {
-            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false): void {}
+            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false, ?string $command = null, int $batch = 1): void {}
         },
         'build_pack' => 'railpack',
         'pull_request_id' => 0,

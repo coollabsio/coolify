@@ -80,7 +80,7 @@ it('hides the map toggle when the cluster stack is disabled', function () {
 
     Livewire::test(Dashboard::class)
         ->assertViewHas('clusterMapAvailable', false)
-        ->assertDontSeeHtml('aria-label="Map view"')
+        ->assertDontSeeHtml('title="Map view"')
         ->assertDontSeeHtml('dashboard-cluster-map');
 });
 
@@ -89,20 +89,18 @@ it('hides the map toggle when the team has no cluster', function () {
 
     Livewire::test(Dashboard::class)
         ->assertViewHas('clusterMapAvailable', false)
-        ->assertDontSeeHtml('aria-label="Map view"')
+        ->assertDontSeeHtml('title="Map view"')
         ->assertDontSeeHtml('dashboard-cluster-map');
 });
 
-it('offers a remembered list and map toggle when the team has a cluster', function () {
+it('offers a remembered map view when the team has a cluster', function () {
     NodeCluster::factory()->create(['team_id' => $this->team->id, 'name' => 'Visible mesh']);
 
     Livewire::test(Dashboard::class)
         ->assertViewHas('clusterMapAvailable', true)
-        ->assertSeeHtml('aria-label="List view"')
-        ->assertSeeHtml('aria-label="Map view"')
+        ->assertSeeHtml('title="Map view"')
         ->assertSeeHtml('coolify-dashboard-servers-view')
-        ->assertSeeLivewire(ClusterMap::class)
-        ->assertSee(route('server.index'), false);
+        ->assertSeeLivewire(ClusterMap::class);
 });
 
 it('refreshes the map every fifteen seconds only while it is visible', function () {

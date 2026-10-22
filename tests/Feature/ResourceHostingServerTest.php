@@ -291,11 +291,11 @@ test('server API rejects enabling build mode when resources exist', function () 
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
-            'is_build_server' => true,
+            'server_role' => 'build',
             'name' => 'should-not-be-saved',
         ])
         ->assertUnprocessable()
-        ->assertInvalid(['is_build_server']);
+        ->assertInvalid(['server_role']);
 
     expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse()
         ->and($this->server->fresh()->name)->toBe($originalName);
@@ -307,7 +307,7 @@ test('server API allows keeping build mode enabled when resources exist', functi
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
-            'is_build_server' => true,
+            'server_role' => 'build',
         ])
         ->assertCreated();
 
@@ -320,12 +320,13 @@ test('server API allows disabling build mode when resources exist', function () 
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
-            'is_build_server' => false,
+            'server_role' => 'both',
             'name' => 'Deployment Server',
         ])
         ->assertCreated();
 
     expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse()
+        ->and($this->server->settings->fresh()->server_role->value)->toBe('both')
         ->and($this->server->fresh()->name)->toBe('Deployment Server');
 });
 

@@ -138,6 +138,25 @@
                             ['value' => true, 'label' => 'Strip prefixes'],
                             ['value' => false, 'label' => 'Keep paths as-is'],
                         ]" :disabled="! $canUpdate" />
+                    @if ($isTraefikProxy)
+                        <x-forms.listbox id="certificateResolverMode" label="Certificate resolver"
+                            onChange="saveCertificateResolverMode"
+                            helper="Traefik certificate resolver for this application's HTTPS routes. Choose <span class='font-bold'>None</span> for domains that use certificates from Traefik's dynamic configuration (for example Cloudflare Origin CA certificates). Redeploy the application to apply the change."
+                            :options="[
+                                ['value' => 'server', 'label' => 'Server setting ('.$serverCertificateResolver.')'],
+                                ['value' => 'none', 'label' => 'None (use your own certificates)'],
+                                ['value' => 'custom', 'label' => 'Custom resolver'],
+                            ]" :disabled="! $canUpdate" />
+                        @if ($certificateResolverMode === 'custom')
+                            <form wire:submit="saveCertificateResolver" class="w-full">
+                                <x-unsaved-bar action="saveCertificateResolver" targets="certificateResolverName" />
+                                <x-forms.input id="certificateResolverName" label="Resolver name" placeholder="cloudflare"
+                                    required
+                                    helper="Name of a certificate resolver defined in your Traefik configuration. Letters, numbers, hyphens, and underscores only."
+                                    canGate="update" :canResource="$application" />
+                            </form>
+                        @endif
+                    @endif
                 </div>
             @else
                 <x-empty size="sm" title="Proxy behavior is managed through labels"
@@ -184,6 +203,30 @@
         @if ($application->build_pack !== 'dockercompose')
             <x-application.settings-section id="advanced-gpu-section" title="GPU"
                 helper="Give this application access to the host's GPUs. More info <a href='https://docs.docker.com/compose/gpu-support/' class='underline dark:text-white' target='_blank'>here</a>.">
+                <x-slot:actions>
+                    @php($canRefreshGpus = $gpuServers->contains(fn ($gpuServer) => $gpuServer->isFunctional()))
+                    <x-forms.button type="button" wire:click="refreshGpus" canGate="update"
+                        :canResource="$gpuServers->first()" :disabled="! $canRefreshGpus"
+                        :tooltip="$canRefreshGpus ? null : 'Validate the server connection first.'">
+                        <x-reicon name="refresh" class="size-3.5" />
+                        Refresh GPUs
+                    </x-forms.button>
+                </x-slot:actions>
+                <x-callout type="info" title="Detected GPUs" class="mb-5">
+                    @foreach ($gpuServers as $gpuServer)
+                        <div wire:key="gpu-server-{{ $gpuServer->id }}" @class(['mt-2' => ! $loop->first])>
+                            <p class="font-medium text-neutral-700 dark:text-fg">
+                                <a href="{{ route('server.show', ['server_uuid' => $gpuServer->uuid]) }}"
+                                    class="underline">{{ $gpuServer->name }}</a>
+                                @if (data_get($gpuServer->server_metadata, 'collected_at'))
+                                    <span class="font-normal text-neutral-500 dark:text-fg-dim">· checked
+                                        {{ \Illuminate\Support\Carbon::parse(data_get($gpuServer->server_metadata, 'collected_at'))->diffForHumans() }}</span>
+                                @endif
+                            </p>
+                            <x-server.gpu-list :server="$gpuServer" />
+                        </div>
+                    @endforeach
+                </x-callout>
                 <div class="grid w-full gap-4 sm:grid-cols-2">
                     <x-forms.listbox id="isGpuEnabled" label="GPU access" onChange="instantSave"
                         :options="[
@@ -199,13 +242,14 @@
                             targets="gpuDriver,gpuCount,gpuDeviceIds,gpuOptions" />
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.input label="GPU driver" id="gpuDriver" canGate="update" :canResource="$application" />
-                            <x-forms.input label="GPU count" placeholder="Empty means use all GPUs" id="gpuCount"
+                            <x-forms.input label="GPU count" placeholder="Empty means use all GPUs" helper="A number, or all." id="gpuCount"
                                 canGate="update" :canResource="$application" />
                         </div>
                         <x-forms.input label="GPU device ids" placeholder="0,2"
                             helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/#access-specific-devices' class='underline dark:text-white' target='_blank'>here</a>."
                             id="gpuDeviceIds" canGate="update" :canResource="$application" />
-                        <x-forms.textarea rows="6" label="GPU options" id="gpuOptions" canGate="update"
+                        <x-forms.textarea rows="6" label="GPU options" id="gpuOptions" placeholder="key=value"
+                            helper="Driver options. Use one key=value pair per line, or a YAML mapping." canGate="update"
                             :canResource="$application" />
                     </form>
                 @endif

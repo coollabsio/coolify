@@ -2,22 +2,22 @@
 #
 # Railpack end-to-end deploy smoke test against the local dev stack.
 #
-# Walks a curated set of railpack-* example apps from
-# DevelopmentRailpackExamplesSeeder, triggers a deploy via the Coolify API,
+# Walks a curated set of Railpack example apps from
+# ApplicationSeeder, triggers a deploy via the Coolify API,
 # waits for the deployment queue to finish, then exec()s into the resulting
 # container and checks that COOLIFY_*, SOURCE_COMMIT, and any RAILPACK_*
 # build inputs landed correctly. Optionally curls the FQDN.
 #
 # Requires:
 #   - Dev stack running: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#   - Seeder run:        php artisan db:seed --class=DevelopmentRailpackExamplesSeeder
+#   - Seeder run:        php artisan migrate:fresh --seed
 #   - Personal token:    PersonalAccessTokenSeeder run (creates Bearer 'root')
 #   - jq, curl available on host
 #
 # Usage:
 #   scripts/railpack-smoke.sh                          # default subset
-#   scripts/railpack-smoke.sh --app railpack-laravel   # single app
-#   scripts/railpack-smoke.sh --all                    # every seeded railpack-* app
+#   scripts/railpack-smoke.sh --app laravel            # single app
+#   scripts/railpack-smoke.sh --all                    # every seeded Railpack app
 #   scripts/railpack-smoke.sh --timeout 900            # build wait per app, seconds
 #   scripts/railpack-smoke.sh --no-curl                # skip FQDN curl
 #   scripts/railpack-smoke.sh --extra-env KEY=VALUE    # build+runtime env (alias of --both-env)
@@ -37,16 +37,16 @@ BOTH_ENVS=()
 APPS=()
 
 DEFAULT_APPS=(
-    railpack-expressjs
-    railpack-nestjs
-    railpack-nextjs-ssr
-    railpack-vite-static
-    railpack-astro-static
-    railpack-python-flask
-    railpack-go-gin
-    railpack-rust
-    railpack-symfony
-    railpack-bun
+    nodejs
+    nestjs
+    nextjs-ssr
+    vite-vanilla-js
+    astro-static
+    python-flask
+    go-gin
+    rust-rocket
+    symfony
+    bun
 )
 
 while (( $# > 0 )); do
@@ -87,7 +87,7 @@ if (( ${#APPS[@]} == 0 )); then
 fi
 
 if [[ "${APPS[0]}" == "__ALL__" ]]; then
-    mapfile -t APPS < <(curl_api GET /applications | jq -r '.[].uuid' | grep '^railpack-' || true)
+    mapfile -t APPS < <(curl_api GET /applications | jq -r '.[] | select(.build_pack == "railpack") | .uuid' || true)
 fi
 
 log()  { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }

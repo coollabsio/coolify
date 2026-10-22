@@ -10,6 +10,13 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
+use Laravel\Fortify\Events\RecoveryCodesGenerated;
+use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
+use Laravel\Fortify\Events\TwoFactorAuthenticationDisabled;
+use Laravel\Fortify\Events\TwoFactorAuthenticationEnabled;
+use Laravel\Passkeys\Events\PasskeyDeleted;
+use Laravel\Passkeys\Events\PasskeyRegistered;
+use Laravel\Passkeys\Events\PasskeyVerified;
 use SocialiteProviders\Authentik\AuthentikExtendSocialite;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Clerk\ClerkExtendSocialite;
@@ -40,7 +47,7 @@ class EventServiceProvider extends ServiceProvider
         });
         Event::listen(Failed::class, function (Failed $event): void {
             auditLog('auth.user.login_failed', [
-                'attempted_email' => data_get($event->credentials, 'email'),
+                'attempted_email' => $this->attemptedEmailForAudit(data_get($event->credentials, 'email')),
                 'guard' => $event->guard,
             ], 'warning');
         });
@@ -56,6 +63,39 @@ class EventServiceProvider extends ServiceProvider
         Event::listen(PasswordReset::class, function (PasswordReset $event): void {
             auditLog('auth.user.password_reset', $this->authContext($event->user));
         });
+        Event::listen(TwoFactorAuthenticationEnabled::class, function (TwoFactorAuthenticationEnabled $event): void {
+            auditLog('auth.user.two_factor_enabled', $this->authContext($event->user));
+        });
+        Event::listen(TwoFactorAuthenticationConfirmed::class, function (TwoFactorAuthenticationConfirmed $event): void {
+            auditLog('auth.user.two_factor_confirmed', $this->authContext($event->user));
+        });
+        Event::listen(TwoFactorAuthenticationDisabled::class, function (TwoFactorAuthenticationDisabled $event): void {
+            auditLog('auth.user.two_factor_disabled', $this->authContext($event->user));
+        });
+        Event::listen(RecoveryCodesGenerated::class, function (RecoveryCodesGenerated $event): void {
+            auditLog('auth.user.recovery_codes_regenerated', $this->authContext($event->user));
+        });
+        Event::listen(PasskeyRegistered::class, function (PasskeyRegistered $event): void {
+            auditLog('auth.user.passkey_registered', $this->authContext($event->user));
+        });
+        Event::listen(PasskeyVerified::class, function (PasskeyVerified $event): void {
+            auditLog('auth.user.passkey_verified', $this->authContext($event->user));
+        });
+        Event::listen(PasskeyDeleted::class, function (PasskeyDeleted $event): void {
+            auditLog('auth.user.passkey_deleted', $this->authContext($event->user));
+        });
+    }
+
+    /**
+     * Users sometimes type a password into the email field, so only a valid email address is stored.
+     */
+    private function attemptedEmailForAudit(mixed $email): ?string
+    {
+        if (blank($email)) {
+            return null;
+        }
+
+        return is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : '[invalid]';
     }
 
     private function authContext(?object $user): array

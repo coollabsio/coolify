@@ -15,7 +15,8 @@
     }
     $activeFilterText = $activeFilterLabels->implode(', ');
 @endphp
-<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables">
+<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables"
+    x-on:focus-compose-environment-variable.window="const key = $event.detail.key; const focus = () => { const row = document.querySelector(`[data-env-key='${CSS.escape(key)}']`); if (!row) return false; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.querySelector('[data-env-settings-trigger]')?.click(); return true; }; if (!focus()) { $wire.focusComposeEnvironmentVariable(key).then(() => requestAnimationFrame(focus)); }">
     <x-application.settings-section id="environment-variables-section" title="Environment variables"
         helper="Environment variables (secrets) for this resource.">
         @can('manageEnvironment', $resource)
@@ -27,27 +28,42 @@
             </x-slot:actions>
         @endcan
         @if ($view === 'normal')
-            @if ($resourceClass === 'App\Models\Application')
-                <div class="grid w-full items-end gap-4 sm:grid-cols-2">
-                    @if (data_get($resource, 'build_pack') !== 'dockercompose')
-                        <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
-                            onChange="instantSave"
-                            helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+            <div class="flex w-full flex-col gap-4">
+                @if ($resourceClass === 'App\Models\Application')
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                            <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
+                                onChange="instantSave"
+                                helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+                                :options="[
+                                    ['value' => false, 'label' => 'Creation order'],
+                                    ['value' => true, 'label' => 'Alphabetical'],
+                                ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                        @endif
+                        <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
+                            helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
                             :options="[
-                                ['value' => false, 'label' => 'Creation order'],
-                                ['value' => true, 'label' => 'Alphabetical'],
+                                ['value' => false, 'label' => 'Standard build arguments'],
+                                ['value' => true, 'label' => 'Docker BuildKit secrets'],
                             ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
-                    @endif
-                    <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
-                        helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
-                        :options="[
-                            ['value' => false, 'label' => 'Standard build arguments'],
-                            ['value' => true, 'label' => 'Docker BuildKit secrets'],
-                        ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
-                </div>
-            @else
-                <p class="text-sm text-neutral-500 dark:text-fg-dim">Manage this resource's environment variables below.</p>
-            @endif
+                    </div>
+                @endif
+                <x-forms.checkbox instantSave="saveCoolifyDefaultVariables" id="include_coolify_default_variables"
+                    label="Include Coolify default variables"
+                    helper="Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, COOLIFY_ENVIRONMENT_NAME and COOLIFY_SERVER_IP to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy or restart."
+                    :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                @if ($this->hasLogRedactionSetting())
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="redact_all_env_values_in_logs" label="Environment values in logs"
+                            onChange="saveLogRedactionSetting"
+                            helper="Hide every environment variable value in deployment logs, scheduled task output, copied or downloaded logs, and logs from the API and MCP. Live log streaming is not changed. Locked variables and known secret formats are always hidden."
+                            :options="[
+                                ['value' => true, 'label' => 'Hide all values'],
+                                ['value' => false, 'label' => 'Hide locked values only'],
+                            ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                    </div>
+                @endif
+            </div>
         @else
             <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
                 @can('manageEnvironment', $resource)
@@ -180,9 +196,9 @@
     @if ($view === 'normal')
         @if (! $readyToLoad)
             <div id="environment-table-section"
-                class="application-settings-section-body mt-1 flex min-h-40 w-full scroll-mt-28 items-center justify-center"
-                wire:loading.class="opacity-100" wire:target="loadEnvironmentVariables">
-                <x-loading text="Loading environment variables..." />
+                class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28" role="status">
+                <span class="sr-only">Loading environment variables</span>
+                <x-skeleton.table flush :rows="6" />
             </div>
         @else
             @php
@@ -225,7 +241,8 @@
                             @endif
                             @if ($row['kind'] === 'managed')
                                 <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
-                                    :env="$row['environmentVariable']" :type="$resource->type()" :showEnvironmentType="$showEnvironmentType" />
+                                    :env="$row['environmentVariable']" :type="$resource->type()"
+                                    :composeInfo="$row['composeInfo']" :showEnvironmentType="$showEnvironmentType" />
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
