@@ -38,7 +38,7 @@ it('shows application configuration sections and navigation', function () {
         ->assertSee('Application details')
         ->assertSee('Internal access')
         ->assertSee('Docker network')
-        ->assertSee('Build pipeline')
+        ->assertSee('Build & deploy')
         ->screenshot(filename: 'application-configuration-overview');
 });
 
@@ -111,23 +111,33 @@ it('saves application name description and ports from the general form', functio
     $page->assertSee('General')
         ->fill('name', $updatedName)
         ->fill('description', 'Updated via browser test')
+        ->click('#internal-access-section button:has-text("Edit networking")')
         ->fill('portsExposes', '8080')
+        ->fill('customNetworkAliases', 'api.internal')
         ->screenshot(filename: 'application-general-before-save');
 
-    submitLivewireForm($page);
-
-    $page->assertValue('name', $updatedName)
+    $page->click('form button[type="submit"]:visible:has-text("Save")')
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('#internal-access-section label')]
+                .find((label) => label.textContent.trim() === 'Network aliases')
+                ?.parentElement.querySelector('input')?.value === 'api.internal'
+            JS)
+        ->assertValue('name', $updatedName)
         ->assertScript(<<<'JS'
             () => [...document.querySelectorAll('#internal-access-section label')]
                 .find((label) => label.textContent.trim() === 'Exposed ports')
                 ?.parentElement.querySelector('input')?.value === '8080'
             JS)
+        ->wait(0.5)
+        ->assertScript("() => document.querySelector('input[name=portsExposes]')?.checkVisibility() === false")
+        ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-general-after-save');
 
     $this->application->refresh();
     expect($this->application->name)->toBe($updatedName)
         ->and($this->application->description)->toBe('Updated via browser test')
-        ->and($this->application->ports_exposes)->toBe('8080');
+        ->and($this->application->ports_exposes)->toBe('8080')
+        ->and($this->application->custom_network_aliases)->toBe('api.internal');
 
     $reloaded = visit($url);
     $reloaded->assertValue('name', $updatedName)

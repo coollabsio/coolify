@@ -150,7 +150,7 @@
                         @endif
                     @else
                         <button type="button"
-                            @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection))"
+                            @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection), @js($row['inherited_port'] ?? null))"
                             class="icon-button shrink-0"
                             title="Domain settings" aria-label="Settings for {{ $publicUrl }}">
                             <x-reicon name="settings" class="size-3.5" />

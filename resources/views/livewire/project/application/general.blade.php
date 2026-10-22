@@ -26,7 +26,7 @@
 
             </x-application.settings-section>
 
-            <x-application.settings-section id="access-section" title="Access" helper="Manage how this application is reached publicly and from the Docker network.">
+            <x-application.settings-section id="access-section" title="Access" helper="Manage how this application is reached publicly, who can access it, and how it is reached from the Docker network.">
             <section id="public-access-section" @class([
                 'border-b border-neutral-200 pb-5 dark:border-white/[0.07]' => $buildPack !== 'dockercompose',
             ])>
@@ -99,12 +99,83 @@
             </section>
 
             @if ($buildPack !== 'dockercompose')
+                <section id="security-section" class="border-b border-neutral-200 py-5 dark:border-white/[0.07]">
+                    <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Authentication</h3>
+                    @if ($application->settings->is_container_label_readonly_enabled == false)
+                    <x-empty size="sm" title="Authentication is managed through labels"
+                        description="Authentication is managed via manual proxy labels. Switch label management back to Coolify to configure it here."
+                        icon-name="admin">
+                        <x-slot:contents>
+                            <button type="button" class="button"
+                                @click="window.scrollToSettingsSection?.('container-labels-section')">
+                                Go to Container labels
+                            </button>
+                        </x-slot:contents>
+                    </x-empty>
+                    @else
+                    <x-forms.listbox id="isHttpBasicAuthEnabled" label="Method" onChange="instantSave"
+                        helper="HTTP Basic Authentication adds the required authentication labels to the proxy. Coolify currently supports a single username and password."
+                        :options="[
+                            ['value' => false, 'label' => 'None'],
+                            ['value' => true, 'label' => 'HTTP Basic Authentication'],
+                        ]" x-bind:disabled="!canUpdate" />
+                    @if ($isHttpBasicAuthEnabled)
+                        <div class="mt-5 grid w-full gap-4 border-t border-neutral-200 pt-5 sm:grid-cols-2 dark:border-white/[0.07]">
+                            <x-forms.input id="httpBasicAuthUsername" label="Username" required
+                                x-bind:disabled="!canUpdate" />
+                            <x-forms.input id="httpBasicAuthPassword" type="password" label="Password" required
+                                x-bind:disabled="!canUpdate" />
+                        </div>
+                        @php
+                            $server = $application->destination->server;
+                            $supportsArgon2id = $server->caddySupportsArgon2idBasicAuth();
+                            $usesArgon2id = $httpBasicAuthHashAlgorithm === HttpBasicAuthHashAlgorithm::ARGON2ID->value;
+                        @endphp
+                        <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Password hashing</h3>
+                            <div class="grid w-full gap-4 {{ $usesArgon2id ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }}">
+                                <x-forms.listbox id="httpBasicAuthHashAlgorithm" label="Algorithm" onChange="instantSave"
+                                    helper="Algorithm that hashes the password for the proxy labels.<br><br>Traefik supports only bcrypt. Argon2id needs the Caddy proxy, version 2.11 or newer. With Argon2id, labels generated for Traefik use bcrypt."
+                                    :options="[
+                                        ['value' => HttpBasicAuthHashAlgorithm::BCRYPT->value, 'label' => 'bcrypt', 'description' => 'Works with every proxy'],
+                                        ['value' => HttpBasicAuthHashAlgorithm::ARGON2ID->value, 'label' => 'Argon2id', 'disabled' => ! $supportsArgon2id, 'description' => match (true) {
+                                            $supportsArgon2id => 'Memory-hard, more resistant to cracking',
+                                            $server->proxyType() === ProxyTypes::CADDY->value => 'Needs Caddy 2.11 or newer on this server',
+                                            default => 'Only supported by the Caddy proxy',
+                                        }],
+                                    ]" x-bind:disabled="!canUpdate" />
+                                @if ($usesArgon2id)
+                                    <div wire:key="http-basic-auth-argon2id-memory-cost" class="min-w-0">
+                                        <x-forms.listbox id="httpBasicAuthArgon2idMemoryCost" label="Memory" onChange="instantSave"
+                                            helper="Memory that the proxy needs to check a password. More memory makes the hash harder to crack, but every login attempt that the proxy has not seen before uses this much memory on the server."
+                                            :options="collect([8, 16, 32, 64, 128, 256])->map(fn (int $mebibytes) => ['value' => $mebibytes * 1024, 'label' => $mebibytes.' MiB'])->all()" x-bind:disabled="!canUpdate" />
+                                    </div>
+                                    <div wire:key="http-basic-auth-argon2id-time-cost" class="min-w-0">
+                                        <x-forms.listbox id="httpBasicAuthArgon2idTimeCost" label="Iterations" onChange="instantSave"
+                                            helper="Number of passes over the memory. More iterations make the hash harder to crack and a password check slower."
+                                            :options="collect(range(1, 12))->map(fn (int $iterations) => ['value' => $iterations, 'label' => (string) $iterations])->all()" x-bind:disabled="!canUpdate" />
+                                    </div>
+                                @else
+                                    <div wire:key="http-basic-auth-bcrypt-cost" class="min-w-0">
+                                        <x-forms.listbox id="httpBasicAuthBcryptCost" label="Cost factor" onChange="instantSave"
+                                            helper="Each step doubles the work to check or crack the password. Traefik checks the password on every request, so a higher cost makes every request slower."
+                                            :options="collect(range(4, 14))->map(fn (int $cost) => ['value' => $cost, 'label' => (string) $cost])->all()" x-bind:disabled="!canUpdate" />
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                    @endif
+                </section>
+            @endif
+
+            @if ($buildPack !== 'dockercompose')
                 <livewire:project.application.internal-access :application="$application"
                     :key="'application-internal-access-'.$application->id" />
             @endif
             </x-application.settings-section>
 
-            <x-application.settings-section id="build-pipeline-section" title="Build pipeline" helper="Commands, directories and options used while building the application.">
+            <x-application.settings-section id="build-pipeline-section" title="Build & deploy" helper="How Coolify builds the application, where it pushes the image, and the commands it runs around each deployment.">
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
                 <div class="application-build-pack-options mb-5 border-b border-neutral-200 pb-5 dark:border-white/[0.07]">
                     <div class="grid gap-4 sm:grid-cols-2">
@@ -329,57 +400,83 @@
                         useMonacoEditor rows="6" x-bind:disabled="!canUpdate"> </x-forms.textarea>
                 </div>
             @endif
-            </x-application.settings-section>
             @if ($buildPack !== 'dockercompose')
-                <x-application.settings-section id="container-image-section" title="Container image" helper="Configure the Docker image used for this application and where the built image is pushed.">
-                @if ($application->destination->server->isSwarm())
-                    @if ($application->build_pack !== 'dockerimage')
-                        <div>Docker Swarm requires the image to be available in a registry. More info <a
-                                class="underline" href="https://coolify.io/docs/knowledge-base/docker/registry"
-                                target="_blank">here</a>.</div>
+                <section id="container-image-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                    <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">{{ $application->build_pack === 'dockerimage' ? 'Image' : 'Image registry' }}</h3>
+                    @if ($application->destination->server->isSwarm())
+                        @if ($application->build_pack !== 'dockerimage')
+                            <div>Docker Swarm requires the image to be available in a registry. More info <a
+                                    class="underline" href="https://coolify.io/docs/knowledge-base/docker/registry"
+                                    target="_blank">here</a>.</div>
+                        @endif
                     @endif
-                @endif
-                <div class="grid gap-4 lg:grid-cols-2">
-                    @if ($application->build_pack === 'dockerimage')
-                        @if ($application->destination->server->isSwarm())
-                            <x-forms.input required id="dockerRegistryImageName" label="Image" placeholder="nginx"
-                                x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="dockerRegistryImageTag" label="Tag" placeholder="alpine"
-                                helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
-                                x-bind:disabled="!canUpdate" />
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        @if ($application->build_pack === 'dockerimage')
+                            @if ($application->destination->server->isSwarm())
+                                <x-forms.input required id="dockerRegistryImageName" label="Image" placeholder="nginx"
+                                    x-bind:disabled="!canUpdate" />
+                                <x-forms.input id="dockerRegistryImageTag" label="Tag" placeholder="alpine"
+                                    helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
+                                    x-bind:disabled="!canUpdate" />
+                            @else
+                                <x-forms.input id="dockerRegistryImageName" label="Image" placeholder="nginx"
+                                    x-bind:disabled="!canUpdate" />
+                                <x-forms.input id="dockerRegistryImageTag" label="Tag" placeholder="alpine"
+                                    helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
+                                    x-bind:disabled="!canUpdate" />
+                            @endif
                         @else
-                            <x-forms.input id="dockerRegistryImageName" label="Image" placeholder="nginx"
-                                x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="dockerRegistryImageTag" label="Tag" placeholder="alpine"
-                                helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
-                                x-bind:disabled="!canUpdate" />
+                            @if (
+                                $application->destination->server->isSwarm() ||
+                                    $application->additional_servers->count() > 0 ||
+                                    $application->settings->is_build_server_enabled ||
+                                    ! $application->destination->server->canBuildApplications())
+                                <x-forms.input id="dockerRegistryImageName" required label="Image"
+                                    placeholder="ghcr.io/your-org/your-app" x-bind:disabled="!canUpdate" />
+                                <x-forms.input id="dockerRegistryImageTag"
+                                    helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                    placeholder="latest" label="Tag"
+                                    x-bind:disabled="!canUpdate" />
+                            @else
+                                <x-forms.input id="dockerRegistryImageName"
+                                    helper="Empty means it won't push the image to a docker registry. Pre-tag the image with your registry url if you want to push it to a private registry (default: Dockerhub). <br><br>Example: ghcr.io/myimage"
+                                    placeholder="ghcr.io/your-org/your-app"
+                                    label="Image" x-bind:disabled="!canUpdate" />
+                                <x-forms.input id="dockerRegistryImageTag"
+                                    placeholder="latest"
+                                    helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                    label="Tag" x-bind:disabled="!canUpdate" />
+                            @endif
                         @endif
-                    @else
-                        @if (
-                            $application->destination->server->isSwarm() ||
-                                $application->additional_servers->count() > 0 ||
-                                $application->settings->is_build_server_enabled ||
-                                ! $application->destination->server->canBuildApplications())
-                            <x-forms.input id="dockerRegistryImageName" required label="Image"
-                                placeholder="ghcr.io/your-org/your-app" x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="dockerRegistryImageTag"
-                                helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
-                                placeholder="latest" label="Tag"
-                                x-bind:disabled="!canUpdate" />
-                        @else
-                            <x-forms.input id="dockerRegistryImageName"
-                                helper="Empty means it won't push the image to a docker registry. Pre-tag the image with your registry url if you want to push it to a private registry (default: Dockerhub). <br><br>Example: ghcr.io/myimage"
-                                placeholder="ghcr.io/your-org/your-app"
-                                label="Image" x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="dockerRegistryImageTag"
-                                placeholder="latest"
-                                helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
-                                label="Tag" x-bind:disabled="!canUpdate" />
-                        @endif
+                    </div>
+                </section>
+            @endif
+            <section id="deployment-lifecycle-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Deployment commands</h3>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="flex flex-col gap-4">
+                    <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
+                        id="preDeploymentCommand" label="Pre-deployment"
+                        helper="An optional script or command to execute in the existing container before the deployment begins.<br>It is always executed with 'sh -c', so you do not need add it manually." />
+                    @if ($buildPack === 'dockercompose')
+                        <x-forms.input x-bind:disabled="shouldDisable()" id="preDeploymentCommandContainer"
+                            label="Container name"
+                            helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
                     @endif
                 </div>
-                </x-application.settings-section>
-            @endif
+                <div class="flex flex-col gap-4">
+                    <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
+                        id="postDeploymentCommand" label="Post-deployment"
+                        helper="An optional script or command to execute in the newly built container after the deployment completes.<br>It is always executed with 'sh -c', so you do not need add it manually." />
+                    @if ($buildPack === 'dockercompose')
+                        <x-forms.input x-bind:disabled="shouldDisable()" id="postDeploymentCommandContainer"
+                            label="Container name"
+                            helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                    @endif
+                </div>
+            </div>
+            </section>
+            </x-application.settings-section>
 
             @if ($buildPack !== 'dockercompose')
                 @php
@@ -390,7 +487,11 @@
                     ]);
                     $portsExposesDomainHint = "You can also set a different internal port for each domain on the <a class='underline dark:text-white' href='{$applicationDomainsUrl}'>Domains</a> page.";
                 @endphp
-                <x-application.settings-section id="networking-section" title="Networking" helper="Ports the container exposes, host port mappings and internal network aliases. You can also set an internal port per domain.">
+                <x-modal-input title="Networking" class="hidden" :wireIgnore="false"
+                    wireOpen="networkingModalOpen" subtitle="Ports the container exposes, host port mappings and internal network aliases."
+                    @open-networking-modal.window="modalOpen = true">
+                <x-slot:content></x-slot:content>
+                <form wire:submit="submit" class="flex flex-col">
                 @if ($this->detectedPortInfo)
                     @if ($this->detectedPortInfo['isEmpty'])
                         <div
@@ -487,150 +588,60 @@
                             wire:model="customNetworkAliases" x-bind:disabled="!canUpdate" />
                     @endif
                 </div>
-                </x-application.settings-section>
+                <div class="mt-5 flex justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                    <x-forms.button type="button" @click="modalOpen = false">Close</x-forms.button>
+                    <x-forms.button type="submit" isHighlighted canGate="update" :canResource="$application">Save</x-forms.button>
+                </div>
+                </form>
+                </x-modal-input>
 
-                <x-application.settings-section id="runtime-section" title="Runtime" helper="Options applied to the container when it starts.">
+                <x-application.settings-section id="container-section" title="Container" helper="Options and labels applied to the container when it starts.">
                     <x-forms.input
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
                         id="customDockerRunOptions" label="Custom Docker options" x-bind:disabled="!canUpdate" />
-                </x-application.settings-section>
-
-                <x-application.settings-section id="security-section" title="Security" helper="Protect this application with authentication at the proxy level.">
-                    @if ($application->settings->is_container_label_readonly_enabled == false)
-                    <x-empty size="sm" title="Authentication is managed through labels"
-                        description="Authentication is managed via manual proxy labels. Switch label management back to Coolify to configure it here."
-                        icon-name="admin">
-                        <x-slot:contents>
-                            <button type="button" class="button"
-                                @click="window.scrollToSettingsSection?.('container-labels-section')">
-                                Go to Container labels
-                            </button>
-                        </x-slot:contents>
-                    </x-empty>
-                    @else
-                    <x-forms.listbox id="isHttpBasicAuthEnabled" label="Authentication" onChange="instantSave"
-                        helper="HTTP Basic Authentication adds the required authentication labels to the proxy. Coolify currently supports a single username and password."
-                        :options="[
-                            ['value' => false, 'label' => 'None'],
-                            ['value' => true, 'label' => 'HTTP Basic Authentication'],
-                        ]" x-bind:disabled="!canUpdate" />
-                    @if ($isHttpBasicAuthEnabled)
-                        <div class="mt-5 grid w-full gap-4 border-t border-neutral-200 pt-5 sm:grid-cols-2 dark:border-white/[0.07]">
-                            <x-forms.input id="httpBasicAuthUsername" label="Username" required
-                                x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="httpBasicAuthPassword" type="password" label="Password" required
-                                x-bind:disabled="!canUpdate" />
-                        </div>
-                        @php
-                            $server = $application->destination->server;
-                            $supportsArgon2id = $server->caddySupportsArgon2idBasicAuth();
-                            $usesArgon2id = $httpBasicAuthHashAlgorithm === HttpBasicAuthHashAlgorithm::ARGON2ID->value;
-                        @endphp
-                        <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Password hashing</h3>
-                            <div class="grid w-full gap-4 {{ $usesArgon2id ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }}">
-                                <x-forms.listbox id="httpBasicAuthHashAlgorithm" label="Algorithm" onChange="instantSave"
-                                    helper="Algorithm that hashes the password for the proxy labels.<br><br>Traefik supports only bcrypt. Argon2id needs the Caddy proxy, version 2.11 or newer. With Argon2id, labels generated for Traefik use bcrypt."
-                                    :options="[
-                                        ['value' => HttpBasicAuthHashAlgorithm::BCRYPT->value, 'label' => 'bcrypt', 'description' => 'Works with every proxy'],
-                                        ['value' => HttpBasicAuthHashAlgorithm::ARGON2ID->value, 'label' => 'Argon2id', 'disabled' => ! $supportsArgon2id, 'description' => match (true) {
-                                            $supportsArgon2id => 'Memory-hard, more resistant to cracking',
-                                            $server->proxyType() === ProxyTypes::CADDY->value => 'Needs Caddy 2.11 or newer on this server',
-                                            default => 'Only supported by the Caddy proxy',
-                                        }],
-                                    ]" x-bind:disabled="!canUpdate" />
-                                @if ($usesArgon2id)
-                                    <div wire:key="http-basic-auth-argon2id-memory-cost" class="min-w-0">
-                                        <x-forms.listbox id="httpBasicAuthArgon2idMemoryCost" label="Memory" onChange="instantSave"
-                                            helper="Memory that the proxy needs to check a password. More memory makes the hash harder to crack, but every login attempt that the proxy has not seen before uses this much memory on the server."
-                                            :options="collect([8, 16, 32, 64, 128, 256])->map(fn (int $mebibytes) => ['value' => $mebibytes * 1024, 'label' => $mebibytes.' MiB'])->all()" x-bind:disabled="!canUpdate" />
-                                    </div>
-                                    <div wire:key="http-basic-auth-argon2id-time-cost" class="min-w-0">
-                                        <x-forms.listbox id="httpBasicAuthArgon2idTimeCost" label="Iterations" onChange="instantSave"
-                                            helper="Number of passes over the memory. More iterations make the hash harder to crack and a password check slower."
-                                            :options="collect(range(1, 12))->map(fn (int $iterations) => ['value' => $iterations, 'label' => (string) $iterations])->all()" x-bind:disabled="!canUpdate" />
-                                    </div>
-                                @else
-                                    <div wire:key="http-basic-auth-bcrypt-cost" class="min-w-0">
-                                        <x-forms.listbox id="httpBasicAuthBcryptCost" label="Cost factor" onChange="instantSave"
-                                            helper="Each step doubles the work to check or crack the password. Traefik checks the password on every request, so a higher cost makes every request slower."
-                                            :options="collect(range(4, 14))->map(fn (int $cost) => ['value' => $cost, 'label' => (string) $cost])->all()" x-bind:disabled="!canUpdate" />
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    @endif
-                    @endif
-                </x-application.settings-section>
-            @endif
-
-            <x-application.settings-section id="deployment-lifecycle-section" title="Deployment lifecycle" helper="Optional commands executed right before and after each deployment.">
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="flex flex-col gap-4">
-                    <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
-                        id="preDeploymentCommand" label="Pre-deployment"
-                        helper="An optional script or command to execute in the existing container before the deployment begins.<br>It is always executed with 'sh -c', so you do not need add it manually." />
-                    @if ($buildPack === 'dockercompose')
-                        <x-forms.input x-bind:disabled="shouldDisable()" id="preDeploymentCommandContainer"
-                            label="Container name"
-                            helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
-                    @endif
-                </div>
-                <div class="flex flex-col gap-4">
-                    <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
-                        id="postDeploymentCommand" label="Post-deployment"
-                        helper="An optional script or command to execute in the newly built container after the deployment completes.<br>It is always executed with 'sh -c', so you do not need add it manually." />
-                    @if ($buildPack === 'dockercompose')
-                        <x-forms.input x-bind:disabled="shouldDisable()" id="postDeploymentCommandContainer"
-                            label="Container name"
-                            helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
-                    @endif
-                </div>
-            </div>
-            </x-application.settings-section>
-
-            @if ($buildPack !== 'dockercompose')
-                <x-application.settings-section id="container-labels-section" title="Container labels" helper="Inspect or override the labels used by the proxy and runtime.">
-                <div class="grid w-full gap-4 sm:grid-cols-2">
-                    <x-forms.listbox id="isContainerLabelReadonlyEnabled" label="Label management"
-                        onChange="instantSave"
-                        helper="When Coolify manages the labels, they are regenerated automatically and manual edits can be lost.<br><br>If you edit them yourself, be careful: a wrong label set can break the proxy configuration after a restart (you can always reset to the Coolify defaults)."
-                        :options="[
-                            ['value' => true, 'label' => 'Managed by Coolify (auto-generated)'],
-                            ['value' => false, 'label' => 'Managed manually (edit labels yourself)'],
-                        ]" x-bind:disabled="!canUpdate" />
-                    <x-forms.listbox id="isContainerLabelEscapeEnabled" label="Special characters"
-                        onChange="instantSave"
-                        helper="By default, $ (and other special characters) are escaped: writing $ saves it as $$.<br><br>Keep them unescaped if you want to use environment variables inside the labels."
-                        :options="[
-                            ['value' => true, 'label' => 'Escape special characters ($ becomes $$)'],
-                            ['value' => false, 'label' => 'Keep unescaped (allow env variables)'],
-                        ]" x-bind:disabled="!canUpdate" />
-                </div>
-                <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                    <div class="mb-1.5 flex items-center justify-between gap-3">
-                        <label class="flex w-fit items-center gap-1.5" style="margin-bottom: 0">Active labels</label>
-                        @can('update', $application)
-                            <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
-                                buttonTitle="Reset to defaults" submitAction="resetDefaultLabels(true)"
-                                :actions="[
-                                    'All your custom proxy labels will be lost.',
-                                    'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',
-                                ]" confirmationText="{{ $application->fqdn . '/' }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Application URL below"
-                                shortConfirmationLabel="Application URL" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Reset Labels" />
-                        @endcan
+                <section id="container-labels-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                    <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Labels</h3>
+                    <div class="grid w-full gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="isContainerLabelReadonlyEnabled" label="Label management"
+                            onChange="instantSave"
+                            helper="When Coolify manages the labels, they are regenerated automatically and manual edits can be lost.<br><br>If you edit them yourself, be careful: a wrong label set can break the proxy configuration after a restart (you can always reset to the Coolify defaults)."
+                            :options="[
+                                ['value' => true, 'label' => 'Managed by Coolify (auto-generated)'],
+                                ['value' => false, 'label' => 'Managed manually (edit labels yourself)'],
+                            ]" x-bind:disabled="!canUpdate" />
+                        <x-forms.listbox id="isContainerLabelEscapeEnabled" label="Special characters"
+                            onChange="instantSave"
+                            helper="By default, $ (and other special characters) are escaped: writing $ saves it as $$.<br><br>Keep them unescaped if you want to use environment variables inside the labels."
+                            :options="[
+                                ['value' => true, 'label' => 'Escape special characters ($ becomes $$)'],
+                                ['value' => false, 'label' => 'Keep unescaped (allow env variables)'],
+                            ]" x-bind:disabled="!canUpdate" />
                     </div>
-                    @if ($application->settings->is_container_label_readonly_enabled)
-                        <x-forms.textarea readonly disabled rows="15" id="customLabels"
-                            monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
-                    @else
-                        <x-forms.textarea rows="15" id="customLabels"
-                            monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
-                    @endif
-                </div>
+                    <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                        <div class="mb-1.5 flex items-center justify-between gap-3">
+                            <label class="flex w-fit items-center gap-1.5" style="margin-bottom: 0">Active labels</label>
+                            @can('update', $application)
+                                <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
+                                    buttonTitle="Reset to defaults" submitAction="resetDefaultLabels(true)"
+                                    :actions="[
+                                        'All your custom proxy labels will be lost.',
+                                        'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',
+                                    ]" confirmationText="{{ $application->fqdn . '/' }}"
+                                    confirmationLabel="Please confirm the execution of the actions by entering the Application URL below"
+                                    shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+                                    step2ButtonText="Permanently Reset Labels" />
+                            @endcan
+                        </div>
+                        @if ($application->settings->is_container_label_readonly_enabled)
+                            <x-forms.textarea readonly disabled rows="15" id="customLabels"
+                                monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
+                        @else
+                            <x-forms.textarea rows="15" id="customLabels"
+                                monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
+                        @endif
+                    </div>
+                </section>
                 </x-application.settings-section>
             @endif
         </div>

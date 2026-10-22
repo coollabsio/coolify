@@ -1908,28 +1908,30 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     background: linear-gradient(var(--well-bg), var(--well-bg)), var(--card-underlay);
 }
 
-/* Dark mode: top-level cards are #121212, a step above the canvas. The top bar
-   matches the canvas instead (see the brand shell below). */
+/* Dark mode: top-level cards are a near-canvas shade (#121212 under 34% black),
+   and their well is #121212, a step above it. The top bar matches the canvas
+   (see the brand shell below). */
 .dark :is(.application-settings-section, .empty-state):not(:is(.application-settings-section, .application-settings-section-body) *) {
-    background: var(--color-card);
+    background: color-mix(in srgb, var(--color-card) 66%, black);
     box-shadow: none;
 }
 
+.dark :is(.application-settings-section, .empty-state):not(:is(.application-settings-section, .application-settings-section-body) *) > :is(.application-settings-section-body, .empty-state-well) {
+    --well-bg: var(--color-card);
+    --well-shadow: none;
+}
+
 /* Dark mode: collection tiles, pagination bars, and tables match the cards.
-   A tile is a card without a well. A table (a shell with a header row) takes
-   the card color on the header row and a darker mix on the rows. */
+   A tile is #121212, like a card well. A table (a shell with a header row) has
+   #121212 rows and a header row in the darker card outer color. */
 .dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"] {
     background-color: var(--color-card) !important;
     border-color: rgb(255 255 255 / 0.08) !important;
     box-shadow: none;
 }
 
-.dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"]:has(> [class~="border-b"]:first-child) {
-    background: color-mix(in srgb, var(--color-card) 66%, black) !important;
-}
-
 .dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"] > [class~="border-b"]:first-child {
-    background: var(--color-card) !important;
+    background: color-mix(in srgb, var(--color-card) 66%, black) !important;
 }
 
 /* Brief accent ring when a settings nav sub-item scrolls a section into view.
@@ -1970,6 +1972,12 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
    over the page canvas to keep the page behind the modal hidden. */
 .application-settings-section.application-settings-form {
     background: linear-gradient(var(--card-bg), var(--card-bg)), var(--coollabs-canvas);
+}
+
+/* Dark mode: the modal markup adds an inline hairline ring outside the card
+   border, which reads as a light double edge. Keep only the card border. */
+.dark .application-settings-section.application-settings-form {
+    box-shadow: var(--shadow-modal) !important;
 }
 
 /* Modals size to content on large screens */
@@ -2037,12 +2045,17 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     --coollabs-line: rgb(255 255 255 / 8%);
 }
 
-/* A well without a card around it sits straight on the canvas. In dark mode its
-   black fill would make it darker than the page, so it takes the card surface. */
+/* A well without a card around it sits straight on the canvas. In dark mode it
+   matches a top-level card: #121212 content, and a table header row in the
+   darker card outer color. */
 .dark .application-settings-section-body:not(.application-settings-section *) {
-    --well-bg: var(--card-bg);
+    --well-bg: var(--color-card);
     --well-border: var(--card-border);
-    --well-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+    --well-shadow: none;
+}
+
+.dark .application-settings-section-body:not(.application-settings-section *) .data-table-header {
+    background: color-mix(in srgb, var(--color-card) 66%, black);
 }
 
 /* Floating panels in the well must stay opaque: restore the global dark values. */

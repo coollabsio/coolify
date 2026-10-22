@@ -137,6 +137,8 @@ class General extends Component
 
     public bool $initLoadingCompose = false;
 
+    public bool $networkingModalOpen = false;
+
     public ?string $initialDockerComposeLocation = null;
 
     public ?Collection $parsedServices;
@@ -820,6 +822,7 @@ class General extends Component
             $this->validate();
 
             $oldPortsExposes = $this->application->ports_exposes;
+            $oldCustomNetworkAliases = $this->application->custom_network_aliases;
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
             $oldBaseDirectory = $this->application->base_directory;
@@ -951,9 +954,10 @@ class General extends Component
             $this->application->refresh();
             $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
             $this->syncData();
-            if ($oldPortsExposes !== $this->portsExposes) {
+            if ($oldPortsExposes !== $this->application->ports_exposes || $oldCustomNetworkAliases !== $this->application->custom_network_aliases) {
                 $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
             }
+            $this->networkingModalOpen = false;
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $this->application->refresh();

@@ -193,13 +193,8 @@
             'project.application.configuration' => array_values(array_filter([
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'access-section', 'label' => 'Access'],
-                ['id' => 'build-pipeline-section', 'label' => 'Build pipeline'],
-                $isComposeApp ? null : ['id' => 'container-image-section', 'label' => 'Container image'],
-                $isComposeApp ? null : ['id' => 'networking-section', 'label' => 'Networking'],
-                $isComposeApp ? null : ['id' => 'runtime-section', 'label' => 'Runtime'],
-                $isComposeApp ? null : ['id' => 'security-section', 'label' => 'Security'],
-                ['id' => 'deployment-lifecycle-section', 'label' => 'Deployment lifecycle'],
-                $isComposeApp ? null : ['id' => 'container-labels-section', 'label' => 'Container labels'],
+                ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
+                $isComposeApp ? null : ['id' => 'container-section', 'label' => 'Container'],
             ])),
             'project.application.advanced' => array_values(array_filter([
                 ['id' => 'advanced-build-section', 'label' => 'Build'],
@@ -234,8 +229,7 @@
                 ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
             ],
             'project.application.resource-operations' => [
-                ['id' => 'clone-destination-section', 'label' => 'Clone destination'],
-                ['id' => 'clone-environment-section', 'label' => 'Clone environment'],
+                ['id' => 'clone-resource-section', 'label' => 'Clone resource'],
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
             ],
         ];

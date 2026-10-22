@@ -14,7 +14,7 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
-        openEditDomain(index, domain, parts, service, indexing, redirect) {
+        openEditDomain(index, domain, parts, service, indexing, redirect, inheritedPort) {
             if (index !== undefined) {
                 $wire.set('editingIndex', index, false);
                 $wire.set('editingDomain', domain, false);
@@ -26,6 +26,7 @@
                 $wire.set('editingOriginalRedirect', redirect, false);
                 $wire.set('editingDomainWasRegenerated', false, false);
                 $wire.set('editingGeneratedHost', null, false);
+                $wire.set('editingInheritedPort', inheritedPort ?? null, false);
             }
             this.editingServiceLabel = service ?? $wire.editingService ?? '';
             this.modalOpen = true;
@@ -328,7 +329,8 @@
                                     <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
                                 </div>
 
-                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain" />
+                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain"
+                                    inheritedPortExpression="$wire.editingInheritedPort" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">

@@ -2820,6 +2820,21 @@ it('does not prefill the default internal port when editing a domain without a p
         ->assertSet('editingDomainParts.port', '');
 });
 
+it('passes the inherited internal port to the domain settings modal', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com:8080',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 8080)
+        ->assertSet('domainRows.0.inherited_port', 3000)
+        ->call('startEdit', 0)
+        ->assertSet('editingInheritedPort', 3000)
+        ->call('cancelEdit')
+        ->assertSet('editingInheritedPort', null);
+});
+
 it('clears a domain port override and shows the default internal port', function () {
     $this->application->update([
         'ports_exposes' => '3000,8080',

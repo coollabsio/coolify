@@ -25,12 +25,14 @@ change.
 - **Layers, not boxes.** Depth comes from a few surface steps (canvas, card,
   well, control), 1px borders, and very soft shadows. Never use thick borders or
   heavy floating shadows.
-- **Card and well.** Content sits in a darker inset panel (the well) inside a
-  soft outer box with a small title row.
+- **Card and well.** Content sits in an inset panel (the well) inside a soft
+  outer box with a small title row. In light mode the well is lighter than the
+  outer box. In dark mode a top-level card is a near-canvas outer box with a
+  lighter `#121212` well.
 - **Tactile buttons.** Buttons and navigation icon tiles have a 2px bottom
   edge. They lift 1px on hover and press down on click.
 - **Dark gray, not black.** Dark mode page canvas and the top bar are neutral
-  sRGB 10,10,10 (`#0a0a0a`). Cards sit one step up (`#121212`). Light mode is
+  sRGB 10,10,10 (`#0a0a0a`). Card wells sit one step up (`#121212`). Light mode is
   pure neutral gray.
 - **One accent.** Coolify purple in both themes (`#6b16ed`, hover `#7317ff`,
   pressed `#5a12c7`, depth `#4a0fa3`, light text and icons `#a391ff`). Yellow
@@ -190,9 +192,10 @@ Class names below are examples. Keep the values and structure.
 
 - Three layers: the canvas (page and sidebar, `--ui-canvas`), the top header
   bar (`--ui-panel`, 48px high), and the cards on the canvas.
-- In dark mode, the header bar, the outer box of a top-level card, and the
-  header row of a table use the same color (`--ui-panel`). The card wells and
-  table rows are the darker content layer below them.
+- In dark mode, the outer box of a top-level card is
+  `color-mix(in srgb, var(--ui-panel) 66%, black)` (about `#0c0c0c`), and its
+  well is `--ui-panel` (`#121212`). Tables use the same pair: the darker mix
+  for the header row and `--ui-panel` for the rows.
 - In light mode the sidebar is the canvas color and has a 1px
   `--ui-chrome-border` right edge. In dark mode the sidebar column, including
   the logo cell, is `#120e1a` with a faint lavender right edge
@@ -298,7 +301,8 @@ Class names below are examples. Keep the values and structure.
     background: var(--ui-card-bg); box-shadow: var(--ui-card-shadow);
     overflow: visible;                      /* menus and tooltips must escape */
 }
-.dark .card { background: var(--ui-panel); }  /* top-level card: same as the header bar */
+.dark .card { background: color-mix(in srgb, var(--ui-panel) 66%, black); box-shadow: none; }  /* top-level card */
+.dark .card > .card-well { background: var(--ui-panel); box-shadow: none; }  /* top-level well */
 .card-header {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 16px; padding: 4px 8px 10px;
@@ -389,12 +393,11 @@ Class names below are examples. Keep the values and structure.
 ### Tables
 
 - Header row: 40px, 13px medium, `--ui-fg-faint`, and a 1px `--ui-divider`
-  bottom border. Fill: `rgb(0 0 0 / 2%)` in light mode, `--ui-panel` in dark
-  mode (the same as the header bar and the card outer box).
-- Dark mode rows use the card well color
-  (`color-mix(in srgb, var(--ui-panel) 66%, black)`, the same as
-  `--ui-well-bg` over the panel), so a table looks like a card: header on
-  top, content below.
+  bottom border. Fill: `rgb(0 0 0 / 2%)` in light mode,
+  `color-mix(in srgb, var(--ui-panel) 66%, black)` in dark mode (the same as
+  the card outer box).
+- Dark mode rows use the card well color (`--ui-panel`, `#121212`), so a
+  table looks like a card: header on top, content below.
 - Data rows: about 48px, 10px 16px padding, a 1px divider, and a faint hover
   fill. Put the row action at the far right.
 - Toolbar on top (search left; filter, sort, and add right), pagination in the
@@ -441,7 +444,8 @@ Class names below are examples. Keep the values and structure.
 
 - Modals use the card anatomy (outer box, title row, well), size to their
   content on desktop, and put the actions on the right below a divider. Use
-  `--ui-modal-shadow`.
+  `--ui-modal-shadow`. In dark mode the edge is only the 1px card border, with
+  no extra hairline ring outside it.
 - Toasts are compact cards (max width 26rem) with a status icon tile, a title,
   an optional description, and a dismiss button. They close after 4 seconds
   and pause on hover.
@@ -534,7 +538,7 @@ The interface is compact and product-focused:
 
 - near-neutral layered surfaces instead of large bordered boxes;
 - 13–14px UI typography and 32px controls;
-- layer cards are a soft outer box around a darker inset well (see section 5),
+- layer cards are a soft outer box around an inset well (see section 5),
   with 1px borders and a restrained `0 1px 2px rgb(0 0 0 / 0.05)` lift, never
   heavy borders or a strong floating shadow;
 - full-width data tables for dense collections;
@@ -652,7 +656,7 @@ lift off the content:
   in light. It has no bottom border until the page scrolls under it. Scrolling
   adds `is-scrolled` on `<html>` (see `layouts/app.blade.php`) and the dark bar
   becomes `rgb(10 10 10 / 0.72)` with blur and a lavender hairline. In dark
-  mode, top-level cards and table header rows use `--color-card` (`#121212`),
+  mode, top-level card wells and table rows use `--color-card` (`#121212`),
   not the top bar.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
   use the canvas color in light mode. In dark mode they use `--color-sidebar`
@@ -692,8 +696,8 @@ The only intentional color is the purple brand accent. Yellow is for warnings.
   the restrained card lift. In dark mode these shells are painted like layer
   cards. A tile, a separate pagination bar, or an empty box is a card without a
   well, so it is `--color-card` (`#121212`). A table (a shell whose first child is a
-  `border-b` header row) has a `--color-card` header row and rows in the well
-  color (`color-mix(in srgb, var(--color-panel) 66%, black)`).
+  `border-b` header row) has a header row in the card outer color
+  (`color-mix(in srgb, var(--color-card) 66%, black)`) and `--color-card` rows.
   These rules match the Tailwind classes in `resources/css/app.css`, because
   the table shells are copied markup without a shared class.
 
@@ -953,12 +957,14 @@ Anatomy:
 
 - soft outer box: 12px radius, 1px border, 6px padding, faint fill
   (`rgb(0 0 0 / 0.75%)` light). In dark mode a top-level card is
-  `--color-panel`, the same as the topbar; a nested card keeps
+  `color-mix(in srgb, var(--color-card) 66%, black)` and its well is
+  `--color-card` (`#121212`); a nested card keeps
   `rgb(255 255 255 / 6%)` over its parent;
 - small title row on the outer box (13px semibold title, 11px description and
   header links), no divider below it;
-- body is an inset well: 8px radius, 1px border, white in light and
-  `rgb(0 0 0 / 34%)` in dark;
+- body is an inset well: 8px radius, 1px border, white in light,
+  `--color-card` in a dark top-level card, and `rgb(0 0 0 / 34%)` in a dark
+  nested card;
 - 16px body padding;
 - optional `flush` mode for full-bleed tables;
 - card-level actions belong in the header slot;
@@ -976,9 +982,9 @@ Some pages put a well (`.application-settings-section-body`) directly on the
 page without a card, for example the domains and environment variable tables.
 The well colors are defined on the well itself as well as on the card, so a
 standalone well keeps its background and border. In dark mode a standalone well
-uses the card outer-box surface (`--card-bg`, `--card-border`) instead of the
-black well fill, because the black fill directly on the canvas is darker than
-the page. An `x-empty` inside a
+matches a top-level card: its content is `--color-card` (`#121212`), and a
+table header row in it is the darker card outer color
+(`color-mix(in srgb, var(--color-card) 66%, black)`). An `x-empty` inside a
 standalone well shows only its centered text, as it does inside a card.
 
 Inside the dark well, controls use a darker translucent fill and border
