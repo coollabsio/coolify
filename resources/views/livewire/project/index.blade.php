@@ -89,7 +89,7 @@
                                 :aria-label="`Open ${project.name}`"></a>
                             <div class="flex items-start gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                     <template x-if="project.iconUrl">
                                         <img :src="project.iconUrl" :alt="`${project.name} icon`" class="h-full w-full rounded-lg object-cover">
                                     </template>
@@ -108,28 +108,23 @@
                             </div>
 
                             <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
-                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
-                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
-                                        aria-label="Environments">
-                                        <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                                        <span x-text="project.environmentCount"></span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
-                                        aria-label="Resources">
-                                        <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                                        <span x-text="project.resourceCount"></span>
-                                    </span>
-                                </div>
+                                <p class="project-card-stats relative z-10 min-w-0">
+                                    <b x-text="project.environmentCount"></b>
+                                    <span x-text="Number(project.environmentCount) === 1 ? 'environment' : 'environments'"></span>
+                                    <span class="project-card-stats-dot" aria-hidden="true">&middot;</span>
+                                    <b x-text="project.resourceCount"></b>
+                                    <span x-text="Number(project.resourceCount) === 1 ? 'resource' : 'resources'"></span>
+                                </p>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     <a x-show="project.addResourceHref" :href="project.addResourceHref"
                                         {{ wireNavigate() }}
-                                        class="flex size-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                        class="card-icon-button flex size-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black"
                                         title="Add resource" :aria-label="`Add resource to ${project.name}`">
                                         <x-reicon name="plus" class="size-3" />
                                     </a>
                                     <a x-show="project.settingsHref" :href="project.settingsHref" {{ wireNavigate() }}
-                                        class="flex size-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                        class="card-icon-button flex size-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black"
                                         title="Project settings" :aria-label="`Open settings for ${project.name}`">
                                         <x-reicon name="settings" class="size-3" />
                                     </a>
@@ -159,7 +154,7 @@
                         class="projects-table-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                 <template x-if="project.iconUrl">
                                     <img :src="project.iconUrl" :alt="`${project.name} icon`" class="h-full w-full rounded-lg object-cover">
                                 </template>

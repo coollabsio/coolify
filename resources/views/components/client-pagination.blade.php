@@ -9,7 +9,7 @@
     'nextDisabled' => 'page >= totalPages',
 ])
 
-<footer {{ $attributes->class('flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint') }}>
+<footer x-bind:hidden="Number(totalPages) <= 1" {{ $attributes->class('pager flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint') }}>
     <div class="flex items-center gap-3">
         <span class="inline-flex h-7 items-center whitespace-nowrap tabular-nums" x-text="{{ $summary }}"></span>
         <x-page-size-select :model="$pageSizeModel" :storage-key="$storageKey" :options="$options" />

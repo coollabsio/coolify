@@ -39,6 +39,13 @@
     --color-coollabs-100: oklch(52.34% 0.287 289.16);
     --color-coollabs-200: oklch(43.76% 0.2369 289.82);
     --color-coollabs-300: oklch(38.04% 0.2031 290.47);
+    /* coolLabs brand purple. Primary actions, focus, and active navigation
+       use these in both themes. Warning yellow is not an accent. */
+    --color-brand: #6b16ed;
+    --color-brand-hover: #7317ff;
+    --color-brand-press: #5a12c7;
+    --color-brand-depth: #4a0fa3;
+    --color-brand-light: #a391ff;
     --color-coolgray-100: oklch(20.9% 0 0);
     --color-coolgray-200: oklch(24.35% 0 0);
     --color-coolgray-300: oklch(26.03% 0 0);
@@ -102,7 +109,33 @@
 }
 
 .dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
-    --button-depth-color: rgb(255 255 255 / 0.08);
+    --button-depth-color: rgb(107 22 237 / 0.35);
+    background-color: rgb(107 22 237 / 0.14);
+    border-color: rgb(163 145 255 / 0.24);
+    color: #ece8ff;
+}
+
+.dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):hover {
+    background-color: rgb(107 22 237 / 0.18);
+    border-color: rgb(163 145 255 / 0.34);
+}
+
+.dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) svg {
+    color: var(--color-brand-light);
+    opacity: 1;
+}
+
+.dark .button.button-highlighted:not(:disabled),
+.dark .button[isHighlighted]:not(:disabled) {
+    background: var(--color-brand);
+    border-color: transparent;
+    color: #fff;
+    --button-depth-color: var(--color-brand-depth);
+}
+
+.dark .button.button-highlighted:not(:disabled):hover,
+.dark .button[isHighlighted]:not(:disabled):hover {
+    background: var(--color-brand-hover);
 }
 
 .button.button-error:not(:disabled) {
@@ -1261,7 +1294,13 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
 }
 
 .dark {
-    --color-accent: oklch(88.13% 0.1507 91.7);
+    /* Purple is the accent in dark mode too. Warning yellow stays on
+       --color-warning for real warnings only (update available, attention). */
+    --color-accent: var(--color-brand);
+    /* Cards sit one step above the #0a0a0a canvas. The top bar uses the canvas,
+       not this color. The sidebar uses --color-sidebar. */
+    --color-card: #121212;
+    --color-sidebar: #120e1a;
     /* Dark surface ladder in hex (sRGB), not oklch: oklch lightness compresses
        to near-black below ~15%, so oklch(15%) rendered as sRGB 11 and cards
        could not lift off the content canvas (sRGB 10). These give clear,
@@ -1842,25 +1881,28 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     background: linear-gradient(var(--well-bg), var(--well-bg)), var(--card-underlay);
 }
 
-/* Dark mode: top-level cards use the topbar color (see DESIGN.md). */
+/* Dark mode: top-level cards are #121212, a step above the canvas. The top bar
+   matches the canvas instead (see the brand shell below). */
 .dark :is(.application-settings-section, .empty-state):not(:is(.application-settings-section, .application-settings-section-body) *) {
-    background: var(--color-panel);
+    background: var(--color-card);
+    box-shadow: none;
 }
 
 /* Dark mode: collection tiles, pagination bars, and tables match the cards.
-   A tile is a card without a well, so it takes the topbar color. A table (a
-   shell with a header row) takes the topbar color on the header row and the
-   box content (well) color on the rows. */
+   A tile is a card without a well. A table (a shell with a header row) takes
+   the card color on the header row and a darker mix on the rows. */
 .dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"] {
-    background: var(--color-panel);
+    background-color: var(--color-card) !important;
+    border-color: rgb(255 255 255 / 0.08) !important;
+    box-shadow: none;
 }
 
 .dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"]:has(> [class~="border-b"]:first-child) {
-    background: color-mix(in srgb, var(--color-panel) 66%, black);
+    background: color-mix(in srgb, var(--color-card) 66%, black) !important;
 }
 
 .dark [class~="rounded-xl"][class~="dark:bg-white/[0.05]"] > [class~="border-b"]:first-child {
-    background: var(--color-panel);
+    background: var(--color-card) !important;
 }
 
 /* Brief accent ring when a settings nav sub-item scrolls a section into view.
@@ -5552,10 +5594,17 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-a
     --button-depth-color: color-mix(in oklab, var(--color-coollabs) 45%, transparent) !important;
 }
 
-html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
-    color: var(--color-warning);
-    border-color: color-mix(in oklab, var(--color-warning) 40%, transparent) !important;
-    --button-depth-color: color-mix(in oklab, var(--color-warning) 35%, transparent) !important;
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon:not(.text-error) {
+    color: #fff;
+    border-color: #8a4dff !important;
+    background: linear-gradient(180deg, var(--color-brand-hover) 0%, var(--color-brand-press) 100%) !important;
+    --button-depth-color: var(--color-brand-depth) !important;
+    box-shadow: 0 2px 0 var(--color-brand-depth), 0 0 16px rgb(115 23 255 / 0.50) !important;
+}
+
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active):active .menu-item-icon:not(.text-error) {
+    transform: translateY(2px);
+    box-shadow: none !important;
 }
 
 /* Danger Zone icons (<x-reicon name="danger">) stay red, also when active. */
@@ -5644,9 +5693,11 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.si
     box-shadow: none;
 }
 
-html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon {
-    border-color: oklch(100% 0 0 / 0.09);
-    background: oklch(100% 0 0 / 0.04);
+html.dark:where(:not([data-nav-items="flat"])) .app-sidebar :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon {
+    border-color: rgb(163 145 255 / 0.13);
+    background: rgb(107 22 237 / 0.07);
+    color: #b9adff;
+    --button-depth-color: rgb(255 255 255 / 0.05);
 }
 
 html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
@@ -5655,10 +5706,17 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-a
     background: #fff;
 }
 
-html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):hover .menu-item-icon,
-html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
-    border-color: oklch(100% 0 0 / 0.18);
-    background: oklch(100% 0 0 / 0.08);
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-item-active):not(.menu-subitem-active):hover .menu-item-icon {
+    border-color: rgb(255 255 255 / 0.14);
+    background: rgb(255 255 255 / 0.06);
+    color: #fff;
+}
+
+/* Admin stays a neutral tile unless it is the current page. */
+html.dark .app-sidebar .nav-admin:not(.menu-item-active) .menu-item-icon {
+    color: oklch(72% 0 0);
+    background: rgb(255 255 255 / 0.03);
+    border-color: rgb(255 255 255 / 0.07);
 }
 
 /* Search keeps its original input look while the sidebar is expanded (always on
@@ -5948,6 +6006,188 @@ html.dark .canvas-zoom-max {
     }
 }
 
+/* Brand shell (dark): black canvas and top bar, purple-black sidebar, scroll hairline.
+   Light mode keeps the neutral shell. Floating navigation keeps its own frame. */
+html.dark .app-sidebar nav.sidebar-nav,
+html.dark .mobile-sidebar-sheet [role="dialog"] {
+    background-color: var(--color-sidebar);
+    background-image: linear-gradient(180deg, rgb(107 22 237 / 0.09), transparent 520px);
+    border-right-color: rgb(163 145 255 / 0.10);
+    --color-nav-text: oklch(80% 0.02 300);
+    --color-nav-muted: oklch(58% 0.04 300);
+}
+
+html.dark .app-topbar-brand {
+    background-color: var(--color-sidebar);
+    background-image: radial-gradient(140% 260% at 0% 0%, rgb(107 22 237 / 0.12), transparent 70%);
+    border-right-color: rgb(163 145 255 / 0.10);
+}
+
+html.dark .app-sidebar .sidebar-footer {
+    background-color: transparent;
+}
+
+html.dark .app-sidebar .menu-search {
+    background-color: rgb(163 145 255 / 0.06) !important;
+    box-shadow: inset 0 0 0 1px rgb(163 145 255 / 0.10) !important;
+}
+
+html.dark .app-sidebar .menu-search:hover {
+    background-color: rgb(163 145 255 / 0.10) !important;
+}
+
+html.dark .app-sidebar .menu-search kbd {
+    border-color: rgb(163 145 255 / 0.18) !important;
+}
+
+html.dark .app-sidebar nav:not(.sidebar-collapsed) .nav-section {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(163 145 255 / 0.55);
+    opacity: 1;
+}
+
+html.dark .app-sidebar .nav-chevron {
+    transition: opacity 120ms ease;
+}
+
+html.dark .app-sidebar .menu-item:not(:hover):not(:focus-visible):not(.menu-item-active) > .nav-chevron {
+    opacity: 0;
+}
+
+html.dark:not([data-nav-style="floating"]) .app-topbar {
+    background-color: #0a0a0a;
+    backdrop-filter: none;
+    transition: background-color 180ms ease;
+}
+
+html.dark:not([data-nav-style="floating"]) .app-topbar > div:not(.app-topbar-brand) {
+    border-bottom-color: transparent;
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar {
+    background-color: rgb(10 10 10 / 0.72);
+    backdrop-filter: blur(12px) saturate(140%);
+}
+
+html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar > .app-topbar-brand {
+    background-color: var(--color-sidebar);
+}
+
+html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar > div:not(.app-topbar-brand) {
+    border-bottom-color: rgb(163 145 255 / 0.12);
+    box-shadow: 0 10px 30px -14px rgb(0 0 0 / 0.95), 0 1px 0 rgb(107 22 237 / 0.06);
+}
+
+html.dark .view-toggle {
+    gap: 2px;
+    padding: 2px;
+    background-color: rgb(107 22 237 / 0.06);
+    border-color: rgb(163 145 255 / 0.16);
+}
+
+html.dark .view-toggle > :is(a, button) {
+    color: oklch(80% 0.02 300);
+}
+
+html.dark .view-toggle > :is(a, button) svg {
+    color: var(--color-brand-light);
+}
+
+html.dark .view-toggle > :is(a, button):not(.is-selected):hover {
+    background-color: rgb(107 22 237 / 0.14);
+    color: #fff;
+}
+
+html.dark .view-toggle > .is-selected {
+    background: linear-gradient(180deg, var(--color-brand-hover), var(--color-brand-press));
+    color: #fff;
+    box-shadow: 0 1px 0 var(--color-brand-depth), inset 0 0 0 1px #8a4dff;
+}
+
+html.dark .view-toggle > .is-selected svg {
+    color: #fff;
+}
+
+html.dark .view-toggle .bg-coollabs {
+    background-color: rgb(163 145 255 / 0.18);
+    color: #d9d0ff;
+}
+
+html.dark .resource-glyph {
+    border-color: rgb(163 145 255 / 0.20);
+    background: rgb(107 22 237 / 0.10);
+    color: var(--color-brand-light);
+}
+
+html.dark .card-icon-button {
+    color: var(--color-brand-light);
+}
+
+html.dark .card-icon-button:hover {
+    background-color: rgb(107 22 237 / 0.16);
+    color: #fff;
+}
+
+html.dark .app-main :is(article.group, a.group).rounded-xl {
+    background-color: var(--color-card) !important;
+    border-color: rgb(255 255 255 / 0.08) !important;
+    box-shadow: none;
+}
+
+html.dark .app-main :is(article.group, a.group).rounded-xl:hover {
+    border-color: rgb(163 145 255 / 0.30) !important;
+    box-shadow: none;
+}
+
+.project-card-stats {
+    color: oklch(40% 0 0);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-card-stats b {
+    color: oklch(20% 0 0);
+    font-weight: 600;
+}
+
+.project-card-stats-dot {
+    margin-inline: 5px;
+    color: oklch(70% 0 0);
+}
+
+html.dark .project-card-stats {
+    color: oklch(72% 0 0);
+}
+
+html.dark .project-card-stats b {
+    color: #f2f2f2;
+}
+
+html.dark .project-card-stats-dot {
+    color: oklch(45% 0 0);
+}
+
+.dark .application-settings-form :is(.input, select, textarea):focus,
+.dark .application-settings-form :is(.input, select, textarea):focus-visible,
+.dark .application-settings-workspace :is(.input, select, textarea):focus,
+.dark .application-settings-workspace :is(.input, select, textarea):focus-visible {
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgb(107 22 237 / 0.25) !important;
+}
+
+/* One page of results: the bar is noise. !important beats the flex utility and Alpine x-show. */
+.pager[hidden] {
+    display: none !important;
+}
+
 /* Dark mode (both navigation styles): the floating dotted backdrop shows through
    see-through surfaces (dark:bg-white/[x] with or without `!`, .button, …). Give the
    outermost ones the same color as an opaque mix with the app background, like the
@@ -5979,7 +6219,8 @@ html.dark .canvas-zoom-max {
     html.dark .app-main [class*="dark:bg-white/[0.09]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 9%, var(--color-app)) !important; }
     html.dark .app-main [class*="dark:bg-white/[0.14]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 14%, var(--color-app)) !important; }
     html.dark .app-main [class*="dark:bg-white/[0.1]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
-    html.dark .app-main :is(.button, .view-toggle):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: color-mix(in oklab, #fff 6%, var(--color-app)) !important; }
+    html.dark .app-main .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: rgb(107 22 237 / 0.14) !important; border-color: rgb(163 145 255 / 0.24) !important; color: #ece8ff !important; }
+    html.dark .app-main .view-toggle:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) { background-color: rgb(107 22 237 / 0.06) !important; border-color: rgb(163 145 255 / 0.16) !important; }
     html.dark .app-main [class*="dark:hover:bg-white/10"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
     html.dark .app-main [class*="dark:hover:bg-white/[0.025]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 2.5%, var(--color-app)) !important; }
     html.dark .app-main [class*="dark:hover:bg-white/[0.035]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 3.5%, var(--color-app)) !important; }
@@ -5991,7 +6232,13 @@ html.dark .canvas-zoom-max {
     html.dark .app-main [class*="dark:hover:bg-white/[0.08]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 8%, var(--color-app)) !important; }
     html.dark .app-main [class*="dark:hover:bg-white/[0.12]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 12%, var(--color-app)) !important; }
     html.dark .app-main [class*="dark:hover:bg-white/[0.1]"]:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
-    html.dark .app-main .button:not(:disabled):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: color-mix(in oklab, #fff 10%, var(--color-app)) !important; }
+    html.dark .app-main .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *):hover { background-color: rgb(107 22 237 / 0.18) !important; border-color: rgb(163 145 255 / 0.34) !important; }
+
+    /* Collection shells are #121212. Same selector as the 5% mix, plus .rounded-xl, so it wins. */
+    html.dark .app-main [class*="dark:bg-white/[0.05]"].rounded-xl:not(:is([class*="dark:bg-"]:not(.app-main), .button, .view-toggle, .application-settings-section, .application-settings-section-body, .box, .coolbox, .data-table, .resource-view, .empty-state, .loading-state-card, .runtime-log-shell, .logs-viewer) *) {
+        background-color: #121212 !important;
+        border-color: rgb(255 255 255 / 0.08) !important;
+    }
 }
 
 /* Resource menu in the collapsed main sidebar: icons only. */
