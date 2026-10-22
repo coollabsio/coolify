@@ -5,7 +5,10 @@
     // single JS expression here — a directive inside the <x-copy-button> tag would
     // break Blade's component-tag compiler.
     $copyResolve = null;
-    if ($copyable) {
+    if ($copyable && $type === 'password') {
+        // Copy the field as shown: it includes unsaved edits and works without Livewire.
+        $copyResolve = "\$el.parentElement.querySelector('input').value";
+    } elseif ($copyable) {
         $copyModel = $modelBinding !== 'null' ? $modelBinding : $attributes->get('wire:model');
         $copyResolve = $copyModel
             ? "\$wire.get('".$copyModel."')"

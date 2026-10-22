@@ -25,7 +25,7 @@ class Input extends Component
         public bool $readonly = false,
         public ?string $helper = null,
         public bool $allowToPeak = true,
-        public bool $copyable = false,
+        public ?bool $copyable = null,
         public bool $isMultiline = false,
         public string $defaultClass = 'input',
         public string $autocomplete = 'off',
@@ -71,6 +71,9 @@ class Input extends Component
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
         }
+        // Password fields get a copy button unless the caller opts out (account password forms).
+        $this->copyable ??= $this->type === 'password';
+
         // Durable class (not type-attr based): Alpine may toggle type to "text" when revealing,
         // and settings-workspace CSS otherwise overrides utility padding-right.
         $hasPeek = $this->type === 'password' && $this->allowToPeak;

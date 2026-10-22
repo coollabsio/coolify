@@ -37,9 +37,9 @@ $email = getOldOrLocal('email', 'test3@example.com');
                     autocomplete="name" label="{{ __('input.name') }}" />
                 <x-forms.input id="email" required type="email" name="email" value="{{ $email }}"
                     autocomplete="email" label="{{ __('input.email') }}" />
-                <x-forms.input id="password" required type="password" name="password" autocomplete="new-password"
+                <x-forms.input id="password" required type="password" :copyable="false" name="password" autocomplete="new-password"
                     label="{{ __('input.password') }}" />
-                <x-forms.input id="password_confirmation" required type="password" name="password_confirmation"
+                <x-forms.input id="password_confirmation" required type="password" :copyable="false" name="password_confirmation"
                     autocomplete="new-password" label="{{ __('input.password.again') }}" />
 
                 <div class="auth-guidance">
