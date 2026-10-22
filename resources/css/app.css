@@ -6084,6 +6084,11 @@ html.dark .app-topbar-brand {
     border-right-color: rgb(163 145 255 / 0.10);
 }
 
+/* The drawer carries the brand surface; its nav must not paint over it. */
+html.dark .mobile-sidebar-sheet nav.sidebar-nav {
+    background-color: transparent;
+}
+
 html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer {
     background-color: transparent;
 }

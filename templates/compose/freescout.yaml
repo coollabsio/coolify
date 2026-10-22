@@ -39,7 +39,7 @@ services:
       - mariadb-data:/var/lib/mysql
     environment:
       - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
-      - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-freescout}
       - MARIADB_USER=${SERVICE_USER_MARIADB}
       - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
     healthcheck:
