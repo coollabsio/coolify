@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://paymenter.org/docs/guides/docker
 # slogan: Open-Source Billing, Built for Hosting
 # category: finance
@@ -8,7 +7,7 @@
 
 services:
   paymenter:
-    image: 'ghcr.io/paymenter/paymenter:v1.4.5'
+    image: 'ghcr.io/paymenter/paymenter:v1.5.9'
     volumes:
       - 'app_logs:/app/storage/logs'
       - 'extenstions:/app/extensions'
