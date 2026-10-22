@@ -195,14 +195,48 @@ Class names below are examples. Keep the values and structure.
   table rows are the darker content layer below them.
 - In light mode the sidebar is the canvas color and has a 1px
   `--ui-chrome-border` right edge. In dark mode the sidebar column, including
-  the logo cell, is `#120e1a` with a brand-purple wash at the top (about 9%,
-  fading out) and a faint lavender right edge (`rgb(163 145 255 / 0.10)`).
+  the logo cell, is `#120e1a` with a faint lavender right edge
+  (`rgb(163 145 255 / 0.10)`). The nav has a brand-purple wash that starts at
+  9% and fades out; the logo cell has a flat 9% wash, so the two read as one
+  surface.
 - The top bar matches the canvas. It has no bottom border at rest. After the
   page scrolls under it, dark mode draws a lavender hairline
   (`rgb(163 145 255 / 0.12)`), a translucent bar, blur, and a soft shadow.
   The logo cell stays the solid sidebar color.
 - Keep the chrome borders faint. A strong border on near-black looks like a
   line drawn on the page.
+
+### App header (logo cell)
+
+- The logo cell is the top of the sidebar column, in the 48px top bar. It is
+  as wide as the sidebar: 224px expanded, 64px collapsed.
+- Expanded: the wordmark (15px semibold, tight tracking, `--ui-fg`), then the
+  version on the same baseline (10.5px medium, `--ui-fg-faint`), with 6px
+  between them and 16px side padding. An update badge sits at the right end.
+- Collapsed: only the 20px logo mark, centered. The cell gets a bottom border
+  so that it lines up with the top bar edge.
+- The update badge is a small pill: 18px high, 6px side padding, 9.5px
+  semibold text, fully rounded, a 10% fill, and a 25% inset ring of the same
+  color. It is purple in light mode and warning yellow in dark mode. While an
+  update runs, the same pill says "Updating". It hides when the sidebar is
+  collapsed.
+- The mobile drawer starts with the same wordmark and version in a 48px row
+  with a bottom border, and a 32px close button on the right. It has no update
+  badge.
+
+### Mobile header
+
+- Below the desktop breakpoint (1024px) a sticky top bar replaces the desktop
+  top bar and sidebar. It is about 56px high (12px vertical padding, 16px side
+  padding, 24px from 640px), translucent (95% of `--ui-panel`) with a small
+  blur, and has a faint bottom border.
+- Left: the logo mark (18px) in a 32px tile with an 8px radius and a neutral
+  fill (`rgb(255 255 255 / 6%)` in dark mode), then the team switcher. The
+  team name truncates.
+- Right, with 4px gaps: status indicators (configuration warnings, active
+  deployments), the update badge, the user menu, and a 36px sidebar button
+  (the same sidebar glyph as the desktop collapse toggle). The sidebar button
+  opens the drawer from the right.
 
 ### Sidebar navigation
 
@@ -622,8 +656,9 @@ lift off the content:
   not the top bar.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
   use the canvas color in light mode. In dark mode they use `--color-sidebar`
-  (`#120e1a`): a vertical brand wash on the nav, a radial wash on the logo
-  cell, and a lavender right edge. Section labels are 10.5px uppercase mono in
+  (`#120e1a`): a vertical brand wash on the nav, a flat 9% wash on the logo
+  cell (the same color as the top of the nav wash), and a lavender right
+  edge. Section labels are 10.5px uppercase mono in
   muted lavender. Chevrons are hidden until the row is hovered, focused, or
   current. The Admin icon stays neutral. The footer is transparent so the
   wash continues. Do not use `dark:border-white/[0.06]` on these chrome edges;
@@ -690,8 +725,31 @@ color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
   rows; yellow washes look muddy on dark UI.
 - Nested items sit behind a thin 1px guide line (`.nav-children`) and use the
   same selected pill, not a thick box border.
-- The update badge sits on the version row and uses a tiny fully rounded
-  primary-action pill.
+- The logo cell (`.app-topbar-brand` in `layouts/app.blade.php`) is `w-56`
+  expanded and `w-16` collapsed. Expanded, it shows the `Coolify` wordmark
+  (`text-[15px] font-semibold tracking-tight`), `<x-version>`
+  (`text-[10.5px]`, `text-fg-faint` in dark), and the update badge
+  (`livewire:upgrade`, instance admins on self-hosted only) at `ml-auto`.
+  Collapsed, it shows only `/coolify-logo.svg` at `size-5` and adds
+  `border-b`.
+- The update badge sits on the version row: an 18px fully rounded pill with
+  9.5px semibold text. It is `bg-coollabs/10 text-coollabs ring-coollabs/25` in
+  light mode and the warning pill (`dark:bg-warning/15 dark:text-warning
+  dark:ring-warning/25`) in dark mode, because an update is a real warning.
+  While an upgrade runs it says "Updating". Both open the upgrade modal.
+- The mobile drawer header (`data-mobile-sidebar-brand`) repeats the wordmark
+  and version in an `h-12` row with a bottom border and a close button. It
+  does not show the update badge.
+- The mobile top bar (`MOBILE TOP BAR` in `layouts/app.blade.php`, `lg:hidden`)
+  is `sticky top-0 z-40`, `px-4 py-3 sm:px-6`, `bg-white/95 dark:bg-panel/95
+  backdrop-blur-sm` with `border-neutral-200/60 dark:border-white/[0.06]`.
+  Left: `/coolify-logo.svg` (18px) in a `size-8 rounded-lg bg-neutral-100
+  dark:bg-white/[0.06]` tile, then `livewire:switch-team`. Right (`gap-1`):
+  `#configuration-warning-hud-slot-mobile`, `deployments-indicator
+  variant="mobile"`, the update badge (`livewire:upgrade key="mobile-upgrade"`,
+  instance admins on self-hosted only), `x-top-user-menu`, and a `size-9`
+  button that toggles the drawer. Keep these in the same order as the desktop
+  top bar.
 - Submenu chevrons (the right chevron on rows that open a submenu and the back
   chevron) are `text-coollabs` in light mode and grey in dark mode
   (`dark:text-fg-faint` right, `dark:text-fg-dim` back).

@@ -233,14 +233,6 @@
                 ],
                 ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
             ],
-            'project.application.rollback' => [
-                ['id' => 'rollback-retention-section', 'label' => 'Image retention'],
-                ['id' => 'rollback-images-section', 'label' => 'Available images'],
-            ],
-            'project.application.resource-limits' => [
-                ['id' => 'cpu-limits-section', 'label' => 'CPU'],
-                ['id' => 'memory-limits-section', 'label' => 'Memory'],
-            ],
             'project.application.resource-operations' => [
                 ['id' => 'clone-destination-section', 'label' => 'Clone destination'],
                 ['id' => 'clone-environment-section', 'label' => 'Clone environment'],

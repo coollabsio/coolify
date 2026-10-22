@@ -6023,9 +6023,10 @@ html.dark .mobile-sidebar-sheet [role="dialog"] {
     --color-nav-muted: oklch(58% 0.04 300);
 }
 
+/* Same color as the top of the sidebar gradient, so the brand and sidebar read as one surface. */
 html.dark .app-topbar-brand {
     background-color: var(--color-sidebar);
-    background-image: radial-gradient(140% 260% at 0% 0%, rgb(107 22 237 / 0.12), transparent 70%);
+    background-image: linear-gradient(rgb(107 22 237 / 0.09), rgb(107 22 237 / 0.09));
     border-right-color: rgb(163 145 255 / 0.10);
 }
 
@@ -6100,6 +6101,43 @@ html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar > .app-topbar
 html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar > div:not(.app-topbar-brand) {
     border-bottom-color: rgb(163 145 255 / 0.12);
     box-shadow: 0 10px 30px -14px rgb(0 0 0 / 0.95), 0 1px 0 rgb(107 22 237 / 0.06);
+}
+
+/* Canvases (default navigation): the canvas runs under a clear top bar, and the
+   canvas root paints the dots (set by the canvas JS) behind it, like the
+   floating navigation does. */
+@media (min-width: 1024px) {
+    html:not([data-nav-style="floating"]) .app-main.app-main-full:has(:is([data-ec-root], .cv-root)) {
+        padding-top: 0;
+    }
+
+    html:not([data-nav-style="floating"]) .app-main-full :is([data-ec-root], .cv-root) {
+        padding-top: calc(3rem + 0.5rem);
+    }
+
+    /* The deploy canvas (.cv-root) paints its own dots. */
+    html:not([data-nav-style="floating"]) .app-main-full [data-ec-root] {
+        background-image: var(--canvas-dots-image, radial-gradient(circle, rgb(0 0 0 / 0.13) 1px, transparent 1px));
+        background-size: var(--canvas-dots-size, 20px 20px);
+        background-position: var(--canvas-dots-position, 0 0);
+    }
+
+    html.dark:not([data-nav-style="floating"]) .app-main-full [data-ec-root] {
+        background-image: var(--canvas-dots-image, radial-gradient(circle, rgb(255 255 255 / 0.09) 1px, transparent 1px));
+    }
+
+    html:not([data-nav-style="floating"]) .app-main-full [data-ec-viewport] {
+        background-image: none;
+    }
+
+    html:not([data-nav-style="floating"]):has(.app-main-full :is([data-ec-root], .cv-root)) .app-topbar {
+        background-color: transparent;
+        backdrop-filter: none;
+    }
+
+    html:not([data-nav-style="floating"]):has(.app-main-full :is([data-ec-root], .cv-root)) .app-topbar > div:not(.app-topbar-brand) {
+        border-bottom-color: transparent;
+    }
 }
 
 html.dark .view-toggle {
