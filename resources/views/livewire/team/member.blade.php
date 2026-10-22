@@ -19,7 +19,7 @@
             <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $member->name }}</span>
             @if ($member->id === Auth::id())
                 <span
-                    class="rounded-full bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-medium text-coollabs dark:bg-warning/15 dark:text-warning">
+                    class="rounded-full bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">
                     You
                 </span>
             @endif

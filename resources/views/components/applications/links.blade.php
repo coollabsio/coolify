@@ -84,7 +84,7 @@
                                     <a class="{{ $linkItemClasses }}" target="_blank"
                                         href="{{ getFqdnWithoutPort($domain) }}">
                                         <span
-                                            class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs ring-1 ring-coollabs/20 dark:bg-warning/10 dark:text-warning dark:ring-warning/20">
+                                            class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs ring-1 ring-coollabs/20 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25">
                                             PR #{{ data_get($preview, 'pull_request_id') }}
                                         </span>
                                         <span class="min-w-0 truncate">{{ getFqdnWithoutPort($domain) }}</span>
@@ -99,7 +99,7 @@
                             <a class="{{ $linkItemClasses }}" target="_blank"
                                 href="{{ getFqdnWithoutPort(data_get($preview, 'fqdn')) }}">
                                 <span
-                                    class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs ring-1 ring-coollabs/20 dark:bg-warning/10 dark:text-warning dark:ring-warning/20">
+                                    class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs ring-1 ring-coollabs/20 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25">
                                     PR #{{ data_get($preview, 'pull_request_id') }}
                                 </span>
                                 <span class="min-w-0 truncate">{{ getFqdnWithoutPort(data_get($preview, 'fqdn')) }}</span>

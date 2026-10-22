@@ -64,7 +64,7 @@
                     'application_uuid' => $application->uuid,
                 ]);
             @endphp
-            <div class="group relative flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 transition-colors hover:bg-neutral-100 focus-within:ring-2 focus-within:ring-coollabs/40 dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] dark:focus-within:ring-warning/40">
+            <div class="group relative flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 transition-colors hover:bg-neutral-100 focus-within:ring-2 focus-within:ring-coollabs/40 dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] dark:focus-within:ring-brand-light/40">
                 <a class="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
                     aria-label="{{ $domainCount > 0 ? 'Manage application domains' : 'Add an application domain' }}"
                     href="{{ $applicationDomainsUrl }}" {{ wireNavigate() }}>
@@ -160,11 +160,11 @@
                                         <div class="grid gap-4 lg:grid-cols-2">
                                             <x-forms.input x-bind:disabled="shouldDisable()"
                                                 placeholder="docker compose build" id="dockerComposeCustomBuildCommand"
-                                                helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose build</span>"
+                                                helper="The compose file path (<span class='dark:text-brand-light'>-f</span> flag) and environment variables (<span class='dark:text-brand-light'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-brand-light'>-f</span> or <span class='dark:text-brand-light'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-brand-light'>docker compose build</span>"
                                                 label="Custom build command" />
                                             <x-forms.input x-bind:disabled="shouldDisable()"
                                                 placeholder="docker compose up -d" id="dockerComposeCustomStartCommand"
-                                                helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose up -d</span>"
+                                                helper="The compose file path (<span class='dark:text-brand-light'>-f</span> flag) and environment variables (<span class='dark:text-brand-light'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-brand-light'>-f</span> or <span class='dark:text-brand-light'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-brand-light'>docker compose up -d</span>"
                                                 label="Custom start command" />
                                         </div>
                                         @if ($this->dockerComposeCustomBuildCommand)
@@ -478,12 +478,12 @@
                     </div>
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input placeholder="3000:3000" id="portsMappings" label="Port mappings"
-                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Format:</span> host:container<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span> 3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host."
+                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-brand-light'>Format:</span> host:container<br><br><span class='inline-block font-bold dark:text-brand-light'>Example:</span> 3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host."
                             x-bind:disabled="!canUpdate" />
                     @endif
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input id="customNetworkAliases" label="Network aliases"
-                            helper="A comma separated list of custom network aliases you would like to add for container in Docker network.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>api.internal,api.local"
+                            helper="A comma separated list of custom network aliases you would like to add for container in Docker network.<br><br><span class='inline-block font-bold dark:text-brand-light'>Example:</span><br>api.internal,api.local"
                             wire:model="customNetworkAliases" x-bind:disabled="!canUpdate" />
                     @endif
                 </div>

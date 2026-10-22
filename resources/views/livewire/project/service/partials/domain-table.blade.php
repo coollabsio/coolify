@@ -89,7 +89,7 @@
                                 </span>
                             @endif
                             <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
-                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
                                 title="{{ $publicUrl }}">
                                 {{ $publicUrl }}
                             </a>

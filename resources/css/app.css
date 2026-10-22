@@ -415,11 +415,12 @@ select,
         position: absolute;
         inset: 0;
         border-radius: inherit;
+        --coolbox-loading-color: var(--color-coollabs);
         background:
-            linear-gradient(var(--color-warning), var(--color-warning)),
-            linear-gradient(var(--color-warning), var(--color-warning)),
-            linear-gradient(var(--color-warning), var(--color-warning)),
-            linear-gradient(var(--color-warning), var(--color-warning));
+            linear-gradient(var(--coolbox-loading-color), var(--coolbox-loading-color)),
+            linear-gradient(var(--coolbox-loading-color), var(--coolbox-loading-color)),
+            linear-gradient(var(--coolbox-loading-color), var(--coolbox-loading-color)),
+            linear-gradient(var(--coolbox-loading-color), var(--coolbox-loading-color));
         background-repeat: no-repeat;
         animation: coolbox-border-track 2400ms linear infinite;
         pointer-events: none;
@@ -434,6 +435,10 @@ select,
         background: white;
         pointer-events: none;
         z-index: 1;
+    }
+
+    .dark .coolbox-loading::before {
+        --coolbox-loading-color: var(--color-brand-light);
     }
 
     .dark .coolbox-loading::after {
@@ -523,7 +528,7 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-    @apply outline-none ring-2 ring-coollabs dark:ring-1 dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
+    @apply outline-none ring-2 ring-coollabs dark:ring-1 dark:ring-brand-light ring-offset-2 dark:ring-offset-coolgray-100;
 }
 
 label {
@@ -587,24 +592,24 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
-/* Loading feedback uses the higher-contrast warning accent in dark mode. */
+/* Loading feedback uses the brand-light accent in dark mode. */
 .dark .animate-spin {
-    color: var(--color-warning) !important;
+    color: var(--color-brand-light) !important;
 }
 
 .dark #nprogress .bar {
-    background: var(--color-warning) !important;
+    background: var(--color-brand-light) !important;
 }
 
 .dark #nprogress .peg {
     box-shadow:
-        0 0 10px var(--color-warning),
-        0 0 5px var(--color-warning) !important;
+        0 0 10px var(--color-brand-light),
+        0 0 5px var(--color-brand-light) !important;
 }
 
 .dark #nprogress .spinner-icon {
-    border-top-color: var(--color-warning) !important;
-    border-left-color: var(--color-warning) !important;
+    border-top-color: var(--color-brand-light) !important;
+    border-left-color: var(--color-brand-light) !important;
 }
 
 html[data-theme="custom"] .loading-indicator,
@@ -1377,6 +1382,11 @@ html[data-theme="custom"] {
     --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, oklch(0% 0 0));
     /* Legacy dark-theme accent utilities use warning as the brand color. */
     --color-warning: var(--theme-bright-color);
+    /* Accent text, icons, and rings (brand-light) follow the picked color in the
+       readable foreground band. --color-brand stays purple here because the
+       brand button gradient (hover/press/depth) is not themed; brand fills and
+       tints are remapped per element below. */
+    --color-brand-light: var(--theme-fg-on-surface);
     --color-accent-foreground: var(--theme-accent-foreground);
     --color-app: color-mix(in oklab, var(--theme-base-color) 12%, oklch(14.03% 0.0022 286.11));
     --color-panel: color-mix(in oklab, var(--theme-base-color) 14%, oklch(15.48% 0.0021 286.15));
@@ -1519,14 +1529,31 @@ html[data-theme="custom"] :is(
     [class~="text-warning"],
     [class~="text-accent"],
     [class~="dark:text-coollabs"],
-    [class~="dark:text-warning"]
+    [class~="dark:text-warning"],
+    [class~="dark:text-brand-light"]
 ) {
     color: var(--theme-fg-on-surface) !important;
+}
+
+/* Brand fills and tints (chips, selected rows, checked boxes, active app tabs)
+   take the picked color. Scoped to the elements that use them so the purple
+   brand buttons keep their matching hover/press/depth tokens. */
+html[data-theme="custom"] :is(
+    [class*=":bg-brand"],
+    [class*=":border-brand"],
+    .application-heading-actions .app-tab
+) {
+    --color-brand: var(--theme-bright-color);
+}
+
+html.dark[data-theme="custom"] [class~="dark:bg-brand"] {
+    color: var(--theme-accent-foreground) !important;
 }
 
 html[data-theme="custom"] [class~="hover:text-coollabs"]:hover,
 html[data-theme="custom"] [class~="hover:text-warning"]:hover,
 html[data-theme="custom"] [class~="dark:hover:text-warning"]:hover,
+html[data-theme="custom"] [class~="dark:hover:text-brand-light"]:hover,
 html[data-theme="custom"] [class~="dark:hover:text-coollabs"]:hover {
     color: var(--theme-fg-on-surface) !important;
 }
@@ -1722,7 +1749,7 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 .dark .error-code {
-    color: var(--color-warning);
+    color: var(--color-brand-light);
 }
 
 .error-code-danger {
@@ -2433,7 +2460,7 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 /*
  * Active primary tab styles.
  * The base rules above set background/color/box-shadow with higher specificity
- * than Tailwind utilities (bg-warning/15, text-warning, ring-*), so active
+ * than Tailwind utilities (bg-brand/15, text-brand-light, ring-*), so active
  * tabs need an explicit override or they look identical to inactive ones.
  */
 .application-heading-actions .app-tab[aria-current='page'],
@@ -2451,15 +2478,15 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 
 .dark .application-heading-actions .app-tab[aria-current='page'],
 .dark .application-heading-actions .app-tab.app-tab-active {
-    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-    color: var(--color-warning);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-warning) 25%, transparent);
+    background: color-mix(in srgb, var(--color-brand) 15%, transparent);
+    color: var(--color-brand-light);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-light) 25%, transparent);
 }
 
 .dark .application-heading-actions .app-tab[aria-current='page']:hover,
 .dark .application-heading-actions .app-tab.app-tab-active:hover {
-    background: color-mix(in srgb, var(--color-warning) 20%, transparent);
-    color: var(--color-warning);
+    background: color-mix(in srgb, var(--color-brand) 20%, transparent);
+    color: var(--color-brand-light);
 }
 
 .application-heading-actions .relative > button[x-ref='trigger'] {
@@ -5620,6 +5647,20 @@ html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-a
     --button-depth-color: color-mix(in oklab, var(--color-error) 40%, transparent) !important;
 }
 
+/* In dark mode the Danger Zone tile is red-tinted, not the white or purple tile of other items. */
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon.text-error {
+    color: var(--color-error) !important;
+    border-color: color-mix(in oklab, var(--color-error) 25%, transparent) !important;
+    background: color-mix(in oklab, var(--color-error) 8%, transparent) !important;
+    --button-depth-color: color-mix(in oklab, var(--color-error) 20%, transparent) !important;
+}
+
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):is(:hover, .menu-item-active, .menu-subitem-active) .menu-item-icon.text-error {
+    border-color: color-mix(in oklab, var(--color-error) 45%, transparent) !important;
+    background: color-mix(in oklab, var(--color-error) 15%, transparent) !important;
+    --button-depth-color: color-mix(in oklab, var(--color-error) 35%, transparent) !important;
+}
+
 html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):focus-visible {
     outline: none;
 }
@@ -6195,6 +6236,16 @@ html.dark .toast-card {
 html.dark .command-palette {
     background: color-mix(in oklab, #6b16ed 10%, var(--coollabs-elevated));
     box-shadow: 0 0 0 1px rgb(163 145 255 / 0.22), var(--shadow-dropdown);
+}
+
+/* Sidebar account menu: the purple tint of the sidebar it opens from. */
+html.dark .listbox-panel.top-user-menu-panel-sidebar {
+    background: color-mix(in oklab, #6b16ed 10%, var(--coollabs-elevated));
+    border-color: rgb(163 145 255 / 0.22);
+}
+
+html.dark .top-user-menu-panel-sidebar .listbox-option:hover {
+    background: rgb(163 145 255 / 0.10);
 }
 
 html.dark .command-palette-header {

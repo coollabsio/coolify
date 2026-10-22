@@ -125,7 +125,7 @@
                     <button type="button" @click="restoreType = 'file'"
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
-                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
                             : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                         <span
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
@@ -142,7 +142,7 @@
                         <button type="button" @click="restoreType = 's3'"
                             class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                             :class="restoreType === 's3'
-                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
                                 : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                             <span
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
@@ -184,7 +184,7 @@
                         @csrf
                     </form>
                     <div x-show="isUploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
-                        <div class="h-full rounded-full bg-coollabs dark:bg-warning"
+                        <div class="h-full rounded-full bg-coollabs dark:bg-brand"
                             :style="`width: ${progress}%`"></div>
                     </div>
 

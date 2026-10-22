@@ -54,7 +54,7 @@
         @class([
             'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
             'right-0! left-auto!' => ! $sidebar,
-            'origin-bottom-left' => $sidebar,
+            'top-user-menu-panel-sidebar origin-bottom-left' => $sidebar,
             'origin-top-right' => ! $sidebar,
         ])>
         <div class="min-w-0 px-2 py-1.5">

@@ -111,7 +111,7 @@
                                                 <span
                                                     class="flex size-4 shrink-0 items-center justify-center rounded-[5px] border"
                                                     :class="isFilterSelected(group.key, option.value)
-                                                        ? 'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black'
+                                                        ? 'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white'
                                                         : 'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]'">
                                                     <svg x-show="isFilterSelected(group.key, option.value)" class="size-3"
                                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">

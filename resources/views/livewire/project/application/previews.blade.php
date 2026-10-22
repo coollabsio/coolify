@@ -44,7 +44,7 @@
                                                 {{ data_get($pull_request, 'title') }}
                                             </h4>
                                             <a target="_blank"
-                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-warning"
+                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-brand-light"
                                                 href="{{ data_get($pull_request, 'html_url') }}">
                                                 Open on GitHub
                                                 <x-external-link />

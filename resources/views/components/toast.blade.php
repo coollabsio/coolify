@@ -110,7 +110,7 @@
                             <div class="toast-icon flex size-8 shrink-0 items-center justify-center rounded-lg"
                                 :class="{
                                     'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400': toast.type === 'success',
-                                    'bg-coollabs/10 text-coollabs dark:bg-warning/10 dark:text-warning': toast.type === 'info',
+                                    'bg-coollabs/10 text-coollabs dark:bg-brand/15 dark:text-brand-light': toast.type === 'info',
                                     'bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning': toast.type === 'warning',
                                     'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400': toast.type === 'danger',
                                     'bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim': toast.type === 'default',

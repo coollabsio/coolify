@@ -27,7 +27,7 @@
                 description="Create a project to organize your environments and resources."
                 icon-name="projects">
                 <x-slot:contents>
-                    <a class="text-[12px] font-medium text-coollabs hover:underline dark:text-warning"
+                    <a class="text-[12px] font-medium text-coollabs hover:underline dark:text-brand-light"
                         href="{{ route('onboarding') }}" {{ wireNavigate() }}>
                         Open onboarding
                     </a>

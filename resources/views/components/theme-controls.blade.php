@@ -124,7 +124,7 @@
                                 aria-haspopup="dialog" :aria-expanded="pickerOpen"
                                 class="group block w-full overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                                 :class="theme === 'custom'
-                                    ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                                    ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
                                     : ''">
                                 <div class="h-20 border-b border-neutral-200 dark:border-white/[0.07]"
                                     :style="`background: color-mix(in oklab, ${themeColor} 28%, ${customMode === 'light' ? 'oklch(97% 0 0)' : 'oklch(17.35% 0.0020 286.18)'})`">
@@ -153,7 +153,7 @@
                             @keydown.enter.prevent="setTheme('{{ $option['value'] }}')"
                             class="group relative overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                             :class="theme === '{{ $option['value'] }}'
-                                ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                                ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
                                 : ''">
                             <div class="h-20 {{ $option['preview'] }} border-b border-neutral-200 dark:border-white/[0.07]">
                                 <div class="flex h-full items-center justify-center">
@@ -195,7 +195,7 @@
                     <button type="button" @click="setWidth('{{ $option['value'] }}')"
                         class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                         :class="pageWidth === '{{ $option['value'] }}'
-                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
                             : ''">
                         <div class="flex h-20 items-center border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">
                             <div class="flex h-11 w-full gap-1.5 rounded-md border border-neutral-300 bg-white p-1.5 dark:border-white/15 dark:bg-[#181818]">
@@ -235,7 +235,7 @@
                     <button type="button" @click="setNavStyle('{{ $option['value'] }}')"
                         class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                         :class="navStyle === '{{ $option['value'] }}'
-                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
                             : ''">
                         @php($floating = $option['value'] === 'floating')
                         <div @class([
@@ -287,7 +287,7 @@
                     <button type="button" @click="setNavItems('{{ $option['value'] }}')"
                         class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                         :class="navItems === '{{ $option['value'] }}'
-                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-warning/30 dark:border-warning/40'
+                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
                             : ''">
                         @php($tiles = $option['value'] === '3d')
                         <div class="flex h-20 flex-col justify-center gap-1.5 border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">

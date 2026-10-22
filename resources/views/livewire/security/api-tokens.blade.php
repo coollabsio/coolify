@@ -190,7 +190,7 @@
                                                 'inline-flex min-h-5 items-center rounded-md border px-2 py-0.5 text-[10px] font-medium',
                                                 'border-error/20 bg-error/10 text-error' => $ability === 'root',
                                                 'border-warning/20 bg-warning/10 text-warning' => in_array($ability, ['write', 'write:sensitive']),
-                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-warning/20 dark:bg-warning/10 dark:text-warning' => $ability === 'deploy',
+                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-brand-light/20 dark:bg-brand/15 dark:text-brand-light' => $ability === 'deploy',
                                                 'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim' => in_array($ability, ['read', 'read:sensitive']),
                                             ])>{{ $ability }}</span>
                                         @endforeach
