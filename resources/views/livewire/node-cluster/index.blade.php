@@ -3,10 +3,7 @@
         $sentinelUpgradeRunning = in_array(data_get($sentinelUpgradeSummary, 'status'), ['queued', 'running'], true);
     @endphp
     <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-            <h2 class="text-[15px]! font-semibold!">Clusters</h2>
-            <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Cluster servers share a private, encrypted network and run cluster applications.</p>
-        </div>
+        <x-section-heading class="mb-0!" title="Clusters" subtitle="Cluster servers share a private, encrypted network and run cluster applications." />
         <div class="flex w-fit shrink-0 flex-wrap items-center gap-2">
             @if ($sentinelUpgradeNodes->isNotEmpty() && ! $sentinelUpgradeRunning)
                 @can('manageSentinel', $sentinelUpgradeNodes->first())

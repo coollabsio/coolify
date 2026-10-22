@@ -19,7 +19,8 @@
 @endphp
 
 <x-application.settings-section id="node-cluster-traffic-map-section" title="Traffic map"
-    helper="Servers allow only required cluster traffic by default. Applications reject mesh and external connections by default. Outbound internet access stays available.">
+    helper="Servers allow only required cluster traffic by default. Applications reject mesh and external connections by default. Outbound internet access stays available."
+    flush>
     @include('livewire.node-cluster.firewall-canvas')
 </x-application.settings-section>
 

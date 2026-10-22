@@ -67,10 +67,7 @@
     @if ($clusterServersEnabled)
         <livewire:node-cluster.index key="server-index-cluster-groups" />
 
-        <div class="mt-8 mb-3 min-w-0">
-            <h2 class="text-[15px]! font-semibold!">Docker servers</h2>
-            <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Docker hosts managed over SSH.</p>
-        </div>
+        <x-section-heading title="Docker servers" subtitle="Docker hosts managed over SSH." class="mt-8" />
     @endif
 
     @php

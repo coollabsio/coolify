@@ -894,9 +894,10 @@ it('renders every cluster application section as its own page', function (string
         $response->assertSee($text, false);
     }
 
+    // The menu renders twice: in the page (below xl) and in the main sidebar (xl and up).
     expect($response->getContent())->toMatch(
         '/aria-current="page"[^>]*href="'.preg_quote(route($routeName, $routeParameters), '/').'"/'
-    )->and(substr_count($response->getContent(), 'aria-current="page"'))->toBe(1)
+    )->and(substr_count($response->getContent(), 'aria-current="page"'))->toBe(2)
         ->and(ClusterApplicationShow::SECTIONS)->toContain($section);
 })->with([
     'general' => ['project.cluster-application.show', 'general', ['Overview', 'Internal hostname', 'Copy internal hostname', 'Runtime', 'Start command']],

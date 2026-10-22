@@ -6,7 +6,7 @@
         storageKey: @js('coolify-firewall-canvas-'.$cluster->uuid),
     })"
     x-on:firewall-rules-changed.window="replaceRules($event.detail.rules)"
-    class="relative overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-black/20"
+    class="relative overflow-hidden rounded-[calc(0.5rem-1px)] bg-neutral-50 dark:bg-black/20"
 >
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
         <p class="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-fg-dim">

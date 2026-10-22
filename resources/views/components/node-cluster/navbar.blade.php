@@ -1,7 +1,7 @@
 @props(['cluster'])
 
 @teleport('#server-topbar-context')
-    <div data-testid="node-cluster-topbar-context" class="flex min-w-0 items-center gap-2 text-[13px]">
+    <div data-testid="node-cluster-topbar-context" class="flex min-w-0 items-center gap-1 text-[13px]">
         <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
         <span class="min-w-0 truncate px-2 font-semibold text-black dark:text-fg">
             {{ $cluster->name }}

@@ -42,24 +42,36 @@
             'key' => 'danger',
             'label' => 'Danger Zone',
             'route' => 'project.cluster-application.danger',
-            'icon' => 'shield-alert',
-            'group' => 'Operations',
+            'icon' => 'danger',
+            'group' => 'Danger Zone',
         ],
     ]);
     $groupedMenuItems = $menuItems->groupBy('group');
+    // In-page sections (cards) shown as sub-items under the active page, like the v4 application sidebar.
+    $pageSections = [
+        'general' => [
+            ['id' => 'cluster-application-details', 'label' => 'Application details'],
+            ['id' => 'cluster-application-overview', 'label' => 'Overview'],
+            ['id' => 'cluster-application-runtime', 'label' => 'Runtime'],
+            ['id' => 'cluster-application-domains', 'label' => 'Domains'],
+        ],
+        'resource-limits' => [
+            ['id' => 'cluster-application-cpu-limits', 'label' => 'CPU'],
+            ['id' => 'cluster-application-memory-limits', 'label' => 'Memory'],
+        ],
+    ];
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start">
+<x-main-nav-menu back-label="Dashboard">
     <nav aria-label="Cluster application sections"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                     aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
-                <a wire:key="cluster-application-link-{{ $menuItem['key'] }}"
-                    @class([
+                <a @class([
                         'menu-item',
                         'menu-item-active' => $menuItem['key'] === $activeKey,
                     ])
@@ -69,7 +81,18 @@
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                 </a>
+                @if ($menuItem['key'] === $section && filled($pageSections[$section] ?? null))
+                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex" x-data="{ activeSection: '' }">
+                        @foreach ($pageSections[$section] as $pageSection)
+                            <button type="button" class="menu-subitem"
+                                :class="activeSection === '{{ $pageSection['id'] }}' && 'menu-subitem-active'"
+                                x-on:click="activeSection = '{{ $pageSection['id'] }}'; history.replaceState(null, '', '#{{ $pageSection['id'] }}'); window.scrollToSettingsSection?.('{{ $pageSection['id'] }}')">
+                                <span class="menu-item-label text-left">{{ $pageSection['label'] }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
             @endforeach
         @endforeach
     </nav>
-</aside>
+</x-main-nav-menu>

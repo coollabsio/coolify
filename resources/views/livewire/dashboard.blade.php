@@ -307,6 +307,7 @@
             @endif
 
             @if ($dashboardServers->isEmpty())
+                <div @if ($clusterMapAvailable) x-cloak x-show="viewMode !== 'map'" @endif>
                 @if ($privateKeys->isEmpty())
                     <x-empty title="A private key is required"
                         description="Add an SSH private key before connecting your first server."
@@ -336,6 +337,7 @@
                         @endcan
                     </x-empty>
                 @endif
+                </div>
             @else
                 <div x-cloak x-show="viewMode === 'grid'"
                     class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @4xl:grid-cols-4">

@@ -107,7 +107,7 @@ it('renders cluster groups with the cluster actions on the servers page', functi
     $view = file_get_contents(resource_path('views/livewire/node-cluster/index.blade.php'));
 
     expect($view)
-        ->toContain('>Clusters</h2>')
+        ->toContain('<x-section-heading class="mb-0!" title="Clusters"')
         ->toContain('New cluster')
         ->toContain('Not in a cluster')
         ->toContain('Cluster settings')

@@ -13,11 +13,27 @@
     }";
     $iconTile = 'flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim';
     $pill = 'inline-flex h-5 max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-100 px-1.5 text-[11px] font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white';
+    // The map can lose its last cluster and server while the page is open (wire:poll).
+    $mapIsEmpty = 'data.clusters.length === 0 && data.dockerServers.length === 0';
 @endphp
 <div wire:poll.15s.visible="refreshMap" data-testid="dashboard-cluster-map" class="min-w-0">
     <div wire:ignore x-data="clusterMap" x-on:keydown.escape.window="pinnedEdgeId = null" class="min-w-0">
+        <div x-cloak x-show="{{ $mapIsEmpty }}">
+            <x-empty title="No servers yet" description="Connect infrastructure for your deployments."
+                icon-name="servers" size="sm">
+                @can('createAnyResource')
+                    <x-slot:contents>
+                        <a href="{{ route('server.create') }}" {{ wireNavigate() }} class="button button-highlighted">
+                            <x-reicon name="plus" class="size-3.5" />
+                            New server
+                        </a>
+                    </x-slot:contents>
+                @endcan
+            </x-empty>
+        </div>
+
         {{-- Canvas: pan, zoom, and the optional traffic layer. --}}
-        <div
+        <div x-show="!({{ $mapIsEmpty }})"
             class="hidden overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm sm:block dark:border-white/[0.08] dark:bg-white/[0.05]">
             <div
                 class="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2 dark:border-white/[0.08]">
@@ -302,7 +318,7 @@
         </div>
 
         {{-- Small screens: the same map as a stacked list. --}}
-        <div class="flex flex-col gap-3 sm:hidden">
+        <div x-show="!({{ $mapIsEmpty }})" class="flex flex-col gap-3 sm:hidden">
             <template x-for="cluster in data.clusters" x-bind:key="cluster.uuid">
                 <section
                     class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">

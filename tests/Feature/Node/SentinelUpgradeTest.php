@@ -114,7 +114,7 @@ describe('release source', function () {
     });
 
     it('leaves the legacy sentinel version helper untouched', function () {
-        expect(get_latest_sentinel_version())->toBe('1.0.1');
+        expect(get_latest_sentinel_version())->toBe(data_get(get_versions_data(), 'coolify.sentinel.version'));
     });
 });
 

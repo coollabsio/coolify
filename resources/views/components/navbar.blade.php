@@ -160,6 +160,7 @@
                             ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*'), 'sectionStart' => true],
                             ['label' => 'Email', 'icon' => 'mail', 'href' => route('settings.email'), 'active' => request()->is('settings/email')],
                             ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup')],
+                            ['label' => 'Cluster trust', 'icon' => 'shield-star', 'href' => route('settings.node-trust'), 'active' => request()->is('settings/cluster-trust'), 'visible' => isDev() && config('constants.sentinel.host_enabled', false)],
                         ]],
                     ],
                 ])->map(fn (array $items) => collect($items)

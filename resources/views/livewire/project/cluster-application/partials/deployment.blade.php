@@ -1,3 +1,5 @@
+{{-- Matches the v4 deployment page: history and log stack, and sit side by side from 2xl. --}}
+<div class="flex min-w-0 flex-col gap-4 2xl:grid 2xl:grid-cols-[24rem_minmax(0,1fr)] 2xl:items-start">
 @include('livewire.project.cluster-application.partials.deployment-history', ['selectedDeploymentUuid' => $selectedDeployment['uuid']])
 
 <div x-data="{
@@ -51,7 +53,7 @@
     destroy() {
         if (typeof this.commitCleanup === 'function') this.commitCleanup();
     }
-}" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none">
+}" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full min-w-0 flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none 2xl:sticky 2xl:top-4 2xl:h-[calc(100dvh-10rem)] 2xl:min-h-[32rem]">
     <div :class="fullscreen ? 'fullscreen flex flex-col' : 'flex flex-1 min-h-0 flex-col overflow-hidden'">
         <div class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"
             :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-200 shadow-sm dark:border-coolgray-200'">
@@ -135,4 +137,5 @@
             </div>
         </div>
     </div>
+</div>
 </div>

@@ -3,7 +3,7 @@
     @if ($deploymentHistory['total'] > 0)
         <div class="data-table relative w-full transition-opacity"
             wire:loading.class="opacity-50 pointer-events-none" wire:target="goToPage,previousPage,nextPage">
-            <div class="deployment-table-scroll">
+            <div @class(['deployment-table-scroll', 'deployment-table-embedded' => filled($selectedDeploymentUuid ?? null)])>
                 <div class="data-table-header deployment-table-grid rounded-none!">
                     <span>Status</span>
                     <span>Source</span>
