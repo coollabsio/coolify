@@ -6047,6 +6047,11 @@ html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search kbd {
     border-color: rgb(163 145 255 / 0.18) !important;
 }
 
+/* Group dividers use the lavender sidebar edge: the neutral hairline looks olive on the purple-black sidebar. */
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-nav :is([class~="dark:border-white/[0.06]"], [class~="dark:border-white/[0.07]"], [class~="dark:border-white/[0.08]"]) {
+    border-color: rgb(163 145 255 / 0.10) !important;
+}
+
 /* The collapsed rail shows Search as a tile like the other items: no row frame (the fill is
    removed in the utilities layer above), the dark tile. */
 html.dark .app-sidebar nav.sidebar-collapsed .menu-search {
