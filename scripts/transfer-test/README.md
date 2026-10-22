@@ -23,9 +23,26 @@ scripts/transfer-test/e2e.sh               # transfer both VMs A -> B through th
 scripts/transfer-test/reset.sh
 scripts/transfer-test/reverse-e2e.sh       # undo paths: transfer back, transfer over an archive, take back, archive delete (18 checks)
 scripts/transfer-test/reset.sh
-scripts/transfer-test/extras-e2e.sh        # fake tokens, DNS, secret links, runner config, links, icon ... (31 checks)
+scripts/transfer-test/extras-e2e.sh        # fake tokens, DNS, secret links, runner config, links, icon ... (33 checks)
+scripts/transfer-test/reset.sh
+scripts/transfer-test/full-e2e.sh          # every kind of resource and setting on debian-root, compared record by record and container by container
 scripts/transfer-test/reset.sh
 ```
+
+`full-e2e.sh` adds the records of `seed-extras.php` and `seed-full.php` to debian-root (settings that are not the
+default, every database type, a service with compose parser version 3, a second destination, backups to the dev MinIO),
+deploys them on A, and transfers the server. Then it compares:
+
+- every record of the server on A and on B (`snapshot.sh` writes the records, `snapshot-diff.php` prints each missing
+  row, extra row, and changed column that `ServerTransferCoverage` does not explain),
+- the containers and the files in `/data/coolify` on the VM after A deployed and after B deployed everything again
+  (`runtime-snapshot.sh`),
+- a database backup to S3, a volume backup, and a scheduled task that B runs.
+
+The results are in `<state>/full/` (`db.diff`, `runtime.diff`). The VM must reach the MinIO containers of A and B:
+`sudo iptables -t raw -I PREROUTING 1 -s 10.221.<A slot>.0/24 -d <MinIO container IP>/32 -p tcp --dport 9000 -j ACCEPT`
+for each of them (not persistent). `tests/Unit/ServerTransfer/ServerTransferCoverageTest.php` runs the same record
+comparison in CI, with a value that is not the default in every column.
 
 For a manual test, run `scripts/transfer-test/manual-setup.sh`: it resets, adds the fake extra records to A, and
 prints the URLs, logins, and tokens.
@@ -47,6 +64,9 @@ VM server on A → Transfer, and use the target URL `http://localhost:<B port>` 
 | `seed-extras.php`, `verify-extras-*.php` | Fake records and checks of `extras-e2e.sh` |
 | `manual-setup.sh` | Reset plus the fake extra records, then prints what to open and enter for a manual test |
 | `seed-inventory.php` | Seeds a large database-only demo server (no deploys) on the current instance |
+| `full-e2e.sh`, `seed-full.php` | The full coverage test and its records |
+| `snapshot.sh`, `snapshot.php`, `snapshot-diff.php` | Write and compare the records of a server (`Tests\Support\ServerTransferSnapshot`) |
+| `runtime-snapshot.sh` | Writes the containers and Coolify files of a VM for a comparison |
 
 Tokens and the VM SSH key are written to `<main checkout>/.dev-instances/transfer-test/<source>/` (not in git).
 For a full manual test of every transferred setting, see `docs/server-transfer-full-coverage.md`.

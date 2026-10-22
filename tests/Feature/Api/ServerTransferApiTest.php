@@ -9,9 +9,11 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -162,6 +164,29 @@ describe('POST /api/v1/servers/import', function () {
             ->toBe('token-value-123')
             ->and(data_get(Server::where('uuid', $serverUuid)->first()?->server_metadata, 'transfer.status'))
             ->toBe('claimed');
+    });
+
+    test('keeps whitespace and empty strings of the bundle values', function () {
+        $this->application->forceFill(['dockerfile' => "FROM nginx:alpine\nEXPOSE 80\n", 'build_pack' => 'dockerfile'])->saveQuietly();
+        LocalFileVolume::withoutEvents(fn () => LocalFileVolume::forceCreate([
+            'uuid' => new_public_id(), 'fs_path' => '/data/coolify/applications/app.yml', 'mount_path' => '/etc/app.yml',
+            'content' => "  indented: true\nlast: line\n", 'resource_type' => Application::class, 'resource_id' => $this->application->id,
+        ]));
+        SharedEnvironmentVariable::create(['key' => 'EMPTY_ON_SERVER', 'value' => '', 'type' => 'server', 'server_id' => $this->server->id, 'team_id' => $this->team->id]);
+        $export = transferExportForApiTest($this->server);
+        $appUuid = $this->application->uuid;
+        $this->application->forceDelete();
+        $this->server->forceDelete();
+        $this->privateKey->delete();
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export])
+            ->assertCreated();
+
+        $imported = Application::where('uuid', $appUuid)->firstOrFail();
+        expect($imported->dockerfile)->toBe("FROM nginx:alpine\nEXPOSE 80\n")
+            ->and($imported->fileStorages()->value('content'))->toBe("  indented: true\nlast: line\n")
+            ->and(SharedEnvironmentVariable::where('key', 'EMPTY_ON_SERVER')->first()?->value)->toBe('');
     });
 
     test('rejects import when ip still exists', function () {

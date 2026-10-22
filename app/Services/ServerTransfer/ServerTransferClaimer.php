@@ -187,7 +187,9 @@ class ServerTransferClaimer
      */
     private function dnsResources(Server $server): Collection
     {
-        return $server->applications()
+        // The server itself owns the DNS record of its Cloudflare tunnel.
+        return collect([$server])
+            ->concat($server->applications())
             ->concat($server->services()->with('applications')->get()->flatMap->applications);
     }
 

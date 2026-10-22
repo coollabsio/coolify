@@ -738,6 +738,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             if (! $this->server->hetzner_server_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Hetzner Cloud server or token.');
 
@@ -760,6 +761,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
 
@@ -782,6 +784,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             if (! $this->server->digitalocean_droplet_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a DigitalOcean droplet or token.');
 
@@ -804,6 +807,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             if (! $this->server->hostinger_virtual_machine_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Hostinger VPS or token.');
 

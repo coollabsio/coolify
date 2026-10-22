@@ -449,7 +449,8 @@ class ServerTransferExporter
     private function collectManagedDnsRecords(Server $server, Collection $applications, Collection $services): array
     {
         // Keyed by "morph type:id". Soft-deleted previews are covered, but their references are not exported.
-        $resourceKeys = [];
+        // The server itself owns the DNS record of its Cloudflare tunnel.
+        $resourceKeys = [$server->getMorphClass().':'.$server->id => ['kind' => 'server', 'uuid' => $server->uuid]];
         foreach ($applications as $application) {
             $resourceKeys[$application->getMorphClass().':'.$application->id] = ['kind' => 'application', 'uuid' => $application->uuid];
             foreach (ApplicationPreview::withTrashed()->where('application_id', $application->id)->get() as $preview) {
@@ -461,10 +462,6 @@ class ServerTransferExporter
                 $resourceKeys[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['kind' => 'service_application', 'uuid' => $serviceApplication->uuid];
             }
         }
-        if ($resourceKeys === []) {
-            return ['records' => collect(), 'resource_keys' => [], 'warnings' => []];
-        }
-
         $records = ManagedDnsRecord::query()
             ->whereHas('references', function ($query) use ($resourceKeys) {
                 $query->where(function ($query) use ($resourceKeys) {

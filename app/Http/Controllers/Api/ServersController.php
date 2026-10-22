@@ -18,6 +18,7 @@ use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -966,6 +967,17 @@ class ServersController extends Controller
         $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if (is_null($deleteFromProvider)) {
             return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
+        }
+        // Another Coolify instance manages a transferred server. This instance deletes only its own records:
+        // never the cloud server, the containers, or the DNS records that the other instance uses.
+        if ($server->isTransferredAway()) {
+            if ($deleteFromProvider) {
+                return response()->json(['message' => 'This server is managed by another Coolify instance. Delete its cloud server from that instance.'], 422);
+            }
+            app(ServerTransferClaimer::class)->deleteArchive($server);
+            auditLog('api.server.deleted', ['team_id' => $teamId, 'server_uuid' => $server->uuid, 'server_name' => $server->name, 'ip' => $server->ip, 'archive' => true]);
+
+            return response()->json(['message' => 'Server deleted.']);
         }
 
         if ($server->definedResources()->count() > 0 && ! $force) {

@@ -64,8 +64,19 @@ class SshMultiplexingHelper
         }
     }
 
+    /**
+     * A disabled server, such as the archive of a transferred server, gets no SSH or scp connection.
+     */
+    private static function assertNotDisabled(Server $server): void
+    {
+        if ($server->settings->force_disabled) {
+            throw new \RuntimeException('Server is disabled.');
+        }
+    }
+
     public static function establishNewMultiplexedConnection(Server $server): bool
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
@@ -133,6 +144,7 @@ class SshMultiplexingHelper
 
     public static function generateScpCommand(Server $server, string $source, string $dest): string
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
@@ -173,6 +185,7 @@ class SshMultiplexingHelper
      */
     public static function generateScpDownloadCommand(Server $server, string $remoteSource, string $localDest): string
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
@@ -234,9 +247,7 @@ class SshMultiplexingHelper
 
     private static function sshCommandPrefix(Server $server, bool $disableMultiplexing, ?int $commandTimeout): string
     {
-        if ($server->settings->force_disabled) {
-            throw new \RuntimeException('Server is disabled.');
-        }
+        self::assertNotDisabled($server);
 
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];

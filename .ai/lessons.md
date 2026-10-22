@@ -1,5 +1,9 @@
 # Lessons
 
+## Keep imported data exact
+- The global `TrimStrings` and `ConvertEmptyStringsToNull` middleware change every string of a JSON request. An endpoint that receives stored records (for example the server transfer import) must skip them with `skipWhen()`; otherwise text loses its edge whitespace and an empty value becomes null.
+- Code that creates models from stored data with model events on also runs their `created` hooks and set-mutators (default destinations, settings, variables, parser versions, ports). Compare the result with the source record by record, and restore or remove what the hooks changed.
+
 ## Prove regressions before changing code
 - Reproduce the reported failure on the unchanged baseline before adding a fix.
 - When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.

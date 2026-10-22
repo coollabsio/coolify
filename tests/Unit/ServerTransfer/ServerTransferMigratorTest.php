@@ -654,13 +654,21 @@ test('transfer back asks the managing instance to transfer the archive here with
 
     $token = $user->tokens()->sole();
     expect((int) $token->team_id)->toBe($this->team->id)
-        ->and($token->abilities)->toBe(['read', 'write'])
         ->and($token->expires_at->isFuture())->toBeTrue()
         ->and(data_get($this->server->fresh()->server_metadata, 'transfer.transfer_back.from'))->toBe('https://8.8.8.8');
-    Http::assertSent(fn ($request) => $request->url() === "https://8.8.8.8/api/v1/servers/{$this->server->uuid}/migrate"
-        && $request->hasHeader('Authorization', 'Bearer token-of-b')
-        && $request['target_url'] === 'https://coolify-a.test'
-        && str_starts_with((string) $request['target_token'], $token->id.'|'));
+    $importToken = null;
+    Http::assertSent(function ($request) use ($token, &$importToken) {
+        $importToken = (string) $request['target_token'];
+
+        return $request->url() === "https://8.8.8.8/api/v1/servers/{$this->server->uuid}/migrate"
+            && $request->hasHeader('Authorization', 'Bearer token-of-b')
+            && $request['target_url'] === 'https://coolify-a.test'
+            && str_starts_with($importToken, $token->id.'|');
+    });
+    // The other instance runs the import checks and the import with this token. An empty bundle fails only the validation.
+    $this->withHeaders(['Authorization' => "Bearer {$importToken}", 'Accept' => 'application/json'])
+        ->postJson('/api/v1/servers/import', ['bundle' => []])
+        ->assertStatus(422);
 });
 
 test('a refused transfer back deletes the token and shows the reason of the other instance', function () {

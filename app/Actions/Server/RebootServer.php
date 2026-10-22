@@ -20,9 +20,7 @@ SH;
 
     public function handle(Server $server): void
     {
-        if ($server->isTransferredAway()) {
-            throw new \RuntimeException('This server is managed by another Coolify instance.');
-        }
+        $server->assertNotTransferredAway();
         if (! $server->isFunctional()) {
             throw new \RuntimeException('Server is not reachable or not ready.');
         }

@@ -523,7 +523,8 @@ class ServerTransferMigrator
             throw new RuntimeException('Enter the URL at which the other instance reaches this instance.');
         }
 
-        $importToken = $user->createToken("transfer back {$archive->uuid}", ['read', 'write'], now()->addHours(3), $archive->team_id);
+        // The import checks and the import need write and deploy.
+        $importToken = $user->createToken("transfer back {$archive->uuid}", ['read', 'write', 'deploy'], now()->addHours(3), $archive->team_id);
         $migrateUrl = $managerUrl.'/api/v1/servers/'.rawurlencode($archive->uuid).'/migrate';
 
         try {

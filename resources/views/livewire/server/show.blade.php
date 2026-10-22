@@ -294,7 +294,7 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </x-forms.button>
                                 @endif
-                                @if ($server->cloudProviderToken)
+                                @if ($server->cloudProviderToken && ! $server->isTransferredAway())
                                     @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
                                         <x-forms.button type="button" wire:click.prevent="startHetznerServer" isHighlighted
                                             canGate="update" :canResource="$server">

@@ -29,6 +29,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneSqlite;
+use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Models\User;
@@ -339,6 +340,71 @@ test('round trip import preserves uuids secrets and related resources after sour
         ->first();
     expect($shared)->not->toBeNull()
         ->and($shared->value)->toBe('shared-secret');
+});
+
+test('an imported application and service keep their compose parser version and their variables', function () {
+    $this->application->forceFill(['build_pack' => 'nixpacks', 'compose_parsing_version' => '3'])->saveQuietly();
+    EnvironmentVariable::updateOrCreate(['key' => 'NIXPACKS_NODE_VERSION', 'resourceable_type' => $this->application->getMorphClass(), 'resourceable_id' => $this->application->id], ['value' => '18']);
+    $this->service->forceFill(['compose_parsing_version' => '3'])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    $serviceUuid = $this->service->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $application = Application::where('uuid', $applicationUuid)->firstOrFail();
+    expect($application->compose_parsing_version)->toBe('3')
+        ->and(Service::where('uuid', $serviceUuid)->value('compose_parsing_version'))->toBe('3')
+        ->and($application->environment_variables()->where('key', 'NIXPACKS_NODE_VERSION')->pluck('value')->all())->toBe(['18']);
+});
+
+test('a static application keeps the port that the user set after turning on static', function () {
+    $this->application->settings->forceFill(['is_static' => true])->save();
+    $this->application->refresh()->forceFill(['ports_exposes' => '8080'])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $application = Application::where('uuid', $applicationUuid)->firstOrFail();
+    expect($application->ports_exposes)->toBe('8080')
+        ->and($application->settings->is_static)->toBeTrue();
+});
+
+test('a swarm server gets only the destinations of the bundle', function () {
+    $swarm = (new SwarmDocker)->forceFill(['uuid' => new_public_id(), 'name' => 'swarm', 'network' => 'swarm-overlay', 'server_id' => $this->server->id]);
+    $swarm->saveQuietly();
+    foreach ([$this->application, $this->database, $this->service] as $resource) {
+        $resource->forceFill(['destination_type' => $swarm->getMorphClass(), 'destination_id' => $swarm->id])->saveQuietly();
+    }
+    $this->destination->delete();
+    $this->server->settings->forceFill(['is_swarm_manager' => true])->saveQuietly();
+    $bundle = $this->exporter->export($this->server->fresh());
+    $serverUuid = $this->server->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $server = Server::where('uuid', $serverUuid)->firstOrFail();
+    expect($server->standaloneDockers()->count())->toBe(0)
+        ->and($server->swarmDockers()->pluck('network')->all())->toBe(['swarm-overlay']);
+});
+
+test('variables with a legacy key that new variables cannot use move unchanged', function () {
+    $variable = EnvironmentVariable::create(['key' => 'LEGACY_KEY', 'value' => 'legacy', 'resourceable_type' => $this->application->getMorphClass(), 'resourceable_id' => $this->application->id]);
+    DB::table('environment_variables')->where('id', $variable->id)->update(['key' => 'legacy-key']);
+    $shared = SharedEnvironmentVariable::create(['type' => 'server', 'server_id' => $this->server->id, 'team_id' => $this->team->id, 'key' => 'LEGACY_SHARED', 'value' => 'shared']);
+    DB::table('shared_environment_variables')->where('id', $shared->id)->update(['key' => 'legacy-shared']);
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Application::where('uuid', $applicationUuid)->firstOrFail()->environment_variables()->where('key', 'legacy-key')->value('value'))->toBe('legacy')
+        ->and(SharedEnvironmentVariable::where('key', 'legacy-shared')->value('value'))->toBe('shared');
 });
 
 test('import validates the claimed server in the background, but a dry run does not', function () {

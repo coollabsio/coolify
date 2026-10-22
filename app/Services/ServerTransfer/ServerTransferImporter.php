@@ -416,7 +416,7 @@ class ServerTransferImporter
             $warnings = array_merge($warnings, $this->linkSqliteVolumes());
 
             $this->importDnsZones(data_get($bundle, 'dns_zones', []), $preserveUuids);
-            $created['managed_dns_records'] = $this->importManagedDnsRecords(data_get($bundle, 'managed_dns_records', []), $teamId, $preserveUuids);
+            $created['managed_dns_records'] = $this->importManagedDnsRecords(data_get($bundle, 'managed_dns_records', []), $server, $teamId, $preserveUuids);
 
             $created['ssl_certificates'] = $this->importSslCertificates(data_get($bundle, 'ssl_certificates', []), $server);
             $created['volume_backups'] = $this->importVolumeBackups(data_get($bundle, 'volume_backups', []), $teamId);
@@ -811,6 +811,9 @@ class ServerTransferImporter
 
             $map[$originalUuid !== '' ? $originalUuid : $model->uuid] = $model->fresh();
         }
+        // The created hook of the server made a default destination; the server gets only the destinations of the bundle.
+        StandaloneDocker::query()->whereKey($existingStandalone->slice($standaloneIndex)->modelKeys())->delete();
+        SwarmDocker::query()->whereKey($existingSwarm->slice($swarmIndex)->modelKeys())->delete();
 
         return $map;
     }
@@ -821,17 +824,7 @@ class ServerTransferImporter
     private function importServerSharedEnvVars(array $variables, Server $server, int $teamId): void
     {
         foreach ($variables as $variable) {
-            SharedEnvironmentVariable::create([
-                'key' => data_get($variable, 'key'),
-                'value' => data_get($variable, 'value'),
-                'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
-                'is_literal' => (bool) data_get($variable, 'is_literal', false),
-                'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
-                'comment' => data_get($variable, 'comment'),
-                'type' => 'server',
-                'server_id' => $server->id,
-                'team_id' => $teamId,
-            ]);
+            $this->createSharedVariable($variable, ['type' => 'server', 'server_id' => $server->id, 'team_id' => $teamId]);
         }
     }
 
@@ -854,17 +847,35 @@ class ServerTransferImporter
 
                 continue;
             }
-            SharedEnvironmentVariable::create([
-                'key' => $key,
-                'value' => data_get($variable, 'value'),
-                'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
-                'is_literal' => (bool) data_get($variable, 'is_literal', false),
-                'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
-                'comment' => data_get($variable, 'comment'),
-                'type' => 'team',
-                'team_id' => $teamId,
-            ]);
+            $this->createSharedVariable($variable, ['type' => 'team', 'team_id' => $teamId]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $variable  A shared variable of the bundle.
+     * @param  array<string, mixed>  $scope  The type, the team, and the server, project, or environment of the variable.
+     */
+    private function createSharedVariable(array $variable, array $scope): void
+    {
+        $shared = new SharedEnvironmentVariable([
+            'value' => data_get($variable, 'value'),
+            'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
+            'is_literal' => (bool) data_get($variable, 'is_literal', false),
+            'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
+            'comment' => data_get($variable, 'comment'),
+            ...$scope,
+        ]);
+        $this->keepVariableKey($shared, (string) data_get($variable, 'key'));
+        $shared->save();
+    }
+
+    /**
+     * Sets the key of a variable as it is on the source. The key setter rejects names that only older Coolify
+     * versions accepted (such as my-var); deployments skip those with a warning, so the transfer keeps them.
+     */
+    private function keepVariableKey(EnvironmentVariable|SharedEnvironmentVariable $variable, string $key): void
+    {
+        $variable->setRawAttributes(['key' => $key] + $variable->getAttributes());
     }
 
     /**
@@ -1037,17 +1048,7 @@ class ServerTransferImporter
             if ($exists) {
                 continue;
             }
-            SharedEnvironmentVariable::create([
-                'key' => data_get($variable, 'key'),
-                'value' => data_get($variable, 'value'),
-                'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
-                'is_literal' => (bool) data_get($variable, 'is_literal', false),
-                'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
-                'comment' => data_get($variable, 'comment'),
-                'type' => 'project',
-                'project_id' => $project->id,
-                'team_id' => $teamId,
-            ]);
+            $this->createSharedVariable($variable, ['type' => 'project', 'project_id' => $project->id, 'team_id' => $teamId]);
         }
     }
 
@@ -1115,17 +1116,7 @@ class ServerTransferImporter
             if ($exists) {
                 continue;
             }
-            SharedEnvironmentVariable::create([
-                'key' => data_get($variable, 'key'),
-                'value' => data_get($variable, 'value'),
-                'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
-                'is_literal' => (bool) data_get($variable, 'is_literal', false),
-                'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
-                'comment' => data_get($variable, 'comment'),
-                'type' => 'environment',
-                'environment_id' => $environment->id,
-                'team_id' => $teamId,
-            ]);
+            $this->createSharedVariable($variable, ['type' => 'environment', 'environment_id' => $environment->id, 'team_id' => $teamId]);
         }
     }
 
@@ -1304,11 +1295,18 @@ class ServerTransferImporter
         // Maintenance mode is not fillable.
         $application->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page'])->all());
         $application->save();
+        // The created hook gives a new application the newest compose parser and default variables. A transferred
+        // application keeps its parser, which names its volumes and domains, and gets only the variables of the bundle.
+        $application->forceFill(collect($attributes)->only('compose_parsing_version')->filter()->all())->saveQuietly();
+        EnvironmentVariable::query()->whereMorphedTo('resourceable', $application)->delete();
 
         $settings = (array) data_get($payload, 'settings', []);
         if ($settings !== [] && $application->settings) {
+            $portsExposes = $application->ports_exposes;
             $application->settings->fill(collect($settings)->except(['id', 'application_id'])->all());
             $application->settings->save();
+            // The is_static setter sets the port of a static application to 80; the user can change it after that.
+            $application->refresh()->forceFill(['ports_exposes' => $portsExposes])->saveQuietly();
         }
 
         $this->importEnvVars(data_get($payload, 'environment_variables', []), $application, false);
@@ -1415,6 +1413,8 @@ class ServerTransferImporter
         // Maintenance mode and the Coolify default variables switch are not fillable.
         $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'])->all());
         $service->save();
+        // The created hook gives a new service the newest compose parser; a transferred service keeps its own.
+        $service->forceFill(collect($attributes)->only('compose_parsing_version')->filter()->all())->saveQuietly();
 
         $this->importEnvVars(data_get($payload, 'environment_variables', []), $service, false);
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $service, $teamId);
@@ -1524,7 +1524,6 @@ class ServerTransferImporter
 
                 $env = new EnvironmentVariable;
                 $env->forceFill([
-                    'key' => data_get($variable, 'key'),
                     'value' => data_get($variable, 'value'),
                     'is_literal' => (bool) data_get($variable, 'is_literal', false),
                     'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
@@ -1542,6 +1541,7 @@ class ServerTransferImporter
                     'resourceable_type' => $resource->getMorphClass(),
                     'resourceable_id' => $resource->id,
                 ]);
+                $this->keepVariableKey($env, (string) data_get($variable, 'key'));
                 // Older bundles have no version; the column default applies.
                 if (filled(data_get($variable, 'version'))) {
                     $env->version = (string) data_get($variable, 'version');
@@ -2166,7 +2166,7 @@ class ServerTransferImporter
      *
      * @param  list<array<string, mixed>>  $records
      */
-    private function importManagedDnsRecords(array $records, int $teamId, bool $preserveUuids): int
+    private function importManagedDnsRecords(array $records, Server $server, int $teamId, bool $preserveUuids): int
     {
         $count = 0;
         foreach ($records as $payload) {
@@ -2177,6 +2177,7 @@ class ServerTransferImporter
                     'application' => $this->applicationMap[(string) data_get($reference, 'uuid')] ?? null,
                     'preview' => $this->previewMap[(string) data_get($reference, 'uuid')] ?? null,
                     'service_application' => $this->serviceApplicationMap[(string) data_get($reference, 'uuid')] ?? null,
+                    'server' => $server,
                     default => null,
                 })
                 ->filter()

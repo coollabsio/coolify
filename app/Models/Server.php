@@ -1387,6 +1387,19 @@ $siteAddress {
     }
 
     /**
+     * Stops an action that changes the host, its cloud server, its Cloudflare tunnel, or its DNS records.
+     * Another Coolify instance manages a transferred server; this instance keeps only an archive of it.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertNotTransferredAway(): void
+    {
+        if ($this->isTransferredAway()) {
+            throw new \RuntimeException('This server is managed by another Coolify instance.');
+        }
+    }
+
+    /**
      * Whether this server may be validated / installed against from this instance.
      */
     public function canBeValidated(): bool

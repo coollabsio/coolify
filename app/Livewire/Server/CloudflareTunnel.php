@@ -88,6 +88,7 @@ class CloudflareTunnel extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             if (filled($this->server->settings->cloudflare_tunnel_id)) {
                 foreach ($tunnels->tearDown($this->server) as $warning) {
                     $this->dispatch('warning', $warning);
