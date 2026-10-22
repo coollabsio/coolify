@@ -38,7 +38,7 @@
                 default => ['Ready', 'success'],
             }];
         });
-        $iconButton = 'flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
+        $iconButton = 'card-icon-button flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black';
         // Same look as $iconButton, sized to the 20px section title it sits next to.
         $titleIconButton = 'flex size-5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
         $tableShell = 'overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]';
@@ -127,7 +127,7 @@
 
                             <div class="flex min-w-0 items-start gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                     @if ($project->icon_path)
                                         <img src="{{ project_icon_url($project) }}"
                                             alt="{{ $project->name }} icon"
@@ -150,18 +150,13 @@
                             </div>
 
                             <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
-                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
-                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
-                                        aria-label="Environments">
-                                        <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                                        {{ $project->environments->count() }}
-                                    </span>
-                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
-                                        aria-label="Resources">
-                                        <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                                        {{ $resourceCount }}
-                                    </span>
-                                </div>
+                                <p class="project-card-stats relative z-10 min-w-0">
+                                    <b>{{ $project->environments->count() }}</b>
+                                    {{ $project->environments->count() === 1 ? 'environment' : 'environments' }}
+                                    <span class="project-card-stats-dot" aria-hidden="true">&middot;</span>
+                                    <b>{{ $resourceCount }}</b>
+                                    {{ $resourceCount === 1 ? 'resource' : 'resources' }}
+                                </p>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     @if ($firstEnvironment)
@@ -210,7 +205,7 @@
                                 class="absolute inset-0" aria-label="Open {{ $project->name }}"></a>
                             <div class="flex min-w-0 items-center gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                    class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                     @if ($project->icon_path)
                                         <img src="{{ project_icon_url($project) }}" alt="{{ $project->name }} icon"
                                             class="h-full w-full rounded-lg object-cover">
@@ -356,7 +351,7 @@
 
                             <div class="relative z-10 flex min-w-0 items-start gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
                                 <div class="min-w-0 flex-1 self-center">
@@ -400,7 +395,7 @@
                             class="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-4 @2xl:min-w-[480px] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem] hover:no-underline {{ $tableRow }}">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
+                                    class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
                                 <p class="truncate text-[13px] font-semibold text-black dark:text-fg">

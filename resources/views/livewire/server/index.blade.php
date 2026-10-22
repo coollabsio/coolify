@@ -191,7 +191,7 @@
 
                         <div class="relative z-10 flex items-start gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0 flex-1 self-center">
@@ -253,7 +253,7 @@
                         ])>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0">

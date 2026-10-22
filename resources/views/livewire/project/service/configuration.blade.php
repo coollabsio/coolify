@@ -33,7 +33,9 @@
                         <x-application.settings-section id="compose-resources-section" title="Compose resources"
                             description="Applications and databases defined in this service." flush>
                             <x-slot:actions>
-                                <x-canvas-view-toggle />
+                                @if ($applications->isNotEmpty() || $databases->isNotEmpty())
+                                    <x-canvas-view-toggle />
+                                @endif
                                 <a class="button" target="_blank" href="{{ $service->documentation() }}">
                                     Documentation
                                     <x-reicon name="external-link" class="size-4" />
