@@ -5576,6 +5576,12 @@ html:where(:not([data-nav-items="flat"])) .menu-subitem {
         background-color: oklch(100% 0 0 / 0.07) !important;
     }
 
+    /* The collapsed desktop rail shows Search as a tile only, without the row fill. */
+    html .app-sidebar nav.sidebar-collapsed .menu-search.menu-item,
+    html .app-sidebar nav.sidebar-collapsed .menu-search.menu-item:hover {
+        background-color: transparent !important;
+    }
+
     @media (max-width: 1023.98px) {
         html:where(:not([data-nav-items="flat"])) nav.sidebar-collapsed .menu-search.menu-item {
             background-color: var(--color-neutral-100) !important;
@@ -5599,7 +5605,7 @@ html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subi
     border-color: #8a4dff !important;
     background: linear-gradient(180deg, var(--color-brand-hover) 0%, var(--color-brand-press) 100%) !important;
     --button-depth-color: var(--color-brand-depth) !important;
-    box-shadow: 0 2px 0 var(--color-brand-depth), 0 0 16px rgb(115 23 255 / 0.50) !important;
+    box-shadow: 0 2px 0 var(--color-brand-depth) !important;
 }
 
 html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active):active .menu-item-icon:not(.text-error) {
@@ -6040,6 +6046,19 @@ html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search kbd {
     border-color: rgb(163 145 255 / 0.18) !important;
 }
 
+/* The collapsed rail shows Search as a tile like the other items: no row frame (the fill is
+   removed in the utilities layer above), the dark tile. */
+html.dark .app-sidebar nav.sidebar-collapsed .menu-search {
+    box-shadow: none !important;
+}
+
+html.dark:where(:not([data-nav-items="flat"])) .app-sidebar nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon {
+    border-color: rgb(163 145 255 / 0.13);
+    background: rgb(107 22 237 / 0.07);
+    color: #b9adff;
+    --button-depth-color: rgb(255 255 255 / 0.05);
+}
+
 html.dark :is(.app-sidebar, .mobile-sidebar-sheet) nav:not(.sidebar-collapsed) .nav-section {
     font-family: var(--font-mono);
     font-size: 10.5px;
@@ -6116,6 +6135,44 @@ html.dark .view-toggle > .is-selected svg {
 html.dark .view-toggle .bg-coollabs {
     background-color: rgb(163 145 255 / 0.18);
     color: #d9d0ff;
+}
+
+/* Toasts: a faint edge that blends into the toast background. */
+html.dark .toast-card {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.05), var(--shadow-dropdown);
+}
+
+/* Toast icon tile: the 3D depth of the sidebar tiles, tinted with the icon color of the toast type. */
+.toast-icon {
+    border: 1px solid color-mix(in oklab, currentColor 22%, transparent);
+    box-shadow: 0 2px 0 color-mix(in oklab, currentColor 30%, transparent);
+}
+
+/* Command palette: the purple brand tint of the dark shell. */
+html.dark .command-palette {
+    background: color-mix(in oklab, #6b16ed 10%, var(--coollabs-elevated));
+    box-shadow: 0 0 0 1px rgb(163 145 255 / 0.22), var(--shadow-dropdown);
+}
+
+html.dark .command-palette-header {
+    background: transparent;
+}
+
+html.dark .command-palette-header-icon:not(.is-loading) {
+    color: var(--color-brand-light);
+}
+
+html.dark .command-palette-input::placeholder {
+    color: oklch(72% 0.05 300);
+}
+
+html.dark .command-palette-body {
+    background: color-mix(in oklab, #6b16ed 6%, var(--coollabs-base));
+    box-shadow: 0 0 0 1px rgb(163 145 255 / 0.12);
+}
+
+html.dark .command-palette-item:is(:focus, :focus-visible) :is(.command-palette-quickcommand, .command-palette-type-badge, .command-palette-item-chevron, .command-palette-item-icon) {
+    color: #fff;
 }
 
 html.dark .resource-glyph {

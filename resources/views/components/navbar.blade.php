@@ -178,6 +178,7 @@
                 // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth};
                 // only the desktop sidebar has the slots.
                 $navContext = $desktop ? request()->attributes->get('mainNavContext', []) : [];
+                $navContextName = collect($navContext)->pluck('name')->filter()->last() ?? 'Resource menu';
             @endphp
             {{-- Wide screens on a resource page: the deepest resource menu replaces the main menu. Back shows the
                  menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
@@ -255,6 +256,25 @@
             @endforeach
             <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
+                    @if ($navContext)
+                        {{-- Wide screens: the main menu of a resource page opens the deepest resource menu again.
+                             Other pages keep an empty row, so the menu items do not move between pages. --}}
+                        <li class="mb-1 hidden xl:block">
+                            <button type="button" @click="navLevel = {{ array_key_last($navContext) }}; navSwap = 'forward'"
+                                title="Back to the {{ $navContextName }} menu" aria-label="Back to the {{ $navContextName }} menu"
+                                class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
+                                <span class="flex-1 truncate pl-6 text-center font-medium text-black dark:text-fg"
+                                    :class="collapsed && 'lg:hidden'">{{ $navContextName }}</span>
+                                <span class="menu-back-icon flex shrink-0 items-center justify-center">
+                                    <x-reicon name="chevron-down" class="size-3 -rotate-90 text-coollabs dark:text-fg-dim" />
+                                </span>
+                            </button>
+                        </li>
+                    @elseif ($desktop)
+                        <li class="mb-1 hidden xl:block" aria-hidden="true">
+                            <span class="menu-item menu-back invisible"><span class="menu-back-icon"></span><span class="font-medium">&nbsp;</span></span>
+                        </li>
+                    @endif
             @foreach ($navSections as $sectionLabel => $sectionItems)
                 {{-- The first section needs no title. --}}
                 @unless ($loop->first)

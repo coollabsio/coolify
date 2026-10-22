@@ -254,7 +254,7 @@
 
 @php
     // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
-    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu', $application->name);
 @endphp
 
 {{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).

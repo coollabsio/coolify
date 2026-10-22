@@ -35,8 +35,8 @@ change.
 - **One accent.** Coolify purple in both themes (`#6b16ed`, hover `#7317ff`,
   pressed `#5a12c7`, depth `#4a0fa3`, light text and icons `#a391ff`). Yellow
   is only for real warnings. The dark sidebar, including the logo cell, is
-  purple-black (`#120e1a`) with a faint brand wash. The page canvas stays
-  neutral.
+  purple-black (`#120e1a`) with a faint brand wash. The dark command palette
+  has a light purple tint. The page canvas stays neutral.
 - **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
   No em dashes in UI copy.
 
@@ -142,7 +142,8 @@ Rules for the tokens:
   `--ui-menu-bg`, never a translucent value, or the content behind shows
   through.
 - Keep the page canvas, cards, menus, and logs pure neutral (chroma 0). The
-  dark sidebar and the logo cell above it are the tinted surface.
+  dark sidebar, the logo cell above it, and the dark command palette are the
+  tinted surfaces.
 - **Dark lightness level.** The canvas is at 14.48% and the header panel at
   19.13%. To
   change the level, move every dark surface and border token by the same
@@ -232,7 +233,7 @@ Class names below are examples. Keep the values and structure.
     border-color: #8a4dff;
     background: linear-gradient(180deg, var(--ui-accent-top), var(--ui-accent-bottom));
     --ui-depth-color: var(--ui-accent-edge);
-    box-shadow: 0 2px 0 var(--ui-accent-edge), 0 0 16px rgb(115 23 255 / 0.50);
+    box-shadow: 0 2px 0 var(--ui-accent-edge);  /* no glow: the row clips it */
 }
 ```
 
@@ -242,6 +243,17 @@ Class names below are examples. Keep the values and structure.
   hidden until the row is hovered, focused, or current.
 - Group rows under section labels (11px in light mode; 10.5px uppercase muted
   lavender in dark mode), and separate groups with a 1px divider.
+- Do not put a glow (a blurred `box-shadow`) on a tile. The current row clips
+  it, so it shows as a dim square behind the tile.
+- In the collapsed sidebar, Search is a tile like the other items: no row fill
+  and no frame around it. Only the expanded sidebar shows Search as an input.
+- A menu that replaces another menu in place starts with a back row: a
+  centered label and a 12px chevron on the side of the direction. The back row
+  points left (`‹ Dashboard`). The row that opens the resource menu again from
+  the main menu points right (`adonisjs ›`) and shows the resource name.
+- Keep the menu items in the same place on every page. When a page has no
+  resource menu, keep an empty row of the same height where the resource row
+  would be.
 
 ### Card (outer box, title row, well)
 
@@ -357,6 +369,17 @@ Class names below are examples. Keep the values and structure.
 - Grid view tiles of a collection are cards without a well. In dark mode they
   are `--ui-panel`, the same as the header bar.
 
+### View switcher
+
+- A segmented control (`.view-toggle`) on the right of a collection toolbar.
+- Table and grid buttons are icon-only (30px square, 14px icon). The name is in
+  `title` and `aria-label`.
+- Show only the view that is not current. In table view the control shows the
+  grid icon; in grid view, the list icon. Do not show a selected pill for the
+  current view.
+- Text links stay labelled: the `Canvas` link with its "Try it" badge, and the
+  `List view` link that is the only way back from a canvas.
+
 ### Status badge
 
 ```css
@@ -388,6 +411,22 @@ Class names below are examples. Keep the values and structure.
 - Toasts are compact cards (max width 26rem) with a status icon tile, a title,
   an optional description, and a dismiss button. They close after 4 seconds
   and pause on hover.
+- The toast edge blends into the toast background. In dark mode it is
+  `rgb(255 255 255 / 0.05)`, not the control border.
+- The status icon tile is 3D, like a navigation tile: a 1px border and a 2px
+  bottom edge in the status color (`currentColor` at 22% and 30%).
+
+### Command palette
+
+- In dark mode the palette has a light brand tint: the shell is
+  `color-mix(in oklab, #6b16ed 10%, <elevated>)` with a
+  `rgb(163 145 255 / 0.22)` ring, and the results body is 6% purple with a
+  `rgb(163 145 255 / 0.12)` ring. The search icon is `#a391ff`. The
+  placeholder is muted lavender.
+- On the selected (focused) row in dark mode, the parts on a purple fill are
+  white: the quick-command and type badges, the icon tile glyph (for example
+  the plus of a create row), and the chevron. Purple text on a purple fill is
+  not readable.
 
 ### Logs and code
 
@@ -468,8 +507,8 @@ The interface is compact and product-focused:
 - outline Reicon glyphs through `<x-reicon>`;
 - the Coolify purple brand accent in both themes (`#6b16ed`); yellow only for
   real warnings, such as "Update available";
-- the active sidebar item is a purple gradient tile with a soft glow. The row
-  itself stays transparent;
+- the active sidebar item is a purple gradient tile with a 2px depth edge and
+  no glow. The row itself stays transparent;
 - sentence-case labels and headings;
 - never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
   ASCII hyphen (`-`) for empty cells and separators.
@@ -596,10 +635,10 @@ value. The dark ladder is `--color-app` 10, `--color-panel` 20,
 `--coollabs-elevated` 22, `--coollabs-base` 28,
 `--coollabs-recessed` 34 (sRGB, r=g=b), which reads as distinct surfaces.
 
-Temperature: the page canvas, cards, menus, listboxes, modals, logs, and the
-command palette stay **pure neutral gray** (r=g=b). Do not tint those. The
-dark sidebar (`--color-sidebar`, `#120e1a`) is the exception: it carries a
-faint brand-purple wash. The light page canvas uses `bg-neutral-50` (not
+Temperature: the page canvas, cards, menus, listboxes, modals, and logs stay
+**pure neutral gray** (r=g=b). Do not tint those. The dark sidebar
+(`--color-sidebar`, `#120e1a`) and the dark command palette are the exceptions:
+they carry a faint brand-purple wash. The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
 The only intentional color is the purple brand accent. Yellow is for warnings.
 - **Layer cards** use the outer box and inset well from section 5.
@@ -608,7 +647,10 @@ The only intentional color is the purple brand accent. Yellow is for warnings.
   Nested pages keep the full trail (project, environment, resource).
 - **Pagination** is hidden when there is only one page (both arrows disabled).
 - **Project cards** spell out their counts: "1 environment · 35 resources".
-- **The view switcher** shows every view. The current one is a purple pill.
+- **The view switcher** (`x-canvas-view-toggle`,
+  `x-shared-variables.view-controls`) shows only the other view, as an icon
+  button: the grid icon in table view, the list icon in grid view. The labelled
+  `Canvas` link and the `List view` link on canvas pages keep their text.
 - **Tables and collection tiles** outside a layer card use the
   `rounded-xl border … dark:bg-white/[0.05]` shell plus the crisp
   `--coollabs-hairline` ring; in light they are `bg-white` with the ring and
@@ -635,7 +677,13 @@ color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
 - With the default tile items (not Appearance → Navigation items → Flat), each
   icon sits in a 30px 3D tile (16px icon, 6px padding, 1px border) in a 36px row.
 - With tile items, the row has no fill: the current item shows through its
-  accent tile (purple light, yellow dark) and its brighter label.
+  purple accent tile and its brighter label. The dark active tile has a 2px
+  depth edge and no glow, because the row (`overflow: hidden`) clips a glow
+  into a square.
+- In the collapsed desktop sidebar, Search is a tile like the other items. The
+  row fill is removed in `@layer utilities` (the button has a layered
+  `!important` fill utility that an unlayered rule cannot beat), and the dark
+  tile uses the same colors as the other tiles.
 - With Flat items, active rows are rounded pills (`rounded-md`) with a solid
   neutral selected fill (`bg-black/5` light, `bg-white/6` dark) and no accent
   rail. Hover rows use the same radius. Do not use accent-tinted gradients on nav
@@ -661,6 +709,16 @@ in-flow resource heading, or legacy `.navbar-main` tabs to one resource type.
 
 Keep route-derived active state in Blade/Livewire. Do not rely only on Alpine
 state because it can disappear after polling or a Livewire morph.
+
+From `xl`, the resource menu replaces the main menu in the main sidebar
+(`x-main-nav-menu`, `registerMainNavContext()`, `components/navbar.blade.php`).
+Its back row (`‹ Dashboard`, `‹ Servers`, `‹ Service`) shows the menu one depth
+lower, without a page load. The main menu then starts with a row that opens the
+deepest resource menu again: the resource name with a right chevron
+(`adonisjs ›`). Pass the name as `name` to `registerMainNavContext()` or
+`<x-main-nav-menu :name>`; without a name the row says "Resource menu". Pages
+with no resource menu keep an invisible row of the same height, so the main
+menu items do not move between pages.
 
 The global topbar owns the current resource identity, its compact status
 badges, configuration warnings (`#configuration-warning-hud-slot`), and the
@@ -1169,7 +1227,11 @@ top-anchored overlay:
 - create rows use a neutral plus tile that only picks up the accent when the
   row is focused;
 - type pills and quickcommand chips stay recessed; they tint with the accent
-  only on the focused row;
+  only on the focused row. In dark mode the text of the focused row's chips,
+  its icon tile glyph, and its chevron are white;
+- in dark mode the shell, header, and results body carry the brand-purple
+  tint from Part 1 (rules after the dark `.view-toggle` rules in
+  `resources/css/app.css`). Light mode stays neutral;
 - neutral thin scrollbar inside the results body (not brand-colored);
 - create-resource modals opened from the palette reuse the standard
   `application-settings-section` layer-card shell.
@@ -1186,7 +1248,10 @@ server → destination → project → environment create flow.
 Current toast behavior:
 
 - compact layered card, maximum width 26rem;
-- Reicon status tile for success, info, warning, danger, or default;
+- Reicon status tile for success, info, warning, danger, or default. The tile
+  (`.toast-icon`) is 3D: a border and a 2px bottom edge in the status color;
+- a faint edge (`.toast-card`, dark `rgb(255 255 255 / 0.05)`) that blends into
+  the toast background;
 - title plus optional description;
 - dismiss and copy-details actions;
 - normally up to four stacked notifications, without evicting persistent notices;

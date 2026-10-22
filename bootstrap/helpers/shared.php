@@ -4626,11 +4626,12 @@ function wireNavigate(): string
  * Registers a resource menu that the main sidebar shows in place of its main menu on wide screens
  * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
  * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
+ * The main menu then shows a row (labelled with $name) that opens the deepest resource menu again.
  */
-function registerMainNavContext(int $depth, string $label, string $backTitle): void
+function registerMainNavContext(int $depth, string $label, string $backTitle, ?string $name = null): void
 {
     $levels = request()->attributes->get('mainNavContext', []);
-    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle];
+    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle, 'name' => $name];
     ksort($levels);
 
     request()->attributes->set('mainNavContext', $levels);
