@@ -19,6 +19,14 @@
                         this.sidebarReady = true;
                     });
                 });
+                if (!window.__coolifyMarkScrolled) {
+                    window.__coolifyMarkScrolled = () => {
+                        document.documentElement.classList.toggle('is-scrolled', window.scrollY > 2);
+                    };
+                    window.addEventListener('scroll', window.__coolifyMarkScrolled, { passive: true });
+                    document.addEventListener('livewire:navigated', () => requestAnimationFrame(window.__coolifyMarkScrolled));
+                }
+                window.__coolifyMarkScrolled();
             },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;

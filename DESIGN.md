@@ -29,11 +29,14 @@ change.
   soft outer box with a small title row.
 - **Tactile buttons.** Buttons and navigation icon tiles have a 2px bottom
   edge. They lift 1px on hover and press down on click.
-- **Dark gray, not black.** Dark mode is a pure neutral dark gray (page
-  canvas about sRGB 10,10,10). Light mode is pure neutral
-  gray.
-- **One accent per theme.** Purple in light mode, yellow in dark mode (purple
-  has too little contrast on dark surfaces). Everything else is neutral.
+- **Dark gray, not black.** Dark mode page canvas and the top bar are neutral
+  sRGB 10,10,10 (`#0a0a0a`). Cards sit one step up (`#121212`). Light mode is
+  pure neutral gray.
+- **One accent.** Coolify purple in both themes (`#6b16ed`, hover `#7317ff`,
+  pressed `#5a12c7`, depth `#4a0fa3`, light text and icons `#a391ff`). Yellow
+  is only for real warnings. The dark sidebar, including the logo cell, is
+  purple-black (`#120e1a`) with a faint brand wash. The page canvas stays
+  neutral.
 - **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
   No em dashes in UI copy.
 
@@ -94,8 +97,8 @@ follow the theme.
 
 .dark {
     /* Surfaces (dark: pure neutral dark gray) */
-    --ui-canvas: oklch(14.48% 0 0);   /* sRGB 10,10,10 */
-    --ui-panel: oklch(19.13% 0 0);     /* sRGB 20,20,20: header bar, card and table headers */
+    --ui-canvas: #0a0a0a;              /* page and top bar */
+    --ui-panel: #121212;               /* cards and table headers, not the top bar */
     --ui-card-bg: rgb(255 255 255 / 6%);
     --ui-card-border: rgb(255 255 255 / 8%);
     --ui-well-bg: rgb(0 0 0 / 34%);
@@ -114,8 +117,15 @@ follow the theme.
     --ui-fg-dim: oklch(76.99% 0 0);
     --ui-fg-faint: oklch(65% 0 0);
 
-    /* Accent and status: yellow accent in dark mode */
-    --ui-accent: oklch(88.13% 0.1507 91.7);
+    /* Accent stays purple. Yellow is the warning color, not the accent. */
+    --ui-accent: #6b16ed;
+    --ui-accent-top: #7317ff;
+    --ui-accent-bottom: #5a12c7;
+    --ui-accent-edge: #4a0fa3;
+    --ui-accent-fg: #ffffff;
+    --ui-accent-light: #a391ff;
+    --ui-sidebar: #120e1a;
+    --ui-card: #121212;
     --ui-success: oklch(72.27% 0.192 149.58);
     --ui-warning: oklch(88.13% 0.1507 91.7);
     --ui-error: oklch(66% 0.2 27.33);
@@ -131,16 +141,16 @@ Rules for the tokens:
 - Floating surfaces (menus, popovers, tooltips, modals) must be opaque. Use
   `--ui-menu-bg`, never a translucent value, or the content behind shows
   through.
-- Keep the dark surfaces pure neutral (chroma 0). A brand tint on the
-  surfaces was tried and removed.
+- Keep the page canvas, cards, menus, and logs pure neutral (chroma 0). The
+  dark sidebar and the logo cell above it are the tinted surface.
 - **Dark lightness level.** The canvas is at 14.48% and the header panel at
   19.13%. To
   change the level, move every dark surface and border token by the same
   amount (canvas, panel, menu, hover, borders, and the Coolify surface ladder),
   so the steps between layers stay the same. If you move only some of them, a
   hover fill can become darker than its menu.
-- The primary buttons use purple in both themes. Only focus rings, active
-  navigation, and other accent states change to yellow in dark mode.
+- Primary buttons, focus rings, and active navigation use purple in both
+  themes. Warning yellow is not an accent.
 
 ## P3. Scales
 
@@ -182,9 +192,14 @@ Class names below are examples. Keep the values and structure.
 - In dark mode, the header bar, the outer box of a top-level card, and the
   header row of a table use the same color (`--ui-panel`). The card wells and
   table rows are the darker content layer below them.
-- The sidebar is the canvas color and has a 1px `--ui-chrome-border` right
-  edge. The brand block (product name and version) at the top of the sidebar
-  column also uses the canvas color, with a 1px bottom border.
+- In light mode the sidebar is the canvas color and has a 1px
+  `--ui-chrome-border` right edge. In dark mode the sidebar column, including
+  the logo cell, is `#120e1a` with a brand-purple wash at the top (about 9%,
+  fading out) and a faint lavender right edge (`rgb(163 145 255 / 0.10)`).
+- The top bar matches the canvas. It has no bottom border at rest. After the
+  page scrolls under it, dark mode draws a lavender hairline
+  (`rgb(163 145 255 / 0.12)`), a translucent bar, blur, and a soft shadow.
+  The logo cell stays the solid sidebar color.
 - Keep the chrome borders faint. A strong border on near-black looks like a
   line drawn on the page.
 
@@ -205,21 +220,28 @@ Class names below are examples. Keep the values and structure.
     box-shadow: 0 2px 0 var(--ui-depth-color);
     transition: transform 80ms, box-shadow 80ms, border-color 120ms, background-color 120ms;
 }
-.dark .nav-tile { border-color: rgb(255 255 255 / 9%); background: rgb(255 255 255 / 4%); }
+.dark .nav-tile {
+    border-color: rgb(163 145 255 / 0.13);
+    background: rgb(107 22 237 / 0.07);
+    color: #b9adff;
+}
 .nav-item:hover .nav-tile { transform: translateY(-1px); box-shadow: 0 3px 0 var(--ui-depth-color); }
 .nav-item:active .nav-tile { transform: translateY(2px); box-shadow: none; }
 .nav-item.is-active .nav-tile {
-    color: var(--ui-accent);
-    border-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
-    --ui-depth-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
+    color: #fff;
+    border-color: #8a4dff;
+    background: linear-gradient(180deg, var(--ui-accent-top), var(--ui-accent-bottom));
+    --ui-depth-color: var(--ui-accent-edge);
+    box-shadow: 0 2px 0 var(--ui-accent-edge), 0 0 16px rgb(115 23 255 / 0.50);
 }
 ```
 
 - Use outline icons (1.5px stroke) at 16px. A brand item can use a one-color
   brand mark when it is clearer than an outline icon.
-- Rows with a submenu end in a 12px chevron: accent in light mode, faint gray
-  in dark mode.
-- Group rows under 11px section labels, and separate groups with a 1px divider.
+- Rows with a submenu end in a 12px chevron. In dark mode the chevron is
+  hidden until the row is hovered, focused, or current.
+- Group rows under section labels (11px in light mode; 10.5px uppercase muted
+  lavender in dark mode), and separate groups with a 1px divider.
 
 ### Card (outer box, title row, well)
 
@@ -444,10 +466,10 @@ The interface is compact and product-focused:
   heavy borders or a strong floating shadow;
 - full-width data tables for dense collections;
 - outline Reicon glyphs through `<x-reicon>`;
-- the Coolify purple brand accent in light mode;
-- the readable Coolify yellow accent in dark mode;
-- solid active-item fills (neutral black/white opacity), not accent gradients;
-  active state is a flat selected surface with no accent rail;
+- the Coolify purple brand accent in both themes (`#6b16ed`); yellow only for
+  real warnings, such as "Update available";
+- the active sidebar item is a purple gradient tile with a soft glow. The row
+  itself stays transparent;
 - sentence-case labels and headings;
 - never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
   ASCII hyphen (`-`) for empty cells and separators.
@@ -527,19 +549,18 @@ the card well (`.dark .application-settings-section-body :is(.listbox-panel,
 ...)`).
 | `--coollabs-subtle` | 50% neutral | 70.8% neutral | labels and muted titles (light darkened for WCAG AA 4.5:1) |
 
-Accent behavior is intentionally theme-aware:
+Accent behavior uses Coolify purple in both themes. Brand tokens live in
+`@theme` as `--color-brand` (`#6b16ed`), `--color-brand-hover` (`#7317ff`),
+`--color-brand-press` (`#5a12c7`), `--color-brand-depth` (`#4a0fa3`), and
+`--color-brand-light` (`#a391ff`). Dark mode sets `--color-accent` to
+`--color-brand`. `--color-warning` stays yellow and is only for real warnings.
 
-- **Light mode:** Coolify purple (`coollabs`) for active controls, focus,
-  primary actions, and navigation accents.
-- **Dark mode:** Coolify yellow (`warning`) for the same states because the
-  original purple did not provide sufficient text and ring contrast.
-
-Do not hard-code blue focus rings or leave yellow accent utilities active in
-light mode. Primary action patterns should normally follow:
+Do not hard-code blue focus rings, and do not use `dark:text-warning` as a
+stand-in for the accent. Selected chips follow:
 
 ```html
 bg-coollabs/10 text-coollabs ring-coollabs/25
-dark:bg-warning/15 dark:text-warning dark:ring-warning/25
+dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25
 ```
 
 The filled top-level action/tab treatment uses the same palette at a restrained
@@ -554,16 +575,20 @@ lift off the content:
 - **Content canvas** is the base layer: `bg-app` in dark (deepest,
   `--color-app` `oklch(14.48% 0 0)`, sRGB 10,10,10), `bg-neutral-50` in light. The
   `<main>` content area and page body use it.
-- **Topbar chrome** uses `bg-panel` in dark (`--color-panel`
-  `oklch(19.13% 0 0)`, sRGB 20,20,20, a clear step lighter than the content canvas)
-  and `bg-white` in light, so the header reads as a separate panel. In dark
-  mode, top-level layer cards and table header rows use the same `--color-panel`.
+- **Topbar chrome** uses the canvas color in dark (`#0a0a0a`) and `bg-white`
+  in light. It has no bottom border until the page scrolls under it. Scrolling
+  adds `is-scrolled` on `<html>` (see `layouts/app.blade.php`) and the dark bar
+  becomes `rgb(10 10 10 / 0.72)` with blur and a lavender hairline. In dark
+  mode, top-level cards and table header rows use `--color-card` (`#121212`),
+  not the top bar.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
-  use the content canvas color (`bg-neutral-50` / `dark:bg-app`). The sidebar
-  has a 1px right border, and the brand block has a 1px bottom border. These
-  chrome borders stay faint (`border-black/[0.06]`, `dark:border-white/[0.04]`);
-  do not use `dark:border-white/[0.06]`, which a global rule forces to the
-  solid hairline grey. The mobile drawer keeps `bg-panel` / `bg-white`.
+  use the canvas color in light mode. In dark mode they use `--color-sidebar`
+  (`#120e1a`): a vertical brand wash on the nav, a radial wash on the logo
+  cell, and a lavender right edge. Section labels are 10.5px uppercase mono in
+  muted lavender. Chevrons are hidden until the row is hovered, focused, or
+  current. The Admin icon stays neutral. The footer is transparent so the
+  wash continues. Do not use `dark:border-white/[0.06]` on these chrome edges;
+  a global rule forces that utility to the solid hairline grey.
 
 Dark surface tokens are exact oklch equivalents of chosen sRGB steps. oklch
 lightness compresses toward pure black below ~15%, so check the rendered sRGB
@@ -571,22 +596,26 @@ value. The dark ladder is `--color-app` 10, `--color-panel` 20,
 `--coollabs-elevated` 22, `--coollabs-base` 28,
 `--coollabs-recessed` 34 (sRGB, r=g=b), which reads as distinct surfaces.
 
-Temperature: in both modes every panel is **pure neutral gray** (r=g=b).
-In dark mode, every surface token (`--color-app`, `--color-panel`,
-`--coollabs-*`, `--color-surface`, `--color-raised`, `--color-selected`,
-`--color-log`) has chroma 0, so menus, listbox panels, modals, logs, and the
-command palette match the canvas. Do not give one surface a cast (blue, warm,
-or purple). The light page canvas uses `bg-neutral-50` (not
+Temperature: the page canvas, cards, menus, listboxes, modals, logs, and the
+command palette stay **pure neutral gray** (r=g=b). Do not tint those. The
+dark sidebar (`--color-sidebar`, `#120e1a`) is the exception: it carries a
+faint brand-purple wash. The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
-The only intentional color is the purple/yellow brand accent.
+The only intentional color is the purple brand accent. Yellow is for warnings.
 - **Layer cards** use the outer box and inset well from section 5.
+- **Top-level pages** (Projects, Servers, and the other section roots) do not
+  repeat the page title in the breadcrumb when that title is the visible `h1`.
+  Nested pages keep the full trail (project, environment, resource).
+- **Pagination** is hidden when there is only one page (both arrows disabled).
+- **Project cards** spell out their counts: "1 environment · 35 resources".
+- **The view switcher** shows every view. The current one is a purple pill.
 - **Tables and collection tiles** outside a layer card use the
   `rounded-xl border … dark:bg-white/[0.05]` shell plus the crisp
   `--coollabs-hairline` ring; in light they are `bg-white` with the ring and
   the restrained card lift. In dark mode these shells are painted like layer
   cards. A tile, a separate pagination bar, or an empty box is a card without a
-  well, so it is `--color-panel`. A table (a shell whose first child is a
-  `border-b` header row) has a `--color-panel` header row and rows in the well
+  well, so it is `--color-card` (`#121212`). A table (a shell whose first child is a
+  `border-b` header row) has a `--color-card` header row and rows in the well
   color (`color-mix(in srgb, var(--color-panel) 66%, black)`).
   These rules match the Tailwind classes in `resources/css/app.css`, because
   the table shells are copied markup without a shared class.

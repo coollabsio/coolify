@@ -1,6 +1,6 @@
 @props(['listUrl' => null, 'canvasUrl' => null, 'onCanvas' => false, 'views' => null])
 @php
-    $idle = 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg dark:hover:bg-white/[0.06] dark:hover:text-fg';
+    $idle = 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:hover:text-white';
     $canvasItem = 'relative flex h-7.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[12px] font-medium transition-colors';
     $views ??= ['table' => ['Table view', 'unordered-list'], 'grid' => ['Grid view', 'grid']];
     // One list view (no table / grid choice): nothing to switch to on the list page.
@@ -22,11 +22,14 @@
             List view
         </a>
     @else
-        {{-- Only the views you can switch to, with their names; the current one is not shown. --}}
+        {{-- Every view stays visible. The current one is the selected pill. --}}
         @unless ($singleList)
             @foreach ($views as $mode => [$label, $icon])
-                <button type="button" x-on:click="setViewMode(@js($mode))" x-show="viewMode !== @js($mode)" x-cloak
-                    class="{{ $canvasItem }} {{ $idle }}" title="{{ $label }}">
+                <button type="button" x-on:click="setViewMode(@js($mode))"
+                    class="{{ $canvasItem }}"
+                    :class="viewMode === @js($mode) ? 'is-selected' : @js($idle)"
+                    :aria-pressed="(viewMode === @js($mode)).toString()"
+                    title="{{ $label }}">
                     <x-reicon :name="$icon" class="size-3.5" />
                     {{ $label }}
                 </button>

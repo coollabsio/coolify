@@ -271,7 +271,7 @@
                                 :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <x-reicon :name="$item['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label flex-1 text-left" :class="collapsed && 'lg:hidden'">{{ $item['label'] }}</span>
-                                <x-reicon name="chevron-down" class="size-3 -rotate-90 text-coollabs dark:text-fg-faint" ::class="collapsed && 'lg:hidden'" />
+                                <x-reicon name="chevron-down" class="nav-chevron size-3 -rotate-90 text-coollabs dark:text-fg-faint" ::class="collapsed && 'lg:hidden'" />
                             </button>
                         @else
                             <a title="{{ $item['label'] }}" href="{{ $item['href'] }}"
@@ -294,9 +294,9 @@
             <li x-show="!submenu" @if ($activeSubmenu ?? null) x-cloak @endif @class(['xl:hidden' => $navContext ?? []])
                 :class="{ 'xl:hidden': navLevel !== -1 }">
                 <a title="Admin" {{ wireNavigate() }}
-                    class="{{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    class="nav-admin {{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">
-                    <x-reicon name="fire" class="menu-item-icon text-pink-500" />
+                    <x-reicon name="fire" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Admin</span>
                 </a>
             </li>
@@ -324,7 +324,7 @@
     </ul>
     {{-- Sidebar footer (desktop only; mobile uses a temporary slide-over). It stays visible;
          only the menu above it scrolls on short or zoomed-in screens. --}}
-    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-neutral-50 px-2 py-2 dark:bg-app lg:-mx-3 lg:flex lg:px-3">
+    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-neutral-50 px-2 py-2 dark:bg-transparent lg:-mx-3 lg:flex lg:px-3">
         <div class="flex items-center gap-1" :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
             <x-top-user-menu sidebar />
             <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
