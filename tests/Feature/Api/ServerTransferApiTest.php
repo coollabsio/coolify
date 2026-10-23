@@ -241,6 +241,23 @@ describe('POST /api/v1/servers/import', function () {
             ->assertJsonValidationErrors(['preserve_uuids']);
     });
 
+    test('on Cloud, rate limits the SSH validation that the import starts', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        $this->team->update(['custom_server_limit' => 10]);
+        InstanceSettings::findOrFail(0)->forceFill(['server_validation_max_failures_per_ip' => 1])->save();
+        Server::throttleValidation($this->team->id, '10.66.0.20');
+
+        $export = transferExportForApiTest($this->server);
+        $this->server->forceDelete();
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export])
+            ->assertStatus(429);
+
+        expect(Server::where('uuid', $export['server']['uuid'])->exists())->toBeFalse();
+        Queue::assertNotPushed(ValidateAndInstallServerJob::class);
+    });
+
     test('rejects import when the destination team is at its cloud server limit', function () {
         config()->set('constants.coolify.self_hosted', false);
         $this->team->update(['custom_server_limit' => 1]);
@@ -260,6 +277,72 @@ describe('POST /api/v1/servers/import', function () {
             ->assertJsonPath('errors.server.0', 'Server limit reached for your subscription.');
 
         expect(Server::where('team_id', $this->team->id)->count())->toBe(1);
+    });
+});
+
+describe('POST /api/v1/servers/import with an unsafe bundle', function () {
+    test('rejects the whole bundle before it writes anything', function (Closure $tamper, string $error) {
+        $export = transferExportForApiTest($this->server);
+        $this->application->forceDelete();
+        $this->server->forceDelete();
+        $tamper($export);
+        $counts = fn () => [Server::withTrashed()->count(), PrivateKey::count(), Project::count(), Application::withTrashed()->count(), GithubApp::count()];
+        $before = $counts();
+
+        $response = $this->withHeaders(transferHeaders($this->importToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export])
+            ->assertStatus(422);
+
+        expect(collect($response->json('errors.bundle'))->contains(fn (string $message) => str_contains($message, $error)))->toBeTrue((string) $response->getContent())
+            ->and($counts())->toBe($before);
+        Queue::assertNotPushed(ValidateAndInstallServerJob::class);
+        Process::assertNothingRan();
+    })->with([
+        'server uuid with shell syntax' => [function (array &$bundle) {
+            $bundle['server']['uuid'] = 'x;id;#';
+        }, 'server.uuid is not a valid id'],
+        'private key uuid with command substitution' => [function (array &$bundle) {
+            $bundle['private_key']['uuid'] = 'a $(id)';
+        }, 'private_key.uuid is not a valid id'],
+        'project uuid with path traversal' => [function (array &$bundle) {
+            $bundle['projects'][0]['uuid'] = '../x';
+        }, 'projects.0.uuid is not a valid id'],
+        'reference uuid with path traversal' => [function (array &$bundle) {
+            $bundle['projects'][0]['environments'][0]['applications'][0]['destination_uuid'] = '../../etc';
+        }, 'destination_uuid is not a valid id'],
+        'javascript git source url' => [function (array &$bundle) {
+            $bundle['github_apps'] = [['uuid' => 'evil-app', 'name' => 'evil', 'html_url' => 'javascript:alert(1)', 'api_url' => 'https://api.github.com']];
+        }, 'github_apps.0.html_url'],
+        'invalid application fqdn' => [function (array &$bundle) {
+            $bundle['projects'][0]['environments'][0]['applications'][0]['attributes']['fqdn'] = 'javascript:alert(document.cookie)';
+        }, 'applications.0.fqdn'],
+        'invalid scheduled task cron' => [function (array &$bundle) {
+            $bundle['projects'][0]['environments'][0]['applications'][0]['scheduled_tasks'] = [['name' => 'task', 'command' => 'echo hi', 'frequency' => 'every full moon']];
+        }, 'scheduled_tasks.0.frequency is not a valid cron expression'],
+        'storage path with shell syntax' => [function (array &$bundle) {
+            $bundle['projects'][0]['environments'][0]['applications'][0]['persistent_storages'] = [['name' => 'data', 'mount_path' => '/data;id', 'host_path' => null]];
+        }, 'persistent_storages.0.mount_path'],
+        'destination network with shell syntax' => [function (array &$bundle) {
+            $bundle['destinations'][0]['network'] = 'coolify;id';
+        }, 'destinations.0.network'],
+        'too many warnings' => [function (array &$bundle) {
+            $bundle['warnings'] = array_fill(0, 1001, 'x');
+        }, 'A bundle can have at most 1000 warnings'],
+    ]);
+
+    test('a uuid that another team uses does not say that the other team has it', function () {
+        $export = transferExportForApiTest($this->server);
+        $appUuid = $this->application->uuid;
+        $this->server->forceDelete();
+        $this->application->forceFill(['environment_id' => Environment::factory()->create([
+            'project_id' => Project::factory()->create(['team_id' => Team::factory()->create()->id])->id,
+        ])->id])->saveQuietly();
+
+        $response = $this->withHeaders(transferHeaders($this->importToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export])
+            ->assertStatus(422);
+
+        expect($response->json('errors.bundle.0'))->toBe("The application UUID {$appUuid} cannot be used on this instance. Adopt mode needs the same UUID to keep the running containers. If you deleted the application on this instance, delete it permanently first.");
     });
 });
 
@@ -303,7 +386,7 @@ describe('POST /api/v1/servers/{uuid}/transfer/complete', function () {
         $response = $this->withHeaders(transferHeaders($this->sensitiveToken))
             ->postJson("/api/v1/servers/{$this->server->uuid}/transfer/complete", [
                 'export_id' => 'exp-123',
-                'target_instance_url' => 'https://coolify-b.test',
+                'target_instance_url' => 'https://8.8.8.8',
             ]);
 
         $response->assertOk()
@@ -313,7 +396,50 @@ describe('POST /api/v1/servers/{uuid}/transfer/complete', function () {
         expect($server->settings->force_disabled)->toBeTrue()
             ->and(data_get($server->server_metadata, 'transfer.status'))->toBe('transferred')
             ->and(data_get($server->server_metadata, 'transfer.export_id'))->toBe('exp-123')
-            ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://coolify-b.test');
+            ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://8.8.8.8');
+    });
+});
+
+describe('POST /api/v1/servers/{uuid}/transfer/complete with an unsafe URL', function () {
+    test('rejects a target instance URL that a transfer back must not send a token to', function (string $url) {
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/transfer/complete", ['target_instance_url' => $url])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['target_instance_url']);
+
+        expect($this->server->fresh()->isTransferredAway())->toBeFalse();
+    })->with([
+        'javascript' => 'javascript:alert(1)',
+        'plain http' => 'http://8.8.8.8',
+        'private address' => 'https://10.0.0.5',
+    ]);
+});
+
+describe('GET /api/v1/servers/{uuid}/transfer for a member', function () {
+    test('shows the transfer state, but not its log and error', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $memberToken = $member->createToken('member-read', ['read'], teamId: $this->team->id)->plainTextToken;
+        $this->server->forceFill(['server_metadata' => ['migration' => [
+            'status' => 'failed',
+            'target_url' => 'https://8.8.8.8',
+            'error' => 'secret error',
+            'log' => [['at' => now()->toIso8601String(), 'level' => 'error', 'message' => 'secret log']],
+        ]]])->save();
+
+        $this->withHeaders(transferHeaders($memberToken))
+            ->getJson("/api/v1/servers/{$this->server->uuid}/transfer")
+            ->assertOk()
+            ->assertJsonPath('migration.status', 'failed')
+            ->assertJsonMissingPath('migration.log')
+            ->assertJsonMissingPath('migration.error');
+
+        app('auth')->forgetGuards();
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->getJson("/api/v1/servers/{$this->server->uuid}/transfer")
+            ->assertOk()
+            ->assertJsonPath('migration.error', 'secret error')
+            ->assertJsonPath('migration.log.0.message', 'secret log');
     });
 });
 
@@ -324,7 +450,7 @@ describe('full transfer flow A to B on same process', function () {
         $this->withHeaders(transferHeaders($this->sensitiveToken))
             ->postJson("/api/v1/servers/{$this->server->uuid}/transfer/complete", [
                 'export_id' => $export['export_id'],
-                'target_instance_url' => 'https://coolify-b.test',
+                'target_instance_url' => 'https://8.8.8.8',
             ])
             ->assertOk();
 
@@ -473,6 +599,30 @@ describe('GET /api/v1/servers/import/check', function () {
             "the target can reach the SSH port of the server (127.0.0.1:{$port})" => true,
         ]);
         fclose($listener);
+    });
+
+    test('on Cloud, does not probe private, loopback, or link-local addresses', function (string $ip) {
+        config()->set('constants.coolify.self_hosted', false);
+
+        $this->withHeaders(transferHeaders($this->importToken))
+            ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip='.urlencode($ip).'&port=22')
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($message) => str_contains($message, 'is a private, loopback, or link-local address'));
+    })->with(['127.0.0.1', '10.0.0.5', '169.254.169.254', '::1', 'localhost']);
+
+    test('on Cloud, rate limits the reachability probe', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        InstanceSettings::findOrFail(0)->forceFill(['server_validation_max_failures_per_team' => 2])->save();
+
+        foreach (['10.0.0.5', '10.0.0.6'] as $ip) {
+            $this->withHeaders(transferHeaders($this->importToken))
+                ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip={$ip}")
+                ->assertStatus(422);
+        }
+
+        $this->withHeaders(transferHeaders($this->importToken))
+            ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=10.0.0.7')
+            ->assertStatus(429);
     });
 
     test('rejects a token without the write permission', function () {

@@ -10,6 +10,9 @@ use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\User;
@@ -25,6 +28,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -47,6 +51,9 @@ class ServerTransferMigrator
      * plus time for the export, so the worker does not stop the job after the target took the server.
      */
     public const MIGRATION_TIMEOUT_SECONDS = 1500;
+
+    /** Lifetime of the token that a transfer back gives the other instance: the job timeout plus time in the queue. */
+    public const TRANSFER_BACK_TOKEN_SECONDS = 3600;
 
     /** Longer than the job timeout, so a running state older than this one is stale. */
     public const STALE_MIGRATION_SECONDS = 1800;
@@ -304,6 +311,32 @@ class ServerTransferMigrator
                 'This server was already transferred to another instance.'),
             $this->check('no deployment is queued or running on the server', $activeDeployments === 0,
                 "{$activeDeployments} deployment(s) on this server are queued or running. Wait until they finish or cancel them, then transfer the server."),
+            ...array_map(fn (array $job) => $this->check("no {$job['label']} is running on the server", $job['count'] === 0,
+                "{$job['count']} {$job['label']}(s) on this server are running. Wait until they finish, then transfer the server."), $this->runningJobs($server)),
+        ];
+    }
+
+    /**
+     * Backups and scheduled tasks that run on the server. A transfer during a run leaves the run without an owner.
+     * A run that has been 'running' for a day is left over from a stopped worker, so it does not block.
+     *
+     * @return list<array{label: string, count: int}>
+     */
+    private function runningJobs(Server $server): array
+    {
+        $onServer = fn ($schedule) => $schedule && (int) $schedule->server()?->id === (int) $server->id;
+        $running = fn (string $model, string $schedule) => $model::query()
+            ->where('status', 'running')
+            ->where('created_at', '>', now()->subDay())
+            ->with($schedule)
+            ->get()
+            ->filter(fn (Model $execution) => $onServer($execution->{$schedule}))
+            ->count();
+
+        return [
+            ['label' => 'database backup', 'count' => $running(ScheduledDatabaseBackupExecution::class, 'scheduledDatabaseBackup')],
+            ['label' => 'volume backup', 'count' => $running(ScheduledVolumeBackupExecution::class, 'scheduledVolumeBackup')],
+            ['label' => 'scheduled task', 'count' => $running(ScheduledTaskExecution::class, 'scheduledTask')],
         ];
     }
 
@@ -484,7 +517,8 @@ class ServerTransferMigrator
             'complete' => $complete,
             'warnings' => $warnings,
             'checklist' => $checklist,
-            'target_server_url' => is_string(data_get($importBody, 'server_url')) ? data_get($importBody, 'server_url') : null,
+            // The target sends this URL, and the UI renders it as a link.
+            'target_server_url' => self::isLinkableUrl(data_get($importBody, 'server_url')) ? data_get($importBody, 'server_url') : null,
             'message' => 'Server migrated to '.$targetUrl.'. Automations disabled on this instance.',
         ];
     }
@@ -523,8 +557,9 @@ class ServerTransferMigrator
             throw new RuntimeException('Enter the URL at which the other instance reaches this instance.');
         }
 
-        // The import checks and the import need write and deploy.
-        $importToken = $user->createToken("transfer back {$archive->uuid}", ['read', 'write', 'deploy'], now()->addHours(3), $archive->team_id);
+        // The import checks, the import, and the status probes need only write and deploy. The claim after the
+        // import deletes the token, and the expiry covers a failed import: the transfer job runs at most 25 minutes.
+        $importToken = $user->createToken(self::transferBackTokenName($archive->uuid), ['write', 'deploy'], now()->addSeconds(self::TRANSFER_BACK_TOKEN_SECONDS), $archive->team_id);
         $migrateUrl = $managerUrl.'/api/v1/servers/'.rawurlencode($archive->uuid).'/migrate';
 
         try {
@@ -555,37 +590,80 @@ class ServerTransferMigrator
         });
     }
 
-    private function normalizeTargetUrl(string $targetUrl): string
+    /**
+     * The rules for the URL of another Coolify instance that this instance sends credentials to: https and a public
+     * address, or a local address in development. Every stored or prefilled instance URL must pass them.
+     *
+     * @throws RuntimeException|ValidationException
+     */
+    public static function validateInstanceUrl(string $url): string
     {
-        $targetUrl = rtrim(trim($targetUrl), '/');
-        if ($targetUrl === '' || ! filter_var($targetUrl, FILTER_VALIDATE_URL)) {
+        $url = rtrim(trim($url), '/');
+        if ($url === '' || ! filter_var($url, FILTER_VALIDATE_URL)) {
             throw new RuntimeException('A valid target instance URL is required (e.g. https://coolify.example.com).');
         }
 
-        if ($this->isLocalDevelopmentTarget($targetUrl)) {
-            if (file_exists('/.dockerenv') || is_file('/run/.containerenv')) {
-                return (string) preg_replace(
-                    '#^(https?://)(localhost|127\.0\.0\.1)(?=[:/]|$)#i',
-                    '$1host.docker.internal',
-                    $targetUrl,
-                );
-            }
-
-            return $targetUrl;
+        if (self::isLocalDevelopmentTarget($url)) {
+            return $url;
         }
 
-        if (strtolower((string) parse_url($targetUrl, PHP_URL_SCHEME)) !== 'https') {
+        if (strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') {
             throw new RuntimeException('The target instance URL must use https, because the transfer sends credentials.');
         }
 
-        Validator::make(['target_url' => $targetUrl], [
+        Validator::make(['target_url' => $url], [
             'target_url' => ['required', new SafeWebhookUrl],
         ])->validate();
+
+        return $url;
+    }
+
+    public static function isValidInstanceUrl(?string $url): bool
+    {
+        try {
+            self::validateInstanceUrl((string) $url);
+
+            return true;
+        } catch (RuntimeException|ValidationException) {
+            return false;
+        }
+    }
+
+    /**
+     * A URL from another instance that the UI may render as a link: https, or http in development.
+     */
+    public static function isLinkableUrl(mixed $url): bool
+    {
+        if (! is_string($url) || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+
+        return $scheme === 'https' || ($scheme === 'http' && isDev());
+    }
+
+    public static function transferBackTokenName(string $serverUuid): string
+    {
+        return "transfer back {$serverUuid}";
+    }
+
+    private function normalizeTargetUrl(string $targetUrl): string
+    {
+        $targetUrl = self::validateInstanceUrl($targetUrl);
+
+        if (self::isLocalDevelopmentTarget($targetUrl) && (file_exists('/.dockerenv') || is_file('/run/.containerenv'))) {
+            return (string) preg_replace(
+                '#^(https?://)(localhost|127\.0\.0\.1)(?=[:/]|$)#i',
+                '$1host.docker.internal',
+                $targetUrl,
+            );
+        }
 
         return $targetUrl;
     }
 
-    private function isLocalDevelopmentTarget(string $url): bool
+    private static function isLocalDevelopmentTarget(string $url): bool
     {
         return isDev()
             && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
@@ -801,7 +879,7 @@ class ServerTransferMigrator
     private function targetRequest(string $url, string $token, int $timeout): PendingRequest
     {
         return Http::timeout($timeout)
-            ->withOptions($this->isLocalDevelopmentTarget($url)
+            ->withOptions(self::isLocalDevelopmentTarget($url)
                 ? ['allow_redirects' => false]
                 : SafeWebhookUrl::httpClientOptions($url))
             ->acceptJson()

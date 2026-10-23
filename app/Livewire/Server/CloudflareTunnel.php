@@ -115,6 +115,7 @@ class CloudflareTunnel extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             $this->isCloudflareTunnelsEnabled = true;
             $this->server->settings->is_cloudflare_tunnel = true;
             $this->server->settings->save();
@@ -130,6 +131,7 @@ class CloudflareTunnel extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             $this->ssh_domain = $this->normalizeSshDomain($this->ssh_domain);
             $activity = ConfigureCloudflared::run($this->server, $this->cloudflare_token, $this->ssh_domain);
             auditLog('ui.server.cloudflare_tunnel.configuration_started', $this->auditContext([

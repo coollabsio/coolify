@@ -158,7 +158,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             return true;
         }
         $serverLimit = Team::serverLimit($team);
-        $servers = $team->servers()->count();
+        $servers = $team->managedServers()->count();
 
         return $servers >= $serverLimit;
     }
@@ -192,7 +192,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function serverOverflow()
     {
-        if (Team::serverLimit($this) < $this->servers->count()) {
+        if (Team::serverLimit($this) < $this->managedServers()->count()) {
             return true;
         }
 
@@ -390,6 +390,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function servers()
     {
         return $this->hasMany(Server::class);
+    }
+
+    /**
+     * Servers that use a server slot. Archives of transferred servers are left out.
+     */
+    public function managedServers()
+    {
+        return $this->servers()->notTransferredAway();
     }
 
     public function usesSwarm(): bool

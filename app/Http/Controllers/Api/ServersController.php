@@ -54,6 +54,27 @@ class ServersController extends Controller
     }
 
     /**
+     * Another instance manages a transferred server. Changing its host or credentials would let
+     * "Enable management" connect to a different host, so these fields stay as they are.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function transferredServerConnectionChanges(Request $request, ModelsServer $server): array
+    {
+        $changed = [
+            'ip' => $request->filled('ip') && ModelsServer::normalizeIp($request->input('ip')) !== ModelsServer::normalizeIp($server->getRawOriginal('ip')),
+            'user' => $request->filled('user') && (string) $request->input('user') !== (string) $server->user,
+            'port' => $request->filled('port') && (int) $request->input('port') !== (int) $server->port,
+            'private_key_uuid' => $request->filled('private_key_uuid') && $request->input('private_key_uuid') !== $server->privateKey?->uuid,
+        ];
+
+        return collect($changed)
+            ->filter()
+            ->map(fn () => ['This field cannot be changed on a transferred server.'])
+            ->all();
+    }
+
+    /**
      * Rejects requests where the deprecated is_build_server flag disagrees with server_role.
      */
     private function legacyBuildServerRoleConflict(Request $request): ?JsonResponse
@@ -775,6 +796,12 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
+        if ($server->isTransferredAway() && ($connectionErrors = $this->transferredServerConnectionChanges($request, $server))) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $connectionErrors,
+            ], 422);
+        }
         if ($request->instant_validate) {
             ModelsServer::throttleValidation($teamId, $request->ip ?? $server->ip);
         }

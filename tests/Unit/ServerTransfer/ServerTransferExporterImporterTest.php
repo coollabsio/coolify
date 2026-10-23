@@ -487,6 +487,8 @@ test('the patch check frequency moves with the server and the last patch check r
 });
 
 test('a transfer back replaces the archive of the same team in the import transaction', function () {
+    // The claim restarts Sentinel with its new token; this test is about the resource containers.
+    Queue::fake();
     $bundle = $this->exporter->export($this->server);
     $bundle['server']['name'] = 'changed-on-the-other-instance';
     app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
@@ -504,6 +506,17 @@ test('a transfer back replaces the archive of the same team in the import transa
         ->and(Server::withTrashed()->find($archiveId))->toBeNull()
         ->and(Application::where('uuid', $this->application->uuid)->firstOrFail()->destination->server_id)->toBe($server->id);
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'docker rm') || str_contains($process->command, 'docker stop'));
+});
+
+test('the import check of a transfer back needs a free server slot, because the archive does not use one', function () {
+    config()->set('constants.coolify.self_hosted', false);
+    $this->team->update(['custom_server_limit' => 1]);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id, 'ip' => '203.0.113.77']);
+
+    $limitCheck = collect($this->importer->importChecks($this->server->uuid, $this->server->ip, $this->team->id))->firstWhere('field', 'server');
+
+    expect($limitCheck['ok'])->toBeFalse();
 });
 
 test('a failed transfer back keeps the archive', function () {
@@ -525,7 +538,10 @@ test('the archive of another team is not replaced', function () {
     $otherTeam = Team::factory()->create();
 
     expect(fn () => $this->importer->import($bundle, teamId: $otherTeam->id))
-        ->toThrow(ValidationException::class, 'Another team of this instance has the archived copy');
+        ->toThrow(ValidationException::class, 'Another team of this instance has the archived copy of this server.');
+
+    $uuidCheck = collect($this->importer->importChecks($this->server->uuid, '203.0.113.50', $otherTeam->id))->firstWhere('field', 'server.uuid');
+    expect($uuidCheck['message'])->not->toContain($this->server->name);
 });
 
 test('import rolls back all created rows when a later resource fails', function () {
@@ -1337,7 +1353,7 @@ test('adopt mode stops the import when a resource uuid is already used', functio
     $this->server->forceDelete();
 
     expect(fn () => $this->importer->import($bundle, teamId: $this->team->id, adoptMode: true))
-        ->toThrow(ValidationException::class, "The application UUID {$appUuid} is already used");
+        ->toThrow(ValidationException::class, "The application UUID {$appUuid} cannot be used on this instance.");
 
     expect(Server::where('uuid', $bundle['server']['uuid'])->exists())->toBeFalse();
 });
@@ -1847,6 +1863,7 @@ test('the GitHub runner config moves disabled with its GitHub App and the bundle
             'On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to {target_url}/webhooks/source/github/events, the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.',
             'In GitLab, open Settings > Webhooks of every project that uses GitLab App Team GitLab, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.',
             'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. Enabling them stops runners that another Coolify instance started on this server.',
+            'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, then remove the old public key from ~/.ssh/authorized_keys on the server.',
         ])
         ->and(implode(' ', $bundle['warnings']))->not->toContain('webhook URL')
         ->and(implode(' ', $bundle['warnings']))->not->toContain('runner');

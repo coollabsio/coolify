@@ -48,14 +48,14 @@ class TransferFinishChecklist
     ];
 
     private const GROUP_OF_TYPE = [
-        'server_connection' => 'server', 'sentinel' => 'server', 's3_storage' => 'server',
+        'server_connection' => 'server', 'sentinel' => 'server', 'previous_ssh_key' => 'server', 's3_storage' => 'server',
         'github_app_webhook' => 'git', 'github_app_urls' => 'git', 'gitlab_webhook' => 'git', 'manual_webhook' => 'git',
         'git_source' => 'git', 'github_runners' => 'git',
         'dns_record' => 'dns', 'domain' => 'dns',
     ];
 
     /** Types that the user can only mark as done. */
-    private const MANUAL_TYPES = ['github_app_urls'];
+    private const MANUAL_TYPES = ['github_app_urls', 'previous_ssh_key'];
 
     /** Types that Coolify can fix with one click. */
     private const FIX_LABELS = [
@@ -145,11 +145,16 @@ class TransferFinishChecklist
     {
         if (in_array($item['type'], ['github_app_webhook', 'github_app_urls'], true)) {
             $githubApp = GithubApp::where('uuid', $item['subject'])->first();
+            $url = $githubApp?->settingsUrl();
 
-            return $githubApp ? [$githubApp->settingsUrl(), 'Open on GitHub'] : null;
+            // The html_url of a GitHub App comes from the bundle of another instance, so only web links are shown.
+            return $url && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true) ? [$url, 'Open on GitHub'] : null;
         }
 
-        return filled($item['link'] ?? null) ? [$item['link'], $item['link_label'] ?? 'Open'] : null;
+        $link = $item['link'] ?? null;
+
+        // Saved links are paths of this instance.
+        return is_string($link) && preg_match('#^/(?![/\\\\])#', $link) ? [$link, $item['link_label'] ?? 'Open'] : null;
     }
 
     public function fixLabel(array $item): ?string
@@ -228,6 +233,10 @@ class TransferFinishChecklist
         $items = [
             $this->item('server_connection', 'server', 'Connection to the server'),
             $this->item('sentinel', 'server', 'Sentinel sends its data to this instance'),
+            // The SSH key moved with the server, so the previous instance still has a copy of it.
+            $this->item('previous_ssh_key', 'server', 'Remove the SSH key of the previous instance from the server',
+                'The previous instance keeps a copy of the SSH key. Add a new key of this instance to the server and select it here, then remove the old public key from ~/.ssh/authorized_keys on the server.',
+                [], route('server.private-key', ['server_uuid' => $server->uuid], false), 'Open private key'),
         ];
 
         $githubApps = $applications->map(fn (Application $application) => $application->source)

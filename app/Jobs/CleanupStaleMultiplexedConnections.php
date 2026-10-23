@@ -227,7 +227,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             }
 
             $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-            $checkCommand = "ssh -O check -o ControlPath={$muxSocket} {$server->user}@{$server->ip} 2>/dev/null";
+            $checkCommand = 'ssh -O check -o ControlPath='.escapeshellarg($muxSocket).' '.escapeshellarg($server->user).'@'.escapeshellarg($server->ip).' 2>/dev/null';
             $checkProcess = Process::run($checkCommand);
 
             if ($checkProcess->exitCode() !== 0) {
@@ -272,7 +272,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         }
 
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-        $checkProcess = Process::run("ssh -O check -o ControlPath={$muxSocket} localhost");
+        $checkProcess = Process::run('ssh -O check -o ControlPath='.escapeshellarg($muxSocket).' localhost');
         $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
             ? $matches[1]
             : null;
@@ -281,7 +281,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             SshMultiplexingHelper::markMuxProcessAsRetiring($pid, $muxSocket);
         }
 
-        $closeCommand = "ssh -O stop -o ControlPath={$muxSocket} localhost 2>/dev/null";
+        $closeCommand = 'ssh -O stop -o ControlPath='.escapeshellarg($muxSocket).' localhost 2>/dev/null';
         $stopProcess = Process::run($closeCommand);
         if ($pid !== null && ! $stopProcess->successful()) {
             SshMultiplexingHelper::unmarkMuxProcessAsRetiring($pid, $muxSocket);

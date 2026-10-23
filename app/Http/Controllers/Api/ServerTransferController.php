@@ -6,13 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
+use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidServerIp;
 use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Throwable;
@@ -135,7 +138,7 @@ class ServerTransferController extends Controller
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
-    public function status(string $uuid): JsonResponse
+    public function status(Request $request, string $uuid): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -149,12 +152,18 @@ class ServerTransferController extends Controller
 
         $this->authorize('view', $server);
 
+        // The log and the error of a transfer can name hosts and credentials problems, so members see only the state.
+        $migration = data_get($server->server_metadata, 'migration');
+        if (is_array($migration) && ! $request->user()->can('update', $server)) {
+            $migration = collect($migration)->except(['log', 'error'])->all();
+        }
+
         return response()->json([
             'server_uuid' => $server->uuid,
             'transfer' => collect((array) data_get($server->server_metadata, 'transfer', []))
                 ->only(['status', 'export_id', 'imported_at', 'claimed_at', 'transferred_at', 'target_instance_url'])
                 ->all(),
-            'migration' => data_get($server->server_metadata, 'migration'),
+            'migration' => $migration,
         ]);
     }
 
@@ -217,7 +226,18 @@ class ServerTransferController extends Controller
 
         // The target connects to the server over SSH when it takes over management, so an unreachable
         // server would leave an imported server here that this instance cannot manage.
-        $connection = @fsockopen($ip, $port, timeout: 5);
+        // On Cloud the probe is rate limited and cannot reach private, loopback, or link-local addresses,
+        // so users cannot scan ports of Cloud's own network.
+        // A host name is resolved once and the probe connects to that address, so DNS cannot change it in between.
+        Server::throttleValidation($teamId, $ip);
+        $probeIp = Server::normalizeIp($ip);
+        if (isCloud() && ! filter_var($probeIp, FILTER_VALIDATE_IP)) {
+            $probeIp = gethostbyname($probeIp);
+        }
+        $probeHost = filter_var($probeIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? "[{$probeIp}]" : $probeIp;
+        $probeAllowed = ! isCloud() || (filter_var($probeIp, FILTER_VALIDATE_IP)
+            && Validator::make(['ip' => "http://{$probeHost}:{$port}"], ['ip' => [new SafeWebhookUrl]])->passes());
+        $connection = $probeAllowed ? @fsockopen($probeHost, $port, timeout: 5) : false;
         if ($connection !== false) {
             fclose($connection);
         }
@@ -235,8 +255,11 @@ class ServerTransferController extends Controller
             [
                 'label' => "the target can reach the SSH port of the server ({$ip}:{$port})",
                 'ok' => $connection !== false,
-                'message' => $connection !== false ? null
-                    : "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
+                'message' => match (true) {
+                    $connection !== false => null,
+                    ! $probeAllowed => "This instance cannot connect to {$ip}: it is a private, loopback, or link-local address, or it does not resolve to a public IPv4 address. Use the public IP address of the server.",
+                    default => "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
+                },
             ],
         ];
 
@@ -319,6 +342,8 @@ class ServerTransferController extends Controller
                 preserveUuids: $request->boolean('preserve_uuids', true),
                 adoptMode: $request->boolean('adopt_mode', true),
             );
+        } catch (ThrottleRequestsException $e) {
+            throw $e;
         } catch (Throwable $e) {
             $payload = ['message' => $e->getMessage()];
             if ($e instanceof ValidationException) {
@@ -386,11 +411,23 @@ class ServerTransferController extends Controller
             ], 422);
         }
 
+        // The UI prefills this URL for a transfer back, which sends a team token to it.
+        $targetInstanceUrl = $request->input('target_instance_url');
+        if (filled($targetInstanceUrl)) {
+            try {
+                $targetInstanceUrl = ServerTransferMigrator::validateInstanceUrl($targetInstanceUrl);
+            } catch (ValidationException $e) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['target_instance_url' => $e->validator->errors()->all()]], 422);
+            } catch (Throwable $e) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['target_instance_url' => [$e->getMessage()]]], 422);
+            }
+        }
+
         try {
             $result = $this->claimer->markTransferred(
                 $server,
                 exportId: $request->input('export_id'),
-                targetInstanceUrl: $request->input('target_instance_url'),
+                targetInstanceUrl: filled($targetInstanceUrl) ? $targetInstanceUrl : null,
             );
         } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);

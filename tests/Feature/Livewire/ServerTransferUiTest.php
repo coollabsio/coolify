@@ -315,3 +315,91 @@ test('team members cannot start a transfer back', function () {
 
     Http::assertNothingSent();
 });
+
+test('the transfer log cannot be polled after the user lost the admin role', function () {
+    $component = Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid]);
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+
+    $component->call('refreshMigration')->assertForbidden();
+});
+
+test('the tokens are not kept in the component after a failed action', function () {
+    Queue::fake();
+    Http::fake(['*' => Http::response(['message' => 'Unauthenticated.'], 401)]);
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->set('targetUrl', 'https://8.8.8.8')
+        ->set('targetToken', 'secret-target-token')
+        ->call('migrateServer')
+        ->assertDispatched('error')
+        ->assertSet('targetToken', '');
+
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://8.8.8.8');
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->set('managerToken', 'secret-manager-token')
+        ->call('transferBack')
+        ->assertDispatched('error')
+        ->assertSet('managerToken', '');
+});
+
+test('the URL of an owner marker is not prefilled for a transfer back', function () {
+    $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'own', 'claimed_at' => now()->subDay()->toIso8601String()]]]])->save();
+    app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server->fresh(), json_encode([
+        'claim_id' => 'other', 'instance_url' => 'https://8.8.8.8', 'claimed_at' => now()->toIso8601String(),
+    ]));
+    expect($this->server->fresh()->isTransferredAway())->toBeTrue();
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSet('managerUrl', '')
+        ->assertSee('data-testid="transfer-back-host"', escape: false);
+});
+
+test('a stored target URL that is not a safe instance URL is not prefilled for a transfer back', function () {
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'http://10.0.0.5:8000');
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSet('managerUrl', '');
+});
+
+test('the transfer page does not link to a server URL that is not https', function () {
+    $this->server->forceFill(['server_metadata' => ['migration' => [
+        'status' => 'succeeded',
+        'target_url' => 'https://8.8.8.8',
+        'checklist' => ['A step.'],
+        'target_server_url' => 'javascript:alert(document.cookie)',
+    ]]])->save();
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Finish the transfer on the target')
+        ->assertDontSee('javascript:alert', escape: false);
+});
+
+test('the transfer page warns about an untrusted owner marker', function () {
+    $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'own', 'claimed_at' => now()->toIso8601String()]]]])->save();
+    app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server->fresh(), json_encode([
+        'claim_id' => 'forged', 'instance_url' => 'https://evil.example', 'claimed_at' => now()->subDay()->toIso8601String(),
+    ]));
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Another instance may claim this server')
+        ->assertSee('https://evil.example');
+});
+
+test('deleting an archive keeps applications that use the server only as an additional destination', function () {
+    Queue::fake();
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id, 'ip' => '10.77.0.11']);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    $sharedApplication = Application::factory()->create(['destination_id' => $otherDestination->id, 'destination_type' => $otherDestination->getMorphClass()]);
+    $sharedApplication->additional_servers()->attach($this->server->id, ['standalone_docker_id' => $destination->id]);
+    $application = Application::factory()->create(['destination_id' => $destination->id, 'destination_type' => $destination->getMorphClass()]);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid])->call('delete', $this->userPassword);
+
+    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($application));
+    Queue::assertNotPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($sharedApplication));
+    expect($sharedApplication->additional_servers()->count())->toBe(0);
+});

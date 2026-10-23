@@ -22,6 +22,10 @@ class ProjectIconStorageService extends AvatarStorageService
         $storageType = $settings->avatar_storage_type === 's3' && $settings->avatar_s3_storage_id ? 's3' : 'local';
         $s3StorageId = $storageType === 's3' ? $settings->avatar_s3_storage_id : null;
         $disk = $this->disk($storageType, $s3StorageId);
+        // The uuid is a path segment, so it must not leave the project-icons directory.
+        if (preg_match('/\A[a-zA-Z0-9_-]+\z/', (string) $project->uuid) !== 1) {
+            throw new RuntimeException('Unable to store the project icon: the project UUID is not valid.');
+        }
         $path = "project-icons/{$project->uuid}/icon.jpg";
 
         if (! $disk->put($path, $contents)) {

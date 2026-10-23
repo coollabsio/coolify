@@ -222,11 +222,11 @@
                             <x-forms.input canGate="update" :canResource="$server" type="password" id="ip"
                                 label="IP address or domain"
                                 helper="Enter a hostname or IP address without http:// or https://."
-                                required :disabled="$isValidating" />
+                                required :disabled="$isValidating || $server->isTransferredAway()" />
                             <x-forms.input canGate="update" :canResource="$server" id="user" label="SSH user"
-                                required :disabled="$isValidating" />
+                                required :disabled="$isValidating || $server->isTransferredAway()" />
                             <x-forms.input canGate="update" :canResource="$server" type="number" id="port"
-                                label="SSH port" required :disabled="$isValidating" />
+                                label="SSH port" required :disabled="$isValidating || $server->isTransferredAway()" />
                         </div>
 
                         <div class="mt-4 grid gap-4 lg:grid-cols-3">

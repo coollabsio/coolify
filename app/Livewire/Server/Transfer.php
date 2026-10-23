@@ -38,7 +38,12 @@ class Transfer extends Component
             // The transfer exports every credential of the server, so only admins and owners may open it.
             $this->authorize('update', $this->server);
             $this->exportId = data_get($this->server->server_metadata, 'transfer.export_id');
-            $this->managerUrl = (string) data_get($this->server->server_metadata, 'transfer.target_instance_url', '');
+            // Transfer back sends a new team token to this URL, so it is prefilled only when this instance chose it.
+            $managerUrl = data_get($this->server->server_metadata, 'transfer.target_instance_url');
+            if (is_string($managerUrl) && ! data_get($this->server->server_metadata, 'transfer.claimed_by_marker')
+                && ServerTransferMigrator::isValidInstanceUrl($managerUrl)) {
+                $this->managerUrl = $managerUrl;
+            }
             $this->thisInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
         } catch (Throwable $e) {
             handleError($e, $this);
@@ -77,8 +82,19 @@ class Transfer extends Component
         return array_values(array_filter((array) data_get($this->migration, 'checklist', []), 'is_string'));
     }
 
+    /**
+     * The link to the server on the target. The target sends it, so only an https link is shown.
+     */
+    public function getTargetServerUrlProperty(): ?string
+    {
+        $url = data_get($this->migration, 'target_server_url');
+
+        return ServerTransferMigrator::isLinkableUrl($url) ? $url : null;
+    }
+
     public function refreshMigration(): void
     {
+        $this->authorize('update', $this->server);
         $this->server->refresh();
         $this->lastWarnings = array_values((array) data_get($this->migration, 'warnings', $this->lastWarnings));
     }
@@ -105,12 +121,14 @@ class Transfer extends Component
 
             $this->server->refresh();
             $this->lastWarnings = [];
-            $this->targetToken = '';
             $this->dispatch('success', 'All checks passed. The transfer started.');
         } catch (Throwable $e) {
             // A failed check is saved in the transfer log, so show it.
             $this->server->refresh();
             handleError($e, $this);
+        } finally {
+            // Public properties are sent to the browser with every response.
+            $this->targetToken = '';
         }
     }
 
@@ -127,10 +145,11 @@ class Transfer extends Component
             ]);
 
             $this->server->refresh();
-            $this->managerToken = '';
             $this->dispatch('success', 'The other instance started the transfer back.');
         } catch (Throwable $e) {
             handleError($e, $this);
+        } finally {
+            $this->managerToken = '';
         }
     }
 
