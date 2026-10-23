@@ -79,113 +79,79 @@
         </x-callout>
     @endcannot
 
-    {{-- Toolbar --}}
-    <div id="domains-section" class="flex flex-wrap items-center gap-2">
-        @if ($hasRows)
-            <div class="relative w-full sm:w-64">
-                <x-reicon name="search"
-                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-                <input type="search" x-model="domainSearch" aria-label="Search services or domains"
-                    class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
-            </div>
-        @endif
-        <div class="ml-auto flex flex-wrap items-center gap-2">
-            @can('update', $application)
-                <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
-                    <x-reicon name="refresh" class="size-3.5" />
-                    Check all DNS
-                </x-forms.button>
-                <div class="relative shrink-0">
-                    @include('livewire.project.shared.cloudflare-autoconfigure')
-                </div>
-                @unless ($labelsAreWritable)
-                    @if (! $isCompose || count($composeServices) > 0)
-                        <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
-                            canGate="update" :canResource="$application">
-                            <x-slot:content>
-                                <button type="button"
-                                    class="button button-highlighted">
-                                    <x-reicon name="plus" class="size-3.5" />
-                                    Add domain
-                                </button>
-                            </x-slot:content>
-                            <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
-                                @if ($isCompose && count($composeServices) > 0)
-                                    <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
-                                        :options="collect($composeServices)->map(fn ($serviceName) => [
-                                            'value' => $serviceName,
-                                            'label' => $serviceName,
-                                        ])->values()->all()"
-                                        :disabled="! auth()->user()->can('update', $application)" />
-                                @endif
-
-                                <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
-
-                                @if ($addDomainDnsFailed)
-                                    <x-callout type="danger" title="DNS is not pointing to the right IP">
-                                        This domain does not currently resolve to this server.
-                                        Traffic may not reach Coolify until you update DNS.
-                                        Are you sure you want to add it anyway?
-                                        @if (filled($addDomainDnsMessage))
-                                            <div class="pt-2">{{ $addDomainDnsMessage }}</div>
-                                        @endif
-                                    </x-callout>
-                                @endif
-
-                                <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                                    <x-forms.button type="button" wire:click="generateDomain">
-                                        Generate domain
-                                    </x-forms.button>
-                                    <div class="flex flex-wrap gap-2">
-                                        @if ($addDomainDnsFailed)
-                                            <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isError>
-                                                Continue
-                                            </x-forms.button>
-                                        @else
-                                            <x-forms.button type="submit" isHighlighted>
-                                                Save
-                                            </x-forms.button>
-                                        @endif
-                                    </div>
-                                </div>
-                            </form>
-                        </x-modal-input>
-                    @endif
-                @endunless
-            @endcan
-        </div>
-    </div>
-
-    @if ($hasRows && ! $labelsAreWritable)
-        <div class="flex flex-wrap items-center justify-end gap-2 service-domains-https">
-            @if ($hasHttpsDomains)
-                <label for="isForceHttpsEnabled-trigger" class="mb-0! text-[12px]!">Redirect HTTP to HTTPS</label>
-                <x-helper helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL." />
-                <div class="w-28 shrink-0">
-                    <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled"
-                        onChange="updateForceHttps" portal
-                        :options="[
-                            ['value' => true, 'label' => 'Enabled'],
-                            ['value' => false, 'label' => 'Disabled'],
-                        ]" :disabled="! auth()->user()->can('update', $application)" />
+    <x-application.settings-section id="domains-section" title="Domains" :flush="$hasRows" class="scroll-mt-28">
+        <x-slot:actions>
+            @if ($hasRows)
+                <div class="relative w-full sm:w-64">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input type="search" x-model="domainSearch" aria-label="Search services or domains"
+                        class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
                 </div>
             @endif
-            <label for="isPermanentRedirectEnabled-trigger" class="mb-0! text-[12px]!">Redirect type</label>
-            <x-helper helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect." />
-            <div class="w-32 shrink-0">
-                <x-forms.listbox canGate="update" :canResource="$application" id="isPermanentRedirectEnabled"
-                    onChange="updatePermanentRedirect" portal
-                    :options="[
-                        ['value' => false, 'label' => 'Temporary'],
-                        ['value' => true, 'label' => 'Permanent'],
-                    ]" :disabled="! auth()->user()->can('update', $application)" />
-            </div>
-        </div>
-    @endif
+            <div class="flex flex-wrap items-center gap-2">
+                @can('update', $application)
+                    <div class="relative shrink-0">
+                        @include('livewire.project.shared.cloudflare-autoconfigure', ['showCheckAllDns' => $hasRows])
+                    </div>
+                    @unless ($labelsAreWritable)
+                        @if (! $isCompose || count($composeServices) > 0)
+                            <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
+                                canGate="update" :canResource="$application">
+                                <x-slot:content>
+                                    <button type="button"
+                                        class="button button-highlighted">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        Add domain
+                                    </button>
+                                </x-slot:content>
+                                <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
+                                    @if ($isCompose && count($composeServices) > 0)
+                                        <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
+                                            :options="collect($composeServices)->map(fn ($serviceName) => [
+                                                'value' => $serviceName,
+                                                'label' => $serviceName,
+                                            ])->values()->all()"
+                                            :disabled="! auth()->user()->can('update', $application)" />
+                                    @endif
 
-    {{-- Table / empty --}}
-    <div id="domains-table-section"
-        class="application-settings-section-body mt-1 scroll-mt-28 {{ $hasRows ? 'is-flush' : '' }} w-full">
+                                    <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
+
+                                    @if ($addDomainDnsFailed)
+                                        <x-callout type="danger" title="DNS is not pointing to the right IP">
+                                            This domain does not currently resolve to this server.
+                                            Traffic may not reach Coolify until you update DNS.
+                                            Are you sure you want to add it anyway?
+                                            @if (filled($addDomainDnsMessage))
+                                                <div class="pt-2">{{ $addDomainDnsMessage }}</div>
+                                            @endif
+                                        </x-callout>
+                                    @endif
+
+                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                                        <x-forms.button type="button" wire:click="generateDomain">
+                                            Generate domain
+                                        </x-forms.button>
+                                        <div class="flex flex-wrap gap-2">
+                                            @if ($addDomainDnsFailed)
+                                                <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isError>
+                                                    Continue
+                                                </x-forms.button>
+                                            @else
+                                                <x-forms.button type="submit" isHighlighted>
+                                                    Save
+                                                </x-forms.button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </form>
+                            </x-modal-input>
+                        @endif
+                    @endunless
+                @endcan
+            </div>
+        </x-slot:actions>
+
         @if ($hasRows)
             <div class="data-table-header service-domains-overview-grid">
                 <span>Domain</span>
@@ -287,7 +253,31 @@
                     description="No domain matches your search." icon-name="search" />
             </div>
         @endif
-    </div>
+    </x-application.settings-section>
+
+    @if ($hasRows && ! $labelsAreWritable)
+        <x-application.settings-section id="domain-redirects-section" title="Redirects"
+            helper="Applies to all domains of this application.">
+            <div class="grid gap-4 lg:grid-cols-2">
+                @if ($hasHttpsDomains)
+                    <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled"
+                        label="Redirect HTTP to HTTPS" onChange="updateForceHttps"
+                        helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" :disabled="! auth()->user()->can('update', $application)" />
+                @endif
+                <x-forms.listbox canGate="update" :canResource="$application" id="isPermanentRedirectEnabled"
+                    label="Redirect type" onChange="updatePermanentRedirect"
+                    helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect."
+                    :options="[
+                        ['value' => false, 'label' => 'Temporary'],
+                        ['value' => true, 'label' => 'Permanent'],
+                    ]" :disabled="! auth()->user()->can('update', $application)" />
+            </div>
+        </x-application.settings-section>
+    @endif
 
     {{-- One dialog for address edits and automatically saved domain settings. --}}
     <div class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }"

@@ -720,7 +720,7 @@ it('shows the compose service redirect control in domain settings', function () 
 it('shows dns entries control next to Add', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 
@@ -731,7 +731,7 @@ it('shows dns entries when domains are managed through labels', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh(['settings'])])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 

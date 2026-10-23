@@ -79,16 +79,9 @@
         @endif
         <div class="ml-auto flex flex-wrap items-center gap-2">
             @can('update', $service)
-                @if ($configuredCount > 0)
-                    <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled"
-                        wire:target="checkAllDns,checkDomainDns">
-                        <x-reicon name="refresh" class="size-3.5" />
-                        Check all DNS
-                    </x-forms.button>
-                @endif
                 @if ($serviceAppCount > 0)
                     <div class="relative shrink-0">
-                        @include('livewire.project.shared.cloudflare-autoconfigure')
+                        @include('livewire.project.shared.cloudflare-autoconfigure', ['showCheckAllDns' => $configuredCount > 0])
                     </div>
                     <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                         canGate="update" :canResource="$service">

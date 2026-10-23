@@ -326,7 +326,7 @@ it('does not add a single-label hostname as a service domain', function () {
 it('shows dns entries control next to Add', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 

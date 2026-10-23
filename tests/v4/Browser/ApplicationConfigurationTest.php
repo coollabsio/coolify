@@ -331,7 +331,11 @@ it('uses compact application domains with unified settings and a form save butto
     $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->screenshot(filename: 'application-domains-dns-menu')
+        ->click('[title="DNS checks and records for this server"]')
+        ->assertSee('Redirect type')
         ->assertSee('Protocol redirect')
         ->assertSee('Search indexing')
         ->assertDontSee('Search engine indexing')
