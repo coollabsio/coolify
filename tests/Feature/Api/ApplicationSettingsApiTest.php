@@ -704,3 +704,78 @@ test('application creation rejects an unsafe Traefik certificate resolver', func
 
     expect(Application::query()->where('git_repository', 'like', '%resolver-test%')->exists())->toBeFalse();
 });
+
+test('PATCH /api/v1/applications/{uuid} turns off label management and keeps custom labels with new domains', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => false,
+            'domains' => 'https://new.example.com',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeFalse()
+        ->and($application->fqdn)->toBe('https://new.example.com')
+        ->and(base64_decode($application->custom_labels))->toBe('sentinel-label=true');
+});
+
+test('PATCH /api/v1/applications/{uuid} regenerates labels when label management is turned back on', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => true,
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeTrue()
+        ->and($labels)->not->toContain('sentinel-label=true')
+        ->and($labels)->toContain('app.example.com');
+});
+
+test('application creation keeps custom labels when label management is off', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/readonly-labels-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'domains' => 'https://app.example.com',
+            'custom_labels' => base64_encode('sentinel-label=true'),
+            'is_container_label_readonly_enabled' => false,
+        ])
+        ->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeFalse()
+        ->and(base64_decode($application->custom_labels))->toBe('sentinel-label=true');
+});
+
+test('rejects an invalid is_container_label_readonly_enabled value', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => 'not-a-boolean',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('is_container_label_readonly_enabled');
+});
