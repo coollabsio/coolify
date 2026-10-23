@@ -120,7 +120,7 @@
   /** Server view: key of the card's group when the card can be moved there (it is saved on its environment canvas). */
   const movableGroupOf = node => (canMoveGroups && node ? groupKey([node], node.zone) : null);
   let groupMeta = {}; // server view: frame top-left and zone inner top-left per group key (see layoutServerView)
-  // Projects canvas: admins drag the project zones; each project saves the zone's top-left (zone.position).
+  // Projects, servers and dashboard canvases: admins drag the zones; each project or server saves its top-left (zone.position).
   const canMoveZones = $derived(canEdit && !!graph?.can_move_zones);
   let zoneOrigins = {}; // server view: top-left per zone id (see layoutServerView)
   // Environment canvas endpoints of a card (the server view has no endpoints of its own for changes).
@@ -540,7 +540,7 @@
   }
 
   /**
-   * Projects canvas: saves the place of a moved zone. Zones that are still placed automatically are saved where they
+   * Projects, servers and dashboard canvases: saves the place of a moved zone. Zones that are still placed automatically are saved where they
    * are too, so they do not move into the space the zone left.
    */
   async function saveZones(id, delta) {
@@ -571,7 +571,7 @@
     const starts = Object.fromEntries(ids.map(id => [id, { ...positions[id] }]));
     const box = toBox(frame);
     const others = frames.filter(f => f !== frame && f.zone === frame.zone).map(toBox);
-    // Projects canvas: zones can sit anywhere, so the group's zone must not grow over another zone.
+    // Movable zones can sit anywhere, so the group's zone must not grow over another zone.
     const otherZones = canMoveZones ? boxes.filter(z => z.id !== frame.zone).map(toBox) : [];
     const top = ZONE_PADDING + zoneHeader(boxes.find(z => z.id === frame.zone)?.zone);
     const zoneAround = b => {

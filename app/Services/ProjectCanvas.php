@@ -57,7 +57,7 @@ class ProjectCanvas
                 'name' => $project->name,
                 'icon' => 'projects',
                 'link' => route('project.show', ['project_uuid' => $project->uuid]),
-                'position' => $this->position($project->canvas_position),
+                'position' => $this->canvas->zonePosition($project->canvas_position),
             ])->values()->all(),
             'nodes' => collect($graph['nodes'])->map(fn (array $node) => [...$node, ...$grouping->get($node['id'])])
                 ->concat($projects->flatMap(fn (Project $project) => $this->emptyNodes($project, $environments->where('project_id', $project->id), $resources, $project->uuid, $canEdit)))
@@ -122,18 +122,6 @@ class ProjectCanvas
             ->reject(fn (Environment $environment) => $used->has($environment->id))
             ->map(fn (Environment $environment) => $this->canvas->emptyNode($project, $environment, $zone, $environment->name, $canAdd))
             ->values();
-    }
-
-    /**
-     * A saved project zone position, or null when the zone is auto placed.
-     *
-     * @return array{x: int, y: int}|null
-     */
-    private function position(mixed $saved): ?array
-    {
-        return is_array($saved) && is_numeric($saved['x'] ?? null) && is_numeric($saved['y'] ?? null)
-            ? ['x' => (int) $saved['x'], 'y' => (int) $saved['y']]
-            : null;
     }
 
     /**

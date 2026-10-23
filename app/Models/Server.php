@@ -133,6 +133,8 @@ class Server extends BaseModel
 
     public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
 
+    protected array $auditExclude = ['canvas_position'];
+
     /**
      * Serves the proxy error pages (503.html) for the Traefik and Caddy catch-all.
      */
@@ -340,6 +342,7 @@ class Server extends BaseModel
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
+        'canvas_position' => 'array',
     ];
 
     /**

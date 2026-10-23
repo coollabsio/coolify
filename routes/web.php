@@ -223,7 +223,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/shared-variables/{scope}/{uuid}/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
         Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
         Route::get('/servers/canvas', [ServerCanvasController::class, 'index'])->middleware(['api.ability:read']);
+        Route::patch('/servers/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
         Route::get('/dashboard/canvas', [ServerCanvasController::class, 'dashboard'])->middleware(['api.ability:read']);
+        Route::patch('/dashboard/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
         Route::get('/servers/{uuid}/canvas', [ServerCanvasController::class, 'show'])->middleware(['api.ability:read']);
         Route::get('/servers/{uuid}/canvas/containers', [ServerCanvasController::class, 'containers'])->middleware(['api.ability:read']);
         Route::get('/servers/{uuid}/canvas/usage', [ServerCanvasController::class, 'usage'])->middleware(['api.ability:read']);

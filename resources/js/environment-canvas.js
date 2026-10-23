@@ -229,7 +229,7 @@ export const groupKey = (nodes, zoneId) => {
 };
 
 /**
- * Server view: zones stack downwards; a zone with a saved place (zone.position, projects canvas) sits there and the
+ * Server view: zones stack downwards; a zone with a saved place (zone.position: projects, servers and dashboard canvases) sits there and the
  * stacked zones keep clear of it. A group with cards saved on its environment canvas (node.saved) sits where
  * those cards are, so the server canvas and the environment canvas share one position (a group that would
  * leave the zone or cover another group moves to the nearest free spot). Other groups follow below,
