@@ -2920,6 +2920,23 @@ it('notifies the team once when a volume backup fails', function () {
     Notification::assertNotSentTo($team, BackupSuccess::class);
 });
 
+it('links volume backup notifications to the instance URL instead of APP_URL', function () {
+    config()->set('app.url', 'http://localhost');
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0, 'fqdn' => 'https://coolify.example.com']));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $expected = "https://coolify.example.com/project/{$application->environment->project->uuid}/environment/{$application->environment->uuid}/application/{$application->uuid}";
+
+    $notification = new BackupFailed($backup, 'Archive command failed');
+
+    expect($notification->url)->toBe($expected)
+        ->and($notification->toPushover()->toPayload('token', 'user')['message'])->toContain("href='{$expected}'");
+});
+
 it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {
     $team = Team::factory()->create();
     [$application, $volume] = createVolumeBackupApplication($team);
