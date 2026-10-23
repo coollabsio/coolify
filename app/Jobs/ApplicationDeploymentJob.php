@@ -1536,6 +1536,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->rolling_update();
 
                 return true;
+            } elseif ($configurationDiff->isLegacyFallback()) {
+                $this->application_deployment_queue->addLogEntry('The last deployment stored no configuration snapshot. Rebuilding image.');
             } else {
                 $this->application_deployment_queue->addLogEntry('Build configuration changed. Rebuilding image.');
             }
