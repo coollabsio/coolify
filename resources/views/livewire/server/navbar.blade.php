@@ -42,7 +42,7 @@
                 'label' => 'Proxy',
                 'route' => 'server.proxy',
                 'active' => request()->routeIs('server.proxy', 'server.proxy.*'),
-                'visible' => ! $server->isSwarmWorker() && $server->canHostResources(),
+                'visible' => $server->isFunctional() && ! $server->isSwarmWorker() && $server->canHostResources(),
                 'warning' => $this->hasTraefikOutdated || $this->hasPendingProxyConfiguration,
             ],
             [
@@ -59,19 +59,20 @@
                 'label' => 'Resources',
                 'route' => 'server.resources',
                 'active' => request()->routeIs('server.resources'),
+                'visible' => $server->isFunctional(),
             ],
             [
                 'label' => 'Terminal',
                 'route' => 'server.command',
                 'active' => $currentRoute === 'server.command',
                 'navigate' => false,
-                'visible' => auth()->user()?->can('canAccessTerminal'),
+                'visible' => $server->isFunctional() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Security',
                 'route' => 'server.security.patches',
                 'active' => request()->routeIs('server.security.*'),
-                'visible' => auth()->user()?->can('update', $server),
+                'visible' => $server->isFunctional() && auth()->user()?->can('update', $server),
             ],
         ];
 

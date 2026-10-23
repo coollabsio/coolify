@@ -49,6 +49,7 @@
             'active' => $activeMenu === 'ca-certificate',
             'icon' => 'file',
             'group' => 'Settings',
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Cloudflare Tunnel',
@@ -66,6 +67,7 @@
             'group' => 'Platform',
             'visible' => ! $server->isSwarmWorker() && $server->canHostResources(),
             'warning' => $server->hasCurrentTraefikOutdatedInfo(),
+            'disabled' => ! $server->isFunctional(),
             'tracks_proxy_configuration' => true,
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
@@ -95,6 +97,7 @@
             'active' => $activeMenu === 'resources',
             'icon' => 'projects',
             'group' => 'Platform',
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Terminal',
@@ -104,6 +107,7 @@
             'group' => 'Operations',
             'navigate' => false,
             'visible' => auth()->user()?->can('canAccessTerminal'),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Destinations',
@@ -145,6 +149,7 @@
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost(),
             'beta' => true,
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Registries',
@@ -153,6 +158,7 @@
             'icon' => 'layers',
             'group' => 'Operations',
             'visible' => auth()->user()?->can('update', $server),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Log Drains',
@@ -186,6 +192,7 @@
             'icon' => 'shield-alert',
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
+            'disabled' => ! $server->isFunctional(),
             'children' => [
                 ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage', 'beta' => true],
                 ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
@@ -199,6 +206,7 @@
             'beta' => true,
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost() && auth()->user()?->can('update', $server),
+            'disabled' => ! $server->isFunctional(),
         ],
         [
             'label' => 'Danger Zone',
