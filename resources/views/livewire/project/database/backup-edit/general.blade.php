@@ -34,7 +34,7 @@
                     ]" />
                     @if (! $backup->dump_all)
                         <div class="w-full" x-data="{
-                            value: @entangle('databasesToBackup').live,
+                            value: @entangle('databasesToBackup'),
                             draft: '',
                             get databases() {
                                 return (this.value || '').split(',').map(name => name.trim()).filter(Boolean);
