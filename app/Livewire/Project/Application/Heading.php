@@ -37,6 +37,7 @@ class Heading extends Component
             ...$this->teamChannelListeners([
                 'ServiceStatusChanged' => 'checkStatus',
                 'ServiceChecked' => '$refresh',
+                'ApplicationStopFailed' => 'stopFailed',
             ]),
         ];
     }
@@ -75,6 +76,20 @@ class Heading extends Component
         } else {
             $this->dispatch('error', 'Server is not functional.');
         }
+    }
+
+    /**
+     * @param  array{applicationUuid?: mixed, message?: mixed}  $event
+     */
+    public function stopFailed(array $event): void
+    {
+        if (($event['applicationUuid'] ?? null) !== $this->application->uuid || ! is_string($event['message'] ?? null)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->dispatch('error', 'Failed to stop the application.', $event['message']);
     }
 
     public function manualCheckStatus()
