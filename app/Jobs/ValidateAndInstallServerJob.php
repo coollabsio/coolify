@@ -180,7 +180,7 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             // Start proxy if needed
-            if (! $this->server->isBuildServer()) {
+            if ($this->server->isProxyShouldRun()) {
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if ($proxyShouldRun) {
                     // Ensure networks exist BEFORE dispatching async proxy startup

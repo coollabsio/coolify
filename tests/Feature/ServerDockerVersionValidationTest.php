@@ -1,6 +1,9 @@
 <?php
 
+use App\Actions\Proxy\StartProxy;
+use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -10,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -84,4 +88,38 @@ it('shows the sudo command for non-root servers', function () {
 
     expect(validateDockerVersionError($this->server->fresh()))
         ->toContain('Run "sudo docker version --format json" on the server as the deploy user');
+});
+
+it('validates a server without a proxy and does not start a proxy', function () {
+    Queue::fake();
+    $this->server->proxy->set('type', ProxyTypes::NONE->value);
+    $this->server->save();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeDockerVersionOutput('{"Server":{"Version":"29.6.2"}}');
+
+    expect(validateDockerVersionError($this->server->fresh()))->toBeNull()
+        ->and($this->server->fresh()->is_validating)->toBeFalsy();
+    Queue::assertNotPushed(StartProxy::class);
+});
+
+it('validates a server without a proxy in the background job', function () {
+    Queue::fake();
+    $this->server->proxy->set('type', ProxyTypes::NONE->value);
+    $this->server->save();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
+    $server = Mockery::mock($this->server->fresh())->makePartial();
+    $server->shouldReceive('validateConnection')->andReturn(['uptime' => true, 'error' => null]);
+    $server->shouldReceive('validateOS')->andReturn('debian');
+    $server->shouldReceive('validatePrerequisites')->andReturn(['success' => true]);
+    $server->shouldReceive('validateDockerEngine')->andReturn(true);
+    $server->shouldReceive('validateDockerCompose')->andReturn(true);
+    $server->shouldReceive('validateDockerEngineVersion')->andReturn(true);
+    $server->shouldReceive('gatherServerMetadata')->andReturnNull();
+
+    (new ValidateAndInstallServerJob($server))->handle();
+
+    expect($this->server->fresh()->validation_logs)->toBeNull()
+        ->and($this->server->fresh()->is_validating)->toBeFalsy();
+    Queue::assertNotPushed(StartProxy::class);
 });
