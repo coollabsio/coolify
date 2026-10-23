@@ -46,7 +46,6 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Process\Pool;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -2733,15 +2732,21 @@ function get_public_ips(): void
 function detect_public_ips(array $columns = ['public_ipv4', 'public_ipv6']): array
 {
     $versions = array_intersect_key(['public_ipv4' => 4, 'public_ipv6' => 6], array_flip($columns));
-    $results = Process::concurrently(function (Pool $pool) use ($versions) {
-        foreach ($versions as $column => $version) {
-            $pool->as($column)->path(__DIR__)->command("curl -{$version}s https://ifconfig.io");
-        }
-    });
+
+    // Start the lookups together, but wait for each one alone, so a timeout of one family does not discard the other.
+    $processes = [];
+    foreach ($versions as $column => $version) {
+        $processes[$column] = Process::path(__DIR__)->start("curl -{$version}s --max-time 10 https://ifconfig.io");
+    }
 
     $detected = [];
-    foreach ($versions as $column => $version) {
-        $ip = trim($results[$column]->output());
+    foreach ($processes as $column => $process) {
+        try {
+            $ip = trim($process->wait()->output());
+        } catch (Throwable) {
+            continue;
+        }
+        $version = $versions[$column];
         if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) !== false) {
             $detected[$column] = $ip;
         }
