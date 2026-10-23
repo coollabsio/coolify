@@ -8,6 +8,57 @@ use Illuminate\Support\Facades\Log;
 
 trait HasMetrics
 {
+    /**
+     * Raw Sentinel responses from prefetchMetrics(), keyed by "type:mins"; each is read once.
+     *
+     * @var array<string, string>
+     */
+    protected array $prefetchedMetricResponses = [];
+
+    /**
+     * Fetch several metric types in one SSH round-trip instead of one per type. The
+     * get*Metrics() getters then read these responses. On a failure nothing is stored,
+     * so each getter fetches on its own as before.
+     *
+     * @param  array<int, string>  $types
+     */
+    public function prefetchMetrics(array $types, int $mins): void
+    {
+        $server = $this->getMetricsServer();
+        if (! $server->isMetricsEnabled()) {
+            return;
+        }
+
+        $from = now()->subMinutes($mins)->toIso8601ZuluString();
+        $token = $this->metricsToken($server);
+        // The token reaches curl on stdin (`-H @-`), so it is not a process argument. The token
+        // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
+        // cannot end the heredoc. Responses are separated by a 0x1E record separator.
+        $script = implode("\nprintf '\\036'\n", array_map(
+            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            $types
+        ));
+
+        try {
+            $output = instant_remote_process(
+                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+                $server,
+                maxAttempts: 1
+            );
+        } catch (\Throwable) {
+            return;
+        }
+
+        $responses = explode("\x1e", (string) $output);
+        if (count($responses) !== count($types)) {
+            return;
+        }
+
+        foreach ($types as $index => $type) {
+            $this->prefetchedMetricResponses["{$type}:{$mins}"] = trim($responses[$index]);
+        }
+    }
+
     public function getCpuMetrics(int $mins = 5): ?array
     {
         return $this->getMetrics('cpu', $mins, 'percent');
@@ -90,25 +141,21 @@ trait HasMetrics
             return null;
         }
 
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $endpoint = $this->getMetricsEndpoint($type, $from);
+        $key = "{$type}:{$mins}";
+        if (array_key_exists($key, $this->prefetchedMetricResponses)) {
+            $response = $this->prefetchedMetricResponses[$key];
+            unset($this->prefetchedMetricResponses[$key]);
+        } else {
+            $from = now()->subMinutes($mins)->toIso8601ZuluString();
+            $endpoint = $this->getMetricsEndpoint($type, $from);
+            $token = $this->metricsToken($server);
 
-        $previousToken = null;
-        try {
-            $previousToken = $server->settings->sentinel_token;
-        } catch (DecryptException) {
-            // fall through to ensureValidSentinelToken which will regenerate
+            $response = instant_remote_process(
+                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" {$endpoint}'"],
+                $server,
+                false
+            );
         }
-        $token = $server->settings->ensureValidSentinelToken();
-        if ($token !== $previousToken) {
-            Log::warning('Regenerated sentinel token during metrics read; sentinel container restart required', ['server_id' => $server->id]);
-        }
-
-        $response = instant_remote_process(
-            ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" {$endpoint}'"],
-            $server,
-            false
-        );
 
         if (str($response)->contains('error')) {
             $error = json_decode($response, true);
@@ -142,6 +189,22 @@ trait HasMetrics
         }
 
         return $metrics;
+    }
+
+    private function metricsToken(Server $server): string
+    {
+        $previousToken = null;
+        try {
+            $previousToken = $server->settings->sentinel_token;
+        } catch (DecryptException) {
+            // fall through to ensureValidSentinelToken which will regenerate
+        }
+        $token = $server->settings->ensureValidSentinelToken();
+        if ($token !== $previousToken) {
+            Log::warning('Regenerated sentinel token during metrics read; sentinel container restart required', ['server_id' => $server->id]);
+        }
+
+        return $token;
     }
 
     private function isServerMetrics(): bool

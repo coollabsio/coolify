@@ -31,6 +31,7 @@ class Metrics extends Component
     public function loadData()
     {
         try {
+            $this->resource->prefetchMetrics(['cpu', 'memory'], $this->interval);
             $cpuMetrics = $this->resource->getCpuMetrics($this->interval);
             $memoryMetrics = $this->resource->getMemoryMetrics($this->interval);
             $this->dispatch("refreshChartData-{$this->chartId}-cpu", [

@@ -386,6 +386,7 @@ test('server zones show host facts, the proxy and a usage endpoint only when met
 
 test('the usage endpoint returns the latest Sentinel values and never another team server', function () {
     $server = Mockery::mock($this->web)->makePartial();
+    $server->shouldReceive('prefetchMetrics')->once()->with(['cpu', 'memory', 'disk'], 1);
     $server->shouldReceive('getCpuMetrics')->andReturn([[1, 10.0], [2, 12.34]]);
     $server->shouldReceive('getMemoryMetrics')->andReturn([[2, 40.0]]);
     $server->shouldReceive('getDiskMetrics')->andThrow(new RuntimeException('no disk data'));

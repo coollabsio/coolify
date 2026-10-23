@@ -145,6 +145,8 @@ class ServerCanvas
                 }
             };
 
+            $server->prefetchMetrics(['cpu', 'memory', 'disk'], 1);
+
             return [
                 'cpu' => $latest(fn () => $server->getCpuMetrics(1)),
                 'memory' => $latest(fn () => $server->getMemoryMetrics(1)),

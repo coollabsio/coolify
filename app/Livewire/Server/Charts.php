@@ -102,6 +102,7 @@ class Charts extends Component
     public function loadData()
     {
         try {
+            $this->server->prefetchMetrics(['cpu', 'memory', 'disk', 'load', 'network'], $this->interval);
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
             // Disk/network/load arrived in a later Sentinel; fetch each optionally so an
