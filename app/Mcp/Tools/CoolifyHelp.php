@@ -120,7 +120,7 @@ class CoolifyHelp extends Tool
                 'topic' => $topic,
                 'description' => self::RECIPES[$topic]['description'],
                 'steps' => collect(self::RECIPES[$topic]['steps'])
-                    ->map(fn (array $step): array => $step + ['available' => isset($tools[$step['tool']])])
+                    ->map(fn (array $step): array => $step + ['available' => $this->stepAvailable($step, $tools)])
                     ->all(),
                 'notes' => ['Steps with available=false need more token abilities.', 'Ask the user before every action that needs confirm=true.'],
             ]));
@@ -153,7 +153,7 @@ class CoolifyHelp extends Tool
     /**
      * Registered tools that this token can see, keyed by name.
      *
-     * @return array<string, array{summary: string, read_only: bool}>
+     * @return array<string, array{summary: string, read_only: bool, actions: array<int, string>|null}>
      */
     private function visibleTools(): array
     {
@@ -163,12 +163,28 @@ class CoolifyHelp extends Tool
             ->mapWithKeys(fn (Tool $tool): array => [$tool->name() => [
                 'summary' => Str::before($tool->description(), '. ').'.',
                 'read_only' => ($tool->annotations()['readOnlyHint'] ?? false) === true,
+                'actions' => $tool instanceof RestActionTool ? $tool->availableActionNames() : null,
             ]])
             ->all();
     }
 
     /**
-     * @param  array<string, array{summary: string, read_only: bool}>  $tools
+     * A step is available when the token sees its tool and, for grouped tools, its action.
+     *
+     * @param  array{tool: string, action?: string, note: string}  $step
+     * @param  array<string, array{summary: string, read_only: bool, actions: array<int, string>|null}>  $tools
+     */
+    private function stepAvailable(array $step, array $tools): bool
+    {
+        if (! isset($tools[$step['tool']])) {
+            return false;
+        }
+
+        return ! isset($step['action']) || in_array($step['action'], $tools[$step['tool']]['actions'] ?? [], true);
+    }
+
+    /**
+     * @param  array<string, array{summary: string, read_only: bool, actions: array<int, string>|null}>  $tools
      * @return array<string, string>
      */
     private function summaries(array $tools): array

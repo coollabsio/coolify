@@ -2,9 +2,11 @@
 
 namespace App\Mcp\Concerns;
 
+use App\Mcp\Servers\CoolifyServer;
 use App\Services\Security\SensitiveDataRedactor;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
 
 trait BuildsResponse
 {
@@ -128,6 +130,7 @@ trait BuildsResponse
     {
         $payload = ['data' => $data];
 
+        $actions = $this->onlyVisibleTools($actions);
         if ($actions !== []) {
             $payload['_actions'] = $actions;
         }
@@ -137,6 +140,28 @@ trait BuildsResponse
         }
 
         return Response::json($payload);
+    }
+
+    /**
+     * Removes suggestions for tools that the current token cannot see, so agents do not call hidden tools.
+     *
+     * @param  array<int, array<string, mixed>>  $suggestions
+     * @return array<int, array<string, mixed>>
+     */
+    protected function onlyVisibleTools(array $suggestions): array
+    {
+        $names = array_column($suggestions, 'tool');
+        if ($names === []) {
+            return $suggestions;
+        }
+
+        $visible = collect(CoolifyServer::TOOLS)
+            ->map(fn (string $class): Tool => app($class))
+            ->filter(fn (Tool $tool): bool => in_array($tool->name(), $names, true) && $tool->eligibleForRegistration())
+            ->map(fn (Tool $tool): string => $tool->name())
+            ->all();
+
+        return array_values(array_filter($suggestions, fn (array $suggestion): bool => in_array($suggestion['tool'] ?? null, $visible, true)));
     }
 
     /**
