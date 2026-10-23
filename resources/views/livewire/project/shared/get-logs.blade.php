@@ -263,9 +263,6 @@
                         <span>Loading logs</span>
                     </div>
                     <div class="runtime-log-empty" x-show="!loading && lineCount === 0" role="status">
-                        <span class="runtime-log-empty-icon" aria-hidden="true">
-                            <x-reicon name="terminal" class="size-4" />
-                        </span>
                         <div>
                             <p>No logs yet</p>
                             <span>Logs will appear here when the container produces output.</span>

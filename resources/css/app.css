@@ -194,18 +194,20 @@
     transition-duration: 120ms;
 }
 
-.button {
-    transition-duration: 120ms, 120ms, 120ms, 80ms, 80ms;
-}
-
 .icon-button:not(:disabled):active,
-.app-tab:active,
-.split-action-main:not(:disabled):active,
-.split-action-caret:not(:disabled):active {
+.app-tab:active {
     transform: scale(0.97);
 }
 
-.button:not(:disabled):active {
+.button,
+.split-action-main,
+.split-action-caret {
+    transition-duration: 120ms, 120ms, 120ms, 80ms, 80ms;
+}
+
+.button:not(:disabled):active,
+.split-action-main:not(:disabled):active,
+.split-action-caret:not(:disabled):active {
     transform: translateY(2px);
     box-shadow: none;
 }
@@ -2575,12 +2577,30 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     opacity: 0.45;
 }
 
+/* Same physical edge as highlighted .button: hover lifts, press sinks. */
+.split-action-main:not(:disabled),
+.split-action-caret:not(:disabled) {
+    --button-depth-color: var(--color-coollabs-300);
+    box-shadow: 0 2px 0 var(--button-depth-color);
+}
+
+.dark .split-action-main:not(:disabled),
+.dark .split-action-caret:not(:disabled) {
+    --button-depth-color: var(--color-brand-depth);
+}
+
+.split-action-main:not(:disabled):hover,
+.split-action-caret:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 0 var(--button-depth-color);
+}
+
 .split-action-main:focus-visible,
 .split-action-caret:focus-visible {
-    outline: none;
+    outline: 1px solid var(--color-accent);
+    outline-offset: 2px;
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /* Custom listbox (replaces native <select>) */
@@ -4625,10 +4645,9 @@ html[data-theme="custom"] .runtime-log-columns {
     min-height: 18rem;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
     padding: 2rem;
     color: var(--runtime-log-muted);
-    text-align: left;
+    text-align: center;
 }
 
 .runtime-log-loading {
@@ -4640,18 +4659,6 @@ html[data-theme="custom"] .runtime-log-columns {
     color: var(--runtime-log-muted);
     font-size: 0.8125rem;
     font-weight: 500;
-}
-
-.runtime-log-empty-icon {
-    display: inline-flex;
-    width: 2.25rem;
-    height: 2.25rem;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--runtime-log-line);
-    border-radius: 0.5rem;
-    background: var(--runtime-log-detail);
 }
 
 .runtime-log-empty p {
