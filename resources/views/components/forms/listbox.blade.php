@@ -80,6 +80,7 @@
     <div class="relative min-w-0" x-data="{
         open: false,
         positioned: false,
+        panelPosition: {},
         saving: false,
         options: @js(array_values($options)),
         @if ($searchable)
@@ -217,12 +218,14 @@
                 window.innerWidth - panelWidth - edge,
             );
 
-            panel.style.top = `${top}px`;
-            panel.style.left = `${left}px`;
-            panel.style.width = `${panelWidth}px`;
+            // Kept in state for the :style binding, because a Livewire morph resets the inline style.
+            this.panelPosition = { top: `${top}px`, left: `${left}px`, width: `${panelWidth}px` };
             this.positioned = true;
         },
     }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
+        {{-- Livewire morphs this attribute in place, so new options arrive without closing an open panel. --}}
+        data-options="{{ json_encode(array_values($options)) }}"
+        x-init="new MutationObserver(() => options = JSON.parse($el.dataset.options)).observe($el, { attributeFilter: ['data-options'] })"
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @if ($preserveValue) wire:ignore @endif
@@ -245,7 +248,7 @@
             <template x-teleport="body">
                 <div id="{{ $panelId }}" class="listbox-panel{{ $searchable ? ' searchable-listbox-panel' : '' }}"
                     style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
-                    x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
+                    x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden', ...panelPosition }"
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"

@@ -4763,7 +4763,7 @@ html[data-theme="custom"] .runtime-log-columns {
 }
 
 .deployment-badge-preview {
-    @apply bg-coollabs/10 text-coollabs ring-1 ring-coollabs/20 dark:bg-warning/10 dark:text-warning dark:ring-warning/20;
+    @apply bg-coollabs/10 text-coollabs ring-1 ring-coollabs/20 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25;
 }
 
 .runtime-logs-fill .runtime-log-viewport {

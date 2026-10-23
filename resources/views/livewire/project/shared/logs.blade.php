@@ -86,13 +86,13 @@
                     @if (count($logTargets['deployments']) > 1 || count($logTargets['services']) > 1)
                         <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                             @if (count($logTargets['deployments']) > 1)
-                                <div class="w-full sm:w-60" wire:key="runtime-logs-deployments-{{ collect($logTargets['deployments'])->map(fn (array $option): string => $option['value'].$option['labelClass'])->join('-') }}">
+                                <div class="w-full sm:w-60" wire:key="runtime-logs-deployments">
                                     <x-forms.listbox id="pullRequestId" label="Deployment" live searchable portal
                                         searchPlaceholder="Search deployments" :options="$logTargets['deployments']" />
                                 </div>
                             @endif
                             @if (count($logTargets['services']) > 1)
-                                <div class="w-full sm:w-60" wire:key="runtime-logs-services-{{ collect($logTargets['services'])->map(fn (array $option): string => $option['value'].$option['label'].$option['dot'].($option['state'] ?? '').($option['description'] ?? ''))->join('|') }}">
+                                <div class="w-full sm:w-60" wire:key="runtime-logs-services">
                                     <x-forms.listbox id="service" label="Service" live searchable portal
                                         searchPlaceholder="Search services" :options="$logTargets['services']" />
                                 </div>
