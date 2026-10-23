@@ -193,9 +193,6 @@
                             ]" x-bind:disabled="!canUpdate" />
                         @endif
                     </div>
-                    @if ($buildPack === 'nixpacks')
-                        <x-nixpacks-deprecated-callout class="mt-4" />
-                    @endif
                 </div>
             @endif
             @if ($application->could_set_build_commands() || ($isStatic && $buildPack !== 'static'))
