@@ -4334,6 +4334,22 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     background: transparent;
 }
 
+/* Dark mode: the panel matches the cards. Rows are the card well color, and the
+   toolbar and column header are the darker card outer color. */
+html.dark:not([data-theme="custom"]) .runtime-log-panel {
+    background: var(--color-card);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+html.dark:not([data-theme="custom"]) .runtime-log-panel :is(.runtime-log-toolbar, .runtime-log-columns) {
+    border-bottom-color: rgb(255 255 255 / 8%);
+    background: color-mix(in srgb, var(--color-card) 66%, black);
+}
+
+html.dark:not([data-theme="custom"]) .runtime-log-panel .runtime-log-toolbar {
+    border-radius: 8px 8px 0 0;
+}
+
 .runtime-log-icon-button {
     display: inline-flex;
     flex-shrink: 0;
@@ -4451,9 +4467,8 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     gap: 0.625rem;
     box-sizing: border-box;
     width: 100%;
-    min-height: 2.75rem;
-    align-items: center;
-    padding: 0.6875rem 1.875rem 0.6875rem 1rem;
+    align-items: baseline;
+    padding: 0.125rem 1.875rem 0.125rem 1rem;
 }
 
 .runtime-log-columns {
@@ -4480,10 +4495,14 @@ html[data-theme="custom"] .runtime-log-columns {
     position: relative;
     border-bottom: 1px solid var(--runtime-log-line);
     border-radius: 0;
-    cursor: pointer;
+    cursor: default;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-size: 0.8125rem;
     line-height: 1.6;
+}
+
+.runtime-log-viewport [data-log-line][data-expandable] {
+    cursor: pointer;
 }
 
 .runtime-log-viewport [data-log-line]:hover,
@@ -4504,10 +4523,14 @@ html[data-theme="custom"] .runtime-log-columns {
     text-transform: uppercase;
 }
 
+.runtime-log-viewport [data-log-line]:not([data-expandable], [aria-expanded="true"])::after {
+    display: none;
+}
+
 .runtime-log-viewport [data-log-line]::after {
     content: "";
     position: absolute;
-    top: 1rem;
+    top: 0.5rem;
     right: 0.75rem;
     width: 0.375rem;
     height: 0.375rem;
@@ -4517,7 +4540,7 @@ html[data-theme="custom"] .runtime-log-columns {
 }
 
 .runtime-log-viewport [data-log-line][aria-expanded="true"]::after {
-    top: 1.1875rem;
+    top: 0.6875rem;
     transform: rotate(225deg);
 }
 
@@ -4536,17 +4559,34 @@ html[data-theme="custom"] .runtime-log-columns {
 }
 
 .runtime-log-viewport [data-line-text] {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
     grid-column: 3;
     grid-row: 1;
     min-width: 0;
+    overflow: hidden;
+}
+
+.runtime-log-message {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+}
+
+.runtime-log-source {
+    flex: 0 0 8rem;
+    width: 8rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .runtime-log-detail {
-    margin: 0 0 0.25rem;
-    padding: 1.25rem;
+    margin: 0;
+    padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--runtime-log-line);
     background: var(--runtime-log-detail);
     color: inherit;
@@ -4554,7 +4594,7 @@ html[data-theme="custom"] .runtime-log-columns {
     white-space: pre-wrap;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-size: 0.8125rem;
-    line-height: 1.8;
+    line-height: 1.6;
 }
 
 .dark .runtime-log-detail {
@@ -4587,18 +4627,21 @@ html[data-theme="custom"] .runtime-log-columns {
 
 /* Text view: one compact, wrapped text line per log entry, like the old viewer. */
 .runtime-log-text-view {
-    padding-block: 0.5rem;
+    padding-block: 0;
 }
 
 .runtime-log-viewport .runtime-log-text-view [data-log-line]:not(.hidden) {
     display: flex;
-    gap: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.125rem;
     min-height: 0;
-    padding: 0 1rem;
+    padding: 0 0.75rem;
     border-bottom: 0;
     cursor: text;
     font-size: 0.75rem;
-    line-height: 1.5;
+    line-height: 1.45;
+    text-align: left;
 }
 
 .runtime-log-viewport .runtime-log-text-view [data-log-line]::before,
@@ -4612,10 +4655,121 @@ html[data-theme="custom"] .runtime-log-columns {
 }
 
 .runtime-log-viewport .runtime-log-text-view [data-line-text] {
+    align-items: flex-start;
     flex: 1 1 auto;
     overflow: visible;
     overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.runtime-log-viewport .runtime-log-text-view .runtime-log-message {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: unset;
     white-space: pre-wrap;
+}
+
+@media (min-width: 640px) {
+    .runtime-log-viewport .runtime-log-text-view [data-log-line]:not(.hidden) {
+        flex-direction: row;
+        gap: 0.5rem;
+    }
+}
+
+.runtime-logs-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.runtime-logs-fill,
+.runtime-logs-fill > #screen,
+.runtime-logs-fill .runtime-logs-stream,
+.runtime-logs-fill .runtime-log-panel {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+/* Comes after the shared min-height: 0 so a phone still gets a tall stream. */
+.runtime-logs-fill {
+    min-height: 70dvh;
+}
+
+/* The page fills the area inside <main>. Those paddings live in layouts/app.blade.php:
+   lg:pt-[calc(3rem+1.75rem)] and lg:pb-10. Width stays on that layout's pageWidth wrapper. */
+.runtime-logs-page {
+    display: flex;
+    flex-direction: column;
+}
+
+.runtime-logs-fill .runtime-log-loading,
+.runtime-logs-fill .runtime-log-empty {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+}
+
+@media (min-width: 1280px) {
+    .runtime-logs-page {
+        height: calc(100dvh - 4.75rem - 2.5rem);
+    }
+
+    .runtime-logs-page > .application-settings-workspace {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
+    .runtime-logs-page > .application-settings-workspace > .grid {
+        flex: 1 1 auto;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .runtime-logs-column {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+    }
+
+    .runtime-logs-column > .w-full {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
+    .runtime-logs-workspace {
+        height: auto;
+        min-height: 0;
+        flex: 1 1 auto;
+    }
+
+    .runtime-logs-fill {
+        min-height: 0;
+    }
+}
+
+.deployment-badge {
+    @apply inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide;
+}
+
+.deployment-badge-production {
+    @apply bg-success/10 text-success uppercase ring-1 ring-success/20;
+}
+
+.deployment-badge-preview {
+    @apply bg-coollabs/10 text-coollabs ring-1 ring-coollabs/20 dark:bg-warning/10 dark:text-warning dark:ring-warning/20;
+}
+
+.runtime-logs-fill .runtime-log-viewport {
+    min-height: 0;
+    flex: 1 1 auto;
+    max-height: none;
 }
 
 .runtime-log-viewport .runtime-log-text-view .log-error [data-line-text] { color: #e55e73; }
