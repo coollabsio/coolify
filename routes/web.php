@@ -203,6 +203,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
         Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:write']);
         Route::get('/projects/canvas', [ProjectCanvasController::class, 'index'])->middleware(['api.ability:read']);
+        Route::patch('/projects/canvas/positions', [ProjectCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
         Route::get('/projects/{uuid}/canvas', [ProjectCanvasController::class, 'show'])->middleware(['api.ability:read']);
         Route::get('/projects/{uuid}/environments', [ProjectController::class, 'get_environments'])->middleware(['api.ability:read']);
         Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);

@@ -668,3 +668,33 @@ test('variables view: saved environment canvas positions do not push resources a
   assert.equal(resources.y, variables.y, 'both zones start at the top');
   assert.ok(resources.x - (variables.x + variables.width) <= ZONE_GAP * 2, 'resources sit next to the variables');
 });
+
+test('projects canvas: a zone with a saved place sits there, also above the other zones', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'Blog' }, { id: 'z2', name: 'Shop', position: { x: 900, y: -400 } }],
+    nodes: [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'application', 'z2', 'prod')],
+    links: [],
+  };
+  const groups = {};
+  const zones = {};
+  const positions = layoutServerView(g, groups, { zones });
+  assert.deepEqual(zones, { z1: { x: 0, y: 0 }, z2: { x: 900, y: -400 } });
+  const box = zoneBoxes(g, positions).find(z => z.id === 'z2');
+  assert.deepEqual({ x: box.x + ZONE_PADDING, y: box.y }, { x: 900, y: -400 });
+  // The group of the moved zone keeps its environment canvas mapping relative to the zone.
+  assert.equal(groups['prod:z2'].inner.y, -400 + ZONE_HEADER + ZONE_PADDING);
+});
+
+test('projects canvas: zones without a saved place stack below a saved zone that is in their way', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'Blog', position: { x: 0, y: 0 } }, { id: 'z2', name: 'Shop' }, { id: 'z3', name: 'Wiki' }],
+    nodes: [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'application', 'z2', 'prod'), envNode('c', 'application', 'z3', 'prod')],
+    links: [],
+  };
+  const positions = layoutServerView(g);
+  const boxes = Object.fromEntries(zoneBoxes(g, positions).map(z => [z.id, z]));
+  assert.ok(boxes.z2.y >= boxes.z1.y + boxes.z1.height + ZONE_GAP);
+  assert.ok(boxes.z3.y >= boxes.z2.y + boxes.z2.height + ZONE_GAP);
+});

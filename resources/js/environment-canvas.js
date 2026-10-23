@@ -229,88 +229,121 @@ export const groupKey = (nodes, zoneId) => {
 };
 
 /**
- * Server view: zones stack downwards. A group with cards saved on its environment canvas (node.saved) sits where
+ * Server view: zones stack downwards; a zone with a saved place (zone.position, projects canvas) sits there and the
+ * stacked zones keep clear of it. A group with cards saved on its environment canvas (node.saved) sits where
  * those cards are, so the server canvas and the environment canvas share one position (a group that would
  * leave the zone or cover another group moves to the nearest free spot). Other groups follow below,
  * GROUPS_PER_ROW per row. When `groups` is given, it gets per group key its frame top-left, the zone's inner
- * top-left, and `shift`: environment canvas position = server view position - shift.
+ * top-left, and `shift`: environment canvas position = server view position - shift. When `zones` is given,
+ * it gets per zone id the zone's top-left (the place that zone.position saves).
  */
-export function layoutServerView(graph, groups = null, { compact = false } = {}) {
+export function layoutServerView(graph, groups = null, { compact = false, zones = null } = {}) {
   const out = {};
+  const laid = zoneGroups(graph).map(zone => ({ zone, ...layoutServerZone(zone, graph.links || [], compact) }));
+  // Saved zones first, so the stacked zones can keep clear of them.
+  const taken = [];
+  const put = (l, origin) => {
+    for (const [id, p] of Object.entries(l.positions)) out[id] = { x: origin.x + p.x, y: origin.y + p.y };
+    for (const [key, g] of Object.entries(groups ? l.groups : {})) {
+      groups[key] = {
+        x: origin.x + g.x,
+        y: origin.y + g.y,
+        inner: { x: origin.x + g.inner.x, y: origin.y + g.inner.y },
+        shift: { x: origin.x + g.shift.x, y: origin.y + g.shift.y },
+      };
+    }
+    if (zones && l.zone.id != null) zones[l.zone.id] = { ...origin };
+    taken.push({ x: origin.x - ZONE_PADDING, y: origin.y, w: l.width + ZONE_PADDING * 2, h: l.height });
+  };
+  const savedPlace = l => (isPoint(l.zone.zone?.position) ? { x: Number(l.zone.zone.position.x), y: Number(l.zone.zone.position.y) } : null);
+  for (const l of laid.filter(savedPlace)) put(l, savedPlace(l));
+  const pinned = taken.slice();
   let y = 0;
-  for (const zone of zoneGroups(graph)) {
-    const inner = { x: 0, y: y + zoneHeader(zone.zone) + ZONE_PADDING };
-    const blocks = contextGroups(zone.nodes).map(([, nodes]) => {
-      const saved = nodes.filter(n => isPoint(n.saved));
-      const block = layoutBlock(nodes, graph.links || []);
-      return {
-        key: groupKey(nodes, zone.id),
-        nodes,
-        block,
-        size: { w: block.width + GROUP_PADDING * 2, h: GROUP_HEADER + GROUP_PADDING * 2 + block.height },
-        at: saved.length ? { x: Math.min(...saved.map(n => Number(n.saved.x))), y: Math.min(...saved.map(n => Number(n.saved.y))) } : null,
-      };
-    });
-    // Empty environments (placeholder cards only) go next to the other groups after these are placed.
-    const isEmpty = b => b.nodes.every(n => n.type === 'empty');
-    const pinned = blocks.filter(b => b.at).sort((a, b) => a.at.y - b.at.y || a.at.x - b.at.x);
-    // The environment canvas puts its first cards below a zone header; those land at the zone's top-left here.
-    const shift = { x: inner.x + GROUP_PADDING, y: inner.y + GROUP_HEADER + GROUP_PADDING - ZONE_HEADER - ZONE_PADDING };
-    const frames = [];
-    const place = ({ key, block, size }, left, top) => {
-      frames.push({ x: left, y: top });
-      for (const [id, p] of Object.entries(block.positions)) {
-        out[id] = { x: left + GROUP_PADDING + p.x, y: top + GROUP_HEADER + GROUP_PADDING + p.y };
-      }
-      if (groups && key) groups[key] = { x: left, y: top, inner, shift };
-      return top + size.h;
-    };
-    const taken = [];
-    const inside = b => b.x >= inner.x && b.y >= inner.y;
-    let bottom = inner.y;
-    for (const b of pinned) {
-      // Environment canvas positions can be left of or above the zone (negative coordinates): keep the group inside.
-      const wanted = {
-        x: Math.max(inner.x, b.at.x + shift.x - GROUP_PADDING),
-        y: Math.max(inner.y, b.at.y + shift.y - GROUP_HEADER - GROUP_PADDING),
-        ...b.size,
-      };
-      const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
-      taken.push({ ...spot, project: b.nodes[0]?.project?.uuid });
-      bottom = Math.max(bottom, place(b, spot.x, spot.y));
-    }
-    let x = 0;
-    let rowTop = pinned.length ? bottom + GROUP_GAP : inner.y;
-    let rowBottom = rowTop;
-    blocks.filter(b => !b.at && !isEmpty(b)).forEach((b, i) => {
-      if (i > 0 && i % GROUPS_PER_ROW === 0) {
-        x = 0;
-        rowTop = rowBottom + GROUP_GAP;
-      }
-      taken.push({ x, y: rowTop, ...b.size, project: b.nodes[0]?.project?.uuid });
-      rowBottom = Math.max(rowBottom, place(b, x, rowTop));
-      x += b.size.w + GROUP_GAP;
-    });
-    bottom = Math.max(bottom, rowBottom);
-    // Right of the last group of the same project (or of the zone), at the nearest free spot.
-    for (const b of blocks.filter(b => !b.at && isEmpty(b))) {
-      const project = b.nodes[0]?.project?.uuid;
-      const anchor = taken.filter(t => t.project === project).at(-1) || taken.at(-1);
-      const wanted = anchor ? { x: anchor.x + anchor.w + GROUP_GAP, y: anchor.y, ...b.size } : { ...inner, ...b.size };
-      const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
-      taken.push({ ...spot, project });
-      bottom = Math.max(bottom, place(b, spot.x, spot.y));
-    }
-    if (compact && frames.length) {
-      // The groups keep their arrangement, but start at the zone's top-left (no empty space from saved positions).
-      const dx = inner.x - Math.min(...frames.map(f => f.x));
-      const dy = inner.y - Math.min(...frames.map(f => f.y));
-      for (const n of zone.nodes) if (out[n.id]) out[n.id] = { x: out[n.id].x + dx, y: out[n.id].y + dy };
-      bottom += dy;
-    }
-    y = bottom + ZONE_PADDING + ZONE_GAP;
+  for (const l of laid.filter(l => !savedPlace(l))) {
+    const wanted = { x: -ZONE_PADDING, y, w: l.width + ZONE_PADDING * 2, h: l.height };
+    const spot = (pinned.length && freeSpot(wanted, pinned, ZONE_GAP, b => b.x === wanted.x && b.y >= y)) || wanted;
+    put(l, { x: 0, y: spot.y });
+    y = spot.y + l.height + ZONE_GAP;
   }
   return out;
+}
+
+/** One zone of the server view laid out at the origin (see layoutServerView). */
+function layoutServerZone(zone, links, compact) {
+  const out = {};
+  const groups = {};
+  const inner = { x: 0, y: zoneHeader(zone.zone) + ZONE_PADDING };
+  const blocks = contextGroups(zone.nodes).map(([, nodes]) => {
+    const saved = nodes.filter(n => isPoint(n.saved));
+    const block = layoutBlock(nodes, links);
+    return {
+      key: groupKey(nodes, zone.id),
+      nodes,
+      block,
+      size: { w: block.width + GROUP_PADDING * 2, h: GROUP_HEADER + GROUP_PADDING * 2 + block.height },
+      at: saved.length ? { x: Math.min(...saved.map(n => Number(n.saved.x))), y: Math.min(...saved.map(n => Number(n.saved.y))) } : null,
+    };
+  });
+  // Empty environments (placeholder cards only) go next to the other groups after these are placed.
+  const isEmpty = b => b.nodes.every(n => n.type === 'empty');
+  const pinned = blocks.filter(b => b.at).sort((a, b) => a.at.y - b.at.y || a.at.x - b.at.x);
+  // The environment canvas puts its first cards below a zone header; those land at the zone's top-left here.
+  const shift = { x: inner.x + GROUP_PADDING, y: inner.y + GROUP_HEADER + GROUP_PADDING - ZONE_HEADER - ZONE_PADDING };
+  const frames = [];
+  const place = ({ key, block, size }, left, top) => {
+    frames.push({ x: left, y: top, w: size.w });
+    for (const [id, p] of Object.entries(block.positions)) {
+      out[id] = { x: left + GROUP_PADDING + p.x, y: top + GROUP_HEADER + GROUP_PADDING + p.y };
+    }
+    if (key) groups[key] = { x: left, y: top, inner, shift };
+    return top + size.h;
+  };
+  const taken = [];
+  const inside = b => b.x >= inner.x && b.y >= inner.y;
+  let bottom = inner.y;
+  for (const b of pinned) {
+    // Environment canvas positions can be left of or above the zone (negative coordinates): keep the group inside.
+    const wanted = {
+      x: Math.max(inner.x, b.at.x + shift.x - GROUP_PADDING),
+      y: Math.max(inner.y, b.at.y + shift.y - GROUP_HEADER - GROUP_PADDING),
+      ...b.size,
+    };
+    const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
+    taken.push({ ...spot, project: b.nodes[0]?.project?.uuid });
+    bottom = Math.max(bottom, place(b, spot.x, spot.y));
+  }
+  let x = 0;
+  let rowTop = pinned.length ? bottom + GROUP_GAP : inner.y;
+  let rowBottom = rowTop;
+  blocks.filter(b => !b.at && !isEmpty(b)).forEach((b, i) => {
+    if (i > 0 && i % GROUPS_PER_ROW === 0) {
+      x = 0;
+      rowTop = rowBottom + GROUP_GAP;
+    }
+    taken.push({ x, y: rowTop, ...b.size, project: b.nodes[0]?.project?.uuid });
+    rowBottom = Math.max(rowBottom, place(b, x, rowTop));
+    x += b.size.w + GROUP_GAP;
+  });
+  bottom = Math.max(bottom, rowBottom);
+  // Right of the last group of the same project (or of the zone), at the nearest free spot.
+  for (const b of blocks.filter(b => !b.at && isEmpty(b))) {
+    const project = b.nodes[0]?.project?.uuid;
+    const anchor = taken.filter(t => t.project === project).at(-1) || taken.at(-1);
+    const wanted = anchor ? { x: anchor.x + anchor.w + GROUP_GAP, y: anchor.y, ...b.size } : { ...inner, ...b.size };
+    const spot = freeSpot(wanted, taken, GROUP_GAP, inside) || wanted;
+    taken.push({ ...spot, project });
+    bottom = Math.max(bottom, place(b, spot.x, spot.y));
+  }
+  if (compact && frames.length) {
+    // The groups keep their arrangement, but start at the zone's top-left (no empty space from saved positions).
+    const dx = inner.x - Math.min(...frames.map(f => f.x));
+    const dy = inner.y - Math.min(...frames.map(f => f.y));
+    for (const n of zone.nodes) if (out[n.id]) out[n.id] = { x: out[n.id].x + dx, y: out[n.id].y + dy };
+    for (const f of frames) f.x += dx;
+    bottom += dy;
+  }
+  const width = Math.max(0, ...frames.map(f => f.x + f.w), zone.zone?.details ? SERVER_ZONE_MIN_WIDTH - ZONE_PADDING * 2 : 0);
+  return { positions: out, groups, width, height: bottom + ZONE_PADDING };
 }
 
 /**

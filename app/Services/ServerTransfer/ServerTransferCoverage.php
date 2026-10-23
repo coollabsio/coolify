@@ -221,6 +221,7 @@ final class ServerTransferCoverage
             'icon_path' => 'The icon file is exported as `icon` (base64 content). The target stores it in its own icon storage and sets the path.',
             'icon_storage_type' => 'The target uses its own default icon storage. See icon_path.',
             'icon_s3_storage_id' => 'The target uses its own default icon storage. See icon_path.',
+            'canvas_position' => 'Place of the project on the projects canvas of the source; the target places it with its own projects.',
         ],
         Environment::class => ['project_id' => self::LINKED],
         ResourceLink::class => [
