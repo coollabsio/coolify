@@ -114,7 +114,7 @@ class ValidateServer
         if ($this->docker_version) {
             return 'OK';
         } else {
-            $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="text-black underline dark:text-white" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = $server->dockerEngineVersionError();
             $server->update([
                 'validation_logs' => $this->error,
             ]);

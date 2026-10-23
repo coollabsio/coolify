@@ -2567,13 +2567,11 @@ $siteAddress {
     public function validateDockerEngineVersion()
     {
         $dockerVersionRaw = instant_remote_process(['docker version --format json'], $this, false);
-        $dockerVersionJson = json_decode($dockerVersionRaw, true);
-        $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
-        $this->rememberDockerVersion(is_string($dockerVersion) ? $dockerVersion : null);
+        $dockerVersion = dockerEngineVersionFromJson($dockerVersionRaw);
+        $this->rememberDockerVersion($dockerVersion);
         $composeVersionRaw = instant_remote_process(['docker compose version --short'], $this, false);
         $this->rememberComposeVersion(is_string($composeVersionRaw) ? $composeVersionRaw : null);
-        $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-        if (is_null($dockerVersion)) {
+        if (is_null(checkMinimumDockerEngineVersion($dockerVersion))) {
             $this->settings->is_usable = false;
             $this->settings->save();
 
@@ -2585,6 +2583,25 @@ $siteAddress {
         ServerReachabilityChanged::dispatch($this);
 
         return true;
+    }
+
+    /**
+     * Explains why validateDockerEngineVersion() failed: the version could not be read, or it is too old.
+     */
+    public function dockerEngineVersionError(): string
+    {
+        $requiredVersion = str(config('constants.docker.minimum_required_version'))->before('.');
+        $documentation = '<a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>';
+        $dockerVersion = $this->dockerVersion();
+
+        if (is_null($dockerVersion)) {
+            $command = $this->isNonRoot() ? 'sudo docker version --format json' : 'docker version --format json';
+            $user = e($this->user);
+
+            return "Coolify could not read the Docker Engine version. Run \"{$command}\" on the server as the {$user} user. It must exit without an error and print only JSON. Text from shell startup files (for example ~/.bashrc) breaks the output.";
+        }
+
+        return "Docker Engine {$dockerVersion} is installed, but Coolify needs version {$requiredVersion} or newer. Please upgrade Docker: {$documentation}.";
     }
 
     public function validateCoolifyNetwork($isSwarm = false, $isBuildServer = false)

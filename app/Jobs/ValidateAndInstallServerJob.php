@@ -160,14 +160,14 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Validate Docker version
             $dockerVersion = $this->server->validateDockerEngineVersion();
             if (! $dockerVersion) {
-                $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
-                $errorMessage = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $errorMessage = $this->server->dockerEngineVersionError();
                 $this->server->update([
                     'validation_logs' => $errorMessage,
                     'is_validating' => false,
                 ]);
                 Log::error('ValidateAndInstallServer: Docker version not sufficient', [
                     'server_id' => $this->server->id,
+                    'docker_version' => $this->server->dockerVersion(),
                 ]);
 
                 return;
