@@ -110,6 +110,17 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            $activeDeployment = $this->manualCleanup ? null : CleanupDocker::activeDeployment($this->server);
+            if ($activeDeployment) {
+                $this->execution_log->update([
+                    'status' => 'success',
+                    'message' => 'Docker cleanup skipped: deployment '.$activeDeployment->deployment_uuid.' is queued or running on this server. The next scheduled cleanup runs as usual.',
+                ]);
+                event(new DockerCleanupDone($this->execution_log));
+
+                return;
+            }
+
             $this->usageBefore = $this->server->getDiskUsage();
 
             if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {

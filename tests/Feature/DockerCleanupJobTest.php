@@ -5,6 +5,7 @@ use App\Events\DockerCleanupDone;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledJobManager;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\DockerCleanupExecution;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -660,3 +661,76 @@ it('keeps an application image name with a single quote inside the grep pattern'
     expect(file_exists($marker))->toBeFalse()
         ->and(explode("\n", $output))->toBe(['rmi postgres:16']);
 })->with(['root user' => false, 'non-root user' => true]);
+
+function dockerCleanupDeployment(Server $server, string $status, string $column = 'server_id', ?Carbon $updatedAt = null): void
+{
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => '1',
+        'deployment_uuid' => 'deployment-'.str()->random(8),
+        'status' => $status,
+        $column => $server->id,
+    ]);
+    if ($updatedAt) {
+        $deployment->forceFill(['updated_at' => $updatedAt])->saveQuietly();
+    }
+}
+
+it('skips a forced scheduled cleanup while a deployment is queued or running on the server, so the build cache is not pruned', function (string $status, string $column) {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => true]);
+    dockerCleanupDeployment($server, $status, $column);
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    $execution = DockerCleanupExecution::query()->sole();
+    expect($commands->contains(fn (string $command) => str_contains($command, 'prune')))->toBeFalse()
+        ->and($execution->status)->toBe('success')
+        ->and($execution->message)->toContain('skipped')
+        ->and($execution->finished_at)->not->toBeNull();
+})->with([
+    'running on the server' => ['in_progress', 'server_id'],
+    'queued on the server' => ['queued', 'server_id'],
+    'building on the server' => ['in_progress', 'build_server_id'],
+]);
+
+it('runs a forced scheduled cleanup when the only deployments are finished, on another server, or stuck', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => true, 'dynamic_timeout' => 3600]);
+    dockerCleanupDeployment($server, 'finished');
+    dockerCleanupDeployment(dockerCleanupReachableServer(), 'in_progress');
+    dockerCleanupDeployment($server, 'in_progress', updatedAt: now()->subSeconds(3601));
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeTrue()
+        ->and(DockerCleanupExecution::query()->sole()->message)->toContain('Forced Docker cleanup');
+});
+
+it('runs a manual cleanup while a deployment is running, because the user started it', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh(), true))->handle();
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeTrue();
+});
+
+it('does not clean after a stop while a deployment is running on the server', function () {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['docker_cleanup_threshold' => 10]);
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = dockerCleanupFakeProcesses();
+
+    expect(CleanupDocker::run($server->fresh(), false, false, true))->toBe([])
+        ->and($commands)->toBeEmpty()
+        ->and(Cache::has(CleanupDocker::lastRunCacheKey($server)))->toBeFalse();
+});

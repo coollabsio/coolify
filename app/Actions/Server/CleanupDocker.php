@@ -2,6 +2,8 @@
 
 namespace App\Actions\Server;
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Support\Actions\UniqueUntilProcessingJobDecorator;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -84,8 +86,23 @@ class CleanupDocker implements ShouldBeUnique
     }
 
     /**
+     * The deployment that is queued or running on the server (as target or build server), if any.
+     * The cleanup prunes the build caches, which fails a build that uses them. A deployment that
+     * wrote no log for longer than the deployment timeout is stuck and does not count.
+     */
+    public static function activeDeployment(Server $server): ?ApplicationDeploymentQueue
+    {
+        return ApplicationDeploymentQueue::query()
+            ->where(fn ($query) => $query->where('server_id', $server->id)->orWhere('build_server_id', $server->id))
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->where('updated_at', '>=', now()->subSeconds($server->settings->dynamic_timeout ?? 3600))
+            ->first(['id', 'deployment_uuid']);
+    }
+
+    /**
      * Cleanup after a resource stop: skipped when a cleanup ran recently, and the queued run
-     * only cleans when the disk usage is at or above the server cleanup threshold.
+     * only cleans when the disk usage is at or above the server cleanup threshold and no
+     * deployment is active on the server.
      */
     public static function dispatchAfterStop(Server $server): void
     {
@@ -125,6 +142,9 @@ class CleanupDocker implements ShouldBeUnique
         $this->deadline = now()->getTimestamp() + self::REMOTE_COMMANDS_DEADLINE;
 
         if ($onlyAboveThreshold) {
+            if (self::activeDeployment($server)) {
+                return [];
+            }
             $diskUsage = $server->getDiskUsage();
             if (is_numeric($diskUsage) && (int) $diskUsage < $server->settings->docker_cleanup_threshold) {
                 return [];
