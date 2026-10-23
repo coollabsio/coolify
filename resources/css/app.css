@@ -1036,9 +1036,8 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
 
 .terminal-target-picker {
     color: rgb(255 255 255 / 0.75);
-    background: rgb(0 0 0 / 0.18);
+    background: oklch(18.31% 0.004 285.99);
     border-color: rgb(255 255 255 / 0.1);
-    backdrop-filter: blur(16px);
 }
 
 /* Pre-session target list: a normal page card, not the themed console canvas. */
