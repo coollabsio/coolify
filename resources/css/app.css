@@ -1868,6 +1868,11 @@ html[data-theme="custom"] textarea:disabled {
     --card-fg: oklch(14.5% 0 0);
     --card-fg-dim: oklch(40% 0 0);
     --card-fg-faint: var(--coollabs-subtle);
+}
+
+/* Layout only for cards: wells set their own display (often a Tailwind grid). */
+.application-settings-section,
+.empty-state {
     margin: 0;
     display: flex;
     width: 100%;
