@@ -172,6 +172,11 @@ trait HasMetrics
     /**
      * Map raw rows to [timestampMs, value] pairs, downsampling long ranges.
      *
+     * Sentinel keeps raw samples for the last 24 to 48 hours and one-minute averages
+     * before that. LTTB buckets by point count, so on ranges that reach past the raw
+     * window the raw part got most of the chart points. Those ranges are averaged per
+     * minute first, the same as Sentinel does, so the density is even over time.
+     *
      * @param  array<int, array<string, mixed>>|null  $rows
      */
     private function mapRows(?array $rows, string $valueField, int $mins): ?array
@@ -184,11 +189,37 @@ trait HasMetrics
             return [(int) $metric['time'], (float) ($metric[$valueField] ?? 0.0)];
         })->toArray();
 
+        if ($mins > 24 * 60) {
+            $metrics = $this->averagePerMinute($metrics);
+        }
+
         if ($mins > 60 && count($metrics) > 1000) {
             $metrics = downsampleLTTB($metrics, 1000);
         }
 
         return $metrics;
+    }
+
+    /**
+     * Average [timestampMs, value] pairs into one-minute buckets, timestamped at the
+     * bucket start like Sentinel's own downsampling. Samples that are a minute or more
+     * apart keep their own value.
+     *
+     * @param  array<int, array{0: int, 1: float}>  $metrics
+     * @return array<int, array{0: int, 1: float}>
+     */
+    private function averagePerMinute(array $metrics): array
+    {
+        $sums = [];
+        $counts = [];
+        foreach ($metrics as [$time, $value]) {
+            $bucket = intdiv($time, 60_000) * 60_000;
+            $sums[$bucket] = ($sums[$bucket] ?? 0.0) + $value;
+            $counts[$bucket] = ($counts[$bucket] ?? 0) + 1;
+        }
+        ksort($sums);
+
+        return array_map(fn (int $bucket) => [$bucket, $sums[$bucket] / $counts[$bucket]], array_keys($sums));
     }
 
     private function metricsToken(Server $server): string

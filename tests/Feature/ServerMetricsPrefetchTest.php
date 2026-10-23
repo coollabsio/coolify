@@ -85,3 +85,25 @@ it('runs the batched metrics script with sudo for a non-root user', function () 
         ->and($commands[0])->not->toContain('sudo curl')
         ->and($commands[0])->not->toContain('sudo printf');
 });
+
+it('keeps long-range charts evenly dense across mixed-resolution Sentinel history', function () {
+    // Sentinel keeps raw samples (here every 10 s) for the last one to two days and
+    // one-minute averages before that. A 7-day chart must not crowd the raw days.
+    $end = 1_800_000_000_000;
+    $rawStart = $end - 2 * 86_400_000;
+    $rows = [];
+    for ($time = $end - 7 * 86_400_000; $time < $rawStart; $time += 60_000) {
+        $rows[] = ['time' => $time, 'percent' => 10];
+    }
+    for ($time = $rawStart; $time < $end; $time += 10_000) {
+        $rows[] = ['time' => $time, 'percent' => ($time / 10_000) % 2 === 0 ? 0 : 20];
+    }
+    Process::fake(fn () => Process::result(json_encode($rows)));
+
+    $metrics = $this->server->getCpuMetrics(10080);
+    $recent = array_filter($metrics, fn (array $point) => $point[0] >= $rawStart);
+
+    expect(count($metrics))->toBeLessThanOrEqual(1000)
+        ->and(count($recent) / count($metrics))->toBeLessThan(0.35)
+        ->and(array_values(array_unique(array_column($recent, 1))))->toBe([10.0]);
+});
