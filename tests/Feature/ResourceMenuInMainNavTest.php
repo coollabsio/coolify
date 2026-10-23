@@ -58,7 +58,7 @@ test('an application page teleports its menu into the main sidebar ', function (
         ->toContain('x-teleport="#main-nav-context-0"')
         ->toContain('application-settings-navigation in-main-nav')
         ->toMatch('#<button type="button" @click="navLevel = -1; navSwap = \'back\'"\s+title="Back to the main menu"#')
-        ->toMatch('#@click="navLevel = 0; navSwap = \'forward\'"\s+title="Back to the Navbar Menu App menu"#')
+        ->not->toContain('Back to the Navbar Menu App menu')
         ->not->toContain('id="main-nav-context-1"')
         ->and(substr_count($html, 'id="main-nav-context-0"'))->toBe(1);
 });
@@ -144,7 +144,7 @@ test('a database backup page keeps the database menu one back away in the main s
         ->toContain('x-teleport="#main-nav-context-1"')
         ->toMatch('#@click="navLevel = -1; navSwap = \'back\'"\s+title="Back to the main menu"#')
         ->toMatch('#@click="navLevel = 0; navSwap = \'back\'"\s+title="Back to the database menu"#')
-        ->toMatch('#@click="navLevel = 1; navSwap = \'forward\'"\s+title="Back to the orders-db menu"#')
+        ->not->toContain('Back to the orders-db menu')
         ->and(substr_count($html, 'aria-label="Database settings"'))->toBe(1)
         ->and(substr_count($html, 'aria-label="Backup settings"'))->toBe(2);
 });

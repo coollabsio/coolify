@@ -1,7 +1,7 @@
-@props(['backLabel', 'backTitle' => 'Back to the main menu', 'depth' => 0, 'name' => null, 'navOnly' => false])
+@props(['backLabel', 'backTitle' => 'Back to the main menu', 'depth' => 0, 'navOnly' => false])
 @php
     // The main sidebar replaces its menu with this one on wide screens (see components/navbar.blade.php).
-    registerMainNavContext($depth, $backLabel, $backTitle, $name);
+    registerMainNavContext($depth, $backLabel, $backTitle);
 @endphp
 {{-- A page menu, rendered twice: in the page (below xl, CSS hides it on xl), and teleported into the
      main sidebar (xl and up). The slot must not contain Livewire components (they would render twice).
