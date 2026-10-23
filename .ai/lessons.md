@@ -135,3 +135,6 @@
 
 ## Session writes are last-writer-wins
 - Laravel saves the whole session payload at the end of every request, and pages run concurrent `wire:poll` requests. A value that one request changes can be overwritten by a request that started earlier. `KeepConcurrentTeamSwitch` protects `currentTeam`; protect any new session value that changes mid-session the same way, or keep it out of the session.
+
+## Keep `:has()` off page-wide ancestors
+- A `:has()` on `html`, `body`, `.app-shell`, or a sibling of `<main>` (for example `html:has(.x) .y`) makes Chrome restyle the page on every DOM change. Chart libraries read layout many times per render, so one ApexCharts render took ~400 ms and blocked navigation. Use a class set by the Blade layout instead, and keep `:has()` on small, local subjects.

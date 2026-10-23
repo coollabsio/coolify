@@ -6441,12 +6441,14 @@ html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar > div:not(.ap
         background-image: none;
     }
 
-    html:not([data-nav-style="floating"]):has(.app-main-full :is([data-ec-root], .cv-root)) .app-topbar {
+    /* A layout class, not html:has(): an html-level :has() restyles the whole
+       page on every DOM change, which made chart renders take seconds. */
+    html:not([data-nav-style="floating"]) .app-shell-canvas > .app-topbar {
         background-color: transparent;
         backdrop-filter: none;
     }
 
-    html:not([data-nav-style="floating"]):has(.app-main-full :is([data-ec-root], .cv-root)) .app-topbar > div:not(.app-topbar-brand) {
+    html:not([data-nav-style="floating"]) .app-shell-canvas > .app-topbar > div:not(.app-topbar-brand) {
         border-bottom-color: transparent;
     }
 }

@@ -34,7 +34,7 @@
             }
         }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail"
             :style="{ '--sidebar-w': collapsed ? '4rem' : '14rem' }" x-cloak
-            @class(['app-shell dark:text-inherit text-black', 'flex h-dvh flex-col' => $fullBleed ?? false])>
+            @class(['app-shell dark:text-inherit text-black', 'app-shell-canvas flex h-dvh flex-col' => $fullBleed ?? false])>
             {{-- ============ DESKTOP TOP BAR ============ --}}
             <header
                 x-data="{ resourceActionsOpen: false }"
