@@ -6,10 +6,14 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyTimeoutException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 /**
  * Tests for the explicit per-server mux lock that prevents concurrent workers
@@ -53,6 +57,18 @@ function makeMuxServer(): Server
     Storage::disk('ssh-keys')->put("ssh_key@{$server->privateKey->uuid}", $server->privateKey->private_key);
 
     return $server;
+}
+
+function muxProcessTimeout(): Closure
+{
+    return function () {
+        $process = new SymfonyProcess(['ssh']);
+
+        throw new ProcessTimedOutException(
+            new SymfonyTimeoutException($process, SymfonyTimeoutException::TYPE_GENERAL),
+            new ProcessResult($process),
+        );
+    };
 }
 
 it('establishes a master with ssh -fN and never the orphan-prone ssh -fNM', function () {
@@ -103,6 +119,91 @@ it('reuses a healthy master regardless of its absolute age', function () {
 
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+});
+
+it('bounds mux check commands so a wedged master cannot block callers', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    $server = makeMuxServer();
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 1),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::ensureMultiplexedConnection($server);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, '-O check'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '-O check') && $process->timeout !== 5);
+});
+
+it('replaces a wedged master whose control check times out', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    $server = makeMuxServer();
+    $muxSocket = "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}";
+
+    File::partialMock()->shouldReceive('delete')->once()->with($muxSocket)->andReturnTrue();
+    Process::fake([
+        '*-O check*' => muxProcessTimeout(),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '-O stop'));
+});
+
+it('does not delete the control socket when the master is simply absent', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = makeMuxServer();
+
+    File::partialMock()->shouldNotReceive('delete');
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 255),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+});
+
+it('bounds the control commands used to stop a mux master', function () {
+    config(['constants.ssh.mux_health_check_timeout' => 5]);
+    $server = makeMuxServer();
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O check') && $process->timeout === 5);
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop') && $process->timeout === 5);
+});
+
+it('replaces a master whose health check times out', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_enabled' => true,
+    ]);
+    $server = makeMuxServer();
+
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
+        '*health_check_ok*' => muxProcessTimeout(),
+        '*-O stop*' => Process::result(exitCode: 0),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
 });
 
 it('does not spawn a master when the per-server lock is already held', function () {
