@@ -6,13 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
+use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidServerIp;
 use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use App\Services\ServerTransfer\ServerTransferMigrator;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Throwable;
@@ -217,7 +220,12 @@ class ServerTransferController extends Controller
 
         // The target connects to the server over SSH when it takes over management, so an unreachable
         // server would leave an imported server here that this instance cannot manage.
-        $connection = @fsockopen($ip, $port, timeout: 5);
+        // On Cloud the probe is rate limited and cannot reach private, loopback, or link-local addresses,
+        // so users cannot scan ports of Cloud's own network.
+        Server::throttleValidation($teamId, $ip);
+        $probeHost = filter_var(Server::normalizeIp($ip), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.Server::normalizeIp($ip).']' : $ip;
+        $probeAllowed = ! isCloud() || Validator::make(['ip' => "http://{$probeHost}:{$port}"], ['ip' => [new SafeWebhookUrl]])->passes();
+        $connection = $probeAllowed ? @fsockopen($ip, $port, timeout: 5) : false;
         if ($connection !== false) {
             fclose($connection);
         }
@@ -235,8 +243,11 @@ class ServerTransferController extends Controller
             [
                 'label' => "the target can reach the SSH port of the server ({$ip}:{$port})",
                 'ok' => $connection !== false,
-                'message' => $connection !== false ? null
-                    : "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
+                'message' => match (true) {
+                    $connection !== false => null,
+                    ! $probeAllowed => "This instance cannot connect to a private, loopback, or link-local address ({$ip}). Use the public IP address of the server.",
+                    default => "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
+                },
             ],
         ];
 
@@ -319,6 +330,8 @@ class ServerTransferController extends Controller
                 preserveUuids: $request->boolean('preserve_uuids', true),
                 adoptMode: $request->boolean('adopt_mode', true),
             );
+        } catch (ThrottleRequestsException $e) {
+            throw $e;
         } catch (Throwable $e) {
             $payload = ['message' => $e->getMessage()];
             if ($e instanceof ValidationException) {

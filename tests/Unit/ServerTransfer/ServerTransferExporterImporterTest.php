@@ -525,7 +525,10 @@ test('the archive of another team is not replaced', function () {
     $otherTeam = Team::factory()->create();
 
     expect(fn () => $this->importer->import($bundle, teamId: $otherTeam->id))
-        ->toThrow(ValidationException::class, 'Another team of this instance has the archived copy');
+        ->toThrow(ValidationException::class, 'Another team of this instance has the archived copy of this server.');
+
+    $uuidCheck = collect($this->importer->importChecks($this->server->uuid, '203.0.113.50', $otherTeam->id))->firstWhere('field', 'server.uuid');
+    expect($uuidCheck['message'])->not->toContain($this->server->name);
 });
 
 test('import rolls back all created rows when a later resource fails', function () {

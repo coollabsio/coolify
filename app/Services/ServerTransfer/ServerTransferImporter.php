@@ -206,6 +206,8 @@ class ServerTransferImporter
 
         if (! $dryRun) {
             $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
+            // The import validates the server over SSH, so it uses the same Cloud limit as a new server.
+            Server::throttleValidation($teamId, $serverIp);
         }
 
         if ($uuidConflict) {
@@ -509,7 +511,7 @@ class ServerTransferImporter
         $uuidMessage = match (true) {
             $existingServer === null => null,
             $existingServer->trashed() => "The server with UUID {$serverUuid} is still being deleted on this instance. Wait a minute, then transfer again.",
-            $existingServer->isTransferredAway() => "Another team of this instance has the archived copy of server {$existingServer->name}. Transfer the server into that team, or delete the archive there first.",
+            $existingServer->isTransferredAway() => 'Another team of this instance has the archived copy of this server. Transfer the server into that team, or delete the archive there first.',
             default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
         };
 

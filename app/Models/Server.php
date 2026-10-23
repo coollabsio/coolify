@@ -1333,6 +1333,16 @@ $siteAddress {
         return $this->proxy->modelScope();
     }
 
+    /**
+     * Servers that this instance manages. A transferred server is only an archive and does not use a server slot.
+     */
+    public function scopeNotTransferredAway(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereNull('server_metadata->transfer->status')
+            ->orWhere('server_metadata->transfer->status', '!=', 'transferred'));
+    }
+
     public function scopeWhereProxyType(Builder $query, string $proxyType): Builder
     {
         return $query->where('proxy->type', $proxyType);

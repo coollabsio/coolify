@@ -241,6 +241,23 @@ describe('POST /api/v1/servers/import', function () {
             ->assertJsonValidationErrors(['preserve_uuids']);
     });
 
+    test('on Cloud, rate limits the SSH validation that the import starts', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        $this->team->update(['custom_server_limit' => 10]);
+        InstanceSettings::findOrFail(0)->forceFill(['server_validation_max_failures_per_ip' => 1])->save();
+        Server::throttleValidation($this->team->id, '10.66.0.20');
+
+        $export = transferExportForApiTest($this->server);
+        $this->server->forceDelete();
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export])
+            ->assertStatus(429);
+
+        expect(Server::where('uuid', $export['server']['uuid'])->exists())->toBeFalse();
+        Queue::assertNotPushed(ValidateAndInstallServerJob::class);
+    });
+
     test('rejects import when the destination team is at its cloud server limit', function () {
         config()->set('constants.coolify.self_hosted', false);
         $this->team->update(['custom_server_limit' => 1]);
@@ -473,6 +490,30 @@ describe('GET /api/v1/servers/import/check', function () {
             "the target can reach the SSH port of the server (127.0.0.1:{$port})" => true,
         ]);
         fclose($listener);
+    });
+
+    test('on Cloud, does not probe private, loopback, or link-local addresses', function (string $ip) {
+        config()->set('constants.coolify.self_hosted', false);
+
+        $this->withHeaders(transferHeaders($this->importToken))
+            ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip='.urlencode($ip).'&port=22')
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($message) => str_contains($message, 'cannot connect to a private, loopback, or link-local address'));
+    })->with(['127.0.0.1', '10.0.0.5', '169.254.169.254', '::1', 'localhost']);
+
+    test('on Cloud, rate limits the reachability probe', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        InstanceSettings::findOrFail(0)->forceFill(['server_validation_max_failures_per_team' => 2])->save();
+
+        foreach (['10.0.0.5', '10.0.0.6'] as $ip) {
+            $this->withHeaders(transferHeaders($this->importToken))
+                ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip={$ip}")
+                ->assertStatus(422);
+        }
+
+        $this->withHeaders(transferHeaders($this->importToken))
+            ->getJson('/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=10.0.0.7')
+            ->assertStatus(429);
     });
 
     test('rejects a token without the write permission', function () {
