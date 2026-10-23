@@ -17,7 +17,7 @@ class RuntimeLogTargets
     /**
      * @param  list<array{uuid: string, name: string, containers: list<array<string, mixed>>}>  $servers
      * @return array{
-     *     deployments: list<array{value: string, label: string, labelClass: string}>,
+     *     deployments: list<array{value: string, label: string, dot: string, state?: string}>,
      *     services: list<array{value: string, label: string, dot: string, description?: string, state?: string}>,
      *     deployment: string,
      *     service: string,
@@ -50,7 +50,7 @@ class RuntimeLogTargets
         $sources = self::sourcesFor($groups[$chosenKey]);
 
         return [
-            'deployments' => $groupDeployments ? self::deploymentOptions($deploymentIds) : [],
+            'deployments' => $groupDeployments ? self::deploymentOptions($deploymentIds, $containers) : [],
             'services' => self::serviceOptions($groups),
             'deployment' => $chosenDeployment,
             'service' => count($groups) > 1 ? $chosenKey : '',
@@ -204,18 +204,37 @@ class RuntimeLogTargets
     }
 
     /**
+     * Deployments show the same status dot and caption as services, for all their containers.
+     *
      * @param  list<string>  $ids
-     * @return list<array{value: string, label: string, labelClass: string}>
+     * @param  list<array{deployment: string, state: string}>  $containers
+     * @return list<array{value: string, label: string, dot: string, state?: string}>
      */
-    private static function deploymentOptions(array $ids): array
+    private static function deploymentOptions(array $ids, array $containers): array
     {
-        return array_map(fn (string $id): array => [
-            'value' => $id,
-            'label' => $id === '0' ? 'Production' : 'PR #'.$id,
-            'labelClass' => $id === '0'
-                ? 'deployment-badge deployment-badge-production'
-                : 'deployment-badge deployment-badge-preview',
-        ], $ids);
+        return array_map(function (string $id) use ($containers): array {
+            $states = array_column(array_filter(
+                $containers,
+                fn (array $container): bool => $container['deployment'] === $id,
+            ), 'state');
+
+            return self::statusOption($id, $id === '0' ? 'Production' : 'PR #'.$id, $states);
+        }, $ids);
+    }
+
+    /**
+     * @param  list<string>  $states
+     * @return array{value: string, label: string, dot: string, state?: string}
+     */
+    private static function statusOption(string $value, string $label, array $states): array
+    {
+        $option = ['value' => $value, 'label' => $label, 'dot' => self::serviceDot($states)];
+        $state = self::serviceStateLabel($states);
+        if ($state !== null) {
+            $option['state'] = $state;
+        }
+
+        return $option;
     }
 
     /**
@@ -261,16 +280,7 @@ class RuntimeLogTargets
     {
         $options = [];
         foreach ($groups as $key => $containers) {
-            $states = array_column($containers, 'state');
-            $option = [
-                'value' => $key,
-                'label' => $key,
-                'dot' => self::serviceDot($states),
-            ];
-            $state = self::serviceStateLabel($states);
-            if ($state !== null) {
-                $option['state'] = $state;
-            }
+            $option = self::statusOption($key, $key, array_column($containers, 'state'));
             if (count($containers) > 1) {
                 $option['description'] = count($containers).' containers';
             }

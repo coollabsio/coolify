@@ -213,7 +213,7 @@ class Logs extends Component
 
     /**
      * @return array{
-     *     deployments: list<array{value: string, label: string, labelClass: string}>,
+     *     deployments: list<array{value: string, label: string, dot: string, state?: string}>,
      *     services: list<array{value: string, label: string, dot: string, description?: string}>,
      *     deployment: string,
      *     service: string,

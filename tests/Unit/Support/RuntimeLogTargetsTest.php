@@ -29,16 +29,16 @@ function runtimeLogTargets(array $servers, string $deployment = '0', string $ser
 it('orders production ahead of newer previews and uses the top bar pills', function () {
     $targets = runtimeLogTargets([
         runtimeLogServer('primary', 'Primary', [
-            runtimeLogContainer('app-pr-7', 'coolify.pullRequestId=7,com.docker.compose.service=web'),
+            runtimeLogContainer('app-pr-7', 'coolify.pullRequestId=7,com.docker.compose.service=web', 'exited'),
             runtimeLogContainer('app', 'coolify.pullRequestId=0,com.docker.compose.service=web'),
             runtimeLogContainer('app-pr-42', 'coolify.pullRequestId=42,com.docker.compose.service=web'),
         ]),
     ]);
 
     expect($targets['deployments'])->toBe([
-        ['value' => '0', 'label' => 'Production', 'labelClass' => 'deployment-badge deployment-badge-production'],
-        ['value' => '42', 'label' => 'PR #42', 'labelClass' => 'deployment-badge deployment-badge-preview'],
-        ['value' => '7', 'label' => 'PR #7', 'labelClass' => 'deployment-badge deployment-badge-preview'],
+        ['value' => '0', 'label' => 'Production', 'dot' => 'success'],
+        ['value' => '42', 'label' => 'PR #42', 'dot' => 'success'],
+        ['value' => '7', 'label' => 'PR #7', 'dot' => 'error', 'state' => 'Stopped'],
     ])
         ->and($targets['deployment'])->toBe('0')
         ->and($targets['service'])->toBe('')

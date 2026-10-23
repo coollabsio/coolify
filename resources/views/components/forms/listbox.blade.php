@@ -4,7 +4,7 @@
     'label' => null,
     'helper' => null,
     'required' => false,
-    'options' => [], // list of ['value' => ..., 'label' => ..., 'description' => ?string, 'disabled' => bool, 'dot' => ?string, 'state' => ?string, 'labelClass' => ?string]
+    'options' => [], // list of ['value' => ..., 'label' => ..., 'description' => ?string, 'disabled' => bool, 'dot' => ?string, 'state' => ?string]
     'placeholder' => 'Select…',
     'emptyText' => 'No options available.',
     'live' => false,
@@ -236,7 +236,7 @@
             :aria-expanded="open" @if ($tooltip) :title="title" @endif>
             <span class="listbox-trigger-label flex items-center gap-2">
                 <span x-show="selectedOption?.dot" class="size-1.5 shrink-0 rounded-full" :class="dotClass(selectedOption?.dot)"></span>
-                <span class="min-w-0 truncate" :class="selectedOption?.labelClass" x-text="current">{{ $multiple ? $multipleLabel : '' }}</span>
+                <span class="min-w-0 truncate" x-text="current">{{ $multiple ? $multipleLabel : '' }}</span>
                 <span x-show="selectedOption?.state" class="shrink-0 text-xs text-neutral-500 dark:text-fg-dim" x-text="selectedOption?.state"></span>
             </span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -292,7 +292,7 @@
                                         <span x-show="option.dot" class="size-1.5 shrink-0 rounded-full" :class="dotClass(option.dot)"></span>
                                         <span class="flex min-w-0 flex-col items-start">
                                             <span class="flex min-w-0 items-baseline gap-2">
-                                                <span class="truncate" :class="option.labelClass" x-text="option.label"></span>
+                                                <span class="truncate" x-text="option.label"></span>
                                                 <span x-show="option.state" x-text="option.state"
                                                     class="shrink-0 text-xs text-neutral-500 dark:text-fg-dim"></span>
                                             </span>
@@ -364,7 +364,7 @@
                                     <span x-show="option.dot" class="size-1.5 shrink-0 rounded-full" :class="dotClass(option.dot)"></span>
                                     <span class="flex min-w-0 flex-col items-start">
                                         <span class="flex min-w-0 items-baseline gap-2">
-                                            <span class="truncate" :class="option.labelClass" x-text="option.label"></span>
+                                            <span class="truncate" x-text="option.label"></span>
                                             <span x-show="option.state" x-text="option.state"
                                                 class="shrink-0 text-xs text-neutral-500 dark:text-fg-dim"></span>
                                         </span>
