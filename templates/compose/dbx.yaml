@@ -1,0 +1,18 @@
+# documentation: https://dbxio.com/en/docs/getting-started
+# slogan: Lightweight database client supporting more than 90 databases.
+# category: database
+# tags: database,sql,client,management,development
+# logo: svgs/dbx.png
+# port: 4224
+
+services:
+  dbx:
+    image: 't8y2/dbx:${DBX_VERSION:-latest}'
+    environment:
+      - SERVICE_URL_DBX_4224
+      - 'DBX_PASSWORD=${SERVICE_PASSWORD_DBX}'
+    volumes:
+      - 'dbx-data:/app/data'
+
+volumes:
+  dbx-data:
