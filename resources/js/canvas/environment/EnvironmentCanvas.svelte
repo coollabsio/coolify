@@ -217,14 +217,15 @@
   // so the top bar keeps only the brand and breadcrumb.
   const topbar = document.querySelector('.app-topbar');
   const floatingBar = () => desktop.matches && !!topbar && document.documentElement.dataset.navStyle === 'floating';
-  // Floating nav: the canvas fills the screen behind the top bar and the sidebar (see app.css),
-  // so fit and the side panel use only the part that the floating panels do not cover.
+  // Desktop: the canvas fills the space behind the top bar (and, with floating nav, the sidebar; see app.css),
+  // so fit and the side panel use only the part that the top bar and floating panels do not cover.
   function coveredInsets() {
     const gap = 8;
     const v = viewport.getBoundingClientRect();
     // The bottom-left controls and deployments sit below the cards; fit keeps no side space for them.
     const deploymentsRight = 0;
-    if (!floatingBar()) return { top: 0, left: Math.max(0, deploymentsRight) };
+    if (!desktop.matches || !topbar) return { top: 0, left: Math.max(0, deploymentsRight) };
+    if (!floatingBar()) return { top: Math.max(0, topbar.getBoundingClientRect().bottom + gap - v.top), left: Math.max(0, deploymentsRight) };
     // The main sidebar, and a page's fixed settings rail (server canvas) when it is on the left.
     const rail = document.querySelector('.application-settings-navigation');
     const panels = [document.querySelector('.app-sidebar > div > nav'), rail && getComputedStyle(rail).position === 'fixed' ? rail : null]
@@ -241,7 +242,7 @@
   const inControls = () => !!bar?.closest('[data-canvas-controls]');
   function alignFloatingBar() {
     if (!floatingBar()) {
-      panelTop = '';
+      panelTop = desktop.matches && topbar ? `${coveredInsets().top}px` : '';
       return;
     }
     if (inControls()) {

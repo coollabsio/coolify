@@ -179,3 +179,29 @@ it('does not substitute another disk mount in the summary', function () {
 
     expect($client->summary()['diskPercent'])->toBeNull();
 });
+
+it('uses the Sentinel data mount as the root disk when no root mount is reported', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/summary' => json_encode(['disk' => [
+            ['mount' => '/app/db', 'used' => 30, 'total' => 100, 'usedPercent' => 30],
+        ]]),
+        '/disk/history' => json_encode([
+            ['time' => 1700000000000, 'mount' => '/app/db', 'usedPercent' => 30],
+            ['time' => 1700000000000, 'mount' => '/boot', 'usedPercent' => 90],
+        ]),
+    ];
+
+    expect($client->summary()['diskPercent'])->toBe(30.0)
+        ->and($client->history('disk', '24h'))->toBe([[1699999800000, 30.0]]);
+});
+
+it('prefers the root mount over the Sentinel data mount', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = ['/disk/history' => json_encode([
+        ['time' => 1700000000000, 'mount' => '/app/db', 'usedPercent' => 30],
+        ['time' => 1700000000000, 'mount' => '/', 'usedPercent' => 60],
+    ])];
+
+    expect($client->history('disk', '24h'))->toBe([[1699999800000, 60.0]]);
+});

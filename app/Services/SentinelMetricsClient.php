@@ -141,7 +141,8 @@ class SentinelMetricsClient
 
         // Disk history interleaves every mount; keep the root filesystem only.
         if ($rootOnly && array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
-            $rows = array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/');
+            $mount = self::rootMountName($rows);
+            $rows = array_filter($rows, fn ($row) => ($row['mount'] ?? null) === $mount);
         }
 
         // Average raw samples into epoch-aligned buckets so every server shares the same
@@ -160,13 +161,28 @@ class SentinelMetricsClient
     }
 
     /**
+     * The mount that stands for the root disk: `/`, else Sentinel's data bind mount.
+     * Sentinel 1.1.2 and older run in a container and report only their own mounts,
+     * so the host disk that holds /data/coolify is reported as `/app/db`.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private static function rootMountName(array $rows): ?string
+    {
+        $mounts = array_column($rows, 'mount');
+
+        return collect(['/', '/app/db'])->first(fn ($mount) => in_array($mount, $mounts, true));
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $mounts
      * @return array{used: ?int, total: ?int, percent: ?float}
      */
     private function rootMount(array $mounts): array
     {
-        $root = collect($mounts)->firstWhere('mount', '/');
-        if ($root === null && ! array_any($mounts, fn ($mount) => array_key_exists('mount', $mount))) {
+        if (array_any($mounts, fn ($mount) => array_key_exists('mount', $mount))) {
+            $root = collect($mounts)->firstWhere('mount', self::rootMountName($mounts));
+        } else {
             $root = $mounts[0] ?? null;
         }
 

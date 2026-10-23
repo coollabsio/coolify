@@ -6422,8 +6422,20 @@ html.dark.is-scrolled:not([data-nav-style="floating"]) .app-topbar > div:not(.ap
         padding-top: 0;
     }
 
-    html:not([data-nav-style="floating"]) .app-main-full :is([data-ec-root], .cv-root) {
+    /* The deploy canvas Steps panel starts below the top bar, and its canvas
+       runs up under the top bar. */
+    html:not([data-nav-style="floating"]) .app-main-full .cv-root {
         padding-top: calc(3rem + 0.5rem);
+    }
+
+    html:not([data-nav-style="floating"]) .app-main-full .cv-root.cv-docked .cv-stage {
+        margin-top: calc(-3rem - 0.5rem);
+    }
+
+    /* The resource canvases fill the space under the top bar, so the top bar
+       does not cut off the cards (fit keeps the cards below it). */
+    html:not([data-nav-style="floating"]) .app-main-full [data-ec-root] {
+        padding: 0 !important;
     }
 
     /* The deploy canvas (.cv-root) paints its own dots. */
