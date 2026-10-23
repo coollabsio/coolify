@@ -10,16 +10,21 @@
 @endphp
 <div @class(['relative', 'min-w-0 flex-1' => $sidebar]) x-data="{
     open: false,
-    appearanceOpen: false,
+    panelMaxHeight: null,
     avatarUrl: @js($user?->avatar_path ? profile_avatar_url($user) : null),
     openPanel() {
-        this.appearanceOpen = false;
+        this.fitPanel();
         this.open = true;
+    },
+    fitPanel() {
+        const rect = this.$refs.userMenuButton.getBoundingClientRect();
+        const space = @js($sidebar) ? rect.top : window.innerHeight - rect.bottom;
+        this.panelMaxHeight = Math.max(space - 12, 160) + 'px';
     },
     closePanel() {
         this.open = false;
     },
-}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()"
+}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()" @resize.window="open && fitPanel()"
     @click.outside="closePanel()">
     <button type="button" x-ref="userMenuButton" @click="open ? closePanel() : openPanel()"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
@@ -44,15 +49,16 @@
         </svg>
     </button>
 
-    {{-- In the sidebar the panel is fixed to the button, so the scrolling sidebar does not clip it. --}}
-    <div x-show="open" x-cloak
+    {{-- In the sidebar the panel is fixed to the button, so the scrolling sidebar does not clip it.
+         The panel scrolls when it is taller than the space next to the button. --}}
+    <div x-show="open" x-cloak :style="{ maxHeight: panelMaxHeight }"
         @if ($sidebar) x-anchor.top-start.fixed.offset.4="$refs.userMenuButton" @endif
         x-transition:enter="transition ease-out duration-150"
         x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
         x-transition:leave="transition ease-in duration-100"
         x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
         @class([
-            'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
+            'top-user-menu-panel listbox-panel z-[90]! w-52! min-w-0! overflow-y-auto!',
             'right-0! left-auto!' => ! $sidebar,
             'top-user-menu-panel-sidebar origin-bottom-left' => $sidebar,
             'origin-top-right' => ! $sidebar,
@@ -69,21 +75,12 @@
                 Profile
             </span>
         </a>
-        <button type="button" class="listbox-option w-full" @click="appearanceOpen = !appearanceOpen"
-            :aria-expanded="appearanceOpen">
+        <a href="{{ route('profile.appearance') }}" {{ wireNavigate() }} class="listbox-option">
             <span class="flex items-center gap-2">
                 <x-reicon name="settings" class="size-4 opacity-80" />
                 Appearance
             </span>
-            <svg class="size-3.5 text-neutral-400 transition-transform dark:text-fg-faint"
-                :class="appearanceOpen && 'rotate-180'" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" />
-            </svg>
-        </button>
-        <div x-show="appearanceOpen" x-collapse.duration.200ms class="mx-1 pb-1 pl-6">
-            <x-theme-controls variant="menu" />
-        </div>
+        </a>
 
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
 

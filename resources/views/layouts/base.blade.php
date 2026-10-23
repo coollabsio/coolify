@@ -54,8 +54,8 @@
             document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
         };
-        // Single source for the theme controls Alpine state, shared by the
-        // Appearance page and the profile dropdown via x-data="themeControls()".
+        // Alpine state for the theme controls, used by the
+        // Appearance page via x-data="themeControls()".
         window.themeControls = () => ({
             theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
             themeColor: window.normalizeThemeColor(localStorage.getItem('themeColor')),
