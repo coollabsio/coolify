@@ -251,15 +251,15 @@ class Metrics extends Component
             }
 
             if ($summary === null) {
-                $rows[] = $this->offlineRow($server);
+                $rows[] = $this->rowWithoutMetrics($server);
 
                 continue;
             }
 
             $current = $results[$server->uuid.':containers'] ?? [];
             $rows[] = array_merge(
-                ['uuid' => $server->uuid, 'name' => $server->name, 'online' => true, 'containers' => count($current)],
-                $summary
+                $summary,
+                ['uuid' => $server->uuid, 'name' => $server->name, 'online' => true, 'reporting' => true, 'containers' => count($current)]
             );
 
             foreach ($current as $c) {
@@ -308,12 +308,15 @@ class Metrics extends Component
     }
 
     /**
+     * A server whose Sentinel returned no current metrics. It is online when Coolify can reach it,
+     * because a failed metrics request does not mean that the server is down.
+     *
      * @return array<string, mixed>
      */
-    protected function offlineRow(Server $server): array
+    protected function rowWithoutMetrics(Server $server): array
     {
         return [
-            'uuid' => $server->uuid, 'name' => $server->name, 'online' => false,
+            'uuid' => $server->uuid, 'name' => $server->name, 'online' => (bool) $server->isFunctional(), 'reporting' => false,
             'cpu' => null, 'memUsed' => null, 'memTotal' => null,
             'diskUsed' => null, 'diskTotal' => null, 'diskPercent' => null,
             'load1' => null, 'netRx' => null, 'netTx' => null, 'containers' => null,

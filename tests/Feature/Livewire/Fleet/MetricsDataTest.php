@@ -131,6 +131,23 @@ it('keeps an unreachable server in the table but excludes it from KPIs', functio
     expect($component->get('kpis')['cpuAvg'])->toBe(30.0);
 });
 
+it('counts a reachable server as online when Sentinel returns no summary', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    $server->update(['name' => 'web-1']);
+    $server->settings->forceFill(['is_reachable' => true, 'is_usable' => true])->saveQuietly();
+    StubMetricsClient::$summaries = [$server->uuid => null];
+
+    $component = Livewire::test(TestableMetrics::class)
+        ->assertSee('No metrics')
+        ->assertDontSee('Offline');
+
+    $row = collect($component->get('serverRows'))->firstWhere('uuid', $server->uuid);
+    expect($row['online'])->toBeTrue();
+    expect($row['reporting'])->toBeFalse();
+    expect($component->get('kpis')['serversOnline'])->toBe(1);
+    expect($component->get('kpis')['serversReporting'])->toBe(0);
+});
+
 it('ranks containers across servers by the selected metric', function () {
     $s = metricsServer($this->team, $this->privateKey);
 

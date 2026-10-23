@@ -109,8 +109,10 @@ $serverListboxOptions = array_merge(
                     @php
                         $sTotal = max(1, (int) ($kpis['serversTotal'] ?? 0));
                         $sOnline = (int) ($kpis['serversOnline'] ?? 0);
-                        $sAttention = min($sOnline, (int) ($kpis['needsAttention'] ?? 0));
-                        $sHealthy = max(0, $sOnline - $sAttention);
+                        $sReporting = min($sOnline, (int) ($kpis['serversReporting'] ?? 0));
+                        $sAttention = min($sReporting, (int) ($kpis['needsAttention'] ?? 0));
+                        $sHealthy = max(0, $sReporting - $sAttention);
+                        $sNoMetrics = $sOnline - $sReporting;
                         $sOffline = max(0, $sTotal - $sOnline);
                     @endphp
                     <div class="mt-auto pt-3">
@@ -118,11 +120,13 @@ $serverListboxOptions = array_merge(
                             <div class="flex h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08] [&>div]:transition-[width] [&>div]:duration-700 [&>div]:ease-out">
                                 @if ($sHealthy > 0)<div class="bg-emerald-500" style="width: {{ $sHealthy / $sTotal * 100 }}%"></div>@endif
                                 @if ($sAttention > 0)<div class="bg-orange-400 dark:bg-warning" style="width: {{ $sAttention / $sTotal * 100 }}%"></div>@endif
+                                @if ($sNoMetrics > 0)<div class="bg-neutral-400 dark:bg-white/30" style="width: {{ $sNoMetrics / $sTotal * 100 }}%"></div>@endif
                                 @if ($sOffline > 0)<div class="bg-red-500 dark:bg-red-400" style="width: {{ $sOffline / $sTotal * 100 }}%"></div>@endif
                             </div>
                             <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-neutral-500 dark:text-fg-dim">
                                 <span>{{ $sHealthy }} healthy</span>
                                 @if ($sAttention > 0)<span class="text-orange-500 dark:text-warning">{{ $sAttention }} attention</span>@endif
+                                @if ($sNoMetrics > 0)<span title="Coolify can reach these servers, but Sentinel did not return current metrics.">{{ $sNoMetrics }} no metrics</span>@endif
                                 @if ($sOffline > 0)<span class="text-red-500 dark:text-red-400">{{ $sOffline }} offline</span>@endif
                             </div>
                         </div>
@@ -259,16 +263,18 @@ $serverListboxOptions = array_merge(
                                 'containers' => $row['containers'],
                             ];
                         @endphp
-                        {{-- Offline servers have no values, so they stay last in each sort. --}}
-                        <div wire:key="fleet-server-{{ $row['uuid'] }}" data-row="{{ json_encode($sortValues) }}" @unless ($row['online']) data-pinned @endunless
+                        {{-- Servers without metrics have no values, so they stay last in each sort. --}}
+                        <div wire:key="fleet-server-{{ $row['uuid'] }}" data-row="{{ json_encode($sortValues) }}" @unless ($row['reporting']) data-pinned @endunless
                             x-show="shown($el)"
                             class="data-table-row fleet-servers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
                             <div class="flex min-w-0 items-center gap-2">
                                 <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}"
                                     class="min-w-0 truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $row['name'] }}</a>
-                                @unless ($row['online'])
+                                @if (! $row['online'])
                                     <span class="table-badge table-badge-warning shrink-0">Offline</span>
-                                @endunless
+                                @elseif (! $row['reporting'])
+                                    <span class="table-badge shrink-0" title="Coolify can reach this server, but Sentinel did not return current metrics.">No metrics</span>
+                                @endif
                             </div>
                             <div>@include('livewire.fleet._usage-cell', ['percent' => $row['cpu'], 'kind' => 'cpu'])</div>
                             <div>@include('livewire.fleet._usage-cell', ['percent' => $memPercent, 'kind' => 'memory'])</div>
