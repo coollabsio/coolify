@@ -698,7 +698,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --no-acl --no-owner --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
+                // Keep owners and privileges in the archive: services such as Supabase need them,
+                // and the restore skips them unless "Keep owners and privileges" is selected.
+                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
             }
 
             $commands[] = $backupCommand;

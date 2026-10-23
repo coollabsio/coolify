@@ -303,6 +303,30 @@ it('backs up a service PostgreSQL database as the user from PGUSER or POSTGRESQL
     'POSTGRES_USER wins' => ["POSTGRES_USER=app\nPGUSER=pguser", 'app'],
 ]);
 
+it('keeps owners and privileges in a single PostgreSQL database backup', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'supabase-db',
+        'image' => 'supabase/postgres:15.14.1.163',
+        'status' => 'running:healthy',
+    ]);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    $commands = backupRunSafetyFakeRemoteCommands(['| grep -E' => "POSTGRES_USER=postgres\nPOSTGRES_DB=postgres"]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect($commands->first(fn (string $command) => str_contains($command, 'pg_dump')))
+        ->toContain('pg_dump --format=custom --username')
+        ->not->toContain('--no-acl')
+        ->not->toContain('--no-owner');
+});
+
 function backupRunSafetyServiceDatabase(Server $server, StandaloneDocker $destination, Environment $environment, string $image): ServiceDatabase
 {
     $service = Service::factory()->create([
