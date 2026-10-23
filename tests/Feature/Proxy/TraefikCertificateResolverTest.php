@@ -95,10 +95,10 @@ test('coolify dashboard routes follow the server certificate resolver', function
     preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d/", $command, $matches);
     $routers = Yaml::parse(base64_decode($matches[1]))['http']['routers'];
 
-    foreach (['coolify-https', 'coolify-reverb-wss', 'coolify-reverb-api-https', 'coolify-terminal-wss'] as $router) {
-        expect($routers[$router])->toHaveKey('tls')
-            ->and($routers[$router]['tls'] ?? [])->toBe($expectedTls);
-    }
+    expect($routers)->toHaveKeys(['coolify-http', 'coolify-https'])
+        ->toHaveCount(2)
+        ->and($routers['coolify-https'])->toHaveKey('tls')
+        ->and($routers['coolify-https']['tls'])->toBe($expectedTls);
 })->with([
     'letsencrypt' => ['letsencrypt', ['certresolver' => 'letsencrypt']],
     'no resolver' => [null, []],
