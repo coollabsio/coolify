@@ -444,7 +444,7 @@ class DatabasesController extends Controller
         $this->authorize('view', $database);
 
         $messageSecrets = [];
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->get()
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->where('database_type', $database->getMorphClass())->get()
             ->map(function (ScheduledDatabaseBackup $backup) use ($database, &$messageSecrets): ScheduledDatabaseBackup {
                 $backup->executions->each(function (ScheduledDatabaseBackupExecution $execution) use ($database, &$messageSecrets): void {
                     $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
@@ -1382,7 +1382,7 @@ class DatabasesController extends Controller
             return $s3Storages;
         }
 
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
         if (! $backupConfig) {
@@ -3061,7 +3061,7 @@ class DatabasesController extends Controller
         $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3197,7 +3197,7 @@ class DatabasesController extends Controller
         $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3315,7 +3315,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
