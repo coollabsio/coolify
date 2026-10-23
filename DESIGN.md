@@ -162,12 +162,16 @@ Rules for the tokens:
   `color-mix(in srgb, var(--color-brand) 14%, transparent)`. A custom theme
   (`html[data-theme="custom"]`) overrides only these tokens, so a hard-coded
   value stays purple when the user picks another color.
-- The custom theme derives every token from the picked color: the brand fill
-  and its hover, press, depth, and ring shades; `--color-brand-foreground`
-  (the computed `--theme-accent-foreground`, so text stays readable on a light
-  color such as yellow); `--color-card` (the tinted surface step); and
-  `--color-sidebar` (between the tinted canvas and panel). When you add a
-  dark-theme color token, give it a custom-theme value in the same block.
+- The custom theme has four colors: Sidebar, Selected (the current page in
+  the sidebar), Accent, and Background. The accent gives the brand fill and its
+  hover, press, depth, and ring shades, and `--color-brand-foreground` (the
+  computed `--theme-accent-foreground`, so text stays readable on a light color
+  such as yellow). The surface, border, and text tokens come from one ladder
+  in `app.css` that mixes the readable text color into the background. The
+  sidebar uses the same ladder with the sidebar color, and it can have the
+  other light/dark scheme than the page (`data-sidebar-scheme`; `dark:`
+  utilities follow it). When you add a color token, give it a value in that
+  ladder.
 - A translucent fill on a control that sits directly on the page (not in a
   card or table) shows the floating-navigation dots through it. Mix the tint
   with the canvas instead:
@@ -693,8 +697,8 @@ value. The dark ladder is `--color-app` 10, `--color-panel` 20,
 Temperature: the page canvas, cards, menus, listboxes, modals, and logs stay
 **pure neutral gray** (r=g=b). Do not tint those. The dark sidebar
 (`--color-sidebar`, `#0d0d0d`) is neutral too. The dark command palette is the
-only exception: it carries a faint brand-purple wash. A custom theme tints all
-of these surfaces with the picked color (see the token rules in P2). The light page canvas uses `bg-neutral-50` (not
+only exception: it carries a faint brand-purple wash. A custom theme derives all
+of these surfaces from its background and sidebar colors (see the token rules in P2). The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
 The only intentional color is the purple brand accent. Yellow is for warnings.
 - **Layer cards** use the outer box and inset well from section 5.

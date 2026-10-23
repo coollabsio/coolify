@@ -12,37 +12,28 @@
                 ['value' => 'light', 'label' => 'Light', 'description' => 'Bright surfaces and dark text.', 'preview' => 'bg-white'],
                 ['value' => 'system', 'label' => 'System', 'description' => 'Follow your operating system.', 'preview' => 'bg-gradient-to-r from-white via-neutral-400 to-[#050505]'],
                 ['value' => 'dark', 'label' => 'Dark', 'description' => 'Dark surfaces and soft contrast.', 'preview' => 'bg-[#181818]'],
-                ['value' => 'custom', 'label' => 'Custom', 'description' => 'Tint light or dark surfaces with any color.', 'preview' => ''],
+                ['value' => 'custom', 'label' => 'Custom', 'description' => 'Pick a preset or your own colors.', 'preview' => ''],
             ] as $option)
                 @if ($option['value'] === 'custom')
-                    {{-- Clicking the card opens the custom color picker popover (color + light/dark). --}}
-                    <div class="relative" @click.outside="pickerOpen = false">
-                        <div role="button" tabindex="0" @click="chooseCustom()" @keydown.enter.prevent="chooseCustom()"
-                            aria-haspopup="dialog" :aria-expanded="pickerOpen"
-                            class="group block w-full overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
-                            :class="theme === 'custom'
-                                ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
-                                : ''">
-                            <div class="h-20 border-b border-neutral-200 dark:border-white/[0.07]"
-                                :style="`background: color-mix(in oklab, ${themeColor} 28%, ${customMode === 'light' ? 'oklch(97% 0 0)' : 'oklch(17.35% 0.0020 286.18)'})`">
-                                <div class="flex h-full items-center justify-center">
-                                    <div class="h-10 w-20 rounded-md border border-white/15 p-1 shadow-sm">
-                                        <div class="h-full w-full rounded-sm" :style="`background: ${themeColor}`"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="p-3">
-                                <div class="flex items-center justify-between gap-2">
-                                    <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
-                                    <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
-                                        x-show="theme === 'custom'" x-cloak />
-                                </div>
-                                <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                                    {{ $option['description'] }}
-                                </p>
-                            </div>
+                    <div role="button" tabindex="0" @click="openCustomDialog()" @keydown.enter.prevent="openCustomDialog()"
+                        aria-haspopup="dialog" :aria-expanded="dialogOpen"
+                        class="group block w-full overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
+                        :class="theme === 'custom'
+                            ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
+                            : ''">
+                        <div class="flex h-20 items-center justify-center border-b border-neutral-200 bg-neutral-100 dark:border-white/[0.07] dark:bg-black/20">
+                            <x-theme-controls.swatch theme="customTheme" class="h-12 w-24" />
                         </div>
-                        <x-theme-controls.picker position="left-0 top-full mt-2" />
+                        <div class="p-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
+                                <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
+                                    x-show="theme === 'custom'" x-cloak />
+                            </div>
+                            <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                {{ $option['description'] }}
+                            </p>
+                        </div>
                     </div>
                 @else
                     <div role="button" tabindex="0"
@@ -50,7 +41,7 @@
                         @keydown.enter.prevent="setTheme('{{ $option['value'] }}')"
                         class="group relative overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                         :class="theme === '{{ $option['value'] }}'
-                            ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
+                            ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
                             : ''">
                         <div class="h-20 {{ $option['preview'] }} border-b border-neutral-200 dark:border-white/[0.07]">
                             <div class="flex h-full items-center justify-center">
@@ -64,7 +55,7 @@
                                 <span class="text-sm font-semibold text-black dark:text-fg">
                                     {{ $option['label'] }}
                                 </span>
-                                <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
+                                <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
                                     x-show="theme === '{{ $option['value'] }}'" x-cloak />
                             </div>
                             <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
@@ -92,7 +83,7 @@
                 <button type="button" @click="setWidth('{{ $option['value'] }}')"
                     class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                     :class="pageWidth === '{{ $option['value'] }}'
-                        ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
+                        ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
                         : ''">
                     <div class="flex h-20 items-center border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">
                         <div class="flex h-11 w-full gap-1.5 rounded-md border border-neutral-300 bg-white p-1.5 dark:border-white/15 dark:bg-[#181818]">
@@ -107,7 +98,7 @@
                     <div class="p-3">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
-                            <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
+                            <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
                                 x-show="pageWidth === '{{ $option['value'] }}'" x-cloak />
                         </div>
                         <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
@@ -132,7 +123,7 @@
                 <button type="button" @click="setNavStyle('{{ $option['value'] }}')"
                     class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                     :class="navStyle === '{{ $option['value'] }}'
-                        ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
+                        ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
                         : ''">
                     @php($floating = $option['value'] === 'floating')
                     <div @class([
@@ -159,7 +150,7 @@
                     <div class="p-3">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
-                            <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
+                            <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
                                 x-show="navStyle === '{{ $option['value'] }}'" x-cloak />
                         </div>
                         <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
@@ -184,7 +175,7 @@
                 <button type="button" @click="setNavItems('{{ $option['value'] }}')"
                     class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
                     :class="navItems === '{{ $option['value'] }}'
-                        ? 'ring-1 ring-coollabs/30 border-coollabs/40 dark:ring-brand-light/30 dark:border-brand-light/40'
+                        ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
                         : ''">
                     @php($tiles = $option['value'] === '3d')
                     <div class="flex h-20 flex-col justify-center gap-1.5 border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">
@@ -207,7 +198,7 @@
                     <div class="p-3">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
-                            <x-reicon name="check-circle" class="size-4 text-black dark:text-fg"
+                            <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
                                 x-show="navItems === '{{ $option['value'] }}'" x-cloak />
                         </div>
                         <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
@@ -216,4 +207,159 @@
             @endforeach
         </div>
     </section>
+
+    {{-- Custom theme dialog: presets, a preview, four colors, and a share code. Save applies the draft. --}}
+    <template x-teleport="body">
+        <div x-show="dialogOpen" x-cloak @keydown.escape.window="dialogOpen = false"
+            class="fixed inset-0 z-99 overflow-hidden">
+            <div x-show="dialogOpen" x-transition.opacity.duration.200ms
+                class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]"></div>
+            <div @click.self="dialogOpen = false"
+                class="relative flex min-h-full items-start justify-center p-2 sm:items-center sm:p-4">
+                <div x-show="dialogOpen" x-trap.inert.noscroll="dialogOpen" role="dialog" aria-modal="true"
+                    aria-labelledby="custom-theme-title"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                    class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden sm:max-h-[calc(100dvh-2rem)]"
+                    style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                    <header class="shrink-0">
+                        <div class="min-w-0 flex-1 py-0.5">
+                            <h3 id="custom-theme-title" class="truncate">Custom theme</h3>
+                            <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">
+                                Colors of Coolify in this browser. Text stays readable on every color.
+                            </p>
+                        </div>
+                        <button type="button" @click="dialogOpen = false"
+                            class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                            <x-reicon name="x" class="size-4" />
+                            <span class="sr-only">Close</span>
+                        </button>
+                    </header>
+                    <template x-if="dialogOpen">
+                        <div class="application-settings-section-body grid min-h-0 flex-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                            <div>
+                                <div class="mb-2 text-xs font-medium text-neutral-500 dark:text-fg-dim">Presets</div>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    <template x-for="preset in presets" :key="preset.name">
+                                        <button type="button" @click="setDraft(preset.theme && { ...preset.theme })"
+                                            :aria-pressed="isDraftPreset(preset)"
+                                            class="group flex flex-col gap-1.5 rounded-lg p-1 text-left outline-0 focus-visible:ring-1 focus-visible:ring-accent">
+                                            <x-theme-controls.swatch theme="(preset.theme ?? preset.swatch)"
+                                                class="h-14 w-full transition-shadow group-hover:shadow-md"
+                                                ::class="isDraftPreset(preset) && 'ring-2 ring-coollabs ring-offset-2 ring-offset-white dark:ring-brand-light dark:ring-offset-panel'" />
+                                            <span class="truncate text-xs text-neutral-600 dark:text-fg-dim" x-text="preset.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="flex min-w-0 flex-col gap-5">
+                                {{-- Preview of a page with the draft colors. --}}
+                                <div class="flex h-48 overflow-hidden rounded-lg border border-neutral-200 text-xs dark:border-white/[0.08]"
+                                    aria-hidden="true">
+                                    <div class="flex w-2/5 flex-col gap-0.5 p-2.5"
+                                        :style="`background: ${draftColors.sidebar}; color: ${textOn(draftColors.sidebar)}`">
+                                        <div class="mb-2 px-2 text-sm font-semibold">Coolify</div>
+                                        <div class="flex items-center gap-2 rounded-md px-2 py-1.5 opacity-75">
+                                            <x-reicon name="dashboard" class="size-3.5" /> Dashboard
+                                        </div>
+                                        <div class="flex items-center gap-2 rounded-md px-2 py-1.5 font-medium"
+                                            :style="`background: ${draftColors.selected}; color: ${textOn(draftColors.selected)}`">
+                                            <x-reicon name="projects" class="size-3.5" /> Projects
+                                        </div>
+                                        <div class="flex items-center gap-2 rounded-md px-2 py-1.5 opacity-75">
+                                            <x-reicon name="servers" class="size-3.5" /> Servers
+                                            <span class="ml-auto rounded-full px-1.5 text-[10px] font-semibold"
+                                                :style="`background: ${draftColors.accent}; color: ${accentTextOn(draftColors.accent)}`">3</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex min-w-0 flex-1 flex-col gap-2 p-3"
+                                        :style="`background: ${draftColors.background}; color: ${textOn(draftColors.background)}`">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="text-sm font-semibold">Projects</span>
+                                            <span class="rounded-md px-2 py-1 text-[11px] font-medium"
+                                                :style="`background: ${draftColors.accent}; color: ${accentTextOn(draftColors.accent)}`">+ New</span>
+                                        </div>
+                                        <div class="rounded-md border p-2.5"
+                                            :style="`background: color-mix(in oklab, ${textOn(draftColors.background)} 4%, ${draftColors.background}); border-color: color-mix(in oklab, ${textOn(draftColors.background)} 14%, ${draftColors.background})`">
+                                            <div class="font-medium">My first project</div>
+                                            <div class="mt-0.5 opacity-60">production</div>
+                                        </div>
+                                        <div class="rounded-md border p-2.5"
+                                            :style="`background: color-mix(in oklab, ${textOn(draftColors.background)} 4%, ${draftColors.background}); border-color: color-mix(in oklab, ${textOn(draftColors.background)} 14%, ${draftColors.background})`">
+                                            <div class="font-medium">Website</div>
+                                            <div class="mt-0.5 opacity-60">staging</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="mb-2 text-xs font-medium text-neutral-500 dark:text-fg-dim">Colors</div>
+                                    <div class="flex flex-col gap-2.5">
+                                        @foreach ([
+                                            'sidebar' => ['Sidebar', 'The navigation on the left'],
+                                            'selected' => ['Selected', 'The current page in the sidebar'],
+                                            'accent' => ['Accent', 'Buttons, links, and highlights'],
+                                            'background' => ['Background', 'Pages, cards, and panels'],
+                                        ] as $key => [$label, $description])
+                                            <div class="flex items-center gap-3">
+                                                <label class="relative size-9 shrink-0 cursor-pointer overflow-hidden rounded-md border border-black/10 shadow-sm dark:border-white/15">
+                                                    <span class="absolute inset-0" :style="`background: ${draftColors.{{ $key }}}`"></span>
+                                                    {{-- autocomplete="off": Firefox session restore otherwise replays the value (#11813). --}}
+                                                    <input type="color" autocomplete="off" :value="draftColors.{{ $key }}"
+                                                        @input="setDraftColor('{{ $key }}', $event.target.value)"
+                                                        aria-label="{{ $label }} color"
+                                                        class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                                                </label>
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="text-sm font-medium text-black dark:text-fg">{{ $label }}</div>
+                                                    <div class="truncate text-xs text-neutral-500 dark:text-fg-dim">{{ $description }}</div>
+                                                </div>
+                                                <input type="text" autocomplete="off" spellcheck="false" maxlength="7"
+                                                    :value="draftColors.{{ $key }}"
+                                                    @change="setDraftColor('{{ $key }}', $event.target.value); $event.target.value = draftColors.{{ $key }}"
+                                                    aria-label="{{ $label }} hex color"
+                                                    class="input w-28! shrink-0 font-mono text-sm" />
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="custom-theme-share-code"
+                                        class="mb-2 block text-xs font-medium text-neutral-500 dark:text-fg-dim">Share code</label>
+                                    <div class="flex gap-2">
+                                        <input id="custom-theme-share-code" x-ref="shareCode" type="text" autocomplete="off"
+                                            spellcheck="false" :value="shareCode"
+                                            @input="readShareCode($event.target.value)"
+                                            @blur="$event.target.value = shareCode; shareCodeInvalid = false"
+                                            :aria-invalid="shareCodeInvalid"
+                                            class="input min-w-0 flex-1 font-mono text-sm"
+                                            :class="shareCodeInvalid && 'border-error! ring-error!'" />
+                                        <button type="button" @click="copyShareCode()" aria-label="Copy share code"
+                                            class="button shrink-0 px-2.5">
+                                            <x-reicon name="copy" x-show="!shareCodeCopied" class="size-4" />
+                                            <x-reicon name="check" x-show="shareCodeCopied" x-cloak class="size-4 text-success" />
+                                        </button>
+                                    </div>
+                                    <p class="mt-1.5 text-xs"
+                                        :class="shareCodeInvalid ? 'text-error' : 'text-neutral-500 dark:text-fg-dim'"
+                                        x-text="shareCodeInvalid
+                                            ? 'Enter four hex colors, separated by commas.'
+                                            : 'Paste a code that someone shared, or copy yours.'"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <footer
+                        class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
+                        <x-forms.button @click="dialogOpen = false">Cancel</x-forms.button>
+                        <x-forms.button isHighlighted @click="saveCustomTheme()">Save theme</x-forms.button>
+                    </footer>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
