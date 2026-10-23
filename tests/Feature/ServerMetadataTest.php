@@ -203,9 +203,9 @@ it('calls gatherServerMetadata during ValidateAndInstall when docker version is 
 
     // Call the action on the mounted instance: a Livewire request round trip
     // would rehydrate the server from the database and drop the mock.
-    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->instance()
-        ->validateDockerVersion();
+    $component = Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])->instance();
+    $component->uptime = '1 day';
+    $component->validateDockerVersion();
 });
 
 it('does not call gatherServerMetadata when docker version validation fails', function () {
@@ -216,9 +216,9 @@ it('does not call gatherServerMetadata when docker version validation fails', fu
 
     // Call the action on the mounted instance: a Livewire request round trip
     // would rehydrate the server from the database and drop the mock.
-    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->instance()
-        ->validateDockerVersion();
+    $component = Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])->instance();
+    $component->uptime = '1 day';
+    $component->validateDockerVersion();
 });
 
 it('stores detected NVIDIA GPUs and the container toolkit when gathering server metadata', function (array $gpuLines, array $toolkitLines, array $expectedGpus, bool $expectedToolkit) {

@@ -5,6 +5,7 @@ namespace App\Livewire\Server\PrivateKey;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -44,8 +45,13 @@ class Show extends Component
 
             return;
         }
+        $this->authorize('update', $this->server);
         try {
-            $this->authorize('update', $this->server);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
+        } catch (ThrottleRequestsException $e) {
+            return handleError($e, $this);
+        }
+        try {
             DB::transaction(function () use ($ownedPrivateKey) {
                 $this->server->privateKey()->associate($ownedPrivateKey);
                 $this->server->save();
@@ -95,6 +101,7 @@ class Show extends Component
     public function checkConnection()
     {
         try {
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if ($uptime) {
                 $this->dispatch('success', 'Server is reachable.');

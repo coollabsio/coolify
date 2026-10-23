@@ -34,11 +34,13 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
@@ -1407,6 +1409,64 @@ $siteAddress {
         return ! $this->isTransferredAway();
     }
 
+    /**
+     * On Coolify Cloud, limit how often SSH validations can run against one IP and from one team.
+     * The window and the maximums are server_validation_* instance settings.
+     * Without a limit, users can make Cloud try SSH logins on hosts that they do not own.
+     * A successful connection gives its attempt back, so only failed logins use up the limit.
+     *
+     * @throws ThrottleRequestsException
+     */
+    public static function throttleValidation(int $teamId, string $ip): void
+    {
+        if (! isCloud()) {
+            return;
+        }
+
+        $limits = self::validationRateLimits($teamId, $ip);
+        foreach ($limits as $key => $maxAttempts) {
+            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                $seconds = RateLimiter::availableIn($key);
+
+                throw new ThrottleRequestsException("Too many server validations. Please try again in {$seconds} seconds.", headers: ['Retry-After' => $seconds]);
+            }
+        }
+        foreach (array_keys($limits) as $key) {
+            RateLimiter::hit($key, self::validationRateLimitSeconds());
+        }
+    }
+
+    private static function validationRateLimitSeconds(): int
+    {
+        return instanceSettings()->server_validation_rate_limit_seconds;
+    }
+
+    /**
+     * @return array<string, int> rate limiter key => max attempts
+     */
+    private static function validationRateLimits(int $teamId, string $ip): array
+    {
+        $settings = instanceSettings();
+
+        return [
+            'server-validation:ip:'.strtolower(self::normalizeIp($ip)) => $settings->server_validation_max_failures_per_ip,
+            'server-validation:team:'.$teamId => $settings->server_validation_max_failures_per_team,
+        ];
+    }
+
+    private function refundValidationAttempt(): void
+    {
+        if (! isCloud()) {
+            return;
+        }
+
+        foreach (array_keys(self::validationRateLimits($this->team_id, $this->ip)) as $key) {
+            if (RateLimiter::attempts($key) > 0) {
+                RateLimiter::decrement($key, self::validationRateLimitSeconds());
+            }
+        }
+    }
+
     public function forceEnableServer()
     {
         if ($this->isTransferredAway()) {
@@ -2333,7 +2393,9 @@ $siteAddress {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            instant_remote_process(['ls /'], $this, disableMultiplexing: true);
+            // One attempt only: retries would repeat failed logins on a host that may not belong to the user.
+            instant_remote_process(['ls /'], $this, disableMultiplexing: true, maxAttempts: 1);
+            $this->refundValidationAttempt();
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();

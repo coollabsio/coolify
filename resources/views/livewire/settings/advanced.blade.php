@@ -115,6 +115,20 @@
                             @endif
                         </div>
                     </x-application.settings-subsection>
+                    <x-application.settings-subsection id="server-validation-section" title="Server validation"
+                        helper="Limits failed SSH validations, so users cannot make Coolify Cloud try logins on hosts that they do not own. Successful connections do not count.">
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input id="server_validation_rate_limit_seconds" type="number" min="60" max="86400"
+                                label="Rate limit window (seconds)"
+                                helper="The period in which Coolify counts failed validations. From 60 to 86400 seconds." />
+                            <x-forms.input id="server_validation_max_failures_per_ip" type="number" min="1" max="1000"
+                                label="Max failed validations per IP"
+                                helper="For one target IP, from all teams together, in the window. From 1 to 1000." />
+                            <x-forms.input id="server_validation_max_failures_per_team" type="number" min="1" max="10000"
+                                label="Max failed validations per team"
+                                helper="For one team, to all IPs together, in the window. From 1 to 10000." />
+                        </div>
+                    </x-application.settings-subsection>
                 @endif
                 <x-application.settings-subsection id="endpoint-section" title="Outbound endpoints">
                     <div class="flex flex-col gap-4">

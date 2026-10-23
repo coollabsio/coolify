@@ -603,6 +603,9 @@ class ServersController extends Controller
         if ($foundServer) {
             return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
         }
+        if ($request->instant_validate) {
+            ModelsServer::throttleValidation($teamId, $request->ip);
+        }
 
         $proxyType = $request->proxy_type ? str($request->proxy_type)->upper() : ProxyTypes::TRAEFIK->value;
 
@@ -772,6 +775,9 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
+        if ($request->instant_validate) {
+            ModelsServer::throttleValidation($teamId, $request->ip ?? $server->ip);
+        }
         if ($request->proxy_type) {
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
                 return str($proxyType->value)->lower();
@@ -1137,6 +1143,7 @@ class ServersController extends Controller
         if ($install && ($response = $this->deployAbilityForbiddenResponse($request, 'Installing the server runs commands on it and starts the proxy, so it needs a token with the deploy permission.'))) {
             return $response;
         }
+        ModelsServer::throttleValidation($teamId, $server->ip);
         if ($install) {
             ValidateAndInstallServerJob::dispatch($server);
         } else {

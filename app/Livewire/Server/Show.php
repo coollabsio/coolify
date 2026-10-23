@@ -442,6 +442,7 @@ class Show extends Component
         try {
             $this->authorize('update', $this->server);
             $this->syncData(true);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if ($uptime) {
                 $this->dispatch('success', 'Server is reachable.');

@@ -389,6 +389,10 @@ class ServerProxyController extends Controller
             ], 422);
         }
 
+        if (! $server->isFunctional()) {
+            return response()->json(['message' => 'Server is not functional.'], 400);
+        }
+
         SaveProxyConfiguration::run($server, $configuration);
 
         auditLog('api.server.proxy.configuration_saved', [
@@ -442,6 +446,10 @@ class ServerProxyController extends Controller
         }
 
         $this->authorize('manageProxy', $server);
+
+        if (! $server->isFunctional()) {
+            return response()->json(['message' => 'Server is not functional.'], 400);
+        }
 
         RestartProxyJob::dispatch($server);
 

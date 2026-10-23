@@ -8,6 +8,7 @@ use App\Events\ServerValidated;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ValidateAndInstall extends Component
@@ -22,6 +23,7 @@ class ValidateAndInstall extends Component
 
     public bool $install = true;
 
+    #[Locked]
     public $uptime = null;
 
     public $supported_os_type = null;
@@ -113,6 +115,7 @@ class ValidateAndInstall extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
             if ($this->server->vultr_instance_id) {
                 $status = $this->server->refreshVultrState();
                 $this->server->refresh();
@@ -177,6 +180,10 @@ class ValidateAndInstall extends Component
     {
         $this->authorize('update', $this->server);
 
+        if (! $this->uptime) {
+            return;
+        }
+
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
@@ -192,6 +199,10 @@ class ValidateAndInstall extends Component
     public function validatePrerequisites()
     {
         $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
 
         $validationResult = $this->server->validatePrerequisites();
         $this->prerequisites_installed = $validationResult['success'];
@@ -233,6 +244,10 @@ class ValidateAndInstall extends Component
     {
         $this->authorize('update', $this->server);
 
+        if (! $this->uptime) {
+            return;
+        }
+
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
@@ -270,6 +285,10 @@ class ValidateAndInstall extends Component
     public function validateDockerVersion()
     {
         $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
 
         if ($this->server->isSwarm()) {
             $swarmInstalled = $this->server->validateDockerSwarm();

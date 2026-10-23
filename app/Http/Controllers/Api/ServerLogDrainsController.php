@@ -274,10 +274,12 @@ class ServerLogDrainsController extends Controller
         $server->refresh();
 
         // Match Livewire instantSave: start or stop the drain service after settings change.
-        if ($server->isLogDrainEnabled()) {
-            StartLogDrain::dispatch($server);
-        } else {
-            StopLogDrain::dispatch($server);
+        if ($server->isFunctional()) {
+            if ($server->isLogDrainEnabled()) {
+                StartLogDrain::dispatch($server);
+            } else {
+                StopLogDrain::dispatch($server);
+            }
         }
 
         auditLog('api.server.log_drains.updated', [
