@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\CheckDomainDnsJob;
+use App\Jobs\ServerFilesFromServerJob;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -11,7 +12,9 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -1052,4 +1055,27 @@ it('preserves readonly compose preview redirects when saving an address', functi
         'web' => ['domain' => 'https://www.renamed-preview.example.com', 'redirect' => 'non-www'],
         'api' => ['domain' => '', 'redirect' => 'www'],
     ]);
+});
+
+it('does not queue file sync jobs when polling dns checks for compose previews', function () {
+    Queue::fake();
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    volumes:\n      - web-data:/data\n  api:\n    image: nginx:alpine\n    volumes:\n      - api-data:/data\nvolumes:\n  web-data:\n  api-data:\n",
+    ]);
+    $preview = createPreviewForPortTests($this->application->fresh(), 101, [
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://compose-preview-poll.invalid']]),
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class);
+
+    // A worker that starts the queued job releases its unique lock, so the next parse queues a new one.
+    Cache::lock(UniqueLock::getKey($queuedOnMount->first()))->forceRelease();
+    $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
+
+    expect($queuedOnMount)->toHaveCount(1)
+        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+        ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
