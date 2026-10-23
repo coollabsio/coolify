@@ -3523,14 +3523,58 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+/* A full-row link sits behind the cells, so gaps open the deployment too; the cells stay on top for their own links and tooltips. */
+.deployment-table-row > :not(.deployment-row-link) {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.deployment-table-row a:not(.deployment-row-link) {
+    pointer-events: auto;
+}
+
+/* The embedded history shows the start time and a status dot in the last column. */
+.deployment-table-embedded .deployment-table-grid {
+    grid-template-columns: minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) 6.5rem minmax(7rem, 0.8fr) 5rem;
+}
+
 @media (min-width: 1536px) {
     .deployment-table-embedded .deployment-table-grid {
-        grid-template-columns: 6.5rem minmax(0, 1fr) 6.5rem;
+        grid-template-columns: minmax(0, 1fr) 5rem;
     }
 
-    .deployment-table-embedded .deployment-table-grid > :nth-child(2),
-    .deployment-table-embedded .deployment-table-grid > :nth-child(n + 5) {
+    .deployment-table-embedded .deployment-table-grid > :nth-child(1),
+    .deployment-table-embedded .deployment-table-grid > :nth-child(3),
+    .deployment-table-embedded .deployment-table-grid > :nth-child(4) {
         display: none;
+    }
+}
+
+/* On the deployment page the history matches the logs height; the page size is fitted to it in JS. */
+@media (min-width: 1536px) {
+    .deployment-history-fit {
+        position: sticky;
+        top: 1rem;
+        display: flex;
+        flex-direction: column;
+        height: calc(100dvh - 10rem);
+        min-height: 32rem;
+    }
+
+    .deployment-history-fit > .application-settings-section,
+    .deployment-history-fit .application-settings-section-body,
+    .deployment-history-fit .data-table {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .deployment-history-fit .deployment-table-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
     }
 }
 
@@ -3995,24 +4039,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     opacity: 0.5;
 }
 
-/* Compact badge that fits the dark logs chrome */
-.logs-viewer-status-badge {
-    height: 1.5rem !important;
-    flex-shrink: 0;
-    border-color: var(--color-neutral-200) !important;
-    background: white !important;
-    padding-inline: 0.5rem !important;
-    font-size: 0.6875rem !important;
-    font-weight: 500 !important;
-    color: var(--color-neutral-700) !important;
-}
-
-.dark .logs-viewer-status-badge {
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    color: #d4d4d4 !important;
-}
-
 /* Section header status (proxy/sentinel) stays inline with title on mobile */
 .logs-settings-section > :is(header, .application-settings-section-header) {
     flex-wrap: nowrap;
@@ -4341,7 +4367,8 @@ html.dark:not([data-theme="custom"]) .runtime-log-panel {
     box-shadow: 0 0 0 1px rgb(255 255 255 / 8%);
 }
 
-html.dark:not([data-theme="custom"]) .runtime-log-panel :is(.runtime-log-toolbar, .runtime-log-columns) {
+html.dark:not([data-theme="custom"]) .runtime-log-panel :is(.runtime-log-toolbar, .runtime-log-columns),
+html.dark:not([data-theme="custom"]) .logs-viewer > .runtime-log-toolbar {
     border-bottom-color: rgb(255 255 255 / 8%);
     background: color-mix(in srgb, var(--color-card) 66%, black);
 }
