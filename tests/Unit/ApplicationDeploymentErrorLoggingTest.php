@@ -6,6 +6,9 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Queue\TimeoutExceededException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 /**
  * Test to verify that deployment errors are properly logged with comprehensive details.
@@ -91,6 +94,7 @@ it('logs comprehensive error details when failed() is called', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     // Mock the failDeployment method to prevent errors
     $job->shouldReceive('failDeployment')->andReturn();
@@ -197,6 +201,7 @@ it('handles exceptions with no message gracefully', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();
@@ -288,6 +293,7 @@ it('logs error code 0 correctly', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();
@@ -393,6 +399,7 @@ it('logs the configured timeout when the deployment times out', function () {
 
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();

@@ -87,8 +87,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public static int $batch_counter = 0;
 
-    private bool $newVersionIsHealthy = false;
-
     private ApplicationDeploymentQueue $application_deployment_queue;
 
     private Application $application;
@@ -2725,7 +2723,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 // Implement healthcheck for swarm
             } else {
                 if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
-                    $this->newVersionIsHealthy = true;
+                    $this->markNewVersionHealthy(true);
 
                     return;
                 }
@@ -2773,12 +2771,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                         $healthCheckStatus = $this->trimmedSavedOutput('health_check')->replace('"', '')->value();
                         if ($healthCheckStatus === 'healthy') {
-                            $this->newVersionIsHealthy = true;
+                            $this->markNewVersionHealthy(true);
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
                         } elseif ($healthCheckStatus === 'unhealthy') {
-                            $this->newVersionIsHealthy = false;
+                            $this->markNewVersionHealthy(false);
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
                             break;
@@ -2798,6 +2796,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Health check failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * Laravel runs failed() on a fresh copy of the job, so the health of the new version is kept outside the job instance.
+     */
+    private function markNewVersionHealthy(bool $healthy): void
+    {
+        $key = "deployment-new-version-healthy:{$this->deployment_uuid}";
+        if ($healthy) {
+            Cache::put($key, true, now()->addDay());
+        } else {
+            Cache::forget($key);
+        }
+    }
+
+    private function newVersionIsHealthy(): bool
+    {
+        return Cache::has("deployment-new-version-healthy:{$this->deployment_uuid}");
     }
 
     private function query_logs()
@@ -2830,7 +2846,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
-        $this->newVersionIsHealthy = true;
+        $this->markNewVersionHealthy(true);
         $this->generate_image_names();
         $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         $this->prepare_builder_image();
@@ -4944,7 +4960,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
-            if ($this->newVersionIsHealthy || $force) {
+            if ($this->newVersionIsHealthy() || $force) {
                 if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
@@ -4973,7 +4989,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         } catch (Exception $e) {
             // If new version is healthy, this is just cleanup - don't fail the deployment
-            if ($this->newVersionIsHealthy || $force) {
+            if ($this->newVersionIsHealthy() || $force) {
                 $this->application_deployment_queue->addLogEntry(
                     "Warning: Could not remove old container: {$e->getMessage()}",
                     'stderr',
@@ -6144,7 +6160,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
                 if ($this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0) {
                     // do not remove already running container for PR deployments
-                } elseif ($this->newVersionIsHealthy) {
+                } elseif ($this->newVersionIsHealthy()) {
                     // The new container passed its health check, so the old container may already be removed.
                     // A later failure (additional destinations, queue advancement, ...) must not remove the only running version.
                     $this->application_deployment_queue->addLogEntry('Deployment failed after the new version became healthy. Keeping the new version of your application running.', 'stderr');
