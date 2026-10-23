@@ -3853,12 +3853,15 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Shared logs viewer (deployment + runtime) — mobile-first toolbar
    Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
+/* Same border as the application settings cards (--card-border). */
 .logs-viewer {
+    border-color: rgb(0 0 0 / 9%);
     background: var(--coollabs-base);
     color: #262626;
 }
 
 .dark .logs-viewer {
+    border-color: rgb(255 255 255 / 8%);
     background: var(--color-log);
     color: #f5f5f5;
 }

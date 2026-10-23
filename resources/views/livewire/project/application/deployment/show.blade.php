@@ -282,11 +282,13 @@
                 this.deploymentFinishedCleanup = null;
             }
         }
-    }" @keydown.window="handleFindShortcut($event)" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full min-w-0 flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none 2xl:sticky 2xl:top-4 2xl:h-[calc(100dvh-10rem)] 2xl:min-h-[32rem]">
+    }" @keydown.window="handleFindShortcut($event)" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full min-w-0 flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none 2xl:h-[calc(100dvh-10rem)] 2xl:min-h-[32rem]"
+        {{-- A sticky parent is a stacking context: drop it so the fullscreen logs cover the sidebar and topbar. --}}
+        :class="fullscreen ? '' : '2xl:sticky 2xl:top-4'">
             <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-0'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"
-                    :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-200 shadow-sm dark:border-coolgray-200'">
+                    :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border shadow-sm'">
                     <div class="runtime-log-toolbar logs-viewer-toolbar">
                         @php
                             $deploymentStatus = data_get($application_deployment_queue, 'status');
