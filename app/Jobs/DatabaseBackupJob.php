@@ -460,6 +460,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     // Local backup failed: the partial file is not tracked, so retention would never remove it.
                     deleteBackupsLocally($this->backup_location, $this->server);
                     $failureMessage = $this->redact($this->error_output ?? $this->backup_output ?? $e->getMessage());
+                    $exitCodeReason = $this->exitCodeReason($e->getCode());
+                    if ($exitCodeReason !== null) {
+                        $failureMessage = $exitCodeReason."\n\n".$failureMessage;
+                    }
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
@@ -814,6 +818,24 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_error_output($e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Explains exit codes of a dump that was stopped from outside. The dump tool cannot report these
+     * itself, so its output ends after the last progress line without an error.
+     */
+    private function exitCodeReason(int|string $exitCode): ?string
+    {
+        return match ($exitCode) {
+            137 => 'The backup stopped with exit code 137: the dump process or the database container was killed (SIGKILL). '
+                .'This is usually the out-of-memory killer: the dump runs inside the database container and shares its memory limit. '
+                .'Check the memory limit of the database and the kernel log (dmesg) on the server.',
+            143 => 'The backup stopped with exit code 143: the dump process or the database container was terminated (SIGTERM), '
+                .'for example because the database was stopped or restarted during the backup.',
+            255 => 'The backup stopped with exit code 255: the SSH connection to the server closed. '
+                .'Check the network connection and the SSH server log on the server.',
+            default => null,
+        };
     }
 
     private function add_to_backup_output($output): void
