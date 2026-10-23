@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\ProcessStatus;
+use App\Jobs\ApplicationPullRequestUpdateJob;
 use App\Jobs\CheckDomainDnsJob;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Livewire\Project\Application\PreviewDomains;
@@ -376,6 +378,38 @@ it('saves compose preview domain port overrides per service without putting the 
         ->toBe([
             'https://web-preview.example.com' => 8080,
             'https://api-preview.example.com' => 3000,
+        ]);
+});
+
+it('posts portless compose preview links in the pull request comment', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n  backend:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://myapp.example.com:3000'],
+            'backend' => ['domain' => 'https://myapp.example.com:3001/backend'],
+        ]),
+    ]);
+
+    // A preview saved before ports moved to overrides still holds port-bearing domains.
+    $preview = createPreviewForPortTests($this->application->fresh(), 136, [
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://136.myapp.example.com:3000'],
+            'backend' => ['domain' => 'https://136.myapp.example.com:3001/backend'],
+        ]),
+    ]);
+
+    // The deployment job regenerates the preview domains before it posts the comment.
+    $preview->generate_preview_fqdn_compose();
+
+    $job = new ApplicationPullRequestUpdateJob($this->application->fresh(), $preview->fresh(), ProcessStatus::FINISHED);
+    $links = (fn (): string => $this->getPreviewLinks())->call($job);
+
+    expect($links)->toBe('[Open frontend](https://136.myapp.example.com) | [Open backend](https://136.myapp.example.com/backend) | ')
+        ->and($preview->fresh()->domain_port_overrides)->toBe([
+            'https://136.myapp.example.com' => 3000,
+            'https://136.myapp.example.com/backend' => 3001,
         ]);
 });
 
