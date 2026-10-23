@@ -1006,7 +1006,8 @@ if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
-    sed -i "/coolify/d" ~/.ssh/authorized_keys
+    # Remove only the key from a previous install (generated with the comment "coolify"), not other keys that contain "coolify"
+    sed -i -E "/[[:space:]]coolify[[:space:]]*$/d" ~/.ssh/authorized_keys
     cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
     rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
