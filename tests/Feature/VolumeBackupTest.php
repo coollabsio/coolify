@@ -1976,7 +1976,7 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
     [$application, $volume] = createVolumeBackupApplication($team);
     $s3Storage = S3Storage::create([
         'name' => 'Streaming destination',
-        'region' => 'us-east-1',
+        'region' => 'ru-central-1',
         'key' => 'key',
         'secret' => 'secret',
         'bucket' => 'bucket',
@@ -2008,6 +2008,7 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
+        && str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
         && ! str_contains($process->command, '--quiet')
         && str_contains($process->command, 'lock=$(mc retention info --default --json --resolve')
         && str_contains($process->command, '*) checksum=--checksum=MD5 ;; *) checksum= ;; esac && (compressor=')
