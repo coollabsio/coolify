@@ -28,7 +28,7 @@
     @if ($hasAnyDeployments)
         {{-- Container breakpoints: the table needs room, which the dashboard column may not have. --}}
         <section class="@container mb-0! min-w-0">
-            <x-section-heading title="Deployments" class="py-1.5" />
+            <x-section-heading :title="$hasRecentDeployments ? 'Recent deployments' : 'Deployments'" class="py-1.5" />
 
             <div class="flex min-w-0 flex-col gap-4">
                 @if ($hasActiveDeployments)
@@ -103,12 +103,6 @@
                 @if ($hasRecentDeployments)
                     <div
                         class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
-                        <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
-                            <h3 class="text-[11px]! leading-4! font-medium! text-neutral-500! dark:text-fg-faint!">
-                                Recent deployments
-                            </h3>
-                        </div>
-
                         <div
                             class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 @2xl:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <span>Application</span>

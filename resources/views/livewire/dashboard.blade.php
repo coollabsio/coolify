@@ -64,10 +64,10 @@
             </div>
         @endif
 
-        {{-- Wide screens: activity takes the left third, projects and servers the other two thirds.
-             It stays one column while the left side has no section (no deployments, no traffic). --}}
-        <div class="grid min-w-0 gap-8 xl:items-start xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <div class="dashboard-activity hidden min-w-0 has-[section]:flex flex-col gap-8">
+        {{-- Wide screens: projects and servers fill the left, activity is a fixed-width column on the right.
+             It stays one column while the activity side has no section (no deployments, no traffic). --}}
+        <div class="grid min-w-0 gap-8 xl:items-start xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_22rem] 2xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_26rem]">
+        <div class="dashboard-activity hidden min-w-0 has-[section]:flex flex-col gap-8 xl:order-last">
         <livewire:dashboard.active-deployments />
 
         @if ($hasTrafficAnalytics)
@@ -112,7 +112,7 @@
                     icon-name="projects" size="sm" />
             @else
                 <div x-cloak x-show="viewMode === 'grid'"
-                    class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @4xl:grid-cols-4">
+                    class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(17rem,100%),1fr))] gap-3">
                     @foreach ($dashboardProjects as $project)
                         @php
                             $firstEnvironment = $project->environments->first();
@@ -315,7 +315,7 @@
                 @endif
             @else
                 <div x-cloak x-show="viewMode === 'grid'"
-                    class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @4xl:grid-cols-4">
+                    class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(17rem,100%),1fr))] gap-3">
                     @foreach ($dashboardServers as $server)
                         @php
                             [$serverStatus, $serverStatusType] = $serverStatuses[$server->id];
@@ -360,10 +360,20 @@
                         </a>
                     @endforeach
                 </div>
+                @php
+                    // A Usage column (latest CPU and memory) only when a listed server collects metrics.
+                    $showServerUsage = $dashboardServers->contains(fn ($server) => $server->isMetricsEnabled());
+                    $serverTableColumns = $showServerUsage
+                        ? 'grid-cols-[minmax(0,1fr)_9.5rem] @xl:grid-cols-[minmax(0,1fr)_9rem_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9rem_9.5rem]'
+                        : 'grid-cols-[minmax(0,1fr)_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem]';
+                @endphp
                 <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
-                    <div class="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-4 @2xl:min-w-[480px] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem] {{ $tableHead }}">
+                    <div class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] {{ $tableHead }}">
                         <div>Server</div>
                         <div class="hidden @2xl:block">Description</div>
+                        @if ($showServerUsage)
+                            <div class="hidden @xl:block">Usage</div>
+                        @endif
                         <div>Status</div>
                     </div>
                     @foreach ($dashboardServers as $server)
@@ -372,7 +382,7 @@
                         @endphp
                         <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                             wire:key="dashboard-server-row-{{ $server->uuid }}"
-                            class="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-4 @2xl:min-w-[480px] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem] hover:no-underline {{ $tableRow }}">
+                            class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] hover:no-underline {{ $tableRow }}">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div
                                     class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
@@ -385,6 +395,43 @@
                             <p class="hidden truncate text-neutral-500 @2xl:block dark:text-fg-dim">
                                 {{ filled($server->description) ? $server->description : '-' }}
                             </p>
+                            @if ($showServerUsage)
+                                <div class="hidden @xl:block">
+                                    @if ($server->isMetricsEnabled())
+                                        {{-- The latest values from the grid card's chart (server-metrics-chart), so the table sends no requests of its own. --}}
+                                        <div class="flex flex-col gap-1 text-[11px] text-neutral-500 tabular-nums dark:text-fg-dim"
+                                            x-data="{
+                                                cpu: null,
+                                                memory: null,
+                                                stop: null,
+                                                init() {
+                                                    const latest = points => points?.length ? points[points.length - 1][1] : null;
+                                                    this.stop = Livewire.on(@js('dashboard-server-metrics-'.$server->uuid), data => {
+                                                        this.cpu = latest(data[0]?.cpu);
+                                                        this.memory = latest(data[0]?.memory);
+                                                    });
+                                                },
+                                                destroy() {
+                                                    this.stop?.();
+                                                },
+                                            }">
+                                            @foreach (['cpu' => ['CPU', 'bg-[rgb(30,144,255)]'], 'memory' => ['Mem', 'bg-[rgb(168,85,247)]']] as $metric => [$metricLabel, $metricColor])
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-7 shrink-0">{{ $metricLabel }}</span>
+                                                    <span class="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
+                                                        <span class="block h-full rounded-full {{ $metricColor }} transition-[width] duration-500"
+                                                            :style="{ width: `${Math.min(100, {{ $metric }} ?? 0)}%` }"></span>
+                                                    </span>
+                                                    <span class="w-8 shrink-0 text-right"
+                                                        x-text="{{ $metric }} === null ? '-' : `${Math.round({{ $metric }})}%`">-</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-neutral-500 dark:text-fg-dim">-</span>
+                                    @endif
+                                </div>
+                            @endif
                             <div class="flex items-center gap-2 text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                                 <span @class([
                                     'size-2 shrink-0 rounded-full',
