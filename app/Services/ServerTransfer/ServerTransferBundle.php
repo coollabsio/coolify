@@ -213,7 +213,6 @@ class ServerTransferBundle
                 }
 
                 foreach (self::items($environment['databases'] ?? null) as $d => $database) {
-                    self::checkDatabaseAttributes($errors, "{$at}.databases.{$d}", (array) ($database['attributes'] ?? []));
                     self::checkStorages($errors, "{$at}.databases.{$d}", $database);
                     self::checkScheduledBackups($errors, "{$at}.databases.{$d}", $database);
                 }
@@ -394,23 +393,6 @@ class ServerTransferBundle
         foreach (self::items($database['scheduled_backups'] ?? null) as $i => $backup) {
             self::checkCron($errors, "{$at}.scheduled_backups.{$i}.frequency", $backup['frequency'] ?? null);
             self::checkPath($errors, "{$at}.scheduled_backups.{$i}.databases_to_backup", $backup['databases_to_backup'] ?? null);
-        }
-    }
-
-    /**
-     * The port checks of the database API. Names and passwords are not checked: older databases
-     * have values that the current patterns refuse, and the values stay inside the containers.
-     *
-     * @param  list<string>  $errors
-     * @param  array<string, mixed>  $attributes
-     */
-    private static function checkDatabaseAttributes(array &$errors, string $at, array $attributes): void
-    {
-        if (array_key_exists('ports_mappings', $attributes)) {
-            self::check($errors, "{$at}.ports_mappings", $attributes['ports_mappings'], ValidationPatterns::portMappingRules());
-        }
-        if (array_key_exists('public_port', $attributes)) {
-            self::check($errors, "{$at}.public_port", $attributes['public_port'], ['nullable', 'integer', 'between:1024,65535']);
         }
     }
 }
