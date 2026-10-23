@@ -99,8 +99,7 @@
             </section>
 
             @if ($buildPack !== 'dockercompose')
-                <section id="security-section" class="border-b border-neutral-200 py-5 dark:border-white/[0.07]">
-                    <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Authentication</h3>
+                <x-application.settings-subsection id="security-section" title="Authentication" first class="border-b border-neutral-200 py-5 dark:border-white/[0.07]">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
                     <x-empty size="sm" title="Authentication is managed through labels"
                         description="Authentication is managed via manual proxy labels. Switch label management back to Coolify to configure it here."
@@ -166,7 +165,7 @@
                         </div>
                     @endif
                     @endif
-                </section>
+                </x-application.settings-subsection>
             @endif
 
             @if ($buildPack !== 'dockercompose')
@@ -398,8 +397,7 @@
                 </div>
             @endif
             @if ($buildPack !== 'dockercompose')
-                <section id="container-image-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                    <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">{{ $application->build_pack === 'dockerimage' ? 'Image' : 'Image registry' }}</h3>
+                <x-application.settings-subsection id="container-image-section" :title="$application->build_pack === 'dockerimage' ? 'Image' : 'Image registry'">
                     @if ($application->destination->server->isSwarm())
                         @if ($application->build_pack !== 'dockerimage')
                             <div>Docker Swarm requires the image to be available in a registry. More info <a
@@ -446,10 +444,9 @@
                             @endif
                         @endif
                     </div>
-                </section>
+                </x-application.settings-subsection>
             @endif
-            <section id="deployment-lifecycle-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Deployment commands</h3>
+            <x-application.settings-subsection id="deployment-lifecycle-section" title="Deployment commands">
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="flex flex-col gap-4">
                     <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
@@ -472,7 +469,7 @@
                     @endif
                 </div>
             </div>
-            </section>
+            </x-application.settings-subsection>
             </x-application.settings-section>
 
             @if ($buildPack !== 'dockercompose')
@@ -597,8 +594,7 @@
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
                         id="customDockerRunOptions" label="Custom Docker options" x-bind:disabled="!canUpdate" />
-                <section id="container-labels-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                    <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Labels</h3>
+                <x-application.settings-subsection id="container-labels-section" title="Labels">
                     <div class="grid w-full gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="isContainerLabelReadonlyEnabled" label="Label management"
                             onChange="instantSave"
@@ -638,7 +634,7 @@
                                 monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
                         @endif
                     </div>
-                </section>
+                </x-application.settings-subsection>
                 </x-application.settings-section>
             @endif
         </div>

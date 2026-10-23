@@ -17,8 +17,7 @@
                         helper="Use a published Redis image from Docker Hub." />
                 </div>
             </div>
-            <section id="credentials-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Credentials <x-helper helper="Keep these values aligned with the credentials configured inside Redis." /></h3>
+            <x-application.settings-subsection id="credentials-section" title="Credentials" helper="Keep these values aligned with the credentials configured inside Redis.">
                 <x-callout type="warning" title="{{ $database->started_at ? 'Keep credentials synchronized' : 'Verify the initial credentials' }}">
                     @if ($database->started_at)
                         Changing values here does not update Redis. Update Redis first, then synchronize the values here so
@@ -44,7 +43,7 @@
                             canGate="update" :canResource="$database" />
                     @endif
                 </div>
-            </section>
+            </x-application.settings-subsection>
         </x-application.settings-section>
 
         <x-application.settings-section id="access-section" title="Access"
@@ -61,12 +60,10 @@
                     </x-process-dialog>
                 @endif
             </x-slot:actions>
-            <section id="connection-section">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Connection <x-helper helper="Use these URLs to connect to the database." /></h3>
+            <x-application.settings-subsection id="connection-section" title="Connection" helper="Use these URLs to connect to the database." first>
                 <livewire:project.database.redis.status-info :database="$database" />
-            </section>
-            <section id="public-access-section" class="relative mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Public access <x-helper helper="Expose this database through the managed TCP proxy." /></h3>
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="public-access-section" title="Public access" helper="Expose this database through the managed TCP proxy." class="relative">
                 <x-table.loading target="instantSave" text="Updating public access..." />
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
@@ -85,7 +82,7 @@
                         helper="Comma-separated host-to-container mappings, for example 3000:6379."
                         canGate="update" :canResource="$database" />
                 </div>
-            </section>
+            </x-application.settings-subsection>
         </x-application.settings-section>
 
         <x-application.settings-section id="container-section" title="Container"
@@ -95,23 +92,21 @@
                 placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
                 id="customDockerRunOptions" label="Custom Docker options" canGate="update"
                 :canResource="$database" />
-            <section id="configuration-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Configuration <x-helper helper="Override only the Redis directives you need. All other defaults remain active." /></h3>
+            <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override only the Redis directives you need. All other defaults remain active.">
                 <x-forms.textarea placeholder="# maxmemory 256mb
     # maxmemory-policy allkeys-lru
     # timeout 300"
                     helper="Coolify automatically applies requirepass using the password above. If you override requirepass here, keep both values identical."
                     label="Custom Redis configuration" rows="10" id="redisConf" canGate="update"
                     :canResource="$database" />
-            </section>
-            <section id="log-delivery-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Log delivery <x-helper helper="Forward container logs to the drain configured on the server." /></h3>
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
                 <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
                     :disabled="! auth()->user()->can('update', $database)" :options="[
                         ['value' => false, 'label' => 'Do not forward logs'],
                         ['value' => true, 'label' => 'Forward logs to the server drain'],
                     ]" />
-            </section>
+            </x-application.settings-subsection>
         </x-application.settings-section>
     </form>
 </div>

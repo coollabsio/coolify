@@ -33,11 +33,11 @@
             </div>
         </header>
 
-        <form wire:submit="submit" class="application-settings-form">
+        <form wire:submit="submit" class="application-settings-form flex flex-col gap-6">
             <x-unsaved-bar action="submit" />
 
             <x-application.settings-section title="General"
-                description="Connection and authentication settings for this private Gitea source.">
+                description="Name, visibility, and webhook of this source.">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$gitea_app" id="name" label="Name" />
 
@@ -56,54 +56,56 @@
                         @endif
                     @endif
                 </div>
-            </x-application.settings-section>
-
-            <x-application.settings-section title="OAuth credentials"
-                description="Client credentials from your Gitea OAuth2 application.">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="clientId"
-                        label="Client ID" />
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="clientSecretInput"
-                        label="Client secret" type="password"
-                        helper="Stored encrypted. Leave empty to keep the existing secret." />
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="organization" label="Organization"
-                        helper="Comma-separated organization or user names to filter visible repositories." />
-                </div>
-            </x-application.settings-section>
-
-            <x-application.settings-section title="Self-hosted / advanced"
-                description="Override endpoints and SSH settings for self-hosted Gitea.">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="htmlUrl"
-                        label="Gitea URL" />
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="apiUrl" label="API URL" />
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="customUser"
-                        label="SSH user" />
-                    <x-forms.input canGate="update" :canResource="$gitea_app" type="number" id="customPort"
-                        label="SSH port" />
-                    <div class="lg:col-span-2">
-                        <x-forms.listbox canGate="update" :canResource="$gitea_app" id="privateKeyId" label="SSH private key (optional)"
-                            :options="collect($privateKeys)->map(fn ($key) => [
-                                'value' => $key->id,
-                                'label' => $key->name,
-                            ])->prepend(['value' => null, 'label' => 'None'])->values()->all()"
-                            :disabled="! auth()->user()->can('update', $gitea_app)" />
+                <x-application.settings-subsection title="Webhook"
+                    helper="Configure this webhook URL in Gitea (user, organization, or repository settings → Webhooks → Add webhook → Gitea).">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <div class="lg:col-span-2">
+                            <x-forms.input readonly label="Webhook URL"
+                                value="{{ rtrim($this->resolvePublicBaseUrl(), '/') }}/webhooks/source/gitea/events" />
+                        </div>
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="webhookSecret"
+                            label="Webhook secret" type="password"
+                            helper="Set this as the Secret in a Gitea webhook (user, organization, or repository settings → Webhooks → Add webhook → Gitea), content type application/json, trigger on Push and Pull Request events. Stored encrypted." />
                     </div>
-                </div>
+                </x-application.settings-subsection>
             </x-application.settings-section>
 
-            <x-application.settings-section title="Webhook"
-                description="Configure this webhook URL in Gitea (user, organization, or repository settings → Webhooks → Add webhook → Gitea).">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <div class="lg:col-span-2">
-                        <x-forms.input readonly label="Webhook URL"
-                            value="{{ rtrim($this->resolvePublicBaseUrl(), '/') }}/webhooks/source/gitea/events" />
+            <x-application.settings-section id="connection-section" title="Connection"
+                helper="OAuth credentials and the endpoints Coolify uses to reach this source.">
+                <x-application.settings-subsection first title="OAuth credentials"
+                    helper="Client credentials from your Gitea OAuth2 application.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="clientId"
+                            label="Client ID" />
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="clientSecretInput"
+                            label="Client secret" type="password"
+                            helper="Stored encrypted. Leave empty to keep the existing secret." />
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="organization" label="Organization"
+                            helper="Comma-separated organization or user names to filter visible repositories." />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$gitea_app" id="webhookSecret"
-                        label="Webhook secret" type="password"
-                        helper="Set this as the Secret in a Gitea webhook (user, organization, or repository settings → Webhooks → Add webhook → Gitea), content type application/json, trigger on Push and Pull Request events. Stored encrypted." />
-                </div>
+                </x-application.settings-subsection>
+                <x-application.settings-subsection title="Self-hosted / advanced"
+                    helper="Override endpoints and SSH settings for self-hosted Gitea.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="htmlUrl"
+                            label="Gitea URL" />
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="apiUrl" label="API URL" />
+                        <x-forms.input canGate="update" :canResource="$gitea_app" id="customUser"
+                            label="SSH user" />
+                        <x-forms.input canGate="update" :canResource="$gitea_app" type="number" id="customPort"
+                            label="SSH port" />
+                        <div class="lg:col-span-2">
+                            <x-forms.listbox canGate="update" :canResource="$gitea_app" id="privateKeyId" label="SSH private key (optional)"
+                                :options="collect($privateKeys)->map(fn ($key) => [
+                                    'value' => $key->id,
+                                    'label' => $key->name,
+                                ])->prepend(['value' => null, 'label' => 'None'])->values()->all()"
+                                :disabled="! auth()->user()->can('update', $gitea_app)" />
+                        </div>
+                    </div>
+                </x-application.settings-subsection>
             </x-application.settings-section>
+
         </form>
 
         <div x-data="{ search: '' }" class="application-settings-form mt-6">

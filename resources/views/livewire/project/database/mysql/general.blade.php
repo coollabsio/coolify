@@ -17,8 +17,7 @@
                         helper="Use a published MySQL image from Docker Hub." />
                 </div>
             </div>
-            <section id="credentials-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Credentials <x-helper helper="Keep these values aligned with the credentials configured inside MySQL." /></h3>
+            <x-application.settings-subsection id="credentials-section" title="Credentials" helper="Keep these values aligned with the credentials configured inside MySQL.">
                 @if ($database->started_at)
                     <x-callout type="warning" title="Keep credentials synchronized">
                         Changing values here does not update MySQL. Update MySQL first, then synchronize the values here so
@@ -45,7 +44,7 @@
                         :readonly="(bool) $database->started_at" canGate="update" :canResource="$database"
                         helper="{{ $database->started_at ? 'You can only change this in the database.' : null }}" />
                 </div>
-            </section>
+            </x-application.settings-subsection>
         </x-application.settings-section>
 
         <x-application.settings-section id="access-section" title="Access"
@@ -62,12 +61,10 @@
                     </x-process-dialog>
                 @endif
             </x-slot:actions>
-            <section id="connection-section">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Connection <x-helper helper="Use these URLs to connect to the database." /></h3>
+            <x-application.settings-subsection id="connection-section" title="Connection" helper="Use these URLs to connect to the database." first>
                 <livewire:project.database.mysql.status-info :database="$database" />
-            </section>
-            <section id="public-access-section" class="relative mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Public access <x-helper helper="Expose this database through the managed TCP proxy." /></h3>
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="public-access-section" title="Public access" helper="Expose this database through the managed TCP proxy." class="relative">
                 <x-table.loading target="instantSave" text="Updating public access..." />
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
@@ -86,7 +83,7 @@
                         helper="Comma-separated host-to-container mappings, for example 3000:3306."
                         canGate="update" :canResource="$database" />
                 </div>
-            </section>
+            </x-application.settings-subsection>
         </x-application.settings-section>
 
         <x-application.settings-section id="container-section" title="Container"
@@ -96,19 +93,17 @@
                 placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
                 id="customDockerRunOptions" label="Custom Docker options" canGate="update"
                 :canResource="$database" />
-            <section id="configuration-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Configuration <x-helper helper="Override the MySQL configuration used by this container." /></h3>
+            <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override the MySQL configuration used by this container.">
                 <x-forms.textarea label="Custom MySQL configuration" rows="10" id="mysqlConf"
                     canGate="update" :canResource="$database" />
-            </section>
-            <section id="log-delivery-section" class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-black dark:text-fg">Log delivery <x-helper helper="Forward container logs to the drain configured on the server." /></h3>
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
                 <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
                     :disabled="! auth()->user()->can('update', $database)" :options="[
                         ['value' => false, 'label' => 'Do not forward logs'],
                         ['value' => true, 'label' => 'Forward logs to the server drain'],
                     ]" />
-            </section>
+            </x-application.settings-subsection>
         </x-application.settings-section>
     </form>
 </div>

@@ -55,57 +55,56 @@
                             </div>
                         </div>
                     @endif
+                    <x-application.settings-subsection id="docker-cleanup-configuration-section"
+                        title="Schedule"
+                        helper="Choose when cleanup runs and whether it should wait for a disk threshold.">
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="0 0 * * *"
+                                id="dockerCleanupFrequency" label="Cleanup frequency" required
+                                helper="Cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
+                            @if (!$forceDockerCleanup)
+                                <x-forms.input canGate="update" :canResource="$server" id="dockerCleanupThreshold"
+                                    type="number" min="1" max="99" label="Disk threshold" required
+                                    helper="Run cleanup after disk usage exceeds this percentage." />
+                            @endif
+                            <x-forms.listbox id="forceDockerCleanup" label="Cleanup trigger"
+                                helper="Forced cleanup runs on every schedule without waiting for the threshold."
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Only above disk threshold'],
+                                    ['value' => true, 'label' => 'Run on every schedule'],
+                                ]" />
+                        </div>
+                    </x-application.settings-subsection>
+                    <x-application.settings-subsection id="docker-cleanup-advanced-section" title="Advanced cleanup"
+                        helper="Control destructive cleanup behavior and application image retention.">
+                        <x-callout type="warning" title="These options can remove recoverable data">
+                            Unused volumes may contain data from stopped containers, while removing retained images
+                            disables rollback to older application versions.
+                        </x-callout>
+
+                        <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                            <x-forms.listbox id="deleteUnusedVolumes" label="Unused volumes"
+                                helper="Permanently remove volumes not attached to running containers."
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Keep unused volumes'],
+                                    ['value' => true, 'label' => 'Delete unused volumes'],
+                                ]" />
+                            <x-forms.listbox id="deleteUnusedNetworks" label="Unused networks"
+                                helper="Remove Docker networks not attached to running containers."
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Keep unused networks'],
+                                    ['value' => true, 'label' => 'Delete unused networks'],
+                                ]" />
+                            <x-forms.listbox id="disableApplicationImageRetention" label="Application images"
+                                helper="Choose Keep retained images to follow each application’s Images to keep setting under Rollback. Delete all old images ignores that setting and keeps only the running image."
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Keep retained images'],
+                                    ['value' => true, 'label' => 'Delete all old images'],
+                                ]" />
+                        </div>
+                    </x-application.settings-subsection>
                 </x-application.settings-section>
 
-                <x-application.settings-section id="docker-cleanup-configuration-section"
-                    title="Cleanup configuration"
-                    helper="Choose when cleanup runs and whether it should wait for a disk threshold.">
-                    <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input canGate="update" :canResource="$server" placeholder="0 0 * * *"
-                            id="dockerCleanupFrequency" label="Cleanup frequency" required
-                            helper="Cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
-                        @if (!$forceDockerCleanup)
-                            <x-forms.input canGate="update" :canResource="$server" id="dockerCleanupThreshold"
-                                type="number" min="1" max="99" label="Disk threshold" required
-                                helper="Run cleanup after disk usage exceeds this percentage." />
-                        @endif
-                        <x-forms.listbox id="forceDockerCleanup" label="Cleanup trigger"
-                            helper="Forced cleanup runs on every schedule without waiting for the threshold."
-                            onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Only above disk threshold'],
-                                ['value' => true, 'label' => 'Run on every schedule'],
-                            ]" />
-                    </div>
-                </x-application.settings-section>
-
-                <x-application.settings-section id="docker-cleanup-advanced-section" title="Advanced cleanup"
-                    helper="Control destructive cleanup behavior and application image retention.">
-                    <x-callout type="warning" title="These options can remove recoverable data">
-                        Unused volumes may contain data from stopped containers, while removing retained images
-                        disables rollback to older application versions.
-                    </x-callout>
-
-                    <div class="mt-4 grid gap-4 lg:grid-cols-3">
-                        <x-forms.listbox id="deleteUnusedVolumes" label="Unused volumes"
-                            helper="Permanently remove volumes not attached to running containers."
-                            onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Keep unused volumes'],
-                                ['value' => true, 'label' => 'Delete unused volumes'],
-                            ]" />
-                        <x-forms.listbox id="deleteUnusedNetworks" label="Unused networks"
-                            helper="Remove Docker networks not attached to running containers."
-                            onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Keep unused networks'],
-                                ['value' => true, 'label' => 'Delete unused networks'],
-                            ]" />
-                        <x-forms.listbox id="disableApplicationImageRetention" label="Application images"
-                            helper="Choose Keep retained images to follow each application’s Images to keep setting under Rollback. Delete all old images ignores that setting and keeps only the running image."
-                            onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Keep retained images'],
-                                ['value' => true, 'label' => 'Delete all old images'],
-                            ]" />
-                    </div>
-                </x-application.settings-section>
             </form>
 
             <x-application.settings-section id="docker-cleanup-executions-section" title="Recent executions"

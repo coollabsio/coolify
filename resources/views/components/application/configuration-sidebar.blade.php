@@ -196,17 +196,11 @@
                 ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
                 $isComposeApp ? null : ['id' => 'container-section', 'label' => 'Container'],
             ])),
-            'project.application.advanced' => array_values(array_filter([
-                ['id' => 'advanced-build-section', 'label' => 'Build'],
+            'project.application.advanced' => [
+                ['id' => 'advanced-build-section', 'label' => 'Build & deploy'],
                 ['id' => 'advanced-container-section', 'label' => 'Container'],
-                $application->git_based() ? ['id' => 'advanced-deployment-section', 'label' => 'Deployment'] : null,
-                $application->git_based() ? ['id' => 'advanced-git-section', 'label' => 'Git'] : null,
-                $isComposeApp ? ['id' => 'advanced-compose-section', 'label' => 'Docker compose'] : null,
                 ['id' => 'advanced-proxy-section', 'label' => 'Proxy'],
-                ['id' => 'advanced-operations-section', 'label' => 'Operations'],
-                ['id' => 'advanced-logs-section', 'label' => 'Logs'],
-                $isComposeApp ? null : ['id' => 'advanced-gpu-section', 'label' => 'GPU'],
-            ])),
+            ],
             'project.application.webhooks' => [
                 ['id' => 'deploy-webhook-section', 'label' => 'Deploy webhook'],
                 ['id' => 'manual-git-webhooks-section', 'label' => 'Manual Git webhooks'],
@@ -220,12 +214,6 @@
             ])),
             'project.application.healthcheck' => [
                 ['id' => 'healthcheck-configuration-section', 'label' => 'Configuration'],
-                [
-                    'id' => $application->health_check_type === 'cmd'
-                        ? 'healthcheck-command-section'
-                        : 'healthcheck-request-section',
-                    'label' => $application->health_check_type === 'cmd' ? 'Command' : 'HTTP request',
-                ],
                 ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
             ],
             'project.application.resource-operations' => [
