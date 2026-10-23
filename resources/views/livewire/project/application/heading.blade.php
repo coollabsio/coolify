@@ -113,6 +113,15 @@
             </div>
         </div>
 
+        @if ($application->build_pack === 'nixpacks' && $activeRouteName !== 'project.application.configuration')
+            <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">
+                {{ config('deprecations.nixpacks') }}
+                <a class="underline" href="{{ route('project.application.configuration', $parameters) }}" {{ wireNavigate() }}>
+                    Switch to Railpack in General settings.
+                </a>
+            </x-callout>
+        @endif
+
         {{-- Desktop actions live in the fixed top bar so they cannot overlap page content. --}}
         @teleport('#resource-action-hud-slot')
         <div class="hidden w-full items-center xl:flex xl:w-auto">

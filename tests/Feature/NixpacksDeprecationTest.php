@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Project\Application\General;
+use App\Livewire\Project\Application\Heading;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -88,3 +89,21 @@ test('switching the build pack to railpack hides the nixpacks deprecation notice
         ->set('buildPack', 'railpack')
         ->assertDontSee(config('deprecations.nixpacks'));
 });
+
+test('the application heading shows the nixpacks deprecation notice only for nixpacks', function (string $buildPack, bool $showsNotice) {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => $buildPack,
+    ]);
+
+    $component = Livewire::test(Heading::class, ['application' => $application])->assertSuccessful();
+
+    $showsNotice
+        ? $component->assertSee(config('deprecations.nixpacks'))->assertSee('Switch to Railpack')
+        : $component->assertDontSee(config('deprecations.nixpacks'));
+})->with([
+    'nixpacks' => ['nixpacks', true],
+    'railpack' => ['railpack', false],
+]);
