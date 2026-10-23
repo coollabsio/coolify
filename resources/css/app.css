@@ -766,6 +766,14 @@ html.dark .application-console-shell[data-console-theme="system"] {
     --console-theme-background: var(--coollabs-elevated);
 }
 
+/* Dark mode: the docked System console uses the dark card colors (darker outer
+   header, --color-card body, faint white ring), so it matches the cards around it. */
+html.dark .application-console-shell[data-console-theme="system"] {
+    --coollabs-elevated: color-mix(in srgb, var(--color-card) 66%, black);
+    --coollabs-base: var(--color-card);
+    --coollabs-hairline: rgb(255 255 255 / 8%);
+}
+
 .console-theme-selector {
     scrollbar-color: rgb(161 161 170) transparent;
     scrollbar-width: thin;
