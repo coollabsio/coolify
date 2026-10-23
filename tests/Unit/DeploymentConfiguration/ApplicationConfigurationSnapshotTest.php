@@ -406,3 +406,25 @@ it('describes added unlocked environment variables with their value', function (
         ->and($change['new_display_value'])->toBe('new-secret')
         ->and(json_encode($diff->toArray()))->toContain('new-secret');
 });
+
+it('does not report Docker Compose preview volumes as pending production changes', function () {
+    $application = snapshotTestApplication(['build_pack' => 'dockercompose']);
+    $previewVolume = fn (): LocalPersistentVolume => LocalPersistentVolume::create([
+        'name' => $application->uuid.'_data-pr-42',
+        'mount_path' => '/app/data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+
+    // A preview deployment adds its volume after the production deployment.
+    markSnapshotTestApplicationDeployed($application);
+    $volume = $previewVolume();
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+
+    // An older production snapshot contains the volume, and the preview cleanup removes it.
+    $volume->delete();
+    $previewVolume();
+    markSnapshotTestApplicationDeployed($application);
+    LocalPersistentVolume::query()->where('name', $application->uuid.'_data-pr-42')->delete();
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+});

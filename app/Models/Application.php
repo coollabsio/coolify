@@ -1507,7 +1507,7 @@ class Application extends BaseModel
             $previousSnapshot = [];
         }
 
-        return app(ConfigurationDiffer::class)->diff($previousSnapshot, $currentSnapshot);
+        return app(ConfigurationDiffer::class)->diff(ApplicationConfigurationSnapshot::withoutPreviewVolumes($previousSnapshot, $this), $currentSnapshot);
     }
 
     public function hasPendingDeploymentConfigurationChanges(): bool
@@ -1551,7 +1551,7 @@ class Application extends BaseModel
             'configuration_hash' => $hash,
             'configuration_snapshot' => $snapshot,
             'configuration_diff' => $previousDeployment?->configuration_snapshot
-                ? app(ConfigurationDiffer::class)->diff($previousDeployment->configuration_snapshot, $snapshot)->toArray()
+                ? app(ConfigurationDiffer::class)->diff(ApplicationConfigurationSnapshot::withoutPreviewVolumes($previousDeployment->configuration_snapshot, $this), $snapshot)->toArray()
                 : null,
         ]);
 
