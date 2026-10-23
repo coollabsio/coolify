@@ -7,6 +7,7 @@ use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
+use App\Models\Team;
 use App\Rules\ValidServerIp;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
@@ -251,6 +252,12 @@ class Show extends Component
         if ($toModel) {
             $this->validate();
             $this->ip = Server::normalizeIp($this->ip);
+            if ($this->server->isTransferredAway() && $this->connectionFieldsChanged()) {
+                $this->ip = $this->server->ip;
+                $this->user = $this->server->user;
+                $this->port = $this->server->port;
+                throw new \Exception('The IP address, SSH user, and SSH port of a transferred server cannot be changed.');
+            }
             // Check only a changed IP, so that an old duplicate does not block saving other fields.
             $ipChanged = $this->ip !== Server::normalizeIp($this->server->getRawOriginal('ip'));
             $foundServer = $ipChanged ? Server::where('ip', $this->ip)
@@ -320,6 +327,13 @@ class Show extends Component
             $this->serverTimezone = $this->server->settings->server_timezone;
             $this->isValidating = $this->server->is_validating ?? false;
         }
+    }
+
+    private function connectionFieldsChanged(): bool
+    {
+        return $this->ip !== Server::normalizeIp($this->server->getRawOriginal('ip'))
+            || (string) $this->user !== (string) $this->server->user
+            || (int) $this->port !== (int) $this->server->port;
     }
 
     /**
@@ -406,13 +420,16 @@ class Show extends Component
             return;
         }
 
-        if ($this->server->team->serverOverflow()) {
+        // The archive does not use a server slot, so taking it back needs a free slot.
+        if (Team::serverLimitReached($this->server->team)) {
             $this->dispatch('error', 'Your team is over its server limit. Upgrade your subscription or remove a server first.');
 
             return;
         }
 
         try {
+            // The claim connects to the host over SSH, so it uses the same Cloud limit as a validation.
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
             $claimer->claim($this->server);
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -595,6 +612,9 @@ class Show extends Component
     {
         try {
             $this->authorize('view', $this->server);
+            if ($this->server->isTransferredAway()) {
+                return;
+            }
             if (! $this->server->hetzner_server_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Hetzner Cloud server or token.');
 
@@ -644,6 +664,9 @@ class Show extends Component
     {
         try {
             $this->authorize('view', $this->server);
+            if ($this->server->isTransferredAway()) {
+                return;
+            }
             if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
 
@@ -666,6 +689,9 @@ class Show extends Component
     {
         try {
             $this->authorize('view', $this->server);
+            if ($this->server->isTransferredAway()) {
+                return;
+            }
             if (! $this->server->digitalocean_droplet_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a DigitalOcean droplet or token.');
 
@@ -688,6 +714,9 @@ class Show extends Component
     {
         try {
             $this->authorize('view', $this->server);
+            if ($this->server->isTransferredAway()) {
+                return null;
+            }
             if (! $this->server->hostinger_virtual_machine_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Hostinger VPS or token.');
 
@@ -918,6 +947,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableHetznerTokens->firstWhere('id', $this->selectedHetznerTokenId);
             if (! $token) {
@@ -959,6 +989,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableHetznerTokens->firstWhere('id', $this->selectedHetznerTokenId);
             if (! $token) {
@@ -990,6 +1021,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableHetznerTokens->firstWhere('id', $this->selectedHetznerTokenId);
             if (! $token) {
@@ -1046,6 +1078,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableDigitalOceanTokens->firstWhere('id', $this->selectedDigitalOceanTokenId);
             if (! $token) {
@@ -1087,6 +1120,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableDigitalOceanTokens->firstWhere('id', $this->selectedDigitalOceanTokenId);
             if (! $token) {
@@ -1118,6 +1152,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableDigitalOceanTokens->firstWhere('id', $this->selectedDigitalOceanTokenId);
             if (! $token) {
@@ -1177,6 +1212,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             $token = $this->availableHostingerTokens->firstWhere('id', $this->selectedHostingerTokenId);
 
             if (! $token) {
@@ -1217,6 +1253,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             $token = $this->availableHostingerTokens->firstWhere('id', $this->selectedHostingerTokenId);
 
             if (! $token) {
@@ -1248,6 +1285,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
             $token = $this->availableHostingerTokens->firstWhere('id', $this->selectedHostingerTokenId);
 
             if (! $token) {
@@ -1307,6 +1345,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
             if (! $token) {
@@ -1348,6 +1387,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
             if (! $token) {
@@ -1379,6 +1419,7 @@ class Show extends Component
 
         try {
             $this->authorize('update', $this->server);
+            $this->server->assertNotTransferredAway();
 
             $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
             if (! $token) {

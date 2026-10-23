@@ -138,7 +138,7 @@ class ServerTransferController extends Controller
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
-    public function status(string $uuid): JsonResponse
+    public function status(Request $request, string $uuid): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -152,12 +152,18 @@ class ServerTransferController extends Controller
 
         $this->authorize('view', $server);
 
+        // The log and the error of a transfer can name hosts and credentials problems, so members see only the state.
+        $migration = data_get($server->server_metadata, 'migration');
+        if (is_array($migration) && ! $request->user()->can('update', $server)) {
+            $migration = collect($migration)->except(['log', 'error'])->all();
+        }
+
         return response()->json([
             'server_uuid' => $server->uuid,
             'transfer' => collect((array) data_get($server->server_metadata, 'transfer', []))
                 ->only(['status', 'export_id', 'imported_at', 'claimed_at', 'transferred_at', 'target_instance_url'])
                 ->all(),
-            'migration' => data_get($server->server_metadata, 'migration'),
+            'migration' => $migration,
         ]);
     }
 
@@ -222,10 +228,16 @@ class ServerTransferController extends Controller
         // server would leave an imported server here that this instance cannot manage.
         // On Cloud the probe is rate limited and cannot reach private, loopback, or link-local addresses,
         // so users cannot scan ports of Cloud's own network.
+        // A host name is resolved once and the probe connects to that address, so DNS cannot change it in between.
         Server::throttleValidation($teamId, $ip);
-        $probeHost = filter_var(Server::normalizeIp($ip), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.Server::normalizeIp($ip).']' : $ip;
-        $probeAllowed = ! isCloud() || Validator::make(['ip' => "http://{$probeHost}:{$port}"], ['ip' => [new SafeWebhookUrl]])->passes();
-        $connection = $probeAllowed ? @fsockopen($ip, $port, timeout: 5) : false;
+        $probeIp = Server::normalizeIp($ip);
+        if (isCloud() && ! filter_var($probeIp, FILTER_VALIDATE_IP)) {
+            $probeIp = gethostbyname($probeIp);
+        }
+        $probeHost = filter_var($probeIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? "[{$probeIp}]" : $probeIp;
+        $probeAllowed = ! isCloud() || (filter_var($probeIp, FILTER_VALIDATE_IP)
+            && Validator::make(['ip' => "http://{$probeHost}:{$port}"], ['ip' => [new SafeWebhookUrl]])->passes());
+        $connection = $probeAllowed ? @fsockopen($probeHost, $port, timeout: 5) : false;
         if ($connection !== false) {
             fclose($connection);
         }
@@ -245,7 +257,7 @@ class ServerTransferController extends Controller
                 'ok' => $connection !== false,
                 'message' => match (true) {
                     $connection !== false => null,
-                    ! $probeAllowed => "This instance cannot connect to a private, loopback, or link-local address ({$ip}). Use the public IP address of the server.",
+                    ! $probeAllowed => "This instance cannot connect to {$ip}: it is a private, loopback, or link-local address, or it does not resolve to a public IPv4 address. Use the public IP address of the server.",
                     default => "This instance cannot reach the server at {$ip}:{$port}. Allow SSH from this instance to the server, then transfer again.",
                 },
             ],
@@ -399,11 +411,23 @@ class ServerTransferController extends Controller
             ], 422);
         }
 
+        // The UI prefills this URL for a transfer back, which sends a team token to it.
+        $targetInstanceUrl = $request->input('target_instance_url');
+        if (filled($targetInstanceUrl)) {
+            try {
+                $targetInstanceUrl = ServerTransferMigrator::validateInstanceUrl($targetInstanceUrl);
+            } catch (ValidationException $e) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['target_instance_url' => $e->validator->errors()->all()]], 422);
+            } catch (Throwable $e) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['target_instance_url' => [$e->getMessage()]]], 422);
+            }
+        }
+
         try {
             $result = $this->claimer->markTransferred(
                 $server,
                 exportId: $request->input('export_id'),
-                targetInstanceUrl: $request->input('target_instance_url'),
+                targetInstanceUrl: filled($targetInstanceUrl) ? $targetInstanceUrl : null,
             );
         } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);

@@ -413,6 +413,10 @@ class Server extends BaseModel
      */
     public function backfillPlaceholderIp(?string $ip): bool
     {
+        if ($this->isTransferredAway()) {
+            return false;
+        }
+
         $ip = blank($ip) ? null : self::normalizeIp($ip);
         if (self::isPlaceholderIp($ip)) {
             return false;
@@ -457,6 +461,11 @@ class Server extends BaseModel
 
     public function refreshHetznerState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->hetzner_server_status;
+        }
+
         if (! $this->hetzner_server_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hetzner') {
             return $this->hetzner_server_status;
         }
@@ -478,6 +487,11 @@ class Server extends BaseModel
 
     public function refreshVultrState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->vultr_instance_status;
+        }
+
         if (! $this->vultr_instance_id || ! $this->cloudProviderToken) {
             return null;
         }
@@ -514,6 +528,11 @@ class Server extends BaseModel
 
     public function refreshDigitalOceanState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->digitalocean_droplet_status;
+        }
+
         if (! $this->digitalocean_droplet_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'digitalocean') {
             return $this->digitalocean_droplet_status;
         }
@@ -555,6 +574,11 @@ class Server extends BaseModel
 
     public function refreshHostingerState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->hostinger_virtual_machine_status;
+        }
+
         if (! $this->hostinger_virtual_machine_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hostinger') {
             return $this->hostinger_virtual_machine_status;
         }

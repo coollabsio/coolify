@@ -29,7 +29,15 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\SslCertificate;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
@@ -232,6 +240,21 @@ test('every exported value arrives unchanged on the target', function () {
         ServiceApplication::class => ['fqdn' => 'https://fuzz-service.example.test', 'domain_port_overrides' => null, 'noindex_domains' => []],
         GithubRunnerConfig::class => ['labels' => ['fuzz-label'], 'max_runners' => 5, 'runner_image' => 'ghcr.io/fuzz/runner:2', 'cpu_limit' => '1.5', 'memory_limit' => '2g', 'capacity_wait_timeout' => 33, 'idle_timeout' => 44, 'job_timeout' => 55],
         LocalFileVolume::class => ['fs_path' => '/data/coolify/applications/fuzz/app.conf', 'mount_path' => '/etc/fuzz/app.conf', 'chown' => '1000:1000', 'chmod' => '0640'],
+        // The import validates these values like the API does.
+        GithubApp::class => ['html_url' => 'https://github.fuzz.example.test', 'api_url' => 'https://api.github.fuzz.example.test'],
+        GitlabApp::class => ['html_url' => 'https://gitlab.fuzz.example.test', 'api_url' => 'https://gitlab.fuzz.example.test/api/v4'],
+        GiteaApp::class => ['html_url' => 'https://gitea.fuzz.example.test', 'api_url' => 'https://gitea.fuzz.example.test/api/v1'],
+        ScheduledTask::class => ['frequency' => '*/7 * * * *'],
+        ScheduledDatabaseBackup::class => ['frequency' => '0 3 * * *'],
+        ScheduledVolumeBackup::class => ['frequency' => '0 4 * * *'],
+        StandalonePostgresql::class => ['postgres_user' => 'fuzz_user', 'postgres_db' => 'fuzz_db', 'ports_mappings' => '15432:5432', 'public_port' => 15432],
+        StandaloneMongodb::class => ['mongo_initdb_root_username' => 'fuzz_user', 'mongo_initdb_database' => 'fuzz_db', 'ports_mappings' => '17017:27017', 'public_port' => 17017],
+        StandaloneMysql::class => ['mysql_user' => 'fuzz_user', 'mysql_database' => 'fuzz_db', 'ports_mappings' => '13306:3306', 'public_port' => 13306],
+        StandaloneMariadb::class => ['mariadb_user' => 'fuzz_user', 'mariadb_database' => 'fuzz_db', 'ports_mappings' => '13307:3306', 'public_port' => 13307],
+        StandaloneClickhouse::class => ['clickhouse_admin_user' => 'fuzz_user', 'ports_mappings' => '18123:8123', 'public_port' => 18123],
+        StandaloneRedis::class => ['ports_mappings' => '16379:6379', 'public_port' => 16379],
+        StandaloneKeydb::class => ['ports_mappings' => '16380:6379', 'public_port' => 16380],
+        StandaloneDragonfly::class => ['ports_mappings' => '16381:6379', 'public_port' => 16381],
     ];
     foreach (array_keys(ServerTransferCoverage::TRANSFERRED) as $class) {
         $class::query()->withoutGlobalScopes()->get()

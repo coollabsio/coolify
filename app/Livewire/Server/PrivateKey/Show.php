@@ -46,6 +46,11 @@ class Show extends Component
             return;
         }
         $this->authorize('update', $this->server);
+        if ($this->server->isTransferredAway()) {
+            $this->dispatch('error', 'The private key of a transferred server cannot be changed.');
+
+            return;
+        }
         try {
             Server::throttleValidation($this->server->team_id, $this->server->ip);
         } catch (ThrottleRequestsException $e) {
@@ -101,6 +106,7 @@ class Show extends Component
     public function checkConnection()
     {
         try {
+            $this->authorize('update', $this->server);
             Server::throttleValidation($this->server->team_id, $this->server->ip);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if ($uptime) {

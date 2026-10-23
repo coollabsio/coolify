@@ -181,7 +181,11 @@ class ServerTransferImporter
         bool $preserveUuids = true,
         bool $adoptMode = true,
     ): array {
-        ServerTransferBundle::assertValid($bundle);
+        // Checks every id, list size, and imported value before anything is written.
+        $validation = ServerTransferBundle::validate($bundle);
+        if (! $validation['valid']) {
+            throw ValidationException::withMessages(['bundle' => $validation['errors']]);
+        }
         $this->assertValidServerPayload((array) data_get($bundle, 'server', []));
 
         if ($adoptMode && ! $preserveUuids) {
@@ -190,7 +194,6 @@ class ServerTransferImporter
             ]);
         }
 
-        $validation = ServerTransferBundle::validate($bundle);
         $warnings = $validation['warnings'];
         if (is_array(data_get($bundle, 'warnings'))) {
             $warnings = array_values(array_unique(array_merge($warnings, $bundle['warnings'])));
@@ -504,8 +507,8 @@ class ServerTransferImporter
     {
         $team = Team::find($teamId);
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
-        // The archive is replaced, so the import does not add a server.
-        $limitReached = ! $team || ($archive === null && Team::serverLimitReached($team));
+        // An archive does not use a server slot, so replacing it also needs a free slot.
+        $limitReached = ! $team || Team::serverLimitReached($team);
 
         $existingServer = $preserveUuids && $archive === null ? Server::withTrashed()->where('uuid', $serverUuid)->first() : null;
         $uuidMessage = match (true) {
@@ -592,7 +595,7 @@ class ServerTransferImporter
 
         if ($adoptMode) {
             throw ValidationException::withMessages([
-                'bundle' => ["The {$label} UUID {$uuid} is already used on this instance. Delete that {$label} permanently first, because adopt mode needs the same UUID to keep the running containers."],
+                'bundle' => ["The {$label} UUID {$uuid} cannot be used on this instance. Adopt mode needs the same UUID to keep the running containers. If you deleted the {$label} on this instance, delete it permanently first."],
             ]);
         }
 
@@ -2273,7 +2276,7 @@ class ServerTransferImporter
             $preview = ApplicationPreview::withTrashed()->where('uuid', $uuid)->first();
             if ($preview && ! $this->previewBelongsToTeam($preview, $teamId)) {
                 throw ValidationException::withMessages([
-                    'previews' => ['An imported preview UUID conflicts with a preview outside the target team.'],
+                    'previews' => ['An imported preview UUID cannot be used on this instance.'],
                 ]);
             }
             if (! $preview) {

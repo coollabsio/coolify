@@ -8,8 +8,13 @@ use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTask;
+use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ServerTransfer\ServerTransferClaimer;
@@ -418,7 +423,7 @@ test('start runs every check and logs which are OK and which failed', function (
     ], 422)]);
 
     expect(fn () => app(ServerTransferMigrator::class)->start($this->server, 'https://8.8.8.8', 'token'))
-        ->toThrow(RuntimeException::class, '2 of 10 checks failed');
+        ->toThrow(RuntimeException::class, '2 of 13 checks failed');
 
     $log = collect(data_get($this->server->fresh()->server_metadata, 'migration.log'));
     expect($log->where('level', 'success')->pluck('message'))->toContain('OK: the target instance accepts the API token.')
@@ -706,4 +711,61 @@ test('start notes system-wide git sources that the target does not have', functi
 })->with([
     'the target has no matching App' => [true],
     'the target has the App' => [false],
+]);
+
+test('a transfer back token has only the import abilities, expires within an hour, and survives the claim', function () {
+    $user = User::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => 'owner']);
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://8.8.8.8');
+    Http::fake(['https://8.8.8.8/api/v1/servers/*/migrate' => Http::response(['migration' => ['status' => 'running']], 202)]);
+
+    app(ServerTransferMigrator::class)->requestTransferBack($this->server->fresh(), $user, 'https://8.8.8.8', 'token-of-b', 'https://coolify-a.test');
+
+    $token = $user->tokens()->sole();
+    expect($token->abilities)->toBe(['write', 'deploy'])
+        ->and($token->expires_at->lte(now()->addHour()))->toBeTrue();
+
+    // The other instance still checks the import status with the token after the import claims the server.
+    Queue::fake();
+    app(ServerTransferClaimer::class)->claim($this->server->fresh());
+
+    expect($user->tokens()->count())->toBe(1);
+});
+
+test('start fails while a backup or a scheduled task runs on the server', function (string $kind) {
+    Queue::fake();
+    Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => []])]);
+    $application = Application::where('name', 'app-on-server')->sole();
+    if ($kind === 'database backup') {
+        $database = StandalonePostgresql::withoutEvents(fn () => StandalonePostgresql::forceCreate([
+            'uuid' => new_public_id(), 'name' => 'busy-db', 'postgres_password' => 'secret',
+            'environment_id' => $application->environment_id, 'destination_id' => $application->destination_id, 'destination_type' => $application->destination_type,
+        ]));
+        $backup = ScheduledDatabaseBackup::create([
+            'enabled' => true, 'frequency' => '0 0 * * *', 'save_s3' => false, 'team_id' => $this->team->id,
+            'database_type' => $database->getMorphClass(), 'database_id' => $database->id,
+        ]);
+        ScheduledDatabaseBackupExecution::create(['scheduled_database_backup_id' => $backup->id, 'status' => 'running']);
+    } else {
+        $task = ScheduledTask::factory()->create(['team_id' => $this->team->id, 'application_id' => $application->id]);
+        ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'running']);
+    }
+
+    expect(fn () => app(ServerTransferMigrator::class)->start($this->server, 'https://8.8.8.8', 'token'))
+        ->toThrow(RuntimeException::class, "1 {$kind}(s) on this server are running");
+    Queue::assertNotPushed(MigrateServerToInstanceJob::class);
+})->with(['database backup', 'scheduled task']);
+
+test('migrate keeps only an https link to the server on the target', function (string $serverUrl, ?string $kept) {
+    Http::fake(['https://8.8.8.8/api/v1/servers/import' => Http::response([
+        'server_uuid' => $this->server->uuid, 'claimed' => true, 'warnings' => [], 'server_url' => $serverUrl,
+    ], 201)]);
+
+    $result = app(ServerTransferMigrator::class)->migrate($this->server, 'https://8.8.8.8', 'token');
+
+    expect($result['target_server_url'])->toBe($kept);
+})->with([
+    'https' => ['https://coolify-b.example.com/server/abc', 'https://coolify-b.example.com/server/abc'],
+    'javascript' => ['javascript:alert(document.cookie)', null],
+    'plain http' => ['http://coolify-b.example.com/server/abc', null],
 ]);

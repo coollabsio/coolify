@@ -4,13 +4,16 @@ namespace App\Services\ServerTransfer;
 
 use App\Enums\GithubRunnerStatus;
 use App\Jobs\DeleteResourceJob;
+use App\Models\Application;
 use App\Models\GithubRunnerExecution;
 use App\Models\ManagedDnsRecord;
 use App\Models\Server;
+use App\Models\Team;
 use App\Notifications\Internal\GeneralNotification;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -67,13 +70,16 @@ class ServerTransferClaimer
             $server = Server::query()->with('settings')->lockForUpdate()->findOrFail($server->id);
 
             // A disabled server refuses SSH, so the owner marker could not be written.
-            if ($server->team->serverOverflow()) {
+            // An archive does not use a server slot, so taking it back needs a free slot.
+            $overLimit = $server->isTransferredAway() ? Team::serverLimitReached($server->team) : $server->team->serverOverflow();
+            if ($overLimit) {
                 throw new RuntimeException('Your team is over its server limit. Upgrade your subscription or remove a server first.');
             }
 
             if ($server->settings) {
                 $server->settings->sentinel_custom_url = $instanceUrl;
-                $server->settings->ensureValidSentinelToken();
+                // A new token: the instance that managed the server before keeps a copy of the old one.
+                $server->settings->generateSentinelToken(save: false);
                 $server->settings->is_sentinel_enabled = true;
                 $server->settings->force_disabled = false;
                 $server->settings->save();
@@ -85,6 +91,7 @@ class ServerTransferClaimer
                 'claimed_at' => $claim['claimed_at'],
                 'claim' => $claim,
             ]);
+            unset($metadata['transfer']['owner_marker_conflict'], $metadata['transfer']['claimed_by_marker']);
             $server->server_metadata = $metadata;
             $server->save();
 
@@ -107,13 +114,13 @@ class ServerTransferClaimer
      *
      * @return array{server_uuid: string, message: string}
      */
-    public function markTransferred(Server $server, ?string $exportId = null, ?string $targetInstanceUrl = null): array
+    public function markTransferred(Server $server, ?string $exportId = null, ?string $targetInstanceUrl = null, bool $fromOwnerMarker = false): array
     {
         if ($server->id === 0) {
             throw new RuntimeException('Cannot transfer the Coolify host itself.');
         }
 
-        $result = DB::transaction(function () use ($server, $exportId, $targetInstanceUrl) {
+        $result = DB::transaction(function () use ($server, $exportId, $targetInstanceUrl, $fromOwnerMarker) {
             $server = Server::query()->with('settings')->lockForUpdate()->findOrFail($server->id);
 
             if ($server->settings) {
@@ -127,9 +134,11 @@ class ServerTransferClaimer
                 'status' => 'transferred',
                 'export_id' => $exportId ?? data_get($metadata, 'transfer.export_id'),
                 'target_instance_url' => $targetInstanceUrl,
+                // Anyone who can write files on the host can write the owner marker, so its URL is not trusted.
+                'claimed_by_marker' => $fromOwnerMarker,
                 'transferred_at' => now()->toIso8601String(),
             ]);
-            unset($metadata['transfer']['finish'], $metadata['transfer']['taken_back_at']);
+            unset($metadata['transfer']['finish'], $metadata['transfer']['taken_back_at'], $metadata['transfer']['owner_marker_conflict']);
             $server->server_metadata = $metadata;
             $server->save();
 
@@ -176,10 +185,47 @@ class ServerTransferClaimer
         }
 
         $this->forgetDnsRecords($server);
-        foreach ($server->definedResources() as $resource) {
+        $this->detachAdditionalApplications($server);
+        foreach ($this->archiveResources($server) as $resource) {
             (new DeleteResourceJob($resource, deleteFromCoolifyOnly: true))->handle();
         }
         $server->forceDelete();
+    }
+
+    /**
+     * The resources that the archive of a transferred server deletes. An application that has the server only as an
+     * additional destination runs on another server of this instance, so it is not one of them.
+     *
+     * @return Collection<int, Model>
+     */
+    public function archiveResources(Server $server): Collection
+    {
+        return $this->primaryApplications($server)
+            ->concat($server->databases())
+            ->concat($server->services()->get());
+    }
+
+    /**
+     * Remove the server from applications that run on it only as an additional destination.
+     */
+    public function detachAdditionalApplications(Server $server): void
+    {
+        $primaryIds = $this->primaryApplications($server)->pluck('id');
+        DB::table('additional_destinations')
+            ->where('server_id', $server->id)
+            ->whereNotIn('application_id', $primaryIds)
+            ->delete();
+    }
+
+    /**
+     * @return Collection<int, Application>
+     */
+    private function primaryApplications(Server $server): Collection
+    {
+        return $server->applications()
+            ->filter(fn (Application $application) => (int) data_get($application, 'destination.server_id') === (int) $server->id)
+            ->unique('id')
+            ->values();
     }
 
     /**
@@ -189,7 +235,7 @@ class ServerTransferClaimer
     {
         // The server itself owns the DNS record of its Cloudflare tunnel.
         return collect([$server])
-            ->concat($server->applications())
+            ->concat($this->primaryApplications($server))
             ->concat($server->services()->with('applications')->get()->flatMap->applications);
     }
 
@@ -236,9 +282,15 @@ class ServerTransferClaimer
     }
 
     /**
-     * Stop managing a claimed server when its owner marker names a claim of another instance.
+     * Stop managing a claimed server when its owner marker names a newer claim of another instance.
      * A server that was added here without a claim ignores the marker: a marker can be left over on a
      * host that an old instance deleted, and the next claim overwrites it.
+     *
+     * Anyone who can write files on the host can write the marker, so it is not proof of a claim. A marker that is
+     * not newer than the claim of this instance, or that names a URL that this instance would not send credentials
+     * to, does not release the server: this instance keeps managing it and saves the conflict, which the UI shows.
+     * A forged marker with a newer time and a valid URL still releases the server; it can be taken back with
+     * Enable management.
      *
      * @return bool true when this instance released the server
      */
@@ -255,13 +307,25 @@ class ServerTransferClaimer
         }
 
         if ($markerClaimId === data_get($server->server_metadata, 'transfer.claim.claim_id')) {
+            if (data_get($server->server_metadata, 'transfer.owner_marker_conflict') !== null) {
+                $this->recordOwnerMarkerConflict($server, null, null);
+            }
+
             return false;
         }
 
+        // Any http(s) URL: a default self-hosted target uses http://IP:8000. The URL is not trusted
+        // (claimed_by_marker), so it is never prefilled for a transfer back.
         $owner = data_get($marker, 'instance_url');
-        $owner = is_string($owner) && $owner !== '' ? $owner : null;
+        $owner = is_string($owner) && filter_var($owner, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($owner, PHP_URL_SCHEME)), ['http', 'https'], true)
+            ? rtrim(trim($owner), '/') : null;
+        if ($owner === null || ! $this->isNewerThanOwnClaim($server, data_get($marker, 'claimed_at'))) {
+            $this->recordOwnerMarkerConflict($server, $markerClaimId, data_get($marker, 'instance_url'));
 
-        $this->markTransferred($server, targetInstanceUrl: $owner);
+            return false;
+        }
+
+        $this->markTransferred($server, targetInstanceUrl: $owner, fromOwnerMarker: true);
 
         Log::warning('Server is claimed by another Coolify instance; management stopped here', [
             'server_uuid' => $server->uuid,
@@ -273,6 +337,50 @@ class ServerTransferClaimer
         ));
 
         return true;
+    }
+
+    private function isNewerThanOwnClaim(Server $server, mixed $markerClaimedAt): bool
+    {
+        $ownClaimedAt = data_get($server->server_metadata, 'transfer.claim.claimed_at');
+        if (! is_string($markerClaimedAt) || ! is_string($ownClaimedAt)) {
+            return false;
+        }
+
+        try {
+            return Carbon::parse($markerClaimedAt)->isAfter(Carbon::parse($ownClaimedAt));
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Save the untrusted marker of another claim, or remove the saved one when $markerClaimId is null.
+     */
+    private function recordOwnerMarkerConflict(Server $server, ?string $markerClaimId, mixed $instanceUrl): void
+    {
+        if ($markerClaimId !== null && data_get($server->server_metadata, 'transfer.owner_marker_conflict.claim_id') === $markerClaimId) {
+            return;
+        }
+
+        if ($markerClaimId !== null) {
+            Log::warning('The owner marker on the server names another claim, but it is not trusted; this instance keeps managing the server', [
+                'server_uuid' => $server->uuid,
+                'marker_claim_id' => $markerClaimId,
+            ]);
+        }
+
+        DB::transaction(function () use ($server, $markerClaimId, $instanceUrl) {
+            $locked = Server::query()->lockForUpdate()->findOrFail($server->id);
+            $metadata = $locked->server_metadata ?? [];
+            $metadata['transfer']['owner_marker_conflict'] = $markerClaimId === null ? null : [
+                'claim_id' => $markerClaimId,
+                'instance_url' => is_string($instanceUrl) ? mb_substr($instanceUrl, 0, 255) : null,
+                'seen_at' => now()->toIso8601String(),
+            ];
+            $locked->server_metadata = $metadata;
+            $locked->save();
+            $server->server_metadata = $metadata;
+        });
     }
 
     /**

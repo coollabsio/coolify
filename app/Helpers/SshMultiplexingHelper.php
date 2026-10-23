@@ -69,7 +69,8 @@ class SshMultiplexingHelper
      */
     private static function assertNotDisabled(Server $server): void
     {
-        if ($server->settings->force_disabled) {
+        // Read the saved flag too: a job that loaded the server before a transfer finished must stop.
+        if ($server->settings->force_disabled || ($server->exists && $server->settings()->value('force_disabled'))) {
             throw new \RuntimeException('Server is disabled.');
         }
     }
@@ -84,7 +85,7 @@ class SshMultiplexingHelper
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = "ssh -fN -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        $establishCommand = 'ssh -fN -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
@@ -301,7 +302,7 @@ class SshMultiplexingHelper
         $muxSocket = $sshConfig['muxFilename'];
         $healthCheckTimeout = config('constants.ssh.mux_health_check_timeout');
 
-        $healthCommand = "timeout $healthCheckTimeout ssh -o ControlMaster=auto -o ControlPath=$muxSocket ";
+        $healthCommand = "timeout $healthCheckTimeout ssh -o ControlMaster=auto -o ControlPath=".escapeshellarg($muxSocket).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
@@ -366,7 +367,7 @@ class SshMultiplexingHelper
 
     private static function muxControlCommand(Server $server, string $operation): string
     {
-        $command = "ssh -O {$operation} -o ControlPath=".self::muxSocket($server).' ';
+        $command = "ssh -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
@@ -377,7 +378,7 @@ class SshMultiplexingHelper
     private static function multiplexingOptions(Server $server): string
     {
         return '-o ControlMaster=auto '
-            .'-o ControlPath='.self::muxSocket($server).' '
+            .'-o ControlPath='.escapeshellarg(self::muxSocket($server)).' '
             .'-o ControlPersist='.config('constants.ssh.mux_persist_time').' ';
     }
 
@@ -433,7 +434,7 @@ class SshMultiplexingHelper
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
-        $options = "-i {$sshKeyLocation} "
+        $options = '-i '.escapeshellarg($sshKeyLocation).' '
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
