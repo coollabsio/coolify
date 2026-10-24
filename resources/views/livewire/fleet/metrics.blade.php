@@ -231,6 +231,9 @@ $serverListboxOptions = array_merge(
         <div class="grid gap-6 lg:grid-cols-2">
             @foreach (['cpu' => 'CPU', 'memory' => 'Memory used', 'network' => 'Network throughput', 'load' => 'Load average', 'disk' => 'Disk usage'] as $key => $label)
                 <x-application.settings-section :title="$label" @class(['lg:col-span-2' => $key === 'cpu'])>
+                    <x-slot:actions>
+                        <div wire:ignore id="fleet-chart-{{ $key }}-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                    </x-slot:actions>
                     <div wire:ignore>
                         <div id="fleet-chart-{{ $key }}" class="min-h-[240px] w-full"></div>
                     </div>
@@ -421,7 +424,7 @@ $serverListboxOptions = array_merge(
                     fill: { type: 'gradient', gradient: { opacityFrom: 0.28, opacityTo: 0.02, stops: [0, 90, 100] } },
                     dataLabels: { enabled: false },
                     grid: { borderColor: 'rgba(128, 128, 128, 0.14)', strokeDashArray: 4 },
-                    legend: { show: series.length > 1, labels: { colors: axisColor } },
+                    legend: { show: false },
                     xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: axisColor } } },
                     yaxis: { min: 0, max: max => max > 0 ? max * 1.2 : 1, forceNiceScale: true, tickAmount: 4, labels: { style: { colors: axisColor }, formatter } },
                     noData: { text: 'No data for this range', style: { color: axisColor } },
@@ -448,6 +451,15 @@ $serverListboxOptions = array_merge(
                     charts[key] = chart;
                 }
 
+                const renderLegends = specs => {
+                    for (const [key, spec] of Object.entries(specs)) {
+                        renderChartLegend(document.getElementById(`fleet-chart-${key}-legend`), spec.series.map((series, i) => ({
+                            name: series.name, color: spec.colors[i], data: series.data, formatter: spec.formatter,
+                        })));
+                    }
+                };
+                renderLegends(specs);
+
                 Livewire.on('refreshChartData-{!! $chartId !!}', payload => {
                     if (typeof checkTheme === 'function') { checkTheme(); }
                     const data = Array.isArray(payload) ? payload[0] : payload;
@@ -456,6 +468,7 @@ $serverListboxOptions = array_merge(
                     for (const [key, chart] of Object.entries(charts)) {
                         chart.updateSeries(next[key].series);
                     }
+                    renderLegends(next);
                 });
                 });
             })();

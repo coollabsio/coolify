@@ -64,26 +64,41 @@
                 <div class="grid gap-6 lg:grid-cols-2">
                     <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage" class="lg:col-span-2"
                         helper="Percentage of available CPU capacity used by this server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
                         <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
                     </x-application.settings-section>
 
                     <x-application.settings-section id="server-memory-metrics-section" title="Memory usage"
                         helper="Percentage of physical memory currently used by this server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-memory-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
                         <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
                     </x-application.settings-section>
 
                     <x-application.settings-section id="server-network-metrics-section" title="Network throughput"
                         helper="Receive and transmit rate across the server's network interfaces.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-network-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
                         <div wire:ignore id="{!! $chartId !!}-network" class="min-h-[240px] w-full"></div>
                     </x-application.settings-section>
 
                     <x-application.settings-section id="server-load-metrics-section" title="Load average"
                         helper="One minute load average reported by the server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-load-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
                         <div wire:ignore id="{!! $chartId !!}-load" class="min-h-[240px] w-full"></div>
                     </x-application.settings-section>
 
                     <x-application.settings-section id="server-disk-metrics-section" title="Disk usage"
                         helper="Percentage of the root filesystem used by this server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-disk-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
                         <div wire:ignore id="{!! $chartId !!}-disk" class="min-h-[240px] w-full"></div>
                     </x-application.settings-section>
                 </div>
@@ -235,13 +250,15 @@
                                 {
                                     ...chartOptions('Network', '#10b981', 'Loading network metrics…', formatRate),
                                     colors: ['#10b981', '#f59e0b'],
-                                    legend: { show: true, labels: { colors: textColor } },
                                 },
                             );
                             const loadChart = new ApexCharts(
                                 document.getElementById('{!! $chartId !!}-load'),
                                 chartOptions('Load', '#14b8a6', 'Loading load metrics…', formatNumber),
                             );
+
+                            const renderLegend = (key, items) => renderChartLegend(
+                                document.getElementById(`{!! $chartId !!}-${key}-legend`), items);
 
                             // Defer to the next frame so the 2x2 grid cells are laid out
                             // before ApexCharts measures them (a zero-width cell renders blank).
@@ -331,6 +348,15 @@
                                     { name: 'TX', data: data.networkTxSeries || [] },
                                 ]);
                                 loadChart.updateSeries([{ name: 'Load', data: data.loadSeries || [] }]);
+
+                                renderLegend('cpu', [{ name: 'CPU', color: cpuColor, data: data.cpuSeries, formatter: formatPercent }]);
+                                renderLegend('memory', [{ name: 'Memory', color: ramColor, data: data.memorySeries, formatter: formatPercent }]);
+                                renderLegend('network', [
+                                    { name: 'RX', color: '#10b981', data: data.networkRxSeries, formatter: formatRate },
+                                    { name: 'TX', color: '#f59e0b', data: data.networkTxSeries, formatter: formatRate },
+                                ]);
+                                renderLegend('load', [{ name: 'Load', color: '#14b8a6', data: data.loadSeries, formatter: formatNumber }]);
+                                renderLegend('disk', [{ name: 'Disk', color: '#ef4444', data: data.diskSeries, formatter: formatPercent }]);
                             });
                         })();
                     </script>

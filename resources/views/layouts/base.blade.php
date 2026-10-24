@@ -402,6 +402,30 @@
                 editorTheme = null
             }
         }
+        // Chart legend in a card header: one entry per series with its last known value.
+        // items: [{ name, color, data: [[timestamp, value], ...], formatter }]
+        function renderChartLegend(element, items) {
+            if (!element) return;
+            element.replaceChildren(...items.map(({ name, color, data, formatter }) => {
+                const last = (data || []).findLast(point => point?.[1] !== null && point?.[1] !== undefined);
+                const item = document.createElement('span');
+                item.className = 'inline-flex items-center gap-1.5';
+                const dot = document.createElement('span');
+                dot.className = 'size-2 shrink-0 rounded-full';
+                dot.style.backgroundColor = color;
+                const label = document.createElement('span');
+                label.className = 'text-neutral-500 dark:text-fg-dim';
+                label.textContent = name;
+                item.append(dot, label);
+                if (last) {
+                    const value = document.createElement('span');
+                    value.className = 'font-medium tabular-nums text-black dark:text-fg';
+                    value.textContent = formatter(last[1]);
+                    item.append(value);
+                }
+                return item;
+            }));
+        }
         @auth
             window.Pusher = Pusher;
             const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;

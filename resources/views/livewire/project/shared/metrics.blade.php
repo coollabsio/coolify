@@ -63,6 +63,9 @@
 
         <x-application.settings-section id="cpu-metrics-section" title="CPU usage"
             helper="Percentage of available CPU capacity used by the application container.">
+            <x-slot:actions>
+                <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+            </x-slot:actions>
             <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
 
             @script
@@ -206,6 +209,12 @@
                                 },
                             },
                         });
+                        renderChartLegend(document.getElementById('{!! $chartId !!}-cpu-legend'), [{
+                            name: 'CPU',
+                            color: cpuColor,
+                            data: chartData[0].seriesData,
+                            formatter: value => `${Number(value.toFixed(Math.abs(value) < 1 ? 2 : 1))}%`,
+                        }]);
                     });
                 })();
             </script>
@@ -214,6 +223,9 @@
 
         <x-application.settings-section id="memory-metrics-section" title="Memory usage"
             helper="Memory consumed by the application container, measured in megabytes.">
+            <x-slot:actions>
+                <div wire:ignore id="{!! $chartId !!}-memory-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+            </x-slot:actions>
             <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
 
             @script
@@ -349,6 +361,12 @@
                                 },
                             },
                         });
+                        renderChartLegend(document.getElementById('{!! $chartId !!}-memory-legend'), [{
+                            name: 'Memory',
+                            color: ramColor,
+                            data: chartData[0].seriesData,
+                            formatter: value => `${Math.round(value)} MB`,
+                        }]);
                     });
                 })();
             </script>
