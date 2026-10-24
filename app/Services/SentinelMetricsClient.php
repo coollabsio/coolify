@@ -184,7 +184,7 @@ class SentinelMetricsClient
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
-    private static function rootMountName(array $rows): ?string
+    public static function rootMountName(array $rows): ?string
     {
         $mounts = array_column($rows, 'mount');
 

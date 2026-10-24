@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Server;
+use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Log;
 
@@ -80,7 +81,7 @@ trait HasMetrics
 
     /**
      * Root filesystem usage percentage over time. Disk history interleaves every
-     * mount, so we keep only the root mount before mapping.
+     * mount, so we keep only the root mount (see SentinelMetricsClient::rootMountName()).
      */
     public function getDiskMetrics(int $mins = 5): ?array
     {
@@ -90,7 +91,8 @@ trait HasMetrics
         }
 
         if (array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
-            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/'));
+            $mount = SentinelMetricsClient::rootMountName($rows);
+            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === $mount));
         }
 
         return $this->mapRows($rows, 'usedPercent', $mins);
