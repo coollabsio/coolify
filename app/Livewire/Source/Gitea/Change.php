@@ -264,10 +264,18 @@ class Change extends Component
         }
     }
 
+    private function authorizeSystemWideChange(): void
+    {
+        if ($this->isSystemWide && ! $this->gitea_app->is_system_wide) {
+            $this->authorize('makeSystemWide', GiteaApp::class);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->gitea_app);
+            $this->authorizeSystemWideChange();
 
             $this->validate();
 
@@ -283,6 +291,7 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->gitea_app);
+            $this->authorizeSystemWideChange();
 
             $this->validateOnly('isSystemWide');
 
