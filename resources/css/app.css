@@ -1319,7 +1319,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Cards sit one step above the #0a0a0a canvas. The top bar uses the canvas,
        not this color. The sidebar uses --color-sidebar. */
     --color-card: #121212;
-    --color-sidebar: #0d0d0d;
+    --color-sidebar: #120e1a;
     /* Dark surface ladder in hex (sRGB), not oklch: oklch lightness compresses
        to near-black below ~15%, so oklch(15%) rendered as sRGB 11 and cards
        could not lift off the content canvas (sRGB 10). These give clear,
@@ -6250,9 +6250,9 @@ html.dark .canvas-zoom-max {
     }
 }
 
-/* Brand shell (dark): black canvas and top bar, quiet neutral sidebar, scroll hairline.
-   The sidebar stays neutral so the content keeps the focus; only the current item
-   uses the brand purple. Light mode keeps the neutral shell. Floating navigation
+/* Brand shell (dark): black canvas and top bar, sidebar, scroll hairline.
+   The default dark theme tints the sidebar purple (below); a custom theme gets
+   these neutral rules. Light mode keeps the neutral shell. Floating navigation
    keeps its own frame. */
 html.dark .app-sidebar nav.sidebar-nav,
 html.dark .mobile-sidebar-sheet [role="dialog"] {
@@ -6279,20 +6279,20 @@ html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search {
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06) !important;
 }
 
-/* The account button is a .button, which is purple in dark mode; keep it neutral in the sidebar. */
-html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
+/* The account button is a .button, which is purple in dark mode; keep it neutral in a custom theme sidebar. */
+html.dark[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
     --button-depth-color: rgb(255 255 255 / 0.05);
     background-color: rgb(255 255 255 / 0.04);
     border-color: rgb(255 255 255 / 0.08);
     color: var(--color-nav-text);
 }
 
-html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):hover {
+html.dark[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):hover {
     background-color: rgb(255 255 255 / 0.07);
     border-color: rgb(255 255 255 / 0.12);
 }
 
-html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) svg {
+html.dark[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) svg {
     color: var(--color-nav-muted);
 }
 
@@ -6325,6 +6325,62 @@ html.dark .app-sidebar .nav-chevron {
 
 html.dark .app-sidebar .menu-item:not(:hover):not(:focus-visible):not(.menu-item-active) > .nav-chevron {
     opacity: 0;
+}
+
+/* Default dark theme sidebar: purple-black with a faint brand wash and lavender
+   tiles, text, and edges. A custom theme keeps the neutral rules above. */
+html.dark:not([data-theme="custom"]) .app-sidebar nav.sidebar-nav,
+html.dark:not([data-theme="custom"]) .mobile-sidebar-sheet [role="dialog"] {
+    background-image: linear-gradient(180deg, rgb(107 22 237 / 0.09), transparent 520px);
+    border-right-color: rgb(163 145 255 / 0.10);
+    --color-nav-text: oklch(80% 0.02 300);
+    --color-nav-muted: oklch(58% 0.04 300);
+}
+
+/* Same color as the top of the sidebar gradient, so the brand and sidebar read as one surface. */
+html.dark:not([data-theme="custom"]) .app-topbar-brand {
+    background-image: linear-gradient(rgb(107 22 237 / 0.09), rgb(107 22 237 / 0.09));
+    border-right-color: rgb(163 145 255 / 0.10);
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search {
+    background-color: rgb(163 145 255 / 0.06) !important;
+    box-shadow: inset 0 0 0 1px rgb(163 145 255 / 0.10) !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search:hover {
+    background-color: rgb(163 145 255 / 0.10) !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search kbd {
+    border-color: rgb(163 145 255 / 0.18) !important;
+}
+
+/* Group dividers use the lavender sidebar edge: the neutral hairline looks olive on the purple-black sidebar. */
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-nav :is([class~="dark:border-white/[0.06]"], [class~="dark:border-white/[0.07]"], [class~="dark:border-white/[0.08]"]) {
+    border-color: rgb(163 145 255 / 0.10) !important;
+}
+
+/* Admin keeps the neutral tile unless it is the current page. */
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon,
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) .app-sidebar nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon {
+    border-color: rgb(163 145 255 / 0.13);
+    background: rgb(107 22 237 / 0.07);
+    color: #b9adff;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) nav:not(.sidebar-collapsed) .nav-section {
+    color: rgb(163 145 255 / 0.55);
+}
+
+/* Sidebar account menu: the purple tint of the sidebar it opens from. */
+html.dark:not([data-theme="custom"]) .listbox-panel.top-user-menu-panel-sidebar {
+    background: color-mix(in oklab, #6b16ed 10%, var(--coollabs-elevated));
+    border-color: rgb(163 145 255 / 0.22);
+}
+
+html.dark:not([data-theme="custom"]) .top-user-menu-panel-sidebar .listbox-option:hover {
+    background: rgb(163 145 255 / 0.10);
 }
 
 /* Custom theme sidebar. These rules come after the dark sidebar rules above, so they win. */
