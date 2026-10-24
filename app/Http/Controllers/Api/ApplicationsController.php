@@ -152,7 +152,12 @@ class ApplicationsController extends Controller
             $application->settings?->makeHidden(['id', 'application_id', 'created_at', 'updated_at']);
         }
 
-        return serializeApiResponse($application);
+        $payload = serializeApiResponse($application);
+        if ($application instanceof Application && filled(data_get($payload, 'docker_compose'))) {
+            $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $application);
+        }
+
+        return $payload;
     }
 
     /**

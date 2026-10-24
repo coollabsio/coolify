@@ -94,8 +94,12 @@
                 id="customDockerRunOptions" label="Custom Docker options" canGate="update"
                 :canResource="$database" />
             <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override the MySQL configuration used by this container.">
-                <x-forms.textarea label="Custom MySQL configuration" rows="10" id="mysqlConf"
-                    canGate="update" :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Custom MySQL configuration" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.textarea label="Custom MySQL configuration" rows="10" id="mysqlConf"
+                        canGate="update" :canResource="$database" />
+                @endif
             </x-application.settings-subsection>
             <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
                 <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"

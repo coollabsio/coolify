@@ -87,3 +87,25 @@ it('hides locked extra-field passwords from an owner and keeps them on save', fu
 
     expect($this->masterPassword->fresh()->value)->toBe('drizzle-master-secret');
 });
+
+it('hides an extra field that references a locked variable and keeps both on save', function () {
+    $this->masterPassword->update(['value' => '$SERVICE_PASSWORD_64_DRIZZLE']);
+    $lockedTarget = $this->service->environment_variables()->create([
+        'key' => 'SERVICE_PASSWORD_64_DRIZZLE',
+        'value' => 'referenced-locked-secret',
+        'is_shown_once' => true,
+    ]);
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    $component = mountStackForm();
+    expect($component->get('fields')['SERVICE_PASSWORD_DRIZZLE']['value'])->toBeNull()
+        ->and(json_encode($component->snapshot).$component->html())->not->toContain('referenced-locked-secret');
+
+    $component->set('fields.SERVICE_PASSWORD_DRIZZLE.isLocked', false)
+        ->set('fields.SERVICE_PASSWORD_DRIZZLE.value', 'attacker-value')
+        ->call('submit');
+
+    expect($this->masterPassword->fresh()->value)->toBe('$SERVICE_PASSWORD_64_DRIZZLE')
+        ->and($lockedTarget->fresh()->value)->toBe('referenced-locked-secret');
+});

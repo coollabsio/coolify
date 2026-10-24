@@ -96,8 +96,12 @@
                 id="customDockerRunOptions" label="Custom Docker options" canGate="update"
                 :canResource="$database" />
             <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override the PostgreSQL configuration used by this container.">
-                <x-forms.textarea label="Custom PostgreSQL configuration" rows="10" id="postgresConf"
-                    canGate="update" :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Custom PostgreSQL configuration" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.textarea label="Custom PostgreSQL configuration" rows="10" id="postgresConf"
+                        canGate="update" :canResource="$database" />
+                @endif
             </x-application.settings-subsection>
             <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
                 <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
@@ -126,13 +130,18 @@
             @endcan
         </x-slot:actions>
         <div class="divide-y divide-neutral-200 dark:divide-border-subtle">
-            @forelse($initScripts ?? [] as $script)
-                <livewire:project.database.init-script :database="$database" :script="$script"
-                    :wire:key="'init-script-'.md5($script['filename'])" />
-            @empty
-                <x-empty title="No initialization scripts"
-                    description="Add a SQL file to run during the first PostgreSQL initialization." />
-            @endforelse
+            @if ($isPasswordHiddenForMember)
+                <x-empty title="Hidden (only admins can view)"
+                    description="Initialization scripts can contain credentials." />
+            @else
+                @forelse($initScripts ?? [] as $script)
+                    <livewire:project.database.init-script :database="$database" :script="$script"
+                        :wire:key="'init-script-'.md5($script['filename'])" />
+                @empty
+                    <x-empty title="No initialization scripts"
+                        description="Add a SQL file to run during the first PostgreSQL initialization." />
+                @endforelse
+            @endif
         </div>
     </x-application.settings-section>
 </div>

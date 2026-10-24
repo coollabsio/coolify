@@ -237,7 +237,19 @@ class DatabasesController extends Controller
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        return serializeApiResponse($database);
+        $payload = serializeApiResponse($database);
+
+        // A locked password variable is never shown again, also not inside the connection URLs.
+        if (request()->attributes->get('can_read_sensitive', false) === true
+            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
+            foreach (['internal_db_url', 'external_db_url'] as $key) {
+                if ($payload->has($key)) {
+                    $payload->put($key, null);
+                }
+            }
+        }
+
+        return $payload;
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void

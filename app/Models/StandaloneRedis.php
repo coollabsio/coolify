@@ -415,6 +415,15 @@ class StandaloneRedis extends BaseModel
     }
 
     /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->runtimeEnvironmentVariable('REDIS_PASSWORD')?->isLockedForLogs();
+    }
+
+    /**
      * The server password for connection URLs. A remote secret is not fetched here, so the URL
      * shows its reference instead of a stale or wrong password.
      */

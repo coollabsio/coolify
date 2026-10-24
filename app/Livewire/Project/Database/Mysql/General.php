@@ -159,7 +159,7 @@ class General extends Component
             $this->mysqlUser = $this->database->mysql_user;
             $this->mysqlPassword = $canSeeCredentials ? $this->database->mysql_password : '';
             $this->mysqlDatabase = $this->database->mysql_database;
-            $this->mysqlConf = $this->database->mysql_conf;
+            $this->mysqlConf = $canSeeCredentials ? $this->database->mysql_conf : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;

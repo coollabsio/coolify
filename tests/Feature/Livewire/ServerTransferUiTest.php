@@ -144,6 +144,28 @@ test('transfer to another instance runs in a queued job', function () {
     expect(data_get($this->server->fresh()->server_metadata, 'migration.status'))->toBe('running');
 });
 
+test('a team admin cannot start a transfer, because it sends every secret to the target', function () {
+    Queue::fake();
+    Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => []])]);
+    $admin = User::factory()->create();
+    $this->team->members()->attach($admin->id, ['role' => 'admin']);
+    $this->actingAs($admin);
+
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->set('targetUrl', 'https://8.8.8.8')
+        ->set('targetToken', 'target-token')
+        ->call('migrateServer')
+        ->assertSet('targetToken', '');
+
+    Queue::assertNotPushed(MigrateServerToInstanceJob::class);
+    expect(data_get($this->server->fresh()->server_metadata, 'migration'))->toBeNull();
+});
+
+test('the transfer confirmation says that locked secrets are sent to the target', function () {
+    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('every environment variable value, also locked ones');
+});
+
 test('transfer page shows the error of a failed transfer', function () {
     $this->server->forceFill(['server_metadata' => ['migration' => [
         'status' => 'failed',

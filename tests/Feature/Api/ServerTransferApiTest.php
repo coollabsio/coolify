@@ -506,6 +506,24 @@ describe('POST /api/v1/servers/{uuid}/migrate', function () {
             ->assertJsonPath('migration.target_url', 'https://8.8.8.8');
     });
 
+    test('rejects a team admin, because a transfer sends every secret to the target', function () {
+        Queue::fake();
+        Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => []])]);
+        $admin = User::factory()->create();
+        $this->team->members()->attach($admin->id, ['role' => 'admin']);
+        $adminToken = $admin->createToken('admin-sensitive', ['*', 'read:sensitive'], teamId: $this->team->id)->plainTextToken;
+
+        $this->withHeaders(transferHeaders($adminToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/migrate", [
+                'target_url' => 'https://8.8.8.8',
+                'target_token' => 'target-token',
+            ])
+            ->assertForbidden();
+
+        Queue::assertNothingPushed();
+        expect(data_get($this->server->fresh()->server_metadata, 'migration'))->toBeNull();
+    });
+
     test('rejects a target without https', function () {
         Queue::fake();
 

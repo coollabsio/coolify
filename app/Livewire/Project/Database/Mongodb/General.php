@@ -146,9 +146,9 @@ class General extends Component
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->mongoConf = $this->database->mongo_conf;
-            $this->mongoInitdbRootUsername = $this->database->mongo_initdb_root_username;
             $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->mongoConf = $canSeeCredentials ? $this->database->mongo_conf : null;
+            $this->mongoInitdbRootUsername = $this->database->mongo_initdb_root_username;
             $this->mongoInitdbRootPassword = $canSeeCredentials ? $this->database->mongo_initdb_root_password : '';
             $this->mongoInitdbDatabase = $this->database->mongo_initdb_database;
             $this->image = $this->database->image;

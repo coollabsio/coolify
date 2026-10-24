@@ -407,6 +407,33 @@ it('describes added unlocked environment variables with their value', function (
         ->and(json_encode($diff->toArray()))->toContain('new-secret');
 });
 
+it('hides the old value of an environment variable that was locked after the deployment and then deleted', function () {
+    $application = snapshotTestApplication();
+    $variable = EnvironmentVariable::create([
+        'key' => 'API_TOKEN',
+        'value' => 'deployed-secret',
+        'is_buildtime' => false,
+        'is_runtime' => true,
+        'is_preview' => false,
+        'is_shown_once' => false,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+    markSnapshotTestApplicationDeployed($application->refresh());
+
+    $variable->update(['is_shown_once' => true]);
+    $variable->delete();
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('label', 'API_TOKEN');
+
+    expect($change)->not->toBeNull()
+        ->and($change['type'])->toBe('removed')
+        ->and($change['sensitive'])->toBeTrue()
+        ->and($change['old_display_value'])->toBe('••••••••')
+        ->and($change['new_display_value'])->toBe('-')
+        ->and(json_encode($diff->toArray()))->not->toContain('deployed-secret');
+});
+
 it('does not report Docker Compose preview volumes as pending production changes', function () {
     $application = snapshotTestApplication(['build_pack' => 'dockercompose']);
     $previewVolume = fn (): LocalPersistentVolume => LocalPersistentVolume::create([
