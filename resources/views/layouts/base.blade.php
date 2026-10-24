@@ -138,6 +138,48 @@
             root.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(localStorage.themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
         };
+        // Shows the tooltip at the same time on every chart of a group while one of them is hovered.
+        // ApexCharts' own chart.group needs equal widths and equal x ranges, so it does not
+        // fit side-by-side cards. Instead, replay the hover as a mouse event at the matching x.
+        // Charts can join a group from separate scripts; charts removed from the page drop out.
+        window.chartSyncGroups ??= {};
+        window.syncChartTooltips = (group, charts) => {
+            const grid = chart => chart.el.querySelector('.apexcharts-grid')?.getBoundingClientRect();
+            const hoverArea = chart => chart.el.querySelector('.apexcharts-svg');
+            const hide = chart => hoverArea(chart)?.dispatchEvent(new MouseEvent('mouseout', { clientX: 0, clientY: -1 }));
+            const peers = source => window.chartSyncGroups[group].filter(chart => chart !== source && chart.el.isConnected);
+
+            window.chartSyncGroups[group] = [
+                ...(window.chartSyncGroups[group] ?? []).filter(chart => chart.el.isConnected),
+                ...charts,
+            ];
+
+            charts.forEach(source => {
+                source.el.addEventListener('mousemove', event => {
+                    // Replayed events are untrusted; skip them so charts do not echo each other.
+                    const rect = grid(source);
+                    const { minX, maxX } = source.w.globals;
+                    if (!event.isTrusted || !rect?.width || !(maxX > minX)) {
+                        return;
+                    }
+                    const timestamp = minX + (event.clientX - rect.left) / rect.width * (maxX - minX);
+
+                    peers(source).forEach(chart => {
+                        const target = grid(chart);
+                        const { minX: min, maxX: max } = chart.w.globals;
+                        if (!target?.width || !(max > min) || timestamp < min || timestamp > max) {
+                            hide(chart);
+                            return;
+                        }
+                        hoverArea(chart)?.dispatchEvent(new MouseEvent('mousemove', {
+                            clientX: target.left + (timestamp - min) / (max - min) * target.width,
+                            clientY: target.top + target.height / 2,
+                        }));
+                    });
+                });
+                source.el.addEventListener('mouseleave', () => peers(source).forEach(hide));
+            });
+        };
         // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
         window.themeControls = () => ({
             theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),

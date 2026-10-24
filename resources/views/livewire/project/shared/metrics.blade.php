@@ -170,6 +170,7 @@
                     });
 
                     cpuChart.render();
+                    window.syncChartTooltips('{!! $chartId !!}', [cpuChart]);
 
                     Livewire.on('refreshChartData-{!! $chartId !!}-cpu', chartData => {
                         checkTheme();
@@ -326,6 +327,7 @@
                     });
 
                     memoryChart.render();
+                    window.syncChartTooltips('{!! $chartId !!}', [memoryChart]);
 
                     Livewire.on('refreshChartData-{!! $chartId !!}-memory', chartData => {
                         checkTheme();

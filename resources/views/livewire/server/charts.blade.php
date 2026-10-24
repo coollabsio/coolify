@@ -220,11 +220,12 @@
                                         dataPointIndex,
                                         w
                                     }) => {
-                                        const value = series[seriesIndex][dataPointIndex];
                                         const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                        const values = series.map((values, index) => values[dataPointIndex] === undefined ? '' :
+                                            `<div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames?.[index] ?? name}: <span class="apexcharts-tooltip-value-bold">${formatter(values[dataPointIndex])}</span></div>`);
 
                                         return `<div class="apexcharts-tooltip-custom">
-                                            <div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames?.[seriesIndex] ?? name}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>
+                                            ${values.join('')}
                                             <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
                                             <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
                                         </div>`;
@@ -268,6 +269,7 @@
                                 diskChart.render();
                                 networkChart.render();
                                 loadChart.render();
+                                window.syncChartTooltips('{!! $chartId !!}-metrics', [cpuChart, memoryChart, networkChart, loadChart, diskChart]);
                             });
 
                             Livewire.on('refreshChartData-{!! $chartId !!}-metrics', chartData => {

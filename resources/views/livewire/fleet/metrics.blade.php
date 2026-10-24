@@ -433,6 +433,7 @@ $serverListboxOptions = array_merge(
                     chart.render();
                     charts[key] = chart;
                 }
+                window.syncChartTooltips('{!! $chartId !!}', Object.values(charts));
 
                 const renderLegends = specs => {
                     for (const [key, spec] of Object.entries(specs)) {
