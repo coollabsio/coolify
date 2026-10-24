@@ -210,6 +210,25 @@ class DatabasesController extends Controller
         return $backup->unsetRelation('s3Storages')->unsetRelation('s3');
     }
 
+    /**
+     * Build the create response; the connection URLs contain credentials, so they need sensitive read access.
+     *
+     * @return array{uuid: string, internal_db_url?: string, external_db_url?: string}
+     */
+    private function createdDatabasePayload(Request $request, $database): array
+    {
+        $payload = ['uuid' => $database->uuid];
+        if ($request->attributes->get('can_read_sensitive', false) !== true) {
+            return $payload;
+        }
+        $payload['internal_db_url'] = $database->internal_db_url;
+        if ($database->is_public && $database->public_port) {
+            $payload['external_db_url'] = $database->external_db_url;
+        }
+
+        return $payload;
+    }
+
     private function removeSensitiveData($database, bool $loadNestedServerSecrets = false)
     {
         $database->makeHidden([
@@ -2318,13 +2337,7 @@ class DatabasesController extends Controller
                 $this->attachTagsToResource($database, $tagNames, $teamId);
             }
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2390,13 +2403,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2462,13 +2469,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2531,13 +2532,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2633,13 +2628,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2682,13 +2671,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2753,13 +2736,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
