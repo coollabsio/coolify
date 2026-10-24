@@ -65,15 +65,6 @@
         init() {
             if (typeof ApexCharts === 'undefined') { return; }
             const o = this.opts(@js($initial), @js($initialCategories));
-            const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                hour12: false,
-                timeZoneName: 'short',
-            });
-            const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                hour12: false,
-                timeZone: 'UTC',
-                timeZoneName: 'short',
-            });
             const formatValue = value => {
                 if (value === null || value === undefined) { return '—'; }
                 const fmt = @js($format);
@@ -110,8 +101,7 @@
                         const timestamp = w.globals.seriesX[0][dataPointIndex];
                         return `<div class='apexcharts-tooltip-custom'>
                             <div class='apexcharts-tooltip-custom-value'>${@js($label)}: <span class='apexcharts-tooltip-value-bold'>${formatValue(value)}</span></div>
-                            <div class='apexcharts-tooltip-custom-title'>Your time: ${formatLocalTimestamp(timestamp)}</div>
-                            <div class='apexcharts-tooltip-custom-title'>UTC: ${formatUtcTimestamp(timestamp)}</div>
+                            ${window.chartTooltipTime(timestamp, { seconds: false })}
                         </div>`;
                     },
                 },

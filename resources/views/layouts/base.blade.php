@@ -138,6 +138,25 @@
             root.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(localStorage.themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
         };
+        // Time lines for chart tooltips. By default only the browser time zone is shown;
+        // the "Chart times" option on the Appearance page adds the UTC time.
+        window.chartTooltipTime = (timestamp, { seconds = true } = {}) => {
+            const format = (timeZone) => new Date(timestamp).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                ...(seconds ? { second: '2-digit' } : {}),
+                hourCycle: 'h23',
+                ...(timeZone ? { timeZone, timeZoneName: 'short' } : {}),
+            });
+            if (localStorage.getItem('chartTimes') !== 'utc') {
+                return `<div class="apexcharts-tooltip-custom-title">${format()}</div>`;
+            }
+            const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            return `<div class="apexcharts-tooltip-custom-title">Your time: ${format(localTimeZone)}</div>
+                <div class="apexcharts-tooltip-custom-title">UTC: ${format('UTC')}</div>`;
+        };
         // Shows the tooltip at the same time on every chart of a group while one of them is hovered.
         // ApexCharts' own chart.group needs equal widths and equal x ranges, so it does not
         // fit side-by-side cards. Instead, replay the hover as a mouse event at the matching x.
@@ -187,6 +206,7 @@
             pageWidth: localStorage.getItem('pageWidth') || 'centered',
             navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
             navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
+            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
             presets: window.customThemePresets,
             // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
             dialogOpen: false,
@@ -271,6 +291,10 @@
                 this.navItems = style;
                 localStorage.setItem('navItems', style);
                 document.documentElement.dataset.navItems = style;
+            },
+            setChartTimes(value) {
+                this.chartTimes = value;
+                localStorage.setItem('chartTimes', value);
             },
         });
 

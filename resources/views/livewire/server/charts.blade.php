@@ -125,15 +125,6 @@
                             };
                             const formatRate = value => `${formatBytes(value)}/s`;
 
-                            const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                                hour12: false,
-                                timeZoneName: 'short',
-                            });
-                            const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                                hour12: false,
-                                timeZone: 'UTC',
-                                timeZoneName: 'short',
-                            });
 
                             const chartOptions = (name, color, loadingText, formatter = formatPercent) => ({
                                 chart: {
@@ -226,8 +217,7 @@
 
                                         return `<div class="apexcharts-tooltip-custom">
                                             ${values.join('')}
-                                            <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
-                                            <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
+                                            ${window.chartTooltipTime(timestamp)}
                                         </div>`;
                                     },
                                 },

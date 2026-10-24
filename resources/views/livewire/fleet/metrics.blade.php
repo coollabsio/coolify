@@ -380,9 +380,6 @@ $serverListboxOptions = array_merge(
                 };
                 const fmtRate = v => `${fmtBytes(v)}/s`;
 
-                const fmtLocalTime = ts => new Date(ts).toLocaleString(undefined, { hour12: false, timeZoneName: 'short' });
-                const fmtUtcTime = ts => new Date(ts).toLocaleString(undefined, { hour12: false, timeZone: 'UTC', timeZoneName: 'short' });
-
                 // The app strips the default ApexCharts tooltip background (utilities.css), so
                 // every chart must render its own `apexcharts-tooltip-custom` markup.
                 const customTooltip = formatter => ({ series, dataPointIndex, w }) => {
@@ -394,8 +391,7 @@ $serverListboxOptions = array_merge(
                         rows += `<div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames[i]}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>`;
                     });
                     return `<div class="apexcharts-tooltip-custom">${rows}
-                        <div class="apexcharts-tooltip-custom-title">Your time: ${fmtLocalTime(timestamp)}</div>
-                        <div class="apexcharts-tooltip-custom-title">UTC: ${fmtUtcTime(timestamp)}</div>
+                        ${window.chartTooltipTime(timestamp)}
                     </div>`;
                 };
 
