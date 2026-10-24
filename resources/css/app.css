@@ -6159,8 +6159,15 @@ html.dark .canvas-zoom-max {
    tab strip, and settings rail float as framed panels over a dotted backdrop,
    like the canvas islands. Set on <html> by applyStoredTheme() from
    localStorage.navStyle; the default style keeps edge-to-edge bars. */
+/* Width of the collapsed desktop sidebar and the brand cell above it. */
+html {
+    --sidebar-collapsed-w: 4rem;
+}
+
 @media (min-width: 1024px) {
     html[data-nav-style="floating"] {
+        /* The framed rail needs no edge spacing: 1px border + 5px padding + 40px content. */
+        --sidebar-collapsed-w: 3.25rem;
         --floating-gap: 0.5rem;
         --floating-radius: 8px;
         --floating-line: oklch(0% 0 0 / 0.09);
@@ -6231,6 +6238,18 @@ html.dark .canvas-zoom-max {
 
     html[data-nav-style="floating"] .app-sidebar > div > nav > .sidebar-footer {
         border-radius: 0 0 var(--floating-radius) var(--floating-radius);
+    }
+
+    html[data-nav-style="floating"] .app-sidebar nav.sidebar-collapsed {
+        padding-left: 0.3125rem;
+        padding-right: 0.3125rem;
+    }
+
+    html[data-nav-style="floating"] .app-sidebar nav.sidebar-collapsed > .sidebar-footer {
+        margin-left: -0.3125rem;
+        margin-right: -0.3125rem;
+        padding-left: 0.3125rem;
+        padding-right: 0.3125rem;
     }
 
     html[data-nav-style="floating"] .app-main {
