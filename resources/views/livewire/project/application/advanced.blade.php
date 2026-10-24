@@ -126,6 +126,13 @@
                         helper="How long to wait for graceful shutdown during rolling updates, manual stops, and restarts. Applies to all containers for this application. Saved automatically. Default: {{ DEFAULT_STOP_GRACE_PERIOD_SECONDS }} seconds. Range: {{ MIN_STOP_GRACE_PERIOD_SECONDS }}-{{ MAX_STOP_GRACE_PERIOD_SECONDS }} seconds (1 hour)."
                         min="{{ MIN_STOP_GRACE_PERIOD_SECONDS }}" max="{{ MAX_STOP_GRACE_PERIOD_SECONDS }}"
                         canGate="update" :canResource="$application" />
+                    @if ($application->build_pack !== 'dockercompose')
+                        <x-forms.input type="number" min="0" max="{{ MAX_ROLLING_UPDATE_DRAIN_SECONDS }}"
+                            id="rollingUpdateDrainSeconds" label="Rolling update drain time (seconds)"
+                            wire:change="saveRollingUpdateDrainSeconds"
+                            helper="How long to wait after the new container is healthy before the old containers stop during a rolling update. The proxy needs this time to send traffic to the new container. Saved automatically. Default: {{ DEFAULT_ROLLING_UPDATE_DRAIN_SECONDS }} seconds. Range: 0-{{ MAX_ROLLING_UPDATE_DRAIN_SECONDS }} seconds. Set to 0 to turn off the wait."
+                            canGate="update" :canResource="$application" />
+                    @endif
                     <x-forms.input type="number" min="0" id="maxRestartCount" label="Max restart count"
                         wire:change="saveMaxRestartCount"
                         helper="Maximum number of restarts before Coolify automatically stops the application and sends a notification. Saved automatically. Set to 0 to disable the limit."

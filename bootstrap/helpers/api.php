@@ -228,6 +228,7 @@ function sharedDataApplications(?Application $application = null): array
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
+        'rolling_update_drain_seconds' => 'integer|min:0|max:'.MAX_ROLLING_UPDATE_DRAIN_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => ValidationPatterns::applicationDomainRules(),
@@ -490,6 +491,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
     $request->offsetUnset('stop_grace_period');
+    $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');

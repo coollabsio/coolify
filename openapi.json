@@ -914,6 +914,12 @@
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
                                     },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
+                                    },
                                     "docker_images_to_keep": {
                                         "type": "integer",
                                         "minimum": 0,
@@ -1565,6 +1571,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -2218,6 +2230,12 @@
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
                                     },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
+                                    },
                                     "docker_images_to_keep": {
                                         "type": "integer",
                                         "minimum": 0,
@@ -2760,6 +2778,12 @@
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
                                     },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
+                                    },
                                     "docker_images_to_keep": {
                                         "type": "integer",
                                         "minimum": 0,
@@ -3281,6 +3305,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -4066,6 +4096,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -25104,6 +25140,10 @@
                     "stop_grace_period": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "rolling_update_drain_seconds": {
+                        "type": "integer",
+                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off."
                     }
                 },
                 "type": "object"

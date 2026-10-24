@@ -55,6 +55,7 @@ function recommendedApplicationSettingsPayload(): array
         'is_env_sorting_enabled' => true,
         'is_pr_deployments_public_enabled' => true,
         'stop_grace_period' => 45,
+        'rolling_update_drain_seconds' => 12,
         'docker_images_to_keep' => 7,
         'is_gzip_enabled' => false,
         'is_stripprefix_enabled' => false,
@@ -343,6 +344,18 @@ test('validates stop grace period bounds', function (int $stopGracePeriod) {
 })->with([
     'below minimum' => 0,
     'above maximum' => 3601,
+]);
+
+test('validates rolling update drain time bounds', function (int $seconds) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'rolling_update_drain_seconds' => $seconds,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('rolling_update_drain_seconds');
+})->with([
+    'below minimum' => -1,
+    'above maximum' => 301,
 ]);
 
 test('validates Docker image retention bounds', function (int $dockerImagesToKeep) {
