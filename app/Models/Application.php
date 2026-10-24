@@ -1931,6 +1931,7 @@ class Application extends BaseModel
                     'commands' => $this->gitCommandsAsShellCommand($commands),
                     'branch' => $branch,
                     'fullRepoUrl' => $fullRepoUrl,
+                    'git' => 'git'.(isset($gitConfigOption) ? " {$gitConfigOption}" : ''),
                 ];
             }
 
@@ -1981,6 +1982,7 @@ class Application extends BaseModel
                         'commands' => $commands->implode(' && '),
                         'branch' => $branch,
                         'fullRepoUrl' => $fullRepoUrl,
+                        'git' => "git {$gitConfigOption}",
                     ];
                 }
 
@@ -2021,6 +2023,7 @@ class Application extends BaseModel
                         'commands' => $commands,
                         'branch' => $branch,
                         'fullRepoUrl' => $fullRepoUrl,
+                        'git' => "{$gitlabGitSshCommand} git",
                     ];
                 }
 
@@ -2039,6 +2042,7 @@ class Application extends BaseModel
                     'commands' => $this->gitCommandsAsShellCommand($commands),
                     'branch' => $branch,
                     'fullRepoUrl' => $fullRepoUrl,
+                    'git' => 'git',
                 ];
             }
         }
@@ -2096,6 +2100,7 @@ class Application extends BaseModel
                 'commands' => $commands,
                 'branch' => $branch,
                 'fullRepoUrl' => $fullRepoUrl,
+                'git' => "{$deployKeyGitSshCommand} git",
             ];
         }
         if ($this->deploymentType() === 'other') {
@@ -2142,6 +2147,7 @@ class Application extends BaseModel
                 'commands' => $this->gitCommandsAsShellCommand($commands),
                 'branch' => $branch,
                 'fullRepoUrl' => $fullRepoUrl,
+                'git' => 'git',
             ];
         }
     }
@@ -2246,9 +2252,22 @@ class Application extends BaseModel
      */
     public function serverCheckoutCommand(string $uuid, string $checkoutDir): string
     {
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
+        return $this->serverCheckout($uuid, $checkoutDir)['command'];
+    }
 
-        return str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand));
+    /**
+     * The clone command of serverCheckoutCommand(), and the git command with the same credentials for later steps.
+     *
+     * @return array{command: string, git: string}
+     */
+    private function serverCheckout(string $uuid, string $checkoutDir): array
+    {
+        ['commands' => $cloneCommand, 'git' => $git] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
+
+        return [
+            'command' => str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand)),
+            'git' => $git,
+        ];
     }
 
     /**
@@ -2260,7 +2279,7 @@ class Application extends BaseModel
     private function composeFileReadCommands(string $uuid, string $gitVersion): Collection
     {
         $checkoutDir = "/tmp/{$uuid}/checkout";
-        $cloneCommand = $this->serverCheckoutCommand($uuid, $checkoutDir);
+        ['command' => $cloneCommand, 'git' => $git] = $this->serverCheckout($uuid, $checkoutDir);
         $workdir = rtrim($this->base_directory, '/');
         $fileList = collect([".{$workdir}{$this->docker_compose_location}"]);
         $composeFilePath = escapeshellarg(".{$workdir}{$this->docker_compose_location}");
@@ -2294,8 +2313,32 @@ class Application extends BaseModel
             $isConeMode ? 'git sparse-checkout init --cone' : 'git sparse-checkout init',
             "git sparse-checkout set {$fileList->implode(' ')}",
             'git read-tree -mu HEAD',
+            ...$this->composeFileSubmoduleCommands($git, ltrim("{$workdir}{$this->docker_compose_location}", '/')),
             $readComposeFile,
         ]);
+    }
+
+    /**
+     * A sparse checkout has no submodules. If the Compose file is inside a submodule, this clones only that
+     * submodule, with the credentials of the clone.
+     *
+     * @return list<string>
+     */
+    private function composeFileSubmoduleCommands(string $git, string $composeFile): array
+    {
+        if (! $this->settings?->is_git_submodules_enabled) {
+            return [];
+        }
+
+        $depthFlag = $this->settings->is_git_shallow_clone_enabled ? ' --depth=1' : '';
+        $escapedComposeFile = escapeshellarg($composeFile);
+
+        // One sh -c line: the non-root sudo parser cannot change commands inside a loop.
+        return ['sh -c '.escapeshellarg(
+            'git ls-files -s | while read -r mode object stage path; do '
+            ."if [ \"\$mode\" = 160000 ]; then case {$escapedComposeFile} in \"\$path\"/*) "
+            ."{$git} submodule update --init --recursive{$depthFlag} -- \"\$path\" >/dev/null || exit 1 ;; esac; fi; done"
+        )];
     }
 
     /**
