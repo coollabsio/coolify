@@ -458,7 +458,7 @@ class ResourceOperations extends Component
 
             $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
-                return $this->addError('destination_id', 'Destination not found.');
+                return $this->dispatch('error', 'Destination not found.');
             }
 
             $result = MigrateResourceToDestination::run(
@@ -503,7 +503,7 @@ class ResourceOperations extends Component
         } catch (ValidationException $e) {
             $message = collect($e->errors())->flatten()->first() ?? $e->getMessage();
 
-            return $this->addError('destination_id', $message);
+            return $this->dispatch('error', $message);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

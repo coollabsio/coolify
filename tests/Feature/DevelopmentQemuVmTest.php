@@ -145,6 +145,21 @@ it('seeds one predefined root qemu server', function () {
         ->and(Server::query()->where('uuid', 'like', 'development-qemu-%')->count())->toBe(1);
 });
 
+it('seeds a new qemu server with the caddy proxy', function () {
+    $server = SeedDevelopmentQemuServer::run('debian-root');
+
+    expect($server->proxyType())->toBe('CADDY')
+        ->and($server->proxy->get('status'))->toBe('exited');
+});
+
+it('keeps the proxy of an existing server when it seeds a qemu vm for it', function () {
+    $this->seed(ServerSeeder::class);
+
+    $server = SeedDevelopmentQemuServer::run('ubuntu-root', true, true);
+
+    expect($server->proxyType())->toBe('TRAEFIK');
+});
+
 it('uses a qemu vm as the localhost sentinel without changing its identity', function () {
     $this->seed(ServerSeeder::class);
 
