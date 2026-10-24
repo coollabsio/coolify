@@ -80,8 +80,8 @@ class Previews extends Component
     private function syncDockerTags(): void
     {
         $this->previewDockerTags = [];
-        foreach ($this->application->previews as $key => $preview) {
-            $this->previewDockerTags[$key] = $preview->docker_registry_image_tag;
+        foreach ($this->application->previews as $preview) {
+            $this->previewDockerTags[$preview->id] = $preview->docker_registry_image_tag;
         }
     }
 
@@ -118,16 +118,8 @@ class Previews extends Component
                 throw new \Exception('Preview not found');
             }
 
-            $previewKey = $this->application->previews->search(function ($item) use ($preview_id) {
-                return $item->id == $preview_id;
-            });
-
-            if ($previewKey === false) {
-                throw new \Exception('Preview not found');
-            }
-
-            $this->validateOnly("previewDockerTags.{$previewKey}");
-            $preview->docker_registry_image_tag = $this->previewDockerTags[$previewKey] ?? null;
+            $this->validateOnly("previewDockerTags.{$preview->id}");
+            $preview->docker_registry_image_tag = $this->previewDockerTags[$preview->id] ?? null;
             $changedFields = $preview->isDirty('docker_registry_image_tag') ? ['docker_registry_image_tag'] : [];
             $preview->save();
             if ($changedFields !== []) {
@@ -385,6 +377,7 @@ class Previews extends Component
 
             // Refresh the application and its previews relationship to reflect the soft delete
             $this->application->load('previews');
+            unset($this->previewDockerTags[$preview->id]);
             $this->dispatch('update_links');
             $this->dispatch('success', 'Preview deletion started. It may take a few moments to complete.');
         } catch (\Throwable $e) {

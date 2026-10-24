@@ -246,6 +246,32 @@ test('API hides locked env value with root token', function () {
     expect($locked)->not->toHaveKey('real_value');
 });
 
+test('API hides the value of the automatic preview copy of a locked env', function () {
+    session(['currentTeam' => $this->team]);
+    $token = $this->admin->createToken('admin-sensitive-preview', ['read', 'read:sensitive', 'write']);
+    $headers = ['Authorization' => 'Bearer '.$token->plainTextToken];
+
+    $this->withHeaders($headers)->postJson("/api/v1/applications/{$this->application->uuid}/envs", [
+        'key' => 'API_LOCKED_VAR',
+        'value' => 'api-secret-value',
+        'is_shown_once' => true,
+    ])->assertCreated();
+
+    $envs = collect($this->withHeaders($headers)
+        ->getJson("/api/v1/applications/{$this->application->uuid}/envs")
+        ->assertOk()
+        ->json())
+        ->where('key', 'API_LOCKED_VAR');
+
+    expect($envs)->toHaveCount(2);
+    expect($envs->pluck('is_preview')->sort()->values()->all())->toBe([false, true]);
+    $envs->each(function (array $env) {
+        expect($env['is_shown_once'])->toBeTruthy();
+        expect($env)->not->toHaveKey('value');
+        expect($env)->not->toHaveKey('real_value');
+    });
+});
+
 // --- API: member role hides env values ---
 
 test('API hides env values for member even with read:sensitive token', function () {

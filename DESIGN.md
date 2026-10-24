@@ -36,10 +36,10 @@ change.
   pure neutral gray.
 - **One accent.** Coolify purple in both themes (`#6b16ed`, hover `#7317ff`,
   pressed `#5a12c7`, depth `#4a0fa3`, light text and icons `#a391ff`). Yellow
-  is only for real warnings. The dark sidebar, including the logo cell, is
-  quiet neutral near-black (`#0d0d0d`), so the content keeps the focus; only
-  the current item's tile is purple. The dark command palette has a
-  light purple tint. The page canvas stays neutral.
+  is only for real warnings. In the default dark theme the sidebar, including
+  the logo cell, is purple-black (`#120e1a`) with a faint brand wash. Users
+  who want a neutral sidebar can pick a custom theme. The dark command palette
+  has a light purple tint. The page canvas stays neutral.
 - **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
   No em dashes in UI copy.
 
@@ -127,7 +127,7 @@ follow the theme.
     --ui-accent-edge: #4a0fa3;
     --ui-accent-fg: #ffffff;
     --ui-accent-light: #a391ff;
-    --ui-sidebar: #0d0d0d;
+    --ui-sidebar: #120e1a;
     --ui-card: #121212;
     --ui-success: oklch(72.27% 0.192 149.58);
     --ui-warning: oklch(88.13% 0.1507 91.7);
@@ -144,8 +144,9 @@ Rules for the tokens:
 - Floating surfaces (menus, popovers, tooltips, modals) must be opaque. Use
   `--ui-menu-bg`, never a translucent value, or the content behind shows
   through.
-- Keep the page canvas, cards, menus, logs, and the sidebar pure neutral
-  (chroma 0). The dark command palette is the only tinted surface.
+- Keep the page canvas, cards, menus, and logs pure neutral (chroma 0). The
+  default dark sidebar, the logo cell above it, and the dark command palette
+  are the tinted surfaces.
 - **Dark lightness level.** The canvas is at 14.48% and the header panel at
   19.13%. To
   change the level, move every dark surface and border token by the same
@@ -220,11 +221,12 @@ Class names below are examples. Keep the values and structure.
   well is `--ui-panel` (`#121212`). Tables use the same pair: the darker mix
   for the header row and `--ui-panel` for the rows.
 - In light mode the sidebar is the canvas color and has a 1px
-  `--ui-chrome-border` right edge. In dark mode the sidebar column, including
-  the logo cell, is a flat neutral `#0d0d0d` (one step above the `#0a0a0a`
-  canvas) with a faint `rgb(255 255 255 / 0.06)` right edge. Do not add a
-  brand tint or wash to the sidebar: a colored sidebar competes with the
-  content for attention.
+  `--ui-chrome-border` right edge. In the default dark theme the sidebar
+  column, including the logo cell, is `#120e1a` with a faint lavender right
+  edge (`rgb(163 145 255 / 0.10)`). The nav has a brand-purple wash that
+  starts at 9% and fades out; the logo cell has a flat 9% wash, so the two
+  read as one surface. A custom theme gets the neutral sidebar rules and its
+  own sidebar color.
 - The top bar matches the canvas. It has no bottom border at rest. After the
   page scrolls under it, dark mode draws a neutral hairline
   (`rgb(255 255 255 / 0.06)`), a translucent bar, blur, and a soft shadow.
@@ -388,6 +390,7 @@ Class names below are examples. Keep the values and structure.
 
 - Use one primary button per area. Other actions are neutral buttons.
 - Destructive actions use the error color for text and focus ring.
+- With Appearance → Style → Flat, all buttons lose the raised edge.
 
 ### Menus, listboxes, and popovers
 
@@ -679,12 +682,13 @@ lift off the content:
   mode, top-level card wells and table rows use `--color-card` (`#121212`),
   not the top bar.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
-  use the canvas color in light mode. In dark mode they use `--color-sidebar`
-  (`#0d0d0d`), flat and neutral, with a `rgb(255 255 255 / 0.06)` right edge.
-  Inactive icon tiles, Search, the account button in the footer, and section
-  labels (10.5px uppercase mono, `--color-nav-muted`) are neutral gray. Only
-  the current item's tile uses the brand purple, so the sidebar does not
-  compete with the content. Chevrons are hidden until the row is hovered,
+  use the canvas color in light mode. In the default dark theme they use
+  `--color-sidebar` (`#120e1a`): a vertical brand wash on the nav, a flat 9%
+  wash on the logo cell, and a lavender right edge. Inactive icon tiles,
+  Search, the account button, and section labels (10.5px uppercase mono) are
+  lavender. The Admin icon stays neutral. These purple rules use
+  `html.dark:not([data-theme="custom"])`; a custom theme keeps neutral tiles,
+  Search, and account button. Chevrons are hidden until the row is hovered,
   focused, or current. Do not use `dark:border-white/[0.06]` on these chrome
   edges; a global rule forces that utility to the solid hairline grey.
 
@@ -695,9 +699,9 @@ value. The dark ladder is `--color-app` 10, `--color-panel` 20,
 `--coollabs-recessed` 34 (sRGB, r=g=b), which reads as distinct surfaces.
 
 Temperature: the page canvas, cards, menus, listboxes, modals, and logs stay
-**pure neutral gray** (r=g=b). Do not tint those. The dark sidebar
-(`--color-sidebar`, `#0d0d0d`) is neutral too. The dark command palette is the
-only exception: it carries a faint brand-purple wash. A custom theme derives all
+**pure neutral gray** (r=g=b). Do not tint those. The exceptions are the
+default dark sidebar (`--color-sidebar`, `#120e1a`, with a brand-purple wash)
+and the dark command palette (a faint brand-purple wash). A custom theme derives all
 of these surfaces from its background and sidebar colors (see the token rules in P2). The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
 The only intentional color is the purple brand accent. Yellow is for warnings.

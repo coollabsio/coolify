@@ -89,10 +89,14 @@
                 id="customDockerRunOptions" label="Custom Docker options" canGate="update"
                 :canResource="$database" />
             <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override only the KeyDB directives you need. All other defaults remain active.">
-                <x-forms.textarea
-                    helper="<a target='_blank' class='underline' href='https://raw.githubusercontent.com/Snapchat/KeyDB/unstable/keydb.conf'>View the default KeyDB configuration</a>"
-                    label="Custom KeyDB configuration" rows="10" id="keydbConf" canGate="update"
-                    :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Custom KeyDB configuration" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.textarea
+                        helper="<a target='_blank' class='underline' href='https://raw.githubusercontent.com/Snapchat/KeyDB/unstable/keydb.conf'>View the default KeyDB configuration</a>"
+                        label="Custom KeyDB configuration" rows="10" id="keydbConf" canGate="update"
+                        :canResource="$database" />
+                @endif
             </x-application.settings-subsection>
             <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
                 <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"

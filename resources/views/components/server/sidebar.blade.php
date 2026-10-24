@@ -227,11 +227,11 @@
 @endphp
 
 @php
-    // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
+    // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
     registerMainNavContext(0, 'Servers', 'Back to the main menu');
 @endphp
 
-{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
+{{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.
      Both copies keep their own warning state (proxy, Sentinel). --}}
 @foreach (['page', 'main-nav'] as $placement)
 @if ($placement === 'main-nav')
@@ -261,7 +261,7 @@
         scheduleSentinelExpiry($event.detail.expiresInMilliseconds);
     ">
 @else
-<aside class="application-settings-navigation in-main-nav min-w-0 xl:self-start"
+<aside class="application-settings-navigation in-main-nav min-w-0"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedServerMenuItems, $serverRouteParameters)) }}"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
@@ -288,14 +288,10 @@
     ">
 @endif
     <nav aria-label="Server configuration sections"
-        @class([
-            'grid gap-0.5',
-            'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
-            'grid-cols-1' => $placement === 'main-nav',
-        ])>
+        class="grid grid-cols-1 gap-0.5">
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
-                <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
+                <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
                     aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
@@ -332,7 +328,7 @@
                     @endif
                 </a>
                 @if ($menuItem['active'] && isset($menuItem['children']))
-                    <div class="col-span-full grid grid-cols-2 gap-0.5 border-l border-neutral-200 pl-2 sm:grid-cols-3 xl:grid-cols-1 dark:border-white/[0.08]">
+                    <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
                         @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
                             <a wire:key="{{ $placement }}-server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
                                 @class(['menu-item', 'menu-item-active' => $child['active']])

@@ -129,6 +129,9 @@ class Show extends Component
 
     public function mount()
     {
+        if ($this->composeInfo !== null && ! (auth()->user()?->can('update', $this->resource) ?? false)) {
+            $this->composeInfo['default'] = null;
+        }
         $this->syncData();
         if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;

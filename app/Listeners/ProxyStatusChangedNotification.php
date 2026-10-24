@@ -24,6 +24,7 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
         if (is_null($server)) {
             return;
         }
+        $server->markProxyTransitionFinished();
         $proxyContainerName = 'coolify-proxy';
         $status = getContainerStatus($server, $proxyContainerName);
         $server->proxy->set('status', $status);

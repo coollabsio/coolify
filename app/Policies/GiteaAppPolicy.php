@@ -36,6 +36,14 @@ class GiteaAppPolicy
     }
 
     /**
+     * Determine whether the user can make a Gitea App available to every team on the instance.
+     */
+    public function makeSystemWide(User $user): bool
+    {
+        return $user->canAccessSystemResources();
+    }
+
+    /**
      * Determine whether the user can update the model.
      */
     public function update(User $user, GiteaApp $giteaApp): bool

@@ -1426,7 +1426,10 @@ class Service extends BaseModel
                     if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
                         $searchValue = str($field['value'])->after('$')->value;
                         $newValue = $this->environment_variables()->where('key', $searchValue)->first();
-                        if ($newValue) {
+                        if ($newValue?->is_shown_once) {
+                            $field['value'] = null;
+                            $field['isLocked'] = true;
+                        } elseif ($newValue) {
                             $field['value'] = $newValue->value;
                         }
                     }

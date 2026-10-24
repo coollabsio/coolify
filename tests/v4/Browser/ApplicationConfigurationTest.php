@@ -97,6 +97,59 @@ it('keeps the PR suffix listbox visible outside the volumes table while scrollin
         ->screenshot(filename: 'application-persistent-storage-pr-suffix-listbox');
 });
 
+it('floats the backup target listbox over the new backup modal instead of scrolling it', function () {
+    foreach (range(1, 6) as $index) {
+        LocalPersistentVolume::create([
+            'uuid' => (string) new Cuid2,
+            'name' => $this->application->uuid.'-data-'.$index,
+            'mount_path' => '/data/'.$index,
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+    }
+
+    loginAndSkipBoarding();
+
+    $url = applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ).'/backups';
+
+    $page = visit($url);
+    $page->assertSee('Storage backups')
+        ->click('button:visible:has-text("Add")')
+        ->assertSee('New scheduled backup')
+        ->assertScript(<<<'JS'
+            () => {
+                document.querySelector('#targetKey-trigger').click();
+
+                return true;
+            }
+            JS)
+        ->wait(0.3)
+        ->assertScript(<<<'JS'
+            () => {
+                const panel = document.querySelector('#targetKey-panel');
+                const modalBody = panel.closest('.application-settings-section-body');
+                const panelRect = panel.getBoundingClientRect();
+
+                return modalBody.scrollHeight <= modalBody.clientHeight
+                    && panelRect.bottom > modalBody.getBoundingClientRect().bottom
+                    && panelRect.bottom <= window.innerHeight
+                    && document.elementFromPoint(panelRect.left + 10, panelRect.bottom - 10)?.closest('#targetKey-panel') === panel;
+            }
+            JS)
+        ->screenshot(filename: 'application-backup-target-listbox');
+
+    selectListboxOption($page, 'targetKey', 'Volume: '.$this->application->uuid.'-data-6');
+
+    $page->assertScript(<<<'JS'
+        () => document.querySelector('#targetKey-trigger').textContent.includes('-data-6')
+        JS)
+        ->assertNoJavaScriptErrors();
+});
+
 it('saves application name description and ports from the general form', function () {
     loginAndSkipBoarding();
 

@@ -1,13 +1,18 @@
 <?php
 
+use App\Actions\Proxy\CheckProxy;
+use App\Actions\Proxy\StartProxy;
+use App\Events\ProxyStatusChanged;
 use App\Events\ServiceChecked;
 use App\Jobs\PushServerUpdateJob;
 use App\Jobs\ServerStorageCheckJob;
+use App\Listeners\ProxyStatusChangedNotification;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -171,6 +176,49 @@ it('marks a stale proxy status as running when sentinel reports a running proxy'
     (new PushServerUpdateJob($server, $data))->handle();
 
     expect($server->fresh()->proxy->get('status'))->toBe('running');
+});
+
+it('does not start a second proxy while a proxy restart runs', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->proxy->set('status', 'restarting');
+    $server->save();
+    $server->markProxyTransitionStarted();
+
+    CheckProxy::shouldNotRun();
+    StartProxy::shouldNotRun();
+    Event::fake([ServiceChecked::class]);
+
+    (new PushServerUpdateJob($server, ['containers' => [], 'filesystem_usage_root' => ['used_percentage' => 10]]))->handle();
+
+    expect($server->fresh()->proxy->get('status'))->toBe('restarting');
+});
+
+it('starts a missing proxy when no proxy restart runs', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    CheckProxy::shouldRun()->once()->andReturn(true);
+    StartProxy::shouldRun()->once();
+    Event::fake([ServiceChecked::class]);
+
+    (new PushServerUpdateJob($server, ['containers' => [], 'filesystem_usage_root' => ['used_percentage' => 10]]))->handle();
+});
+
+it('ends the proxy restart when the proxy status listener runs', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->markProxyTransitionStarted();
+    Process::fake();
+
+    (new ProxyStatusChangedNotification)->handle(new ProxyStatusChanged($server->id));
+
+    expect($server->isProxyTransitionInProgress())->toBeFalse();
 });
 
 it('uses default queue for PushServerUpdateJob', function () {

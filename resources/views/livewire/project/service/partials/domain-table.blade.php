@@ -45,14 +45,15 @@
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
             $publicUrl = getFqdnWithoutPort($row['url']);
-            $isNoindexed = $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']);
+            $serviceApplication = $service->applications->firstWhere('id', $row['service_application_id']);
+            $isNoindexed = $serviceApplication?->isDomainNoindexed($row['url']);
             $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
             $directionLabel = match ($rowDirection) {
                 'www' => 'Redirect to www',
                 'non-www' => 'Redirect to non-www',
                 default => 'Both www and non-www',
             };
-            $faviconUrl = $isSuggested ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
+            $faviconUrl = $isSuggested || $serviceApplication?->hasProxyBasicAuth() ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
             $editingParts = \App\Support\DomainUrlParts::split($row['url']);
             if ($row['has_port_override'] ?? false) {

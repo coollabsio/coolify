@@ -675,7 +675,7 @@ class GlobalSearch extends Component
                 'search_text' => 'destinations docker networks',
             ],
             [
-                'name' => 'Security',
+                'name' => 'Keys & Tokens',
                 'type' => 'navigation',
                 'description' => 'Manage private keys and API tokens',
                 'link' => route('security.private-key.index'),

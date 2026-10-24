@@ -80,7 +80,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::updating(function ($team) {
-            if (auth()->user()?->isMember()) {
+            if (auth()->user()?->roleInTeam($team->id) === 'member') {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });

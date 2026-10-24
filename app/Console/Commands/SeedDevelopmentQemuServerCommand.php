@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Development\InstallDevelopmentGpuDriver;
 use App\Actions\Development\SeedDevelopmentQemuServer;
 use App\Actions\Development\StartDevelopmentInstanceDatabase;
 use Illuminate\Console\Command;
@@ -9,7 +10,7 @@ use Throwable;
 
 class SeedDevelopmentQemuServerCommand extends Command
 {
-    protected $signature = 'dev:qemu:seed {profile : Profile key from config/development-qemu.php} {--keep-others} {--as-localhost : Use the VM for the localhost server (id 0)} {--ip= : SSH host instead of the profile IP} {--port=22 : SSH port}';
+    protected $signature = 'dev:qemu:seed {profile : Profile key from config/development-qemu.php} {--keep-others} {--as-localhost : Use the VM for the localhost server (id 0)} {--ip= : SSH host instead of the profile IP} {--port=22 : SSH port} {--gpu : Install the NVIDIA driver and container toolkit in the VM}';
 
     protected $description = 'Seed one development QEMU server in the Coolify database';
 
@@ -31,6 +32,12 @@ class SeedDevelopmentQemuServerCommand extends Command
             } catch (Throwable $e) {
                 $this->warn("Could not start the coolify-db container for instance backups: {$e->getMessage()}");
             }
+        }
+
+        if ($this->option('gpu')) {
+            $this->info('Installing the NVIDIA driver and container toolkit. This can take some minutes.');
+            InstallDevelopmentGpuDriver::run($server);
+            $this->info('The GPU is ready.');
         }
 
         return self::SUCCESS;

@@ -17,6 +17,10 @@
     @param ?string  $event     Livewire event to listen on for updates (optional)
     @param ?string  $key       payload key holding the numeric array (required with $event)
     @param ?array   $categories initial x-axis timestamps (defaults to $series buckets)
+
+    The hover tooltip renders in a fixed element on <body>, below the spark, so it does not
+    cover the line. The stat tile grids clip overflow, so ApexCharts' own tooltip element
+    (inside the chart) cannot sit below the chart.
 --}}
 @php
     $initial = $initial ?? [];
@@ -43,6 +47,23 @@
     x-data="{
         chart: null,
         refreshCleanup: null,
+        tip: null,
+        hideTipHandler: null,
+        showTip(html, pointX) {
+            if (!this.tip) {
+                this.tip = document.createElement('div');
+                this.tip.className = 'pointer-events-none fixed z-50';
+                document.body.appendChild(this.tip);
+            }
+            this.tip.innerHTML = html;
+            this.tip.hidden = false;
+            const rect = $el.getBoundingClientRect();
+            const width = this.tip.offsetWidth;
+            const left = Math.min(Math.max(rect.left + pointX - width / 2, 8), window.innerWidth - width - 8);
+            this.tip.style.left = `${left}px`;
+            this.tip.style.top = `${rect.bottom + 8}px`;
+        },
+        hideTip() { if (this.tip) { this.tip.hidden = true; } },
         accent() { const c = @js($color); if (c) { return c; } return getComputedStyle(document.documentElement).getPropertyValue('{{ $colorVar }}').trim() || '#3b82f6'; },
         muted() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-geo-empty').trim() || 'rgba(128,128,128,0.45)'; },
         isFlat(a) { return !Array.isArray(a) || a.length === 0 || a.every(v => !Number(v)); },
@@ -65,15 +86,6 @@
         init() {
             if (typeof ApexCharts === 'undefined') { return; }
             const o = this.opts(@js($initial), @js($initialCategories));
-            const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                hour12: false,
-                timeZoneName: 'short',
-            });
-            const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                hour12: false,
-                timeZone: 'UTC',
-                timeZoneName: 'short',
-            });
             const formatValue = value => {
                 if (value === null || value === undefined) { return '—'; }
                 const fmt = @js($format);
@@ -108,15 +120,18 @@
                     custom: ({ series, dataPointIndex, w }) => {
                         const value = series[0][dataPointIndex];
                         const timestamp = w.globals.seriesX[0][dataPointIndex];
-                        return `<div class='apexcharts-tooltip-custom'>
+                        this.showTip(`<div class='apexcharts-tooltip-custom'>
                             <div class='apexcharts-tooltip-custom-value'>${@js($label)}: <span class='apexcharts-tooltip-value-bold'>${formatValue(value)}</span></div>
-                            <div class='apexcharts-tooltip-custom-title'>Your time: ${formatLocalTimestamp(timestamp)}</div>
-                            <div class='apexcharts-tooltip-custom-title'>UTC: ${formatUtcTimestamp(timestamp)}</div>
-                        </div>`;
+                            ${window.chartTooltipTime(timestamp, { seconds: false })}
+                        </div>`, w.globals.translateX + w.globals.seriesXvalues[0][dataPointIndex]);
+                        return '';
                     },
                 },
             });
             this.chart.render();
+            this.hideTipHandler = () => this.hideTip();
+            $el.addEventListener('mouseleave', this.hideTipHandler);
+            window.addEventListener('scroll', this.hideTipHandler, { capture: true, passive: true });
             const event = @js($event);
             const key = @js($key);
             if (event && key) {
@@ -133,5 +148,7 @@
         destroy() {
             this.refreshCleanup?.();
             this.chart?.destroy();
+            this.tip?.remove();
+            window.removeEventListener('scroll', this.hideTipHandler, { capture: true });
         },
     }"></div>

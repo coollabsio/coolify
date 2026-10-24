@@ -23,6 +23,7 @@
 # redis +4, vite +5, mailpit +6/+7, minio +8/+9.
 #
 # Env: COOLIFY_DEV_SERVER_BACKEND=auto|lima|testing-host, COOLIFY_DEV_KVM_PROFILE=<profile>
+#      COOLIFY_DEV_GPU=1 passes the host NVIDIA GPU through to the KVM VM (ubuntu-root only)
 #
 # Side by side: COOLIFY_DEV_INSTANCE=<name> COOLIFY_DEV_SIDE_BY_SIDE=1 starts a second instance of
 # this checkout without stopping the other ones (for example a transfer target, see
@@ -402,6 +403,8 @@ start_backend() {
     local host="${DEV_BIND_ADDRESS:-127.0.0.1}"
     [[ "$host" == 0.0.0.0 ]] && host=127.0.0.1
     echo "Using KVM profile: $profile"
+    local gpu=()
+    [[ "${COOLIFY_DEV_GPU:-}" == 1 ]] && gpu=(--gpu)
     # Use this instance database and encryption key, without a stale environment or config cache.
     # Send logs to stderr to avoid root-owned files in storage/logs.
     APP_ENV=local APP_CONFIG_CACHE="$ROOT/bootstrap/cache/dev-qemu-$$.php" \
@@ -412,7 +415,7 @@ start_backend() {
       DEVELOPMENT_QEMU_SLOT="$(env_value "$instance" DEVELOPMENT_QEMU_SLOT)" \
       DEVELOPMENT_QEMU_DOCKER_NETWORK="$(project_name "$instance")" \
       DEVELOPMENT_QEMU_COOLIFY_CONTAINER="$(project_name "$instance")" \
-      "${privileged[@]}" php artisan dev:qemu "$profile" --as-localhost
+      "${privileged[@]}" php artisan dev:qemu "$profile" --as-localhost "${gpu[@]}"
   elif [[ "$backend" == "lima" ]]; then
     echo "Using Lima profile: $profile"
     start_lima_vm

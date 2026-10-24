@@ -114,13 +114,14 @@
                         <div>
                             <x-modal-confirmation title="Transfer this server?" submitAction="migrateServer"
                                 :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Transfer server"
+                                warningMessage="All secrets of this server and its resources are sent to the target instance: private keys, credentials, and every environment variable value, also locked ones. Continue only if you trust that instance."
                                 :actions="[
                                     'Coolify first checks this server, the target instance, and the token. If a check fails, nothing is changed.',
                                     'The server will be transferred to the target instance.',
                                     'Automations for this server will be disabled on this instance.',
                                 ]">
                                 <x-slot:trigger>
-                                    <x-forms.button canGate="update" :canResource="$server" wire:loading.attr="disabled"
+                                    <x-forms.button canGate="transfer" :canResource="$server" wire:loading.attr="disabled"
                                         wire:target="migrateServer">
                                         <span wire:loading.remove wire:target="migrateServer">Transfer server</span>
                                         <span wire:loading wire:target="migrateServer">Running checks…</span>

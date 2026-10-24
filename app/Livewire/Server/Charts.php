@@ -22,7 +22,7 @@ class Charts extends Component
 
     public int $interval = 5;
 
-    public bool $poll = true;
+    public bool $live = true;
 
     #[Validate(['required', 'integer', 'min:1'])]
     public int|string $sentinelMetricsRefreshRateSeconds;
@@ -89,16 +89,6 @@ class Charts extends Component
         }
     }
 
-    public function pollData()
-    {
-        if ($this->poll || $this->interval <= 10) {
-            $this->loadData();
-            if ($this->interval > 10) {
-                $this->poll = false;
-            }
-        }
-    }
-
     public function loadData()
     {
         try {
@@ -157,9 +147,21 @@ class Charts extends Component
 
     public function setInterval()
     {
-        if ($this->interval <= 10) {
-            $this->poll = true;
-        }
         $this->loadData();
+    }
+
+    public function updatedLive(): void
+    {
+        if ($this->live) {
+            $this->loadData();
+        }
+    }
+
+    /**
+     * Short ranges refresh every 5 seconds; longer ranges change slowly, so they refresh every minute.
+     */
+    public function pollSeconds(): int
+    {
+        return $this->interval <= 60 ? 5 : 60;
     }
 }

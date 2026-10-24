@@ -1536,6 +1536,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->rolling_update();
 
                 return true;
+            } elseif ($configurationDiff->isLegacyFallback()) {
+                $this->application_deployment_queue->addLogEntry('The last deployment stored no configuration snapshot. Rebuilding image.');
             } else {
                 $this->application_deployment_queue->addLogEntry('Build configuration changed. Rebuilding image.');
             }
@@ -2707,6 +2709,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('Rolling update started.');
                     $this->start_by_compose_file();
                     $this->health_check();
+                    $this->wait_for_proxy_to_route_new_container();
                     $this->stop_running_container();
                     $this->application_deployment_queue->addLogEntry('Rolling update completed.');
                 }
@@ -2714,6 +2717,46 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * The proxy adds the new container some seconds after it is healthy. Stopping the old
+     * container before that sends requests to a closed port (502), see #8627.
+     */
+    private function wait_for_proxy_to_route_new_container(): void
+    {
+        $seconds = $this->application->settings->rollingUpdateDrainSeconds();
+        if ($seconds === 0 || ! $this->newVersionIsHealthy()) {
+            return;
+        }
+        $oldContainerNames = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id)
+            ->filter(fn ($container) => data_get($container, 'State') === 'running' && data_get($container, 'Names') !== $this->container_name)
+            ->pluck('Names');
+        if ($oldContainerNames->isEmpty()) {
+            return;
+        }
+        if ($this->proxyLabelsChanged($oldContainerNames)) {
+            // The proxy drops a route that two containers define differently until the old one stops.
+            $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop without waiting.');
+
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry("Waiting {$seconds} seconds for the proxy to send traffic to the new container.");
+        Sleep::for($seconds)->seconds();
+    }
+
+    private function proxyLabelsChanged(Collection $oldContainerNames): bool
+    {
+        $containerNames = $oldContainerNames->prepend($this->container_name)->map(fn (string $name) => escapeshellarg($name))->implode(' ');
+        $output = instant_remote_process(["docker inspect --format '{{json .Config.Labels}}' {$containerNames}"], $this->server, false);
+
+        return collect(preg_split('/\R/', trim((string) $output)))
+            ->map(fn (string $labels) => collect(json_decode($labels, true) ?: [])
+                ->filter(fn ($value, string $key) => str_starts_with($key, 'traefik.') || str_starts_with($key, 'caddy'))
+                ->sortKeys()
+                ->all())
+            ->unique()
+            ->count() > 1;
     }
 
     private function health_check()

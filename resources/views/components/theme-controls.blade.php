@@ -163,14 +163,14 @@
     <section class="application-settings-section">
         <div class="application-settings-section-header">
             <div>
-                <h2>Navigation items</h2>
-                <p>Choose how the main sidebar shows its items.</p>
+                <h2>Style</h2>
+                <p>Choose how buttons and sidebar items look.</p>
             </div>
         </div>
         <div class="application-settings-section-body grid gap-3 sm:grid-cols-2">
             @foreach ([
-                ['value' => '3d', 'label' => '3D', 'description' => 'Each icon sits in a raised tile that lifts on hover.'],
-                ['value' => 'flat', 'label' => 'Flat', 'description' => 'Plain rows with a highlight for the current page.'],
+                ['value' => '3d', 'label' => '3D', 'description' => 'Buttons and sidebar icons sit on a raised edge that lifts on hover.'],
+                ['value' => 'flat', 'label' => 'Flat', 'description' => 'No raised edges. Sidebar items are plain rows with a highlight for the current page.'],
             ] as $option)
                 <button type="button" @click="setNavItems('{{ $option['value'] }}')"
                     class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
@@ -200,6 +200,44 @@
                             <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
                             <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
                                 x-show="navItems === '{{ $option['value'] }}'" x-cloak />
+                        </div>
+                        <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
+                    </div>
+                </button>
+            @endforeach
+        </div>
+    </section>
+
+    <section class="application-settings-section">
+        <div class="application-settings-section-header">
+            <div>
+                <h2>Chart times</h2>
+                <p>Choose which times chart tooltips show.</p>
+            </div>
+        </div>
+        <div class="application-settings-section-body grid gap-3 sm:grid-cols-2">
+            @foreach ([
+                ['value' => 'local', 'label' => 'Your time', 'description' => 'Show the time in the time zone of this browser.', 'lines' => ['Oct 24, 12:30:33']],
+                ['value' => 'utc', 'label' => 'Your time and UTC', 'description' => 'Also show the UTC time. Use it to compare with server logs.', 'lines' => ['Your time: Oct 24, 12:30:33 GMT+2', 'UTC: Oct 24, 10:30:33 UTC']],
+            ] as $option)
+                <button type="button" @click="setChartTimes('{{ $option['value'] }}')"
+                    class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
+                    :class="chartTimes === '{{ $option['value'] }}'
+                        ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
+                        : ''">
+                    <div class="flex h-20 items-center justify-center border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">
+                        <div class="rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-[11px] leading-4 dark:border-white/15 dark:bg-[#181818]">
+                            <div class="text-black dark:text-fg">CPU: <span class="font-semibold">4.3%</span></div>
+                            @foreach ($option['lines'] as $line)
+                                <div class="text-neutral-500 dark:text-fg-dim">{{ $line }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="p-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
+                            <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
+                                x-show="chartTimes === '{{ $option['value'] }}'" x-cloak />
                         </div>
                         <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
                     </div>

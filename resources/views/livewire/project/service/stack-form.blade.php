@@ -77,7 +77,9 @@
                                 <x-helper helper="Variable name: {{ $serviceName }}" />
                             @endif
                         </div>
-                        @if ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
+                        @if (data_get($field, 'isLocked'))
+                            <x-forms.input disabled value="Locked (shown once)" />
+                        @elseif ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
                             <x-forms.input disabled value="Hidden (only admins can view)" />
                         @else
                             <x-forms.input canGate="update" :canResource="$service"

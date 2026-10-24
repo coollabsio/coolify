@@ -134,6 +134,7 @@ class EnvironmentVariable extends BaseModel
                             'is_runtime' => $environment_variable->is_runtime ?? false,
                             'is_buildtime' => $environment_variable->is_buildtime ?? false,
                             'is_required' => $environment_variable->is_required ?? false,
+                            'is_shown_once' => $environment_variable->is_shown_once ?? false,
                             'comment' => $environment_variable->comment,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,

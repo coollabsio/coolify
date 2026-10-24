@@ -102,7 +102,7 @@ class Transfer extends Component
     public function migrateServer(ServerTransferMigrator $migrator): void
     {
         try {
-            $this->authorize('update', $this->server);
+            $this->authorize('transfer', $this->server);
             if ($this->isLocalhost) {
                 throw new \RuntimeException('The Coolify host (localhost) cannot be transferred.');
             }

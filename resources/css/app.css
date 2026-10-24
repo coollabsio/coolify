@@ -214,6 +214,22 @@
     box-shadow: none;
 }
 
+/* Appearance → Style → Flat (data-nav-items="flat") removes the raised edge
+   everywhere, not only in the sidebar: the depth color goes transparent (the
+   !important beats the theme overrides of the variable) and the press uses
+   the scale feedback of .icon-button instead of the lift and sink. */
+html[data-nav-items="flat"] :is(.button, .split-action-main, .split-action-caret, .toast-icon) {
+    --button-depth-color: transparent !important;
+}
+
+html[data-nav-items="flat"] :is(.button, .split-action-main, .split-action-caret):not(:disabled):hover {
+    transform: none;
+}
+
+html[data-nav-items="flat"] :is(.button, .split-action-main, .split-action-caret):not(:disabled):active {
+    transform: scale(0.97);
+}
+
 /* Focus border/ring on any form control should ease, not snap. The accent
    focus indicator is a border-color and/or box-shadow (ring) change, which the
    utilities' `transition-colors` did not fully animate. Target the elements
@@ -585,6 +601,35 @@ tr td:first-child {
 /* Same durable clearance for copy-affordance inputs (utility pr-* loses to settings CSS). */
 .input.input-with-copy-button {
     padding-right: 2.5rem;
+}
+
+/* Number fields use the brand −/+ stepper (components/forms/input) instead of the native spinner. */
+.input.input-with-stepper {
+    padding-right: 4.25rem;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.input.input-with-stepper::-webkit-outer-spin-button,
+.input.input-with-stepper::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.number-stepper {
+    @apply absolute inset-y-px right-px flex;
+}
+
+.number-stepper button {
+    @apply flex w-8 cursor-pointer items-center justify-center border-l border-neutral-200 text-neutral-500 transition-colors last:rounded-r-[5px] hover:bg-neutral-100 hover:text-black active:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-white dark:active:bg-white/[0.1];
+}
+
+.number-stepper button svg {
+    @apply transition-transform duration-150 ease-out;
+}
+
+.number-stepper button:active:not(:disabled) svg {
+    @apply scale-75;
 }
 
 /* Room for both the peek eye and the copy button on maskable read-only fields. */
@@ -1303,6 +1348,9 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Card/table edge ring. Crisped from 93.5% (1.17:1 on canvas, invisible)
        to 85.5% (1.51:1) so surfaces read as bordered cards, not flat fills. */
     --coollabs-hairline: oklch(85.5% 0 0);
+    /* Row and section separators inside cards. Softer than the card edge.
+       Translucent, so it stays visible on any card or theme surface. */
+    --coollabs-divider: oklch(0% 0 0 / 0.04);
     /* Muted labels/titles. Darkened from 55.6% (failed WCAG AA on elevated
        4.46, recessed 4.24, fill 3.76) to 50% so muted text clears 4.5:1 on
        every light surface above white. Dark stays 70.8% (already passes). */
@@ -1319,7 +1367,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Cards sit one step above the #0a0a0a canvas. The top bar uses the canvas,
        not this color. The sidebar uses --color-sidebar. */
     --color-card: #121212;
-    --color-sidebar: #0d0d0d;
+    --color-sidebar: #120e1a;
     /* Dark surface ladder in hex (sRGB), not oklch: oklch lightness compresses
        to near-black below ~15%, so oklch(15%) rendered as sRGB 11 and cards
        could not lift off the content canvas (sRGB 10). These give clear,
@@ -1341,6 +1389,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Kept about 1.6:1 on the canvas so dark cards
        and tables show a visible edge instead of blending into the canvas. */
     --coollabs-hairline: oklch(36% 0 0);
+    --coollabs-divider: oklch(100% 0 0 / 0.045);
     --coollabs-subtle: oklch(70.8% 0 0);
     /* Neutral (was #a8a8b0 / #7a7a84, both cool-tinted). Sidebar text now shares
        the same neutral temperature as the content text, so the sidebar no longer
@@ -1447,6 +1496,7 @@ html[data-theme="custom"] :is(.app-sidebar, .app-topbar-brand, .mobile-sidebar-s
     --coollabs-fill: color-mix(in oklab, var(--t-text) calc(8% + (1 - var(--t-light)) * 4%), var(--t-bg));
     --coollabs-line: color-mix(in oklab, var(--t-text) calc(16% + (1 - var(--t-light)) * 6%), var(--t-bg));
     --coollabs-hairline: color-mix(in oklab, var(--t-text) calc(11% + (1 - var(--t-light)) * 3%), var(--t-bg));
+    --coollabs-divider: color-mix(in oklab, var(--t-text) calc(5% + (1 - var(--t-light)) * 1%), transparent);
     --color-hairline: color-mix(in oklab, var(--t-text) 8%, transparent);
     --color-fg: var(--t-text);
     --color-fg-dim: color-mix(in oklab, var(--t-text) 74%, var(--t-bg));
@@ -1579,6 +1629,16 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
 html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]),
 html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
     border-color: var(--coollabs-line) !important;
+}
+
+/* Row and section separators (one-sided borders and divide-y) use the softer
+   divider token, so lists read as one card instead of a stack of boxes. Card
+   edges (full borders) keep the hairline/line tokens. */
+html:not(.dark) :is([class~="border-b"], [class~="border-t"], [class~="border-y"])[class~="border-neutral-200"],
+html:not(.dark) [class~="divide-neutral-200"] > :not(:last-child),
+.dark :is([class~="border-b"], [class~="border-t"], [class~="border-y"]):is([class~="dark:border-white/[0.06]"], [class~="dark:border-white/[0.07]"], [class~="dark:border-white/[0.08]"]),
+.dark :is([class~="dark:divide-white/[0.06]"], [class~="dark:divide-white/[0.07]"], [class~="dark:divide-white/[0.08]"]) > :not(:last-child) {
+    border-color: var(--coollabs-divider) !important;
 }
 
 html[data-theme="custom"] input:read-only,
@@ -2107,6 +2167,16 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     }
 }
 
+/* A resource menu that the main sidebar (and the mobile drawer) shows instead
+   (navbar #main-nav-context-{depth}). */
+.application-settings-navigation.in-main-nav {
+    display: none;
+}
+
+.application-settings-navigation.in-main-nav ~ * {
+    grid-column: 1 / -1;
+}
+
 @media (min-width: 1280px) {
     /* Fixed like the main sidebar (3rem → bottom); left tracks its width (--sidebar-w).
        Fixed leaves the grid, so the content sibling is pinned to column 2 below. */
@@ -2131,15 +2201,6 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 
     .application-settings-navigation ~ * {
         grid-column: 2;
-    }
-
-    /* A resource menu that the main sidebar shows instead (navbar #main-nav-context-{depth}). */
-    .application-settings-navigation.in-main-nav {
-        display: none;
-    }
-
-    .application-settings-navigation.in-main-nav ~ * {
-        grid-column: 1 / -1;
     }
 
     html:not(.dark) .application-settings-navigation {
@@ -2259,6 +2320,16 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 .application-settings-workspace .input.input-with-copy-and-peek,
 .application-settings-form .input.input-with-copy-and-peek {
     padding-right: 4.25rem;
+}
+
+.application-settings-workspace .input.input-with-stepper,
+.application-settings-form .input.input-with-stepper {
+    padding-right: 4.25rem;
+}
+
+.application-settings-workspace .number-stepper button:last-child,
+.application-settings-form .number-stepper button:last-child {
+    border-radius: 0 7px 7px 0;
 }
 
 .application-settings-workspace .input:focus-visible,
@@ -5767,8 +5838,8 @@ a.command-palette-item:focus-visible {
 /* Navigation items: each sidebar icon sits in a framed 30px tile with the 3D
    depth of .button, like the canvas tool rail. Only the tile reacts; the row
    has no background. Applies to both navigation styles. Appearance →
-   Navigation items → Flat sets data-nav-items="flat" on <html> and turns these
-   rules off, which brings back the plain rows. */
+   Style → Flat sets data-nav-items="flat" on <html> and turns these
+   rules off, which brings back the plain rows (see also the .button rules). */
 html:where(:not([data-nav-items="flat"])) .menu-item:not(.sidebar-toggle) {
     height: 2.25rem;
     padding-left: 0.25rem;
@@ -6250,9 +6321,9 @@ html.dark .canvas-zoom-max {
     }
 }
 
-/* Brand shell (dark): black canvas and top bar, quiet neutral sidebar, scroll hairline.
-   The sidebar stays neutral so the content keeps the focus; only the current item
-   uses the brand purple. Light mode keeps the neutral shell. Floating navigation
+/* Brand shell (dark): black canvas and top bar, sidebar, scroll hairline.
+   The default dark theme tints the sidebar purple (below); a custom theme gets
+   these neutral rules. Light mode keeps the neutral shell. Floating navigation
    keeps its own frame. */
 html.dark .app-sidebar nav.sidebar-nav,
 html.dark .mobile-sidebar-sheet [role="dialog"] {
@@ -6279,20 +6350,20 @@ html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search {
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06) !important;
 }
 
-/* The account button is a .button, which is purple in dark mode; keep it neutral in the sidebar. */
-html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
+/* The account button is a .button, which is purple in dark mode; keep it neutral in a custom theme sidebar. */
+html.dark[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
     --button-depth-color: rgb(255 255 255 / 0.05);
     background-color: rgb(255 255 255 / 0.04);
     border-color: rgb(255 255 255 / 0.08);
     color: var(--color-nav-text);
 }
 
-html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):hover {
+html.dark[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled):hover {
     background-color: rgb(255 255 255 / 0.07);
     border-color: rgb(255 255 255 / 0.12);
 }
 
-html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) svg {
+html.dark[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-footer .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) svg {
     color: var(--color-nav-muted);
 }
 
@@ -6325,6 +6396,62 @@ html.dark .app-sidebar .nav-chevron {
 
 html.dark .app-sidebar .menu-item:not(:hover):not(:focus-visible):not(.menu-item-active) > .nav-chevron {
     opacity: 0;
+}
+
+/* Default dark theme sidebar: purple-black with a faint brand wash and lavender
+   tiles, text, and edges. A custom theme keeps the neutral rules above. */
+html.dark:not([data-theme="custom"]) .app-sidebar nav.sidebar-nav,
+html.dark:not([data-theme="custom"]) .mobile-sidebar-sheet [role="dialog"] {
+    background-image: linear-gradient(180deg, rgb(107 22 237 / 0.09), transparent 520px);
+    border-right-color: rgb(163 145 255 / 0.10);
+    --color-nav-text: oklch(80% 0.02 300);
+    --color-nav-muted: oklch(58% 0.04 300);
+}
+
+/* Same color as the top of the sidebar gradient, so the brand and sidebar read as one surface. */
+html.dark:not([data-theme="custom"]) .app-topbar-brand {
+    background-image: linear-gradient(rgb(107 22 237 / 0.09), rgb(107 22 237 / 0.09));
+    border-right-color: rgb(163 145 255 / 0.10);
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search {
+    background-color: rgb(163 145 255 / 0.06) !important;
+    box-shadow: inset 0 0 0 1px rgb(163 145 255 / 0.10) !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search:hover {
+    background-color: rgb(163 145 255 / 0.10) !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search kbd {
+    border-color: rgb(163 145 255 / 0.18) !important;
+}
+
+/* Group dividers use the lavender sidebar edge: the neutral hairline looks olive on the purple-black sidebar. */
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-nav :is([class~="dark:border-white/[0.06]"], [class~="dark:border-white/[0.07]"], [class~="dark:border-white/[0.08]"]) {
+    border-color: rgb(163 145 255 / 0.10) !important;
+}
+
+/* Admin keeps the neutral tile unless it is the current page. */
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon,
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) .app-sidebar nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon {
+    border-color: rgb(163 145 255 / 0.13);
+    background: rgb(107 22 237 / 0.07);
+    color: #b9adff;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) nav:not(.sidebar-collapsed) .nav-section {
+    color: rgb(163 145 255 / 0.55);
+}
+
+/* Sidebar account menu: the purple tint of the sidebar it opens from. */
+html.dark:not([data-theme="custom"]) .listbox-panel.top-user-menu-panel-sidebar {
+    background: color-mix(in oklab, #6b16ed 10%, var(--coollabs-elevated));
+    border-color: rgb(163 145 255 / 0.22);
+}
+
+html.dark:not([data-theme="custom"]) .top-user-menu-panel-sidebar .listbox-option:hover {
+    background: rgb(163 145 255 / 0.10);
 }
 
 /* Custom theme sidebar. These rules come after the dark sidebar rules above, so they win. */
@@ -6472,15 +6599,15 @@ html.dark .view-toggle {
     border-color: color-mix(in srgb, var(--color-brand-light) 16%, transparent);
 }
 
-html.dark .view-toggle > :is(a, button) {
+html.dark .view-toggle :is(a, button) {
     color: oklch(from var(--color-brand-light) 80% 0.02 h);
 }
 
-html.dark .view-toggle > :is(a, button) svg {
+html.dark .view-toggle :is(a, button) svg {
     color: var(--color-brand-light);
 }
 
-html.dark .view-toggle > :is(a, button):not(.is-selected):hover {
+html.dark .view-toggle :is(a, button):not(.is-selected):hover {
     background-color: color-mix(in srgb, var(--color-brand) 14%, transparent);
     color: #fff;
 }
@@ -6507,8 +6634,9 @@ html.dark .toast-card {
 
 /* Toast icon tile: the 3D depth of the sidebar tiles, tinted with the icon color of the toast type. */
 .toast-icon {
+    --button-depth-color: color-mix(in oklab, currentColor 30%, transparent);
     border: 1px solid color-mix(in oklab, currentColor 22%, transparent);
-    box-shadow: 0 2px 0 color-mix(in oklab, currentColor 30%, transparent);
+    box-shadow: 0 2px 0 var(--button-depth-color);
 }
 
 /* Command palette: the purple brand tint of the dark shell. */
@@ -6661,12 +6789,12 @@ html.dark .project-card-stats-dot {
     }
 }
 
-/* Resource menu in the collapsed main sidebar: icons only. */
-.sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-children, .menu-item > :not(.menu-item-icon)) {
+/* Resource menu in the collapsed desktop sidebar: icons only (the mobile drawer never collapses). */
+.app-sidebar .sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-children, .menu-item > :not(.menu-item-icon)) {
     display: none !important;
 }
 
-.sidebar-collapsed .nav-context-menu .menu-item {
+.app-sidebar .sidebar-collapsed .nav-context-menu .menu-item {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;

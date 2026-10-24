@@ -143,7 +143,7 @@ class Change extends Component
             })->whereUuid($gitea_app_uuid)->firstOrFail();
 
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
-            $this->applications = $this->gitea_app->applications;
+            $this->applications = $this->gitea_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
 
             $settings = instanceSettings();
 
@@ -264,10 +264,18 @@ class Change extends Component
         }
     }
 
+    private function authorizeSystemWideChange(): void
+    {
+        if ($this->isSystemWide && ! $this->gitea_app->is_system_wide) {
+            $this->authorize('makeSystemWide', GiteaApp::class);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->gitea_app);
+            $this->authorizeSystemWideChange();
 
             $this->validate();
 
@@ -283,6 +291,7 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->gitea_app);
+            $this->authorizeSystemWideChange();
 
             $this->validateOnly('isSystemWide');
 

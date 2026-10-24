@@ -73,7 +73,9 @@
 
         </div>
     @else
-        @if ($copyable)
+        @if ($type === 'number')
+            <div class="relative" x-data="numberStepper">
+        @elseif ($copyable)
             <div class="relative">
         @endif
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
@@ -86,7 +88,19 @@
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
-        @if ($copyable)
+        @if ($type === 'number')
+                <div class="number-stepper">
+                    <button type="button" tabindex="-1" aria-label="Decrease" x-on:click="step(-1)"
+                        @disabled($disabled || $readonly)>
+                        <x-reicon name="minus" class="size-3.5" />
+                    </button>
+                    <button type="button" tabindex="-1" aria-label="Increase" x-on:click="step(1)"
+                        @disabled($disabled || $readonly)>
+                        <x-reicon name="plus" class="size-3.5" />
+                    </button>
+                </div>
+            </div>
+        @elseif ($copyable)
                 <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
                     class="absolute top-1/2 right-1 z-10 -translate-y-1/2" />
             </div>

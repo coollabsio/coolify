@@ -30,7 +30,7 @@ class ServerTransferController extends Controller
 
     #[OA\Post(
         summary: 'Migrate server to another Coolify instance',
-        description: 'Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. Follow the progress with GET /servers/{uuid}/transfer. The target URL must use https. Requires read:sensitive and write.',
+        description: 'Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. All secrets of the server, also locked environment variables, are sent to the target. Follow the progress with GET /servers/{uuid}/transfer. The target URL must use https. Requires read:sensitive and write, and the owner role of the server team.',
         path: '/servers/{uuid}/migrate',
         operationId: 'migrate-server-between-instances',
         security: [['bearerAuth' => []]],
@@ -50,7 +50,7 @@ class ServerTransferController extends Controller
         ),
         responses: [
             new OA\Response(response: 202, description: 'Transfer started'),
-            new OA\Response(response: 403, description: 'Missing sensitive permission'),
+            new OA\Response(response: 403, description: 'Missing sensitive permission or not an owner of the server team'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, description: 'Validation or remote import failed'),
         ]
@@ -64,7 +64,7 @@ class ServerTransferController extends Controller
 
         if (! $this->canReadSensitive($request)) {
             return response()->json([
-                'message' => 'Migrating a server requires a token with read:sensitive (or root) ability and an admin/owner team role.',
+                'message' => 'Migrating a server requires a token with read:sensitive (or root) ability and the owner team role.',
             ], 403);
         }
 
@@ -73,7 +73,7 @@ class ServerTransferController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
 
-        $this->authorize('update', $server);
+        $this->authorize('transfer', $server);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {

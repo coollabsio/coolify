@@ -47,15 +47,6 @@
 
         // `24h` buckets are hourly, `7d`/`30d` daily — pick a matching axis/tooltip format.
         const timeFormat = range => (range === '24h' ? 'HH:mm' : 'dd MMM');
-        const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-            hour12: false,
-            timeZoneName: 'short',
-        });
-        const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-            hour12: false,
-            timeZone: 'UTC',
-            timeZoneName: 'short',
-        });
 
         const chart = new ApexCharts(el, {
             chart: {
@@ -108,8 +99,7 @@
 
                     return `<div class="apexcharts-tooltip-custom">
                         <div class="apexcharts-tooltip-custom-value">Requests: <span class="apexcharts-tooltip-value-bold">${requests.toLocaleString()}</span></div>
-                        <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
-                        <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
+                        ${window.chartTooltipTime(timestamp, { seconds: false })}
                     </div>`;
                 },
             },

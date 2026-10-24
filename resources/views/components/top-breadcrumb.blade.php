@@ -259,16 +259,19 @@
     @if ($currentResource)
         <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :items="$resourceItems">
             <x-slot:meta>
-                @if ($currentApplication)
-                    <livewire:project.application.status :application="$currentApplication"
-                        :wire:key="'application-status-'.$currentApplication->uuid" />
-                @elseif ($currentDatabase)
-                    <livewire:project.database.status :database="$currentDatabase"
-                        :wire:key="'database-status-'.$currentDatabase->uuid" />
-                @else
-                    <livewire:project.service.status :service="$currentService"
-                        :wire:key="'service-status-'.$currentService->uuid" />
-                @endif
+                {{-- Below xl, the page heading shows the status. --}}
+                <div class="hidden xl:flex">
+                    @if ($currentApplication)
+                        <livewire:project.application.status :application="$currentApplication"
+                            :wire:key="'application-status-'.$currentApplication->uuid" />
+                    @elseif ($currentDatabase)
+                        <livewire:project.database.status :database="$currentDatabase"
+                            :wire:key="'database-status-'.$currentDatabase->uuid" />
+                    @else
+                        <livewire:project.service.status :service="$currentService"
+                            :wire:key="'service-status-'.$currentService->uuid" />
+                    @endif
+                </div>
             </x-slot:meta>
         </x-breadcrumb-switcher>
     @endif

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
+use App\Actions\Proxy\StartProxy;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
@@ -45,6 +46,8 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             }
             ProxyPortParser::fromConfiguration($configuration);
 
+            $this->server->markProxyTransitionStarted();
+
             // Set status to restarting
             $this->server->proxy->status = 'restarting';
             $this->server->proxy->force_stop = false;
@@ -68,8 +71,12 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             ProxyStatusChangedUI::dispatch($this->server->team_id, $this->activity_id);
 
         } catch (\InvalidArgumentException $e) {
+            $this->server->markProxyTransitionFinished();
+
             return handleError($e);
         } catch (\Throwable $e) {
+            $this->server->markProxyTransitionFinished();
+
             // Set error status
             $this->server->proxy->status = 'error';
             $this->server->save();
@@ -91,9 +98,6 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
     private function buildRestartCommands(string $configuration): array
     {
         $containerName = $this->server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
-        $proxy_path = $this->server->proxyPath();
-        // Absolute paths: a non-root SSH user may not be able to enter the proxy directory (#4255).
-        $compose_file = rtrim($proxy_path, '/').'/docker-compose.yml';
         $stopTimeout = 30;
 
         SaveProxyConfiguration::run($this->server, $configuration);
@@ -127,34 +131,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         ]);
 
         // === START PHASE ===
-        if ($this->server->isSwarmManager()) {
-            $commands = $commands->merge([
-                "echo 'Starting proxy (Swarm mode)...'",
-                "mkdir -p $proxy_path/dynamic",
-                "echo 'Creating required Docker Compose file.'",
-                "echo 'Starting coolify-proxy.'",
-                "docker stack deploy --detach=true -c $compose_file coolify-proxy",
-                "echo 'Successfully started coolify-proxy.'",
-            ]);
-        } else {
-            $caddyfile = 'import /dynamic/*.caddy';
-            $commands = $commands->merge([
-                "echo 'Starting proxy...'",
-                "mkdir -p $proxy_path/dynamic",
-                "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
-                "echo 'Creating required Docker Compose file.'",
-                "echo 'Pulling docker image.'",
-                "docker compose -f $compose_file pull",
-            ]);
-            // Ensure required networks exist BEFORE docker compose up
-            $commands = $commands->merge(ensureProxyNetworksExist($this->server));
-            $commands = $commands->merge([
-                "echo 'Starting coolify-proxy.'",
-                "docker compose -f $compose_file up -d --wait --remove-orphans",
-                "echo 'Successfully started coolify-proxy.'",
-            ]);
-            $commands = $commands->merge(connectProxyToNetworks($this->server));
-        }
+        $commands = $commands->merge(StartProxy::startCommands($this->server));
 
         return $commands->toArray();
     }

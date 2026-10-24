@@ -88,7 +88,7 @@ it('rejects oversized docker compose files loaded from git before parsing', func
     $application->base_directory = '/';
     $application->docker_compose_location = '/docker-compose.yml';
     $application->setRelation('destination', (object) ['server' => $server]);
-    $application->shouldReceive('generateGitImportCommands')->andReturn(['commands' => collect(['git clone example checkout'])]);
+    $application->shouldReceive('generateGitImportCommands')->andReturn(['commands' => collect(['git clone example checkout']), 'git' => 'git']);
     $application->shouldReceive('getGitRemoteStatus')->andReturn(['is_accessible' => true]);
     $application->shouldReceive('save')->once();
 

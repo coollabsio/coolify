@@ -320,6 +320,14 @@ class StandalonePostgresql extends BaseModel
         return 'standalone-postgresql';
     }
 
+    /**
+     * Coolify's own database is the instance sentinel row (id 0). Users can give any database the name "coolify-db".
+     */
+    public function isInstanceDatabase(): bool
+    {
+        return $this->id === 0;
+    }
+
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(

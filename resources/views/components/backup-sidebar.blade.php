@@ -54,7 +54,7 @@
 <x-main-nav-menu :depth="1" :back-label="$parentMenu" :back-title="'Back to the '.strtolower($parentMenu).' menu'"
     data-settings-search-items="{{ json_encode(settingsSearchItems(['Backup' => collect($items)->map(fn (array $item): array => [...$item, 'route' => $routes[$item['key']]])], $parameters)) }}">
     <nav aria-label="Backup settings"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-1 gap-0.5">
         <a class="menu-item" data-page-only {{ wireNavigate() }} href="{{ route($routes['back'], $backParameters) }}">
             <x-reicon name="logout" class="menu-item-icon rotate-180" />
             <span class="menu-item-label">{{ $backLabel }}</span>
@@ -62,7 +62,7 @@
 
         @foreach ($items as $item)
             @if ($item['key'] === 'danger')
-                <div class="col-span-full my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                <div class="col-span-full my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endif
             <a @class([
                 'menu-item',

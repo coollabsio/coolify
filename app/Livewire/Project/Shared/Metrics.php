@@ -16,17 +16,7 @@ class Metrics extends Component
 
     public int $interval = 5;
 
-    public bool $poll = true;
-
-    public function pollData()
-    {
-        if ($this->poll || $this->interval <= 10) {
-            $this->loadData();
-            if ($this->interval > 10) {
-                $this->poll = false;
-            }
-        }
-    }
+    public bool $live = true;
 
     public function loadData()
     {
@@ -47,10 +37,22 @@ class Metrics extends Component
 
     public function setInterval()
     {
-        if ($this->interval <= 10) {
-            $this->poll = true;
-        }
         $this->loadData();
+    }
+
+    public function updatedLive(): void
+    {
+        if ($this->live) {
+            $this->loadData();
+        }
+    }
+
+    /**
+     * Short ranges refresh every 5 seconds; longer ranges change slowly, so they refresh every minute.
+     */
+    public function pollSeconds(): int
+    {
+        return $this->interval <= 60 ? 5 : 60;
     }
 
     public function render()

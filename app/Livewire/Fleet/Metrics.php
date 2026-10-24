@@ -196,9 +196,11 @@ class Metrics extends Component
         $this->loadData();
     }
 
-    public function isLivePollable(): bool
+    public function updatedLive(): void
     {
-        return $this->live && $this->range === '24h';
+        if ($this->live) {
+            $this->loadData();
+        }
     }
 
     /**

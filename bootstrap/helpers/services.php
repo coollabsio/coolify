@@ -25,6 +25,9 @@ function service_logo_urls(mixed $logo): array
     ];
 }
 
+use App\Actions\Service\StartService;
+use App\Actions\Service\StopService;
+use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -32,7 +35,11 @@ use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
@@ -55,7 +62,8 @@ function resource_logo_url(string $name): string
  * the service template, or how the application is built. Null when there is no specific logo.
  *
  * Applications with a domain also get the favicon URL of their first domain. The browser loads it
- * and shows it in place of the logo when it loads. Coolify itself never requests it.
+ * and shows it in place of the logo when it loads. Coolify itself never requests it. Applications
+ * behind HTTP basic auth get no favicon: the request makes the browser ask for the credentials.
  *
  * @return array{src: string, dark: ?string, fallback: ?string, padded: bool, favicon: ?string}|null
  */
@@ -93,7 +101,9 @@ function resource_logo(Model $resource): ?array
             default => $resourceLogo('public-repo'),
         };
 
-        return [...$logo, 'favicon' => resource_favicon_url($resource->fqdn)];
+        $favicon = $resource->is_http_basic_auth_enabled ? null : resource_favicon_url($resource->fqdn);
+
+        return [...$logo, 'favicon' => $favicon];
     }
 
     if (! method_exists($resource, 'type')) {
@@ -662,4 +672,129 @@ function applyServiceApplicationPrerequisites(Service $service): void
             'trace' => $e->getTraceAsString(),
         ]);
     }
+}
+
+/**
+ * Clones a service to a destination. The applications, databases, and volumes of the clone come from parse(),
+ * so their names are the names that the compose file of the clone uses.
+ *
+ * @param  array<string, mixed>  $overrides  Attributes for the new service, for example uuid, name, and environment_id.
+ */
+function clone_service(Service $source, StandaloneDocker|SwarmDocker $destination, array $overrides = [], bool $cloneVolumeData = false): Service
+{
+    $teamId = $source->team()->id;
+    $uuid = $overrides['uuid'] ?? new_public_id();
+
+    $newService = $source->replicate([
+        'id',
+        'created_at',
+        'updated_at',
+    ])->fill([
+        'name' => $source->name.'-clone-'.$uuid,
+        ...$overrides,
+        'uuid' => $uuid,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'server_id' => $destination->server_id,
+    ]);
+    $newService->save();
+
+    foreach ($source->tags as $tag) {
+        $newService->tags()->attach($tag->id);
+    }
+
+    foreach ($source->scheduled_tasks()->get() as $task) {
+        $task->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'uuid' => new_public_id(),
+            'service_id' => $newService->id,
+            'team_id' => $teamId,
+        ])->save();
+    }
+
+    foreach ($source->environment_variables()->get() as $environmentVariable) {
+        $environmentVariable->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'resourceable_id' => $newService->id,
+            'resourceable_type' => $newService->getMorphClass(),
+        ])->save();
+    }
+
+    $source->cloneSecretManagerLinkTo($newService);
+
+    // Service::replicate() does not copy the child rows, so parse() creates them for the clone.
+    $newService->parse();
+    $newService->refresh();
+
+    $sourceApplicationsByName = $source->applications()->get()->keyBy('name');
+    $sourceDatabasesByName = $source->databases()->get()->keyBy('name');
+    $pendingVolumeClones = [];
+
+    foreach ([
+        [$newService->applications()->get(), $sourceApplicationsByName],
+        [$newService->databases()->get(), $sourceDatabasesByName],
+    ] as [$newResources, $sourcesByName]) {
+        foreach ($newResources as $newResource) {
+            $newResource->fill(['status' => 'exited'])->save();
+
+            $sourceResource = $sourcesByName->get($newResource->name);
+            if (! $sourceResource || ! $cloneVolumeData) {
+                continue;
+            }
+
+            $targetVolumesByMount = $newResource->persistentStorages()->get()->keyBy('mount_path');
+            foreach ($sourceResource->persistentStorages()->get() as $sourceVolume) {
+                $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
+                if ($targetVolume) {
+                    $pendingVolumeClones[] = [$sourceVolume->name, $targetVolume];
+                }
+            }
+        }
+    }
+
+    foreach ($newService->databases()->get() as $database) {
+        $sourceDatabase = $sourceDatabasesByName->get($database->name);
+        foreach ($sourceDatabase?->scheduledBackups()->get() ?? [] as $backup) {
+            $newBackup = $backup->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'uuid' => new_public_id(),
+                'database_id' => $database->id,
+                'database_type' => $database->getMorphClass(),
+                'team_id' => $teamId,
+            ]);
+            $newBackup->save();
+            $backup->copyS3StoragesTo($newBackup);
+        }
+    }
+
+    $sourceServer = $source->destination?->server;
+    $targetServer = $newService->destination?->server;
+    if ($pendingVolumeClones !== [] && $sourceServer && $targetServer) {
+        $chain = [
+            function () use ($source) {
+                StopService::run($source);
+            },
+            ...array_map(
+                fn (array $clone) => new VolumeCloneJob($clone[0], $clone[1]->name, $sourceServer, $targetServer, $clone[1]),
+                $pendingVolumeClones,
+            ),
+            function () use ($source) {
+                StartService::run($source);
+            },
+        ];
+
+        // The jobs load the new volume rows, so they must not run before the transaction of the caller commits.
+        DB::afterCommit(fn () => Bus::chain($chain)->onQueue('high')->dispatch());
+    }
+
+    return $newService;
 }

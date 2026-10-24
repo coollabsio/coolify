@@ -4,6 +4,8 @@
     'total' => 0,
     'currentPage' => 1,
     'lastPage' => 1,
+    /** Smallest page size the page-size slot offers */
+    'minPageSize' => 10,
     /** Comma-separated Livewire actions that should show the loading state */
     'wireTarget' => null,
     'firstAction' => null,
@@ -18,9 +20,11 @@
     $buttonClass =
         'flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg';
     $hasLoading = filled($wireTarget);
+    // Keep the footer while a larger page size hides the pages, so the user can change it back.
+    $hidden = isset($pageSize) ? (int) $total <= (int) $minPageSize : (int) $lastPage <= 1;
 @endphp
 
-<footer @if ((int) $lastPage <= 1) hidden @endif {{ $attributes->class('pager flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint') }}>
+<footer @if ($hidden) hidden @endif {{ $attributes->class('pager flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint') }}>
     <div class="flex items-center gap-3">
         <span class="inline-flex h-7 items-center whitespace-nowrap tabular-nums">{{ $from }}–{{ $to }} of {{ $total }}</span>
         @isset($pageSize)

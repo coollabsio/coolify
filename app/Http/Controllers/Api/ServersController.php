@@ -705,6 +705,9 @@ class ServersController extends Controller
                         'server_disk_usage_check_frequency' => ['type' => 'string', 'description' => 'Cron expression for disk usage check frequency.'],
                         'server_disk_usage_notification_interval_hours' => ['type' => 'integer', 'description' => 'Minimum hours between high disk usage notifications (1-720). Default: 24.'],
                         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds (1-300). Default: 10.'],
+                        'wildcard_domain' => ['type' => 'string', 'nullable' => true, 'description' => 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'],
+                        'server_timezone' => ['type' => 'string', 'description' => 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'],
+                        'backup_compression_cpu_percentage' => ['type' => 'integer', 'enum' => [25, 50, 75, 100], 'description' => 'Maximum CPU percentage that backup compression can use. Default: 25.'],
                     ],
                 ),
             ),
@@ -742,7 +745,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled', 'wildcard_domain', 'server_timezone', 'backup_compression_cpu_percentage'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -772,6 +775,13 @@ class ServersController extends Controller
             'server_disk_usage_notification_interval_hours' => 'integer|min:1|max:720',
             'connection_timeout' => 'integer|min:1|max:300',
             'is_terminal_enabled' => 'boolean|nullable',
+            'wildcard_domain' => 'nullable|url',
+            'server_timezone' => ['string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! validate_timezone($value)) {
+                    $fail('The server_timezone must be a valid timezone.');
+                }
+            }],
+            'backup_compression_cpu_percentage' => 'integer|in:25,50,75,100',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
             'name.not_regex' => 'The name must not contain control characters such as new lines.',
@@ -886,9 +896,12 @@ class ServersController extends Controller
             ]);
         }
 
-        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout']);
+        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'server_timezone', 'backup_compression_cpu_percentage']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
+        }
+        if ($request->has('wildcard_domain')) {
+            $server->settings()->update(['wildcard_domain' => $request->input('wildcard_domain')]);
         }
 
         if ($proxyTypeChanged) {

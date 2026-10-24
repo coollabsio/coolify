@@ -67,6 +67,10 @@ class Create extends Component
                 'organization' => 'nullable|string',
             ]);
 
+            if ($this->is_system_wide) {
+                $this->authorize('makeSystemWide', GiteaApp::class);
+            }
+
             $gitea_app = GiteaApp::create([
                 'name' => $this->name,
                 'api_url' => $this->api_url,

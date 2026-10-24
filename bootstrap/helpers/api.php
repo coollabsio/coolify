@@ -204,11 +204,13 @@ function sharedDataApplications(?Application $application = null): array
         'include_source_commit_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
+        'include_coolify_default_variables' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_permanent_redirect_enabled' => 'boolean',
         'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
+        'is_container_label_readonly_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
@@ -226,6 +228,7 @@ function sharedDataApplications(?Application $application = null): array
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
+        'rolling_update_drain_seconds' => 'integer|min:0|max:'.MAX_ROLLING_UPDATE_DRAIN_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => ValidationPatterns::applicationDomainRules(),
@@ -485,13 +488,16 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
     $request->offsetUnset('redact_all_env_values_in_logs');
+    $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
     $request->offsetUnset('stop_grace_period');
+    $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');
     $request->offsetUnset('is_permanent_redirect_enabled');
     $request->offsetUnset('traefik_certificate_resolver');
+    $request->offsetUnset('is_container_label_readonly_enabled');
     $request->offsetUnset('is_raw_compose_deployment_enabled');
     $request->offsetUnset('is_log_drain_enabled');
     $request->offsetUnset('is_gpu_enabled');

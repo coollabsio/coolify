@@ -808,6 +808,11 @@
                                         "type": "string",
                                         "description": "The Dockerfile location in the repository."
                                     },
+                                    "dockerfile_target_build": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The Docker build target (stage) in the Dockerfile."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
@@ -893,6 +898,11 @@
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -903,6 +913,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -926,6 +942,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -1445,6 +1466,11 @@
                                         "type": "string",
                                         "description": "The Dockerfile location in the repository"
                                     },
+                                    "dockerfile_target_build": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The Docker build target (stage) in the Dockerfile."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
@@ -1530,6 +1556,11 @@
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -1540,6 +1571,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -1563,6 +1600,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2082,6 +2124,11 @@
                                         "type": "string",
                                         "description": "The Dockerfile location in the repository."
                                     },
+                                    "dockerfile_target_build": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The Docker build target (stage) in the Dockerfile."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
@@ -2167,6 +2214,11 @@
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -2177,6 +2229,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -2200,6 +2258,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -2699,6 +2762,11 @@
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -2709,6 +2777,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -2732,6 +2806,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -3211,6 +3290,11 @@
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -3221,6 +3305,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -3244,6 +3334,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -3871,6 +3966,11 @@
                                         "type": "string",
                                         "description": "The Dockerfile location in the repository."
                                     },
+                                    "dockerfile_target_build": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The Docker build target (stage) in the Dockerfile."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
@@ -3981,6 +4081,11 @@
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
                                     },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
@@ -3991,6 +4096,12 @@
                                         "minimum": 1,
                                         "maximum": 3600,
                                         "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
                                     },
                                     "docker_images_to_keep": {
                                         "type": "integer",
@@ -4014,6 +4125,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
                                     },
                                     "is_raw_compose_deployment_enabled": {
                                         "type": "boolean",
@@ -7025,6 +7141,11 @@
                                         "description": "Whether to save backups to S3",
                                         "default": false
                                     },
+                                    "disable_local_backup": {
+                                        "type": "boolean",
+                                        "description": "Delete the local backup file after the upload to S3. Only allowed when save_s3 is true.",
+                                        "default": false
+                                    },
                                     "s3_storage_uuid": {
                                         "type": "string",
                                         "description": "Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true."
@@ -7502,6 +7623,14 @@
                                     "redact_all_env_values_in_logs": {
                                         "type": "boolean",
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions."
+                                    },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Restart the database to apply it."
+                                    },
+                                    "is_log_drain_enabled": {
+                                        "type": "boolean",
+                                        "description": "Send the database logs to the log drain of the server. Log drain must be enabled on the server. Restart the database to apply it."
                                     }
                                 },
                                 "type": "object"
@@ -7651,6 +7780,10 @@
                                     "save_s3": {
                                         "type": "boolean",
                                         "description": "Whether data is saved in s3 or not"
+                                    },
+                                    "disable_local_backup": {
+                                        "type": "boolean",
+                                        "description": "Delete the local backup file after the upload to S3. Only allowed when save_s3 is true. Turning save_s3 off also turns this off."
                                     },
                                     "s3_storage_uuid": {
                                         "type": "string",
@@ -17199,6 +17332,12 @@
                                             ],
                                             "example": "https:\/\/example.com"
                                         },
+                                        "proxy_error_page": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
                                         "generate_exact_labels": {
                                             "type": "boolean",
                                             "example": false
@@ -17274,6 +17413,13 @@
                                             "null"
                                         ]
                                     },
+                                    "proxy_error_page": {
+                                        "description": "Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
                                     "generate_exact_labels": {
                                         "type": "boolean"
                                     },
@@ -17323,6 +17469,12 @@
                                             "type": "boolean"
                                         },
                                         "redirect_url": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "proxy_error_page": {
                                             "type": [
                                                 "string",
                                                 "null"
@@ -17437,6 +17589,12 @@
                                             "type": "boolean"
                                         },
                                         "redirect_url": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "proxy_error_page": {
                                             "type": [
                                                 "string",
                                                 "null"
@@ -18448,6 +18606,25 @@
                                     "connection_timeout": {
                                         "type": "integer",
                                         "description": "SSH connection timeout in seconds (1-300). Default: 10."
+                                    },
+                                    "wildcard_domain": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it."
+                                    },
+                                    "server_timezone": {
+                                        "type": "string",
+                                        "description": "Timezone of the server, for example Europe\/Berlin. Scheduled tasks and backups use it."
+                                    },
+                                    "backup_compression_cpu_percentage": {
+                                        "type": "integer",
+                                        "enum": [
+                                            25,
+                                            50,
+                                            75,
+                                            100
+                                        ],
+                                        "description": "Maximum CPU percentage that backup compression can use. Default: 25."
                                     }
                                 },
                                 "type": "object"
@@ -18911,6 +19088,15 @@
                                         "type": [
                                             "boolean",
                                             "null"
+                                        ]
+                                    },
+                                    "redirect": {
+                                        "description": "How to handle www and non-www domains. \"www\" redirects non-www to www, \"non-www\" redirects www to non-www. Both need a www and a non-www domain in url.",
+                                        "type": "string",
+                                        "enum": [
+                                            "both",
+                                            "www",
+                                            "non-www"
                                         ]
                                     },
                                     "max_restart_count": {
@@ -20336,16 +20522,6 @@
                             "type": "boolean",
                             "default": true
                         }
-                    },
-                    {
-                        "name": "delete_from_coolify_only",
-                        "in": "query",
-                        "description": "Remove only Coolify metadata without deleting Docker resources.",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean",
-                            "default": false
-                        }
                     }
                 ],
                 "responses": {
@@ -20376,6 +20552,9 @@
                     },
                     "403": {
                         "description": "The token needs the write and deploy permissions."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -20461,6 +20640,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
                                     }
                                 },
                                 "type": "object"
@@ -24956,6 +25140,10 @@
                     "stop_grace_period": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "rolling_update_drain_seconds": {
+                        "type": "integer",
+                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off."
                     }
                 },
                 "type": "object"
