@@ -55,7 +55,8 @@ function resource_logo_url(string $name): string
  * the service template, or how the application is built. Null when there is no specific logo.
  *
  * Applications with a domain also get the favicon URL of their first domain. The browser loads it
- * and shows it in place of the logo when it loads. Coolify itself never requests it.
+ * and shows it in place of the logo when it loads. Coolify itself never requests it. Applications
+ * behind HTTP basic auth get no favicon: the request makes the browser ask for the credentials.
  *
  * @return array{src: string, dark: ?string, fallback: ?string, padded: bool, favicon: ?string}|null
  */
@@ -93,7 +94,9 @@ function resource_logo(Model $resource): ?array
             default => $resourceLogo('public-repo'),
         };
 
-        return [...$logo, 'favicon' => resource_favicon_url($resource->fqdn)];
+        $favicon = $resource->is_http_basic_auth_enabled ? null : resource_favicon_url($resource->fqdn);
+
+        return [...$logo, 'favicon' => $favicon];
     }
 
     if (! method_exists($resource, 'type')) {

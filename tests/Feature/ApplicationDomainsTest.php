@@ -655,6 +655,14 @@ it('lists existing domains as individual rows', function () {
     expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0);
 });
 
+it('loads no domain favicon when HTTP basic auth protects the application', function () {
+    $this->application->update(['fqdn' => 'https://example.com', 'is_http_basic_auth_enabled' => true]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('https://example.com')
+        ->assertDontSee('https://example.com/favicon.ico', false);
+});
+
 it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
     $this->application->update(['fqdn' => 'https://app.example.com']);
 
