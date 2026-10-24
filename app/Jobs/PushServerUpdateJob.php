@@ -817,7 +817,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function updateProxyStatus()
     {
         // If proxy is not found, start it
-        if ($this->server->isProxyShouldRun()) {
+        if ($this->server->isProxyShouldRun() && ! $this->server->isProxyTransitionInProgress()) {
             if ($this->foundProxy === false) {
                 try {
                     if (CheckProxy::run($this->server)) {
