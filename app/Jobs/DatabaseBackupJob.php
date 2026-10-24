@@ -317,7 +317,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
-            if ($this->database->name === 'coolify-db') {
+            if ($this->database instanceof StandalonePostgresql && $this->database->isInstanceDatabase()) {
                 $databasesToBackup = ['coolify'];
                 $this->directory_name = $this->container_name = 'coolify-db';
                 $ip = Str::slug($this->server->ip);

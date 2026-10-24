@@ -1893,7 +1893,7 @@ $siteAddress {
             ->concat($dragonflies)
             ->concat($clickhouses)
             ->concat($sqlites)
-            ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
+            ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }
 
     public function applications()
