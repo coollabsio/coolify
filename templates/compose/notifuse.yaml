@@ -1,0 +1,57 @@
+# documentation: https://docs.notifuse.com/self-hosting/installation
+# slogan: Open-source, self-hosted email marketing and automation platform with built-in cookieless web analytics.
+# category: email
+# tags: email, newsletter, marketing, automation, smtp, analytics, self-hosted, open source
+# logo: svgs/notifuse.svg
+# port: 8080
+
+services:
+  notifuse:
+    image: notifuse/notifuse:latest
+    environment:
+      - SERVICE_URL_NOTIFUSE_8080
+      - SERVER_PORT=${SERVER_PORT:-8080}
+      - SERVER_HOST=${SERVER_HOST:-0.0.0.0}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=$SERVICE_USER_POSTGRES
+      - DB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - DB_PREFIX=${DB_PREFIX:-notifuse}
+      - DB_NAME=${DB_NAME:-notifuse_system}
+      - DB_SSLMODE=${DB_SSLMODE:-disable}
+      - SECRET_KEY=${SERVICE_REALBASE64_64_NOTIFUSE}
+      - ROOT_EMAIL=${NOTIFUSE_ROOT_EMAIL}
+      - API_ENDPOINT=${SERVICE_URL_NOTIFUSE}
+      - SMTP_HOST=${NOTIFUSE_SMTP_HOST}
+      - SMTP_PORT=${NOTIFUSE_SMTP_PORT}
+      - SMTP_USERNAME=${NOTIFUSE_SMTP_USERNAME}
+      - SMTP_PASSWORD=${NOTIFUSE_SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${NOTIFUSE_SMTP_FROM_EMAIL}
+      - SMTP_FROM_NAME=${NOTIFUSE_SMTP_FROM_NAME}
+      - SMTP_EHLO_HOSTNAME=${NOTIFUSE_SMTP_EHLO_HOSTNAME}
+    volumes:
+      - notifuse-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${DB_NAME:-notifuse_system}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
