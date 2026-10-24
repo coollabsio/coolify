@@ -292,9 +292,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->preview) {
                 if ($this->application->build_pack === 'dockercompose') {
-                    $this->preview->generate_preview_fqdn_compose();
+                    $this->preview->generate_preview_fqdn_compose(keepExistingDomains: true);
                 } else {
-                    $this->preview->generate_preview_fqdn();
+                    $this->preview->generate_preview_fqdn(keepExistingDomains: true);
                 }
             }
             if ($this->application->isGithubAppSource()) {

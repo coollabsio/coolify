@@ -147,7 +147,7 @@ class Previews extends Component
                     ]);
                     $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
                 }
-                $found->generate_preview_fqdn_compose();
+                $found->generate_preview_fqdn_compose(keepExistingDomains: ! $found->wasRecentlyCreated);
                 $this->application->refresh();
                 $this->syncDockerTags();
             } else {
@@ -165,7 +165,7 @@ class Previews extends Component
                 if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
                     $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
                 }
-                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true);
+                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true, keepExistingDomains: true);
                 $this->application->refresh();
                 $this->syncDockerTags();
                 $this->dispatch('update_links');
