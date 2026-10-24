@@ -10,10 +10,11 @@
         <x-server.sidebar :server="$server" activeMenu="metrics" />
 
         <div class="application-settings-form flex w-full flex-col gap-6"
-            @if ($server->isMetricsEnabled()) x-init="$wire.loadData()"
-                @if ($poll) wire:poll.5000ms="pollData" @endif
-            @endif>
+            @if ($server->isMetricsEnabled()) x-init="$wire.loadData()" @endif>
             @if ($server->isMetricsEnabled())
+                @if ($live)
+                    <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="loadData" class="hidden"></div>
+                @endif
                 <form wire:submit.prevent="saveMetricsSettings" class="contents">
                     <x-unsaved-bar action="saveMetricsSettings"
                         targets="sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
@@ -22,8 +23,7 @@
                         helper="Inspect recent CPU and memory usage reported by Sentinel.">
                         <x-slot:actions>
                             <div class="flex items-center gap-2">
-                                <x-status-badge :status="$poll ? 'Live updates' : 'Historical range'"
-                                    :type="$poll ? 'success' : 'neutral'" />
+                                <x-live-toggle :active="$live" storageKey="server-metrics-live" />
                                 <x-forms.button canGate="update" :canResource="$server" wire:click="toggleMetrics">
                                     Disable metrics
                                 </x-forms.button>
@@ -44,8 +44,8 @@
 
                         <div class="mt-4 max-w-xs">
                             <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
-                                ['value' => 5, 'label' => 'Last 5 minutes · live'],
-                                ['value' => 10, 'label' => 'Last 10 minutes · live'],
+                                ['value' => 5, 'label' => 'Last 5 minutes'],
+                                ['value' => 10, 'label' => 'Last 10 minutes'],
                                 ['value' => 30, 'label' => 'Last 30 minutes'],
                                 ['value' => 60, 'label' => 'Last hour'],
                                 ['value' => 720, 'label' => 'Last 12 hours'],
@@ -54,7 +54,7 @@
                             ]" />
                         </div>
                         <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                            Five and ten minute ranges refresh automatically every five seconds.
+                            While live, ranges up to one hour refresh every five seconds. Longer ranges refresh every minute.
                         </p>
                     </x-application.settings-section>
                 </form>

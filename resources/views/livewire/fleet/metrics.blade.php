@@ -6,6 +6,12 @@ $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:
 // Tiles read "Fleet …" across all servers, but just "CPU / Memory / …" when scoped to one.
 $scoped = $serverUuid !== '';
 
+$rangeListboxOptions = [
+    ['value' => '24h', 'label' => 'Last 24 hours'],
+    ['value' => '7d', 'label' => 'Last 7 days'],
+    ['value' => '30d', 'label' => 'Last 30 days'],
+];
+
 $serverListboxOptions = array_merge(
     [['value' => '', 'label' => 'All servers']],
     collect($serverOptions)->map(fn ($name, $uuid) => ['value' => $uuid, 'label' => $name])->values()->all(),
@@ -37,45 +43,22 @@ $serverListboxOptions = array_merge(
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 sm:ml-auto">
-                    @if ($range === '24h')
-                        <div x-data="{ live: $wire.entangle('live').live }"
-                            x-init="
-                                const stored = localStorage.getItem('metrics-live');
-                                if (stored === '0') { live = false; }
-                                if (stored === '1') { live = true; }
-                                $watch('live', value => localStorage.setItem('metrics-live', value ? '1' : '0'));
-                            ">
-                            <button type="button" @click="live = !live" :aria-pressed="live ? 'true' : 'false'"
-                                title="Toggle realtime refresh (updates every 60s)"
-                                class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium ring-1 transition-colors"
-                                :class="live
-                                    ? 'bg-white text-black shadow-sm ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]'
-                                    : 'text-neutral-500 ring-neutral-200 hover:text-black dark:text-fg-faint dark:ring-white/[0.08] dark:hover:text-fg'">
-                                <span class="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
-                                    <span x-show="live" class="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 motion-safe:animate-ping"></span>
-                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full" :class="live ? 'bg-emerald-500' : 'bg-neutral-400 dark:bg-white/40'"></span>
-                                </span>
-                                <span>Live Refresh</span>
-                            </button>
+                <div class="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+                    <div class="relative w-full transition-opacity sm:w-44"
+                        wire:loading.class="pointer-events-none opacity-60" wire:target="setRange">
+                        <x-forms.listbox id="range" onChange="setRange" :onChangeArgs="[]" :options="$rangeListboxOptions" />
+                        <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                            wire:loading.flex wire:target="setRange">
+                            <x-loading compact aria-label="Loading metrics" />
                         </div>
-                    @endif
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        @foreach (['24h' => '24 hours', '7d' => '7 days', '30d' => '30 days'] as $value => $label)
-                            <button type="button" wire:click="setRange('{{ $value }}')"
-                                wire:loading.attr="disabled" wire:target="setRange"
-                                @class([$tabButtonBase, $range === $value ? $tabButtonActive : $tabButtonInactive])>
-                                <span wire:loading.class="invisible" wire:target="setRange('{{ $value }}')">{{ $label }}</span>
-                                <x-loading compact class="absolute" wire:loading wire:target="setRange('{{ $value }}')" aria-label="Loading metrics" />
-                            </button>
-                        @endforeach
                     </div>
+                    <x-live-toggle :active="$live" storageKey="metrics-live" title="Turn live refresh on or off (updates every 60 seconds)" />
                 </div>
             </div>
         @endif
     </div>
 
-    @if ($this->isLivePollable())
+    @if ($live)
         <div wire:poll.60s="loadData" class="hidden"></div>
     @endif
 
