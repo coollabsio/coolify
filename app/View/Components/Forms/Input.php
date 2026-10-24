@@ -80,6 +80,9 @@ class Input extends Component
         if ($hasPeek) {
             $this->defaultClass = $this->defaultClass.' input-with-password-toggle';
         }
+        if ($this->type === 'number') {
+            $this->defaultClass = $this->defaultClass.' input-with-stepper';
+        }
         if ($this->copyable) {
             // Reserve clearance for a single copy button, or for both the peek eye
             // and the copy button when the field is a maskable password.

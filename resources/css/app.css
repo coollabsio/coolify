@@ -587,6 +587,35 @@ tr td:first-child {
     padding-right: 2.5rem;
 }
 
+/* Number fields use the brand −/+ stepper (components/forms/input) instead of the native spinner. */
+.input.input-with-stepper {
+    padding-right: 4.25rem;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.input.input-with-stepper::-webkit-outer-spin-button,
+.input.input-with-stepper::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.number-stepper {
+    @apply absolute inset-y-px right-px flex;
+}
+
+.number-stepper button {
+    @apply flex w-8 cursor-pointer items-center justify-center border-l border-neutral-200 text-neutral-500 transition-colors last:rounded-r-[5px] hover:bg-neutral-100 hover:text-black active:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-white dark:active:bg-white/[0.1];
+}
+
+.number-stepper button svg {
+    @apply transition-transform duration-150 ease-out;
+}
+
+.number-stepper button:active:not(:disabled) svg {
+    @apply scale-75;
+}
+
 /* Room for both the peek eye and the copy button on maskable read-only fields. */
 .input.input-with-copy-and-peek {
     padding-right: 4.25rem;
@@ -2259,6 +2288,16 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 .application-settings-workspace .input.input-with-copy-and-peek,
 .application-settings-form .input.input-with-copy-and-peek {
     padding-right: 4.25rem;
+}
+
+.application-settings-workspace .input.input-with-stepper,
+.application-settings-form .input.input-with-stepper {
+    padding-right: 4.25rem;
+}
+
+.application-settings-workspace .number-stepper button:last-child,
+.application-settings-form .number-stepper button:last-child {
+    border-radius: 0 7px 7px 0;
 }
 
 .application-settings-workspace .input:focus-visible,
