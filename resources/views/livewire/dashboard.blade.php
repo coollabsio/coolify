@@ -112,7 +112,7 @@
                     icon-name="projects" size="sm" />
             @else
                 <div x-cloak x-show="viewMode === 'grid'"
-                    class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(17rem,100%),1fr))] gap-3">
+                    class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @4xl:grid-cols-4">
                     @foreach ($dashboardProjects as $project)
                         @php
                             $firstEnvironment = $project->environments->first();
@@ -315,7 +315,7 @@
                 @endif
             @else
                 <div x-cloak x-show="viewMode === 'grid'"
-                    class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(17rem,100%),1fr))] gap-3">
+                    class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @4xl:grid-cols-4">
                     @foreach ($dashboardServers as $server)
                         @php
                             [$serverStatus, $serverStatusType] = $serverStatuses[$server->id];
