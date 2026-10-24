@@ -23,7 +23,8 @@
                  delay skips the overlay for fast requests. --}}
             run(label, action) {
                 const timer = setTimeout(() => this.busy = label, 150);
-                return Promise.resolve().then(action).catch(() => {}).finally(() => {
+                {{-- Start the action now: callers clear their inputs right after run(). --}}
+                return new Promise((resolve) => resolve(action())).catch(() => {}).finally(() => {
                     clearTimeout(timer);
                     this.busy = null;
                 });
@@ -64,7 +65,7 @@
         </x-slot:badges>
 
         <x-slot:actions>
-            @if ($containerRunning && $filesLoaded)
+            @if ($containerRunning && $filesLoaded && ! $shellUnavailable)
                 <input type="file" class="hidden" x-ref="uploadInput"
                     @change="if ($event.target.files.length) { uploadFile($event.target.files[0]); $event.target.value = '' }" />
                 <x-forms.button type="button" title="Upload a file to this folder" canGate="canAccessTerminal" :canResource="$resource"
@@ -149,6 +150,13 @@
         @elseif (! $containerRunning)
             <x-empty title="Container is not running"
                 description="Start the container to browse its files.">
+                <x-slot:icon>
+                    <x-reicon name="folder" class="size-8" />
+                </x-slot:icon>
+            </x-empty>
+        @elseif ($shellUnavailable)
+            <x-empty title="File browser is not available"
+                description="Coolify cannot open the files of this container. {{ $helperError }}">
                 <x-slot:icon>
                     <x-reicon name="folder" class="size-8" />
                 </x-slot:icon>

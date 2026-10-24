@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Exceptions\ContainerShellUnavailableException;
 use App\Http\Controllers\FileBrowserDownloadController;
 use App\Jobs\PrepareFileDownloadJob;
 use App\Models\Application;
@@ -14,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
@@ -43,6 +45,17 @@ class FileBrowser extends Component
 
     #[Locked]
     public bool $loadFailed = false;
+
+    /** The container has no usable shell, so a helper container reaches its files. */
+    #[Locked]
+    public bool $useHelper = false;
+
+    #[Locked]
+    public bool $shellUnavailable = false;
+
+    /** Why the helper container failed, shown when the reason is known. */
+    #[Locked]
+    public ?string $helperError = null;
 
     #[Locked]
     public ?string $container = null;
@@ -103,6 +116,7 @@ class FileBrowser extends Component
         try {
             $this->availableContainers = $this->containerRunning ? $this->resolveContainers() : [];
             $this->container = $this->availableContainers[0] ?? null;
+            $this->useHelper = false;
             if (is_null($this->container)) {
                 $this->containerRunning = false;
             } else {
@@ -125,6 +139,7 @@ class FileBrowser extends Component
         }
         $this->closeEditor();
         $this->container = $name;
+        $this->useHelper = false;
         $this->currentPath = $this->service()->defaultRoot();
         $this->loadEntries();
     }
@@ -132,6 +147,9 @@ class FileBrowser extends Component
     public function open(string $name): void
     {
         $this->guard();
+        if ($this->isHelperSymlink($name)) {
+            return;
+        }
         $this->currentPath = $this->childPath($name);
         $this->loadEntries();
     }
@@ -215,6 +233,9 @@ class FileBrowser extends Component
     public function openEditor(string $name): void
     {
         $this->guard();
+        if ($this->isHelperSymlink($name)) {
+            return;
+        }
         $path = $this->childPath($name);
         try {
             // read() guards binary/oversized files internally and throws.
@@ -276,6 +297,9 @@ class FileBrowser extends Component
     public function download(string $name): void
     {
         $this->guard();
+        if ($this->isHelperSymlink($name)) {
+            return;
+        }
         try {
             $path = $this->childPath($name);
             $target = $this->service()->downloadInfo($path);
@@ -297,7 +321,7 @@ class FileBrowser extends Component
                 }
                 $downloadId = (string) Str::uuid();
                 $this->pendingDownloads[] = $downloadId;
-                PrepareFileDownloadJob::dispatch($downloadId, auth()->id(), $this->server()->id, $this->container, $path, $target['isDir'], $downloadName, $s3Storage->id);
+                PrepareFileDownloadJob::dispatch($downloadId, auth()->id(), $this->server()->id, $this->container, $path, $target['isDir'], $downloadName, $s3Storage->id, $this->useHelper);
                 $this->dispatch('info', 'Preparing '.$downloadName.'. The download starts when it is ready.');
 
                 return;
@@ -313,6 +337,7 @@ class FileBrowser extends Component
                 'path' => $path,
                 'name' => $downloadName,
                 'is_dir' => $target['isDir'],
+                'use_helper' => $this->useHelper,
             ], FileBrowserDownloadController::TOKEN_TTL_SECONDS);
 
             $this->redirect(route('project.files.download', $token));
@@ -442,7 +467,24 @@ class FileBrowser extends Component
 
     protected function loadEntries(): void
     {
-        $entries = $this->service()->list($this->currentPath);
+        $this->shellUnavailable = false;
+        $this->helperError = null;
+        try {
+            $entries = $this->service()->list($this->currentPath);
+        } catch (ContainerShellUnavailableException $e) {
+            if (! $this->useHelper) {
+                $this->useHelper = true;
+                $this->loadEntries();
+
+                return;
+            }
+            Log::warning('File browser helper container failed', ['container' => $this->container, 'error' => $e->getMessage()]);
+            $entries = [];
+            $this->shellUnavailable = true;
+            if (preg_match('/Unable to find image|failed to resolve reference|pull access denied|manifest unknown/i', $e->getMessage())) {
+                $this->helperError = 'The server could not pull the Coolify helper image ('.coolifyHelperImage().':'.getHelperVersion().'). Check that the server can reach the registry.';
+            }
+        }
         $this->entries = array_map(fn ($e) => [
             'name' => $e->name,
             'type' => $e->type,
@@ -456,7 +498,22 @@ class FileBrowser extends Component
 
     protected function service(): ContainerFilesystemService
     {
-        return new ContainerFilesystemService($this->server(), $this->container);
+        return new ContainerFilesystemService($this->server(), $this->container, $this->useHelper);
+    }
+
+    /**
+     * The helper resolves absolute symlinks in its own file system, not in the
+     * container, so it would show the wrong files. It cannot change them,
+     * because its root file system is read-only.
+     */
+    protected function isHelperSymlink(string $name): bool
+    {
+        if (! $this->useHelper || ! collect($this->entries)->contains(fn (array $entry) => $entry['name'] === $name && $entry['type'] === 'symlink')) {
+            return false;
+        }
+        $this->dispatch('error', 'Symlinks cannot be opened in a container without a shell. Open the target path instead.');
+
+        return true;
     }
 
     protected function server(): Server
