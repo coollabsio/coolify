@@ -1,4 +1,5 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none" x-data
+    x-init="@js($loadComposeOnOpen) && $wire.loadComposeFile(true)">
     <div>
         @if ($application->build_pack === 'nixpacks')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">
@@ -31,7 +32,20 @@
             </div>
 
             <div class="shrink-0">
-                @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
+                @if ($this->needsComposeFile())
+                    <div class="flex items-center gap-1">
+                        @can('update', $application)
+                            <x-forms.button wire:click="loadComposeFile">Load compose</x-forms.button>
+                        @endcan
+                        @can('deploy', $application)
+                            <x-forms.button id="application-mobile-actions" disabled default-class="split-action-main rounded-md!"
+                                tooltip="Load the Compose file before you deploy.">
+                                <x-reicon name="play-circle" class="size-3.5" />
+                                Deploy
+                            </x-forms.button>
+                        @endcan
+                    </div>
+                @else
                     @can('deploy', $application)
                         <x-split-action id="application-mobile-actions">
                             @if (str($application->status)->startsWith('exited'))
@@ -134,8 +148,17 @@
                     @if ($this->runningDeploymentUrl)
                         <x-deploying-indicator :href="$this->runningDeploymentUrl" class="mr-1" />
                     @endif
-                    @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
-                        <span class="px-2 text-[13px] text-neutral-500 dark:text-fg-dim">Load a Compose file to deploy.</span>
+                    @if ($this->needsComposeFile())
+                        @can('update', $application)
+                            <x-forms.button wire:click="loadComposeFile">Load compose</x-forms.button>
+                        @endcan
+                        @can('deploy', $application)
+                            <x-forms.button id="application-desktop-actions" disabled default-class="split-action-main rounded-md!"
+                                tooltip="Load the Compose file before you deploy.">
+                                <x-reicon name="play-circle" class="size-3.5" />
+                                Deploy
+                            </x-forms.button>
+                        @endcan
                     @else
                         <div class="resource-heading-menus shrink-0">
                             <x-applications.links :application="$application" />

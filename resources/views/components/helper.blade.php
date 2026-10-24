@@ -116,7 +116,7 @@
     </button>
     {{-- teleported so a dropdown or other stacking context cannot put it under the sidebar --}}
     <template x-teleport="body">
-        <div x-ref="popup" x-show="open" x-cloak :id="$id('helper-popup')" role="tooltip"
+        <div x-ref="popup" x-show="open" x-cloak :id="$id('helper-popup')" wire:key="helper-popup" role="tooltip"
             x-transition:enter="transition ease-out duration-100"
             x-transition:enter-start="opacity-0 translate-y-0.5"
             x-transition:enter-end="opacity-100 translate-y-0"

@@ -155,6 +155,7 @@ class General extends Component
         'resetDefaultLabels',
         'configurationChanged' => '$refresh',
         'confirmDomainUsage',
+        'composeFileLoaded' => 'syncLoadedComposeFile',
     ];
 
     protected function rules(): array
@@ -575,18 +576,7 @@ class General extends Component
 
                 return;
             }
-            $this->parsedServices = redactLockedValuesInGeneratedCompose($this->parsedServices, $this->application);
-
-            // Refresh parsedServiceDomains to reflect any changes in docker_compose_domains
-            $this->application->refresh();
-
-            // Sync the docker_compose_raw from the model to the component property
-            // This ensures the Monaco editor displays the loaded compose file
-            $this->syncData();
-
-            $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
-            // Convert service names with dots and dashes to use underscores for HTML form binding
-            $this->parsedServiceDomains = $this->sanitizeParsedServiceDomainsForForm($this->parsedServiceDomains);
+            $this->showLoadedComposeFile();
 
             $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
@@ -603,6 +593,34 @@ class General extends Component
         } finally {
             $this->initLoadingCompose = false;
         }
+    }
+
+    /**
+     * Shows a Compose file that the heading loaded while this form is open.
+     */
+    public function syncLoadedComposeFile(): void
+    {
+        $this->authorize('update', $this->application);
+
+        $this->application->refresh();
+        $this->parsedServices = $this->application->parse();
+        $this->showLoadedComposeFile();
+    }
+
+    private function showLoadedComposeFile(): void
+    {
+        $this->parsedServices = redactLockedValuesInGeneratedCompose($this->parsedServices, $this->application);
+
+        // Refresh parsedServiceDomains to reflect any changes in docker_compose_domains
+        $this->application->refresh();
+
+        // Sync the docker_compose_raw from the model to the component property
+        // This ensures the Monaco editor displays the loaded compose file
+        $this->syncData();
+
+        $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
+        // Convert service names with dots and dashes to use underscores for HTML form binding
+        $this->parsedServiceDomains = $this->sanitizeParsedServiceDomainsForForm($this->parsedServiceDomains);
     }
 
     public function generateDomain(string $serviceName)

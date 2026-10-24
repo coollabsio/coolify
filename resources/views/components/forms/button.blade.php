@@ -81,7 +81,7 @@
 @if ($authDisabled || filled($tooltip))
     {{-- teleported so a dropdown or other stacking context cannot hide or move it --}}
     <template x-teleport="body">
-        <div x-ref="tip" x-show="visible" x-cloak :id="$id('button-tooltip')" role="tooltip"
+        <div x-ref="tip" x-show="visible" x-cloak :id="$id('button-tooltip')" wire:key="button-tooltip" role="tooltip"
             x-transition:enter="transition-opacity ease-out duration-100"
             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
             x-transition:leave="transition-opacity ease-in duration-75"
