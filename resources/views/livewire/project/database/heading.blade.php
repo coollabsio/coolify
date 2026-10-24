@@ -49,10 +49,10 @@
     <livewire:project.shared.configuration-checker :resource="$database" />
 
     <x-process-dialog @startdatabase.window="processDialogOpen = true" closeWithX>
-        <x-slot:title>Database Startup</x-slot:title>
+        <x-slot:title>Database Startup Logs</x-slot:title>
         <x-slot:content>
             <div wire:ignore class="flex h-full min-h-0 min-w-0 max-w-full flex-col">
-                <livewire:activity-monitor header="Logs" fullHeight />
+                <livewire:activity-monitor fullHeight />
             </div>
         </x-slot:content>
     </x-process-dialog>

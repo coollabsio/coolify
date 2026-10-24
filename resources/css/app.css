@@ -2979,6 +2979,26 @@ input[type="search"]::-webkit-search-results-decoration {
     width: 100%;
 }
 
+/* The dialog body is already the well: the log sits in it directly, without
+   its own box. */
+.process-dialog-body .activity-monitor-log {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+/* Show the status of the activity monitor next to the dialog title. */
+.process-dialog-status {
+    display: none;
+}
+
+.process-dialog:has([data-activity-status="running"]) .process-dialog-status-running,
+.process-dialog:has([data-activity-status="finished"]) .process-dialog-status-finished,
+.process-dialog:has([data-activity-status="failed"]) .process-dialog-status-failed {
+    display: inline-flex;
+}
+
 .validation-installation-logs {
     border: 1px solid var(--coollabs-fill);
 }

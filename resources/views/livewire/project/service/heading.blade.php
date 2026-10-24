@@ -18,9 +18,9 @@
     <livewire:project.shared.configuration-checker :resource="$service" />
 
     <x-process-dialog @startservice.window="processDialogOpen = true" closeWithX>
-        <x-slot:title>Service Startup</x-slot:title>
+        <x-slot:title>Service Startup Logs</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" fullHeight />
+            <livewire:activity-monitor fullHeight />
         </x-slot:content>
     </x-process-dialog>
 

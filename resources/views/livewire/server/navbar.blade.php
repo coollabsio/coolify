@@ -11,7 +11,7 @@
                     </div>
                 @endif
                 <div class="flex min-h-0 flex-1 flex-col">
-                    <livewire:activity-monitor header="Logs" fullHeight />
+                    <livewire:activity-monitor fullHeight />
                 </div>
             </div>
         </x-slot:content>

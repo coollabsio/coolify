@@ -281,7 +281,7 @@
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
                     <div class="flex h-full min-h-0 flex-col" wire:ignore>
-                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" header="Logs" fullHeight />
+                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" fullHeight />
                     </div>
                 </x-slot:content>
             </x-process-dialog>

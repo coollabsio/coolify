@@ -1,5 +1,15 @@
-@php use App\Actions\CoolifyTask\RunRemoteProcess; @endphp
-<div @class([
+@php
+    use App\Actions\CoolifyTask\RunRemoteProcess;
+
+    $exitCode = data_get($activity, 'properties.exitCode');
+    $activityStatus = match (true) {
+        ! $activity => null,
+        $isPollingActive || $exitCode === null => 'running',
+        (int) $exitCode === 0 => 'finished',
+        default => 'failed',
+    };
+@endphp
+<div data-activity-status="{{ $activityStatus }}" @class([
     'h-full flex flex-col overflow-hidden' => $fullHeight,
     'overflow-hidden' => !$fullHeight,
 ])>
@@ -48,7 +58,7 @@
             characterData: true
         });" x-destroy="observer && observer.disconnect()"
             @class([
-                'flex flex-col w-full min-w-0 max-w-full px-4 py-2 overflow-y-auto bg-white border border-solid rounded-sm dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300',
+                'activity-monitor-log flex flex-col w-full min-w-0 max-w-full px-4 py-2 overflow-y-auto bg-white border border-solid rounded-sm dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300',
                 'flex-1 min-h-0' => $fullHeight,
                 'max-h-96' => !$fullHeight,
             ])>

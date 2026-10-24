@@ -227,3 +227,29 @@ describe('activity output of a resource', function () {
         expect($component->get('activity')?->id)->toBe($this->serviceActivity->id);
     });
 });
+
+test('the process status shows running until the activity ends, then its result', function (?int $exitCode, string $status) {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $activity = Activity::create([
+        'log_name' => 'default',
+        'description' => 'proxy restart activity',
+        'properties' => ['team_id' => $this->team->id, 'server_uuid' => $server->uuid],
+    ]);
+
+    $this->actingAs($this->user);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    $component = Livewire::test(ActivityMonitor::class)
+        ->call('newMonitorActivity', $activity->id)
+        ->assertSeeHtml('data-activity-status="running"');
+
+    $activity->update(['properties' => $activity->properties->put('exitCode', $exitCode)]);
+
+    $component->call('polling')
+        ->assertSet('isPollingActive', $exitCode === null)
+        ->assertSeeHtml("data-activity-status=\"{$status}\"");
+})->with([
+    'still running' => [null, 'running'],
+    'succeeded' => [0, 'finished'],
+    'failed' => [1, 'failed'],
+]);
