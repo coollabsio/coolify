@@ -1,11 +1,13 @@
 <script>
   import BetaBadge from '../BetaBadge.svelte';
+  import Select from './Select.svelte';
   // Filters and view toggles. The root docks it (use:dock) into the zoom controls bar
   // (CanvasControls, bottom left) on desktop, or in a rounded box above the canvas on small screens.
 
   let { viewOnly, viewOnlyTitle, filter, projects, environments, views, dock, onfilter } = $props();
 
-  const select = 'select h-8! w-44 py-0! text-[12px]! max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:basis-32';
+  const select = 'w-44 max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:basis-32';
+  const options = (all, list) => [{ value: '', label: all }, ...list.map(o => ({ value: o.uuid, label: o.name }))];
   const value = (options, wanted) => (options.some(o => o.uuid === wanted) ? wanted : '');
 
   /** Table / grid / canvas switcher from the page (Blade), when the page has one. */
@@ -24,15 +26,13 @@
   <!-- Small screens: the actions wrap onto more rows instead of covering the title. -->
   <div class="ml-auto flex shrink-0 items-center gap-2 max-lg:min-w-0 max-lg:shrink max-lg:flex-wrap" use:adopt={views}>
     <!-- Connect and server views: show the resources of one project and / or environment only. -->
-    <select class={select} class:hidden={projects.length < 2} aria-label="Filter by project" title="Filter by project"
-      value={value(projects, filter.project)} onchange={e => onfilter({ project: e.currentTarget.value, environment: '' })}>
-      <option value="">All projects</option>
-      {#each projects as o (o.uuid)}<option value={o.uuid}>{o.name}</option>{/each}
-    </select>
-    <select class={select} class:hidden={environments.length < 2} aria-label="Filter by environment" title="Filter by environment"
-      value={value(environments, filter.environment)} onchange={e => onfilter({ ...filter, environment: e.currentTarget.value })}>
-      <option value="">All environments</option>
-      {#each environments as o (o.uuid)}<option value={o.uuid}>{o.name}</option>{/each}
-    </select>
+    {#if projects.length > 1}
+      <Select class={select} label="Filter by project" value={value(projects, filter.project)}
+        options={options('All projects', projects)} onchange={project => onfilter({ project, environment: '' })} />
+    {/if}
+    {#if environments.length > 1}
+      <Select class={select} label="Filter by environment" value={value(environments, filter.environment)}
+        options={options('All environments', environments)} onchange={environment => onfilter({ ...filter, environment })} />
+    {/if}
   </div>
 </div>
