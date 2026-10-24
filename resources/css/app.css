@@ -3695,7 +3695,8 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .fleet-containers-table-grid {
-    grid-template-columns: 2.25rem minmax(9rem, 1.7fr) minmax(6rem, 0.9fr) minmax(8.5rem, 1fr);
+    grid-template-columns: 2.25rem minmax(9rem, 1.7fr) minmax(6rem, 0.9fr) repeat(4, minmax(7rem, 1fr));
+    min-width: 54rem;
 }
 
 .scheduled-executions-table-grid {

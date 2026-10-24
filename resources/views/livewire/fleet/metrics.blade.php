@@ -276,22 +276,7 @@ $serverListboxOptions = array_merge(
 
         {{-- Hottest containers --}}
         <x-application.settings-section id="metrics-containers-section" title="Hottest containers" flush
-            helper="{{ $scoped ? 'Busiest containers on this server, ranked by the selected metric.' : 'Busiest containers across the fleet, ranked by the selected metric.' }}">
-            <x-slot:actions>
-                <div class="flex items-center gap-2">
-                    <x-loading compact class="text-neutral-400 dark:text-fg-faint"
-                        wire:loading.flex wire:target="containerMetric" />
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'] as $m => $mlabel)
-                            <button type="button" wire:click="$set('containerMetric', '{{ $m }}')"
-                                wire:loading.attr="disabled" wire:target="containerMetric"
-                                @class([$tabButtonBase, $containerMetric === $m ? $tabButtonActive : $tabButtonInactive])>
-                                {{ $mlabel }}
-                            </button>
-                        @endforeach
-                    </div>
-                </div>
-            </x-slot:actions>
+            helper="{{ $scoped ? 'Busiest containers on this server, sortable by resource usage.' : 'Busiest containers across the fleet, sortable by resource usage.' }}">
             @if (empty($topContainers))
                 <div class="p-4">
                     <x-empty size="sm" title="No container metrics"
@@ -299,37 +284,28 @@ $serverListboxOptions = array_merge(
                 </div>
             @else
                 @php
-                    $metricOf = fn ($c) => match ($containerMetric) {
-                        'memory' => $c['memUsed'] ?? 0,
-                        'disk' => $c['diskBytes'] ?? 0,
-                        'network' => $c['net'] ?? 0,
-                        default => $c['cpu'] ?? 0,
-                    };
-                    // Bars are scaled to the leader so the row length reads as "share of the hottest".
-                    $maxMetric = max(1, collect($topContainers)->map($metricOf)->max());
+                    $containerMetrics = ['cpu' => 'CPU', 'memUsed' => 'Memory', 'diskBytes' => 'Disk', 'net' => 'Network'];
+                    $maxMetrics = [];
+                    foreach ($containerMetrics as $key => $label) {
+                        $maxMetrics[$key] = max(1, collect($topContainers)->max($key) ?? 0);
+                    }
                 @endphp
-                <div class="data-table transition-opacity" wire:loading.class="pointer-events-none opacity-50"
-                    wire:target="containerMetric" x-data="trafficTable({ per: Number.MAX_SAFE_INTEGER, key: 'value' })">
+                <div class="data-table" x-data="trafficTable({ per: Number.MAX_SAFE_INTEGER, key: 'cpu' })">
                     <div class="data-table-header fleet-containers-table-grid border-b-0!">
                         <span class="text-center">#</span>
                         @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Container', 'text' => true, 'class' => 'justify-self-start'])
                         @include('livewire.traffic._sort-header', ['column' => 'server', 'label' => 'Server', 'text' => true, 'class' => 'justify-self-start'])
-                        @include('livewire.traffic._sort-header', ['column' => 'value', 'label' => ['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'][$containerMetric], 'class' => 'justify-self-end'])
+                        @foreach ($containerMetrics as $key => $label)
+                            @include('livewire.traffic._sort-header', ['column' => $key, 'label' => $label, 'class' => 'justify-self-end'])
+                        @endforeach
                     </div>
                     <div class="flex flex-col">
                         @foreach ($topContainers as $c)
                             @php
                                 $meta = $this->containerMeta($c['id']);
-                                $pct = min(100, round($metricOf($c) / $maxMetric * 100, 1));
-                                $display = match ($containerMetric) {
-                                    'memory' => formatBytes($c['memUsed'] ?? 0),
-                                    'disk' => formatBytes($c['diskBytes'] ?? 0),
-                                    'network' => formatBytes($c['net'] ?? 0).'/s',
-                                    default => round($c['cpu'] ?? 0).'%',
-                                };
                             @endphp
                             <div wire:key="fleet-container-{{ $c['serverUuid'] ?? $c['server'] }}-{{ $c['id'] }}"
-                                data-row="{{ json_encode(['name' => $meta['name'], 'server' => $c['server'], 'value' => $metricOf($c)]) }}"
+                                data-row="{{ json_encode(['name' => $meta['name'], 'server' => $c['server'], 'cpu' => $c['cpu'] ?? 0, 'memUsed' => $c['memUsed'] ?? 0, 'diskBytes' => $c['diskBytes'] ?? 0, 'net' => $c['net'] ?? 0]) }}"
                                 x-show="shown($el)"
                                 class="data-table-row fleet-containers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
                                 <div class="self-center text-center text-[12px] tabular-nums text-neutral-400 dark:text-fg-faint">{{ $loop->iteration }}</div>
@@ -344,13 +320,23 @@ $serverListboxOptions = array_merge(
                                     @endif
                                 </div>
                                 <div class="min-w-0 self-center truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
-                                <div class="flex items-center justify-end gap-2.5 self-center">
-                                    <div class="hidden h-1.5 w-full max-w-[6rem] overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]"
-                                        title="{{ $pct }}% of the busiest">
-                                        <div class="h-full rounded-full bg-[var(--chart-status-3xx)] transition-[width] duration-700 ease-out" style="width: {{ $pct }}%"></div>
+                                @foreach ($containerMetrics as $key => $label)
+                                    @php
+                                        $pct = min(100, round(($c[$key] ?? 0) / $maxMetrics[$key] * 100, 1));
+                                        $display = match ($key) {
+                                            'cpu' => round($c[$key] ?? 0).'%',
+                                            'net' => formatBytes($c[$key] ?? 0).'/s',
+                                            default => formatBytes($c[$key] ?? 0),
+                                        };
+                                    @endphp
+                                    <div class="flex items-center justify-end gap-2.5 self-center">
+                                        <div class="hidden h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-neutral-100 xl:block dark:bg-white/[0.06]"
+                                            title="{{ $pct }}% of the busiest">
+                                            <div class="h-full rounded-full bg-[var(--chart-status-3xx)] transition-[width] duration-700 ease-out" style="width: {{ $pct }}%"></div>
+                                        </div>
+                                        <span class="whitespace-nowrap text-right text-[13px] tabular-nums text-black dark:text-fg">{{ $display }}</span>
                                     </div>
-                                    <span class="w-20 shrink-0 whitespace-nowrap text-right text-[13px] tabular-nums text-black dark:text-fg">{{ $display }}</span>
-                                </div>
+                                @endforeach
                             </div>
                         @endforeach
                     </div>
