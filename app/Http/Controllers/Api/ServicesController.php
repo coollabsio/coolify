@@ -1023,7 +1023,6 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
-            new OA\Parameter(name: 'delete_from_coolify_only', in: 'query', required: false, description: 'Remove only Coolify metadata without deleting Docker resources.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1054,6 +1053,7 @@ class ServicesController extends Controller
                 ref: '#/components/responses/404',
             ),
             new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function delete_by_uuid(Request $request)
@@ -1072,10 +1072,14 @@ class ServicesController extends Controller
 
         $this->authorize('delete', $service);
 
-        $service->delete();
+        // The parameter was removed. Reject it instead of ignoring it, so old clients do not delete Docker resources they asked to keep.
+        if ($request->boolean('delete_from_coolify_only')) {
+            return response()->json([
+                'message' => 'The delete_from_coolify_only parameter is no longer supported. Nothing was deleted. Send the request without it: Coolify removes the service also when the server is not reachable.',
+            ], 422);
+        }
 
-        $deleteFromCoolifyOnlyRequested = $request->boolean('delete_from_coolify_only');
-        $deleteFromCoolifyOnly = $deleteFromCoolifyOnlyRequested || ! $service->server?->isFunctional();
+        $service->delete();
 
         DeleteResourceJob::dispatch(
             resource: $service,
@@ -1083,23 +1087,15 @@ class ServicesController extends Controller
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true),
-            deleteFromCoolifyOnly: $deleteFromCoolifyOnly,
         );
 
         auditLog('api.service.deleted', [
             'team_id' => $teamId,
             'service_uuid' => $service->uuid,
             'service_name' => $service->name,
-            'delete_from_coolify_only' => $deleteFromCoolifyOnly,
         ]);
 
-        $message = match (true) {
-            $deleteFromCoolifyOnlyRequested => 'The service will be removed from Coolify only; Docker resources will remain.',
-            $deleteFromCoolifyOnly => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
-            default => 'Service deletion request queued.',
-        };
-
-        return response()->json(['message' => $message]);
+        return response()->json(['message' => 'Service deletion request queued.']);
     }
 
     #[OA\Patch(

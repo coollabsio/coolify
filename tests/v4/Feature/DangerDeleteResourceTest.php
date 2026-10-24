@@ -149,29 +149,3 @@ test('delete applies selectedActions from checkbox state', function () {
     expect($component->get('delete_configurations'))->toBeTrue();
     expect($component->get('docker_cleanup'))->toBeTrue();
 });
-
-test('service can be removed from Coolify without remote cleanup', function () {
-    $service = Service::factory()->create([
-        'environment_id' => $this->environment->id,
-        'server_id' => $this->server->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-    ]);
-
-    Livewire::test(Danger::class, ['resource' => $service])
-        ->set('projectUuid', $this->project->uuid)
-        ->set('environmentUuid', $this->environment->uuid)
-        ->assertSee('Server is not reachable')
-        ->assertSee('Remove from Coolify only')
-        ->call('deleteFromCoolifyOnly', 'test-password')
-        ->assertHasNoErrors()
-        ->assertRedirectToRoute('project.resource.index', [
-            'project_uuid' => $this->project->uuid,
-            'environment_uuid' => $this->environment->uuid,
-        ]);
-
-    Queue::assertPushed(
-        DeleteResourceJob::class,
-        fn (DeleteResourceJob $job): bool => $job->resource->is($service) && $job->deleteFromCoolifyOnly
-    );
-});

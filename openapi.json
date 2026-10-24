@@ -20486,16 +20486,6 @@
                             "type": "boolean",
                             "default": true
                         }
-                    },
-                    {
-                        "name": "delete_from_coolify_only",
-                        "in": "query",
-                        "description": "Remove only Coolify metadata without deleting Docker resources.",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean",
-                            "default": false
-                        }
                     }
                 ],
                 "responses": {
@@ -20526,6 +20516,9 @@
                     },
                     "403": {
                         "description": "The token needs the write and deploy permissions."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [

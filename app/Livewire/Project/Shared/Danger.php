@@ -132,32 +132,6 @@ class Danger extends Component
         }
     }
 
-    public function deleteFromCoolifyOnly(string $password): mixed
-    {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return 'The provided password is incorrect.';
-        }
-
-        if (! $this->resource instanceof Service) {
-            return 'Service not found.';
-        }
-
-        try {
-            $this->authorize('delete', $this->resource);
-            DeleteResourceJob::dispatch(
-                resource: $this->resource,
-                deleteFromCoolifyOnly: true,
-            )->afterResponse();
-
-            return redirectRoute($this, 'project.resource.index', [
-                'project_uuid' => $this->projectUuid,
-                'environment_uuid' => $this->environmentUuid,
-            ]);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function flush($password)
     {
         try {
