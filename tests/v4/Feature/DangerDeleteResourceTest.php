@@ -64,7 +64,7 @@ test('delete returns error string when password is incorrect', function () {
     expect(Application::find($this->application->id))->not->toBeNull();
 });
 
-test('delete redirects before dispatching resource cleanup after the response', function () {
+test('delete hides the resource before the redirect and dispatches cleanup after the response', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
         'server_id' => $this->server->id,
@@ -84,7 +84,9 @@ test('delete redirects before dispatching resource cleanup after the response', 
 
     expect($component->effects)->toHaveKey('redirectUsingNavigate', true);
 
-    expect(Service::find($service->id))->not->toBeNull();
+    // The redirected environment page must not list the resource while the cleanup job still runs.
+    expect(Service::find($service->id))->toBeNull()
+        ->and(Service::withTrashed()->find($service->id))->not->toBeNull();
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
 });
 

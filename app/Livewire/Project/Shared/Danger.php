@@ -115,6 +115,8 @@ class Danger extends Component
 
         try {
             $this->authorize('delete', $this->resource);
+            // Soft delete first, so the environment page after the redirect does not list the resource.
+            $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,
