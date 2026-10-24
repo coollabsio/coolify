@@ -251,6 +251,111 @@ describe('PATCH /api/v1/applications/{uuid}/envs', function () {
         $response->assertStatus(422);
         $response->assertJsonFragment(['uuid' => ['This field is not allowed.']]);
     });
+
+    test('keeps value and other flags when only is_buildtime is sent', function (bool $isPreview) {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'NEXTAUTH_SECRET',
+            'value' => 'super-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => $isPreview,
+            'is_literal' => true,
+            'is_multiline' => true,
+            'is_shown_once' => true,
+            'is_buildtime' => true,
+            'is_runtime' => true,
+        ]);
+
+        $payload = ['key' => 'NEXTAUTH_SECRET', 'is_buildtime' => false];
+        if ($isPreview) {
+            $payload['is_preview'] = true;
+        }
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs", $payload)
+            ->assertStatus(201);
+
+        $env->refresh();
+        expect($env->value)->toBe('super-secret')
+            ->and($env->is_buildtime)->toBeFalse()
+            ->and($env->is_runtime)->toBeTrue()
+            ->and($env->is_literal)->toBeTruthy()
+            ->and($env->is_multiline)->toBeTrue()
+            ->and($env->is_shown_once)->toBeTruthy();
+    })->with(['production' => false, 'preview' => true]);
+
+    test('bulk update keeps value and other flags when only is_buildtime is sent', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'NEXTAUTH_SECRET',
+            'value' => 'super-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => false,
+            'is_literal' => true,
+            'is_multiline' => true,
+            'is_shown_once' => true,
+            'is_buildtime' => true,
+        ]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [['key' => 'NEXTAUTH_SECRET', 'is_buildtime' => false]],
+        ])->assertStatus(201);
+
+        $env->refresh();
+        expect($env->value)->toBe('super-secret')
+            ->and($env->is_buildtime)->toBeFalse()
+            ->and($env->is_literal)->toBeTruthy()
+            ->and($env->is_multiline)->toBeTrue()
+            ->and($env->is_shown_once)->toBeTruthy();
+    });
+});
+
+describe('partial PATCH /api/v1/services/{uuid}/envs', function () {
+    test('keeps value when only a flag is sent', function () {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+        ]);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'SECRET',
+            'value' => 'super-secret',
+            'resourceable_type' => Service::class,
+            'resourceable_id' => $service->id,
+            'is_preview' => false,
+        ]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/services/{$service->uuid}/envs", [
+            'key' => 'SECRET',
+            'is_literal' => true,
+        ])->assertStatus(201);
+
+        $env->refresh();
+        expect($env->value)->toBe('super-secret')
+            ->and($env->is_literal)->toBeTruthy();
+    });
 });
 
 describe('environment variable key validation for app and service APIs', function () {

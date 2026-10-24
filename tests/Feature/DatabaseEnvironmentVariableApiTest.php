@@ -194,6 +194,29 @@ describe('PATCH /api/v1/databases/{uuid}/envs', function () {
         expect($env->value)->toBe('new_value');
     });
 
+    test('keeps value when only a flag is sent', function () {
+        $database = createDatabase($this);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'SECRET',
+            'value' => 'super-secret',
+            'resourceable_type' => StandalonePostgresql::class,
+            'resourceable_id' => $database->id,
+        ]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/databases/{$database->uuid}/envs", [
+            'key' => 'SECRET',
+            'is_literal' => true,
+        ])->assertStatus(201);
+
+        $env->refresh();
+        expect($env->value)->toBe('super-secret')
+            ->and($env->is_literal)->toBeTruthy();
+    });
+
     test('returns 404 when environment variable does not exist', function () {
         $database = createDatabase($this);
 
