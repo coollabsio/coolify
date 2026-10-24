@@ -1348,6 +1348,9 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Card/table edge ring. Crisped from 93.5% (1.17:1 on canvas, invisible)
        to 85.5% (1.51:1) so surfaces read as bordered cards, not flat fills. */
     --coollabs-hairline: oklch(85.5% 0 0);
+    /* Row and section separators inside cards. Softer than the card edge.
+       Translucent, so it stays visible on any card or theme surface. */
+    --coollabs-divider: oklch(0% 0 0 / 0.04);
     /* Muted labels/titles. Darkened from 55.6% (failed WCAG AA on elevated
        4.46, recessed 4.24, fill 3.76) to 50% so muted text clears 4.5:1 on
        every light surface above white. Dark stays 70.8% (already passes). */
@@ -1386,6 +1389,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     /* Kept about 1.6:1 on the canvas so dark cards
        and tables show a visible edge instead of blending into the canvas. */
     --coollabs-hairline: oklch(36% 0 0);
+    --coollabs-divider: oklch(100% 0 0 / 0.045);
     --coollabs-subtle: oklch(70.8% 0 0);
     /* Neutral (was #a8a8b0 / #7a7a84, both cool-tinted). Sidebar text now shares
        the same neutral temperature as the content text, so the sidebar no longer
@@ -1492,6 +1496,7 @@ html[data-theme="custom"] :is(.app-sidebar, .app-topbar-brand, .mobile-sidebar-s
     --coollabs-fill: color-mix(in oklab, var(--t-text) calc(8% + (1 - var(--t-light)) * 4%), var(--t-bg));
     --coollabs-line: color-mix(in oklab, var(--t-text) calc(16% + (1 - var(--t-light)) * 6%), var(--t-bg));
     --coollabs-hairline: color-mix(in oklab, var(--t-text) calc(11% + (1 - var(--t-light)) * 3%), var(--t-bg));
+    --coollabs-divider: color-mix(in oklab, var(--t-text) calc(5% + (1 - var(--t-light)) * 1%), transparent);
     --color-hairline: color-mix(in oklab, var(--t-text) 8%, transparent);
     --color-fg: var(--t-text);
     --color-fg-dim: color-mix(in oklab, var(--t-text) 74%, var(--t-bg));
@@ -1624,6 +1629,16 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
 html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]),
 html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
     border-color: var(--coollabs-line) !important;
+}
+
+/* Row and section separators (one-sided borders and divide-y) use the softer
+   divider token, so lists read as one card instead of a stack of boxes. Card
+   edges (full borders) keep the hairline/line tokens. */
+html:not(.dark) :is([class~="border-b"], [class~="border-t"], [class~="border-y"])[class~="border-neutral-200"],
+html:not(.dark) [class~="divide-neutral-200"] > :not(:last-child),
+.dark :is([class~="border-b"], [class~="border-t"], [class~="border-y"]):is([class~="dark:border-white/[0.06]"], [class~="dark:border-white/[0.07]"], [class~="dark:border-white/[0.08]"]),
+.dark :is([class~="dark:divide-white/[0.06]"], [class~="dark:divide-white/[0.07]"], [class~="dark:divide-white/[0.08]"]) > :not(:last-child) {
+    border-color: var(--coollabs-divider) !important;
 }
 
 html[data-theme="custom"] input:read-only,

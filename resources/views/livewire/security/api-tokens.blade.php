@@ -238,7 +238,7 @@
                                 description="Try a different description or permission." />
                         </div>
 
-                        <x-client-pagination x-cloak x-show="filteredTokens.length > 0"
+                        <x-client-pagination total="filteredTokens.length" x-cloak x-show="filteredTokens.length > 0"
                             summary="`${firstVisibleRow}-${lastVisibleRow} of ${filteredTokens.length}`"
                             page-size-model="perPage" storage-key="coolify.page-size.api-tokens"
                             previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"

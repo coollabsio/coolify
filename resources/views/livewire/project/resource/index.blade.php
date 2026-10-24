@@ -252,7 +252,7 @@
                         Try a different search or filter.
                     </p>
                 </div>
-                <x-client-pagination x-show="filteredResources.length > 0"
+                <x-client-pagination total="filteredResources.length" x-show="filteredResources.length > 0"
                     summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
                     page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
             </div>
@@ -309,7 +309,7 @@
                         Try a different search or filter.
                     </p>
                 </div>
-                <x-client-pagination x-show="filteredResources.length > 0"
+                <x-client-pagination total="filteredResources.length" x-show="filteredResources.length > 0"
                     class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
                     page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />

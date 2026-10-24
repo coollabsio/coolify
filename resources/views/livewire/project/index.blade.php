@@ -133,7 +133,7 @@
                         </article>
                     </template>
                 </div>
-                <x-client-pagination x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
+                <x-client-pagination total="filteredProjects.length" x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.projects" :options="[12, 24, 48, 96]" />
             </div>
@@ -197,7 +197,7 @@
                         </div>
                     </div>
                 </template>
-                <x-client-pagination x-show="filteredProjects.length > 0"
+                <x-client-pagination total="filteredProjects.length" x-show="filteredProjects.length > 0"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.projects" :options="[12, 24, 48, 96]" />
             </div>
