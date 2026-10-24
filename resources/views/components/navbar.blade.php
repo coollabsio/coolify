@@ -10,7 +10,7 @@
         if (!collapsed) return;
         const el = $event.target.closest('.menu-item, .menu-subitem');
         if (!el) { tooltip.show = false; return; }
-        const text = el.getAttribute('title') || el.getAttribute('aria-label') || '';
+        const text = el.getAttribute('title') || el.getAttribute('aria-label') || el.querySelector('.menu-item-label')?.textContent.trim() || '';
         if (!text) return;
         const rect = el.getBoundingClientRect();
         tooltip.text = text;
