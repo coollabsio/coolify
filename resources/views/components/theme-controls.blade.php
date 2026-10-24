@@ -163,14 +163,14 @@
     <section class="application-settings-section">
         <div class="application-settings-section-header">
             <div>
-                <h2>Navigation items</h2>
-                <p>Choose how the main sidebar shows its items.</p>
+                <h2>Style</h2>
+                <p>Choose how buttons and sidebar items look.</p>
             </div>
         </div>
         <div class="application-settings-section-body grid gap-3 sm:grid-cols-2">
             @foreach ([
-                ['value' => '3d', 'label' => '3D', 'description' => 'Each icon sits in a raised tile that lifts on hover.'],
-                ['value' => 'flat', 'label' => 'Flat', 'description' => 'Plain rows with a highlight for the current page.'],
+                ['value' => '3d', 'label' => '3D', 'description' => 'Buttons and sidebar icons sit on a raised edge that lifts on hover.'],
+                ['value' => 'flat', 'label' => 'Flat', 'description' => 'No raised edges. Sidebar items are plain rows with a highlight for the current page.'],
             ] as $option)
                 <button type="button" @click="setNavItems('{{ $option['value'] }}')"
                     class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"

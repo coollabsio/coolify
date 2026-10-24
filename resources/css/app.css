@@ -214,6 +214,22 @@
     box-shadow: none;
 }
 
+/* Appearance → Style → Flat (data-nav-items="flat") removes the raised edge
+   everywhere, not only in the sidebar: the depth color goes transparent (the
+   !important beats the theme overrides of the variable) and the press uses
+   the scale feedback of .icon-button instead of the lift and sink. */
+html[data-nav-items="flat"] :is(.button, .split-action-main, .split-action-caret, .toast-icon) {
+    --button-depth-color: transparent !important;
+}
+
+html[data-nav-items="flat"] :is(.button, .split-action-main, .split-action-caret):not(:disabled):hover {
+    transform: none;
+}
+
+html[data-nav-items="flat"] :is(.button, .split-action-main, .split-action-caret):not(:disabled):active {
+    transform: scale(0.97);
+}
+
 /* Focus border/ring on any form control should ease, not snap. The accent
    focus indicator is a border-color and/or box-shadow (ring) change, which the
    utilities' `transition-colors` did not fully animate. Target the elements
@@ -5806,8 +5822,8 @@ a.command-palette-item:focus-visible {
 /* Navigation items: each sidebar icon sits in a framed 30px tile with the 3D
    depth of .button, like the canvas tool rail. Only the tile reacts; the row
    has no background. Applies to both navigation styles. Appearance →
-   Navigation items → Flat sets data-nav-items="flat" on <html> and turns these
-   rules off, which brings back the plain rows. */
+   Style → Flat sets data-nav-items="flat" on <html> and turns these
+   rules off, which brings back the plain rows (see also the .button rules). */
 html:where(:not([data-nav-items="flat"])) .menu-item:not(.sidebar-toggle) {
     height: 2.25rem;
     padding-left: 0.25rem;
@@ -6602,8 +6618,9 @@ html.dark .toast-card {
 
 /* Toast icon tile: the 3D depth of the sidebar tiles, tinted with the icon color of the toast type. */
 .toast-icon {
+    --button-depth-color: color-mix(in oklab, currentColor 30%, transparent);
     border: 1px solid color-mix(in oklab, currentColor 22%, transparent);
-    box-shadow: 0 2px 0 color-mix(in oklab, currentColor 30%, transparent);
+    box-shadow: 0 2px 0 var(--button-depth-color);
 }
 
 /* Command palette: the purple brand tint of the dark shell. */

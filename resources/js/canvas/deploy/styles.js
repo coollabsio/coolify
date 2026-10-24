@@ -95,6 +95,8 @@ const CSS = `
   .cv-item:focus-visible { outline: none; }
   .cv-item:focus-visible i { outline: 1px solid var(--color-accent, currentColor); outline-offset: 2px; }
   .cv-item:active i { transform: translateY(2px); box-shadow: none; }
+  /* Appearance → Style → Flat: no ledge, lift, or press, like app.css .button. */
+  html[data-nav-items="flat"] .cv-item i { --cv-depth: transparent; transform: none; }
   .cv-item b { display: block; font-size: 13px; font-weight: 500; }
   .cv-item small { display: block; color: var(--cv-subtle); font-size: 11.5px; }
 
