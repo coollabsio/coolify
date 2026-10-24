@@ -68,6 +68,21 @@ it('falls back to one fetch per metric when the batch fails', function () {
         ->and($commands)->toHaveCount(2);
 });
 
+it('quotes the bucketed history URL in a single fetch for a non-root user', function () {
+    $commands = [];
+    Process::fake(function (PendingProcess $process) use (&$commands) {
+        $commands[] = $process->command;
+
+        return Process::result('[{"time":60000,"percent":5}]');
+    });
+    $this->server->forceFill(['user' => 'deploy'])->saveQuietly();
+
+    expect($this->server->getCpuMetrics(720))->toBe([[60000, 5.0]])
+        ->and($commands)->toHaveCount(1)
+        ->and($commands[0])->toContain('sudo bash -c')
+        ->and($commands[0])->toMatch('/"http:\/\/localhost:8888\/api\/cpu\/history\?from=[^"]+&bucket_ms=60000"/');
+});
+
 it('runs the batched metrics script with sudo for a non-root user', function () {
     $commands = [];
     Process::fake(function (PendingProcess $process) use (&$commands) {
