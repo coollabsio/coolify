@@ -74,7 +74,8 @@ it('normalizes containers, parsing the stringified cpu percent', function () {
             ['id' => 'app-a', 'cpu' => ['time' => 't', 'percent' => '12.5'],
                 'memory' => ['used' => 500, 'usedPercent' => 5.0],
                 'disk' => ['writableLayer' => 3, 'volumesTotal' => 7],
-                'network' => ['rxBytesPerSec' => 4.0, 'txBytesPerSec' => 1.0]],
+                'network' => ['rxBytesPerSec' => 4.0, 'txBytesPerSec' => 1.0],
+                'status' => ['state' => 'running', 'health' => 'healthy', 'restartCount' => 0]],
         ]),
     ];
 
@@ -85,6 +86,20 @@ it('normalizes containers, parsing the stringified cpu percent', function () {
     expect($rows[0]['memUsed'])->toBe(500);
     expect($rows[0]['diskBytes'])->toBe(10); // writableLayer + volumesTotal
     expect($rows[0]['net'])->toBe(5.0);      // rx + tx
+});
+
+it('lists only running containers, not removed or stopped ones', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/containers/current' => json_encode([
+            ['id' => 'app-running', 'cpu' => ['percent' => '1.0'], 'status' => ['state' => 'running']],
+            // Sentinel keeps the last samples of a removed container until retention, without a status.
+            ['id' => 'volume-backup-removed', 'cpu' => ['percent' => '79.0'], 'status' => null],
+            ['id' => 'exciting_mclaren', 'cpu' => ['percent' => '1.0'], 'status' => ['state' => 'exited']],
+        ]),
+    ];
+
+    expect(array_column($client->containersCurrent(), 'id'))->toBe(['app-running']);
 });
 
 it('returns an empty container list when the endpoint 404s', function () {
