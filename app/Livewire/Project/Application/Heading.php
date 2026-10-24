@@ -33,8 +33,8 @@ class Heading extends Component
     public bool $docker_cleanup = true;
 
     /**
-     * Set once on page open, so that a later switch to the Compose build pack does not load the file
-     * before the user confirms its location.
+     * Set once when the General page opens, where the user sees the Compose file location. Other pages
+     * only show the button, and a later switch to the Compose build pack waits for the user.
      */
     #[Locked]
     public bool $loadComposeOnOpen = false;
@@ -64,7 +64,9 @@ class Heading extends Component
         $lastDeployment = $this->application->get_last_successful_deployment();
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
-        $this->loadComposeOnOpen = $this->needsComposeFile() && auth()->user()?->can('update', $this->application);
+        $this->loadComposeOnOpen = $this->activeRouteName === 'project.application.configuration'
+            && $this->needsComposeFile()
+            && auth()->user()?->can('update', $this->application);
     }
 
     public function needsComposeFile(): bool

@@ -51,21 +51,30 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-test('an admin opening a compose application without a compose file loads it automatically', function () {
+test('an admin opening the general page of a compose application without a compose file loads it automatically', function () {
     $this->actingAs($this->admin);
 
-    Livewire::test(Heading::class, ['application' => $this->application])
+    Livewire::test(Heading::class, ['application' => $this->application, 'activeRouteName' => 'project.application.configuration'])
         ->assertSet('loadComposeOnOpen', true)
         ->assertSee('Load compose')
         ->assertSee('Load the Compose file before you deploy.')
         ->assertDontSee('Load a Compose file to deploy.');
 });
 
+test('other application pages show the load button but do not load the compose file', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(Heading::class, ['application' => $this->application, 'activeRouteName' => 'project.application.danger'])
+        ->assertSet('loadComposeOnOpen', false)
+        ->assertSee('Load compose')
+        ->assertSee('Load the Compose file before you deploy.');
+});
+
 test('a compose application that already has a compose file does not load it on open', function () {
     $this->actingAs($this->admin);
     $this->application->update(['docker_compose_raw' => "services:\n  web:\n    image: nginx\n"]);
 
-    Livewire::test(Heading::class, ['application' => $this->application])
+    Livewire::test(Heading::class, ['application' => $this->application, 'activeRouteName' => 'project.application.configuration'])
         ->assertSet('loadComposeOnOpen', false)
         ->assertDontSee('Load compose');
 });
@@ -84,7 +93,7 @@ test('the automatic load is skipped when the compose file is already loaded', fu
 test('a member cannot load the compose file and does not load it on open', function () {
     $this->actingAs($this->member);
 
-    Livewire::test(Heading::class, ['application' => $this->application])
+    Livewire::test(Heading::class, ['application' => $this->application, 'activeRouteName' => 'project.application.configuration'])
         ->assertSet('loadComposeOnOpen', false)
         ->assertDontSee('Load compose')
         ->call('loadComposeFile')
