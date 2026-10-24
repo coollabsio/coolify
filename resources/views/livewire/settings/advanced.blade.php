@@ -71,7 +71,7 @@
                                 <x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" />
                             </div>
                             Authenticate with a bearer token from
-                            <a href="{{ route('security.api-tokens') }}" class="font-medium underline" {{ wireNavigate() }}>Security → API Tokens</a>.
+                            <a href="{{ route('security.api-tokens') }}" class="font-medium underline" {{ wireNavigate() }}>Keys & Tokens → API Tokens</a>.
                         </x-callout>
                     @endif
                 </x-application.settings-subsection>
