@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none">
     <div>
         @if ($application->build_pack === 'nixpacks')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">

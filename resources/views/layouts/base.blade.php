@@ -181,6 +181,11 @@
                     if (!event.isTrusted || !rect?.width || !(maxX > minX)) {
                         return;
                     }
+                    // ApexCharts hides the source tooltip outside the plot grid; hide the peers too.
+                    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+                        peers(source).forEach(hide);
+                        return;
+                    }
                     const timestamp = minX + (event.clientX - rect.left) / rect.width * (maxX - minX);
 
                     peers(source).forEach(chart => {
