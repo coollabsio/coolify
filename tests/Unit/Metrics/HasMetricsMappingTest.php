@@ -74,6 +74,16 @@ it('does not use non-root mounts when root disk samples are missing', function (
     expect($double->getDiskMetrics(5))->toBe([]);
 });
 
+it('uses the Sentinel data mount for disk metrics when no root mount is reported', function () {
+    $double = new MetricsMappingDouble;
+    $double->rowsByType['disk'] = [
+        ['time' => 1000, 'mount' => '/boot', 'usedPercent' => 90],
+        ['time' => 1000, 'mount' => '/app/db', 'usedPercent' => 30],
+    ];
+
+    expect($double->getDiskMetrics(5))->toBe([[1000, 30.0]]);
+});
+
 it('supports older disk rows without a mount field', function () {
     $double = new MetricsMappingDouble;
     $double->rowsByType['disk'] = [['time' => 1000, 'usedPercent' => 40]];

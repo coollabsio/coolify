@@ -325,12 +325,36 @@
                                         },
                                     },
                                 });
-                                diskChart.updateSeries([{ name: 'Disk', data: data.diskSeries || [] }]);
-                                networkChart.updateSeries([
-                                    { name: 'RX', data: data.networkRxSeries || [] },
-                                    { name: 'TX', data: data.networkTxSeries || [] },
-                                ]);
-                                loadChart.updateSeries([{ name: 'Load', data: data.loadSeries || [] }]);
+                                diskChart.updateOptions({
+                                    series: [{ name: 'Disk', data: data.diskSeries || [] }],
+                                    noData: {
+                                        text: 'No disk metrics available',
+                                        style: {
+                                            color: textColor,
+                                        },
+                                    },
+                                });
+                                networkChart.updateOptions({
+                                    series: [
+                                        { name: 'RX', data: data.networkRxSeries || [] },
+                                        { name: 'TX', data: data.networkTxSeries || [] },
+                                    ],
+                                    noData: {
+                                        text: 'No network metrics available',
+                                        style: {
+                                            color: textColor,
+                                        },
+                                    },
+                                });
+                                loadChart.updateOptions({
+                                    series: [{ name: 'Load', data: data.loadSeries || [] }],
+                                    noData: {
+                                        text: 'No load metrics available',
+                                        style: {
+                                            color: textColor,
+                                        },
+                                    },
+                                });
                             });
                         })();
                     </script>
