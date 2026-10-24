@@ -54,10 +54,10 @@
 <x-main-nav-menu back-label="Dashboard" :nav-only="$navOnly"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-1 gap-0.5">
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
-                <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
@@ -73,7 +73,7 @@
                     @endif
                 </a>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
-                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                    <div class="nav-children flex flex-col gap-0.5 py-1"
                         x-data="{ activeSection: '' }">
                         @foreach ($storageSections as $section)
                             <button type="button" class="menu-subitem"

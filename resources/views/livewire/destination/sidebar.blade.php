@@ -25,10 +25,10 @@
 <x-main-nav-menu back-label="Destinations" back-title="Back to Integrations"
     data-settings-search-items="{{ json_encode(settingsSearchItems(['Destination' => $destinationMenuItems], $destinationRouteParameters)) }}">
     <nav aria-label="Destination settings"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-1 gap-0.5">
         @foreach ($destinationMenuItems as $menuItem)
             @if ($menuItem['label'] === 'Danger Zone')
-                <div class="col-span-full my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                <div class="col-span-full my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endif
             <a wire:key="destination-settings-{{ str($menuItem['label'])->slug() }}"
                 @class(['menu-item', 'menu-item-active' => $menuItem['active']])

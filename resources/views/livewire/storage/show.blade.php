@@ -39,10 +39,10 @@
                 <x-main-nav-menu back-label="S3 Storage" back-title="Back to Integrations"
                     data-settings-search-items="{{ json_encode(settingsSearchItems(['S3 storage' => $settingsMenuItems], $storageRouteParameters)) }}">
                     <nav aria-label="S3 storage settings"
-                        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                        class="grid grid-cols-1 gap-0.5">
                         @foreach ($settingsMenuItems as $menuItem)
                             @if ($menuItem['label'] === 'Danger Zone')
-                                <div class="col-span-full my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                                <div class="col-span-full my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
                             @endif
                             <a wire:key="storage-settings-{{ str($menuItem['label'])->slug() }}"
                                 @class([

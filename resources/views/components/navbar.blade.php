@@ -24,7 +24,7 @@
         // Label of the open submenu ('' = main menu). It starts on the submenu of the current page
         // ([data-active-submenu], read in init). Back opens the main menu.
         submenu: '',
-        // Depth of the open resource menu on wide screens (-1 = main menu or submenu). It starts on the
+        // Depth of the open resource menu (-1 = main menu or submenu). It starts on the
         // deepest menu of the current page; Back opens the menu one depth lower.
         navLevel: -1,
         // Direction of the last menu swap ('forward' or 'back'); it selects the enter animation of every menu.
@@ -35,25 +35,53 @@
             const ua = navigator.userAgent || '';
             return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
         })(),
+        // Shows the menu of the current page: its deepest resource menu, or the submenu that holds it.
+        showCurrentPageMenu() {
+            this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
+            this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+        },
         init() {
-                this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
-                this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+                this.showCurrentPageMenu();
                 if (@js($desktop)) {
                     // The open resource menu depth is kept across page loads: a page that opens a deeper menu
                     // (e.g. a backup) plays the forward swap, and a page that opens a lower one plays the back swap.
                     const previousLevel = sessionStorage.getItem('navLevel');
-                    if (previousLevel !== null && window.matchMedia('(min-width: 80rem)').matches) {
+                    if (previousLevel !== null && window.matchMedia('(min-width: 64rem)').matches) {
                         const levelChange = this.navLevel - Number(previousLevel);
                         this.navSwap = levelChange > 0 ? 'forward' : (levelChange < 0 ? 'back' : '');
                     }
                     sessionStorage.setItem('navLevel', this.navLevel);
                     this.$watch('navLevel', level => sessionStorage.setItem('navLevel', level));
+                } else {
+                    // The resource menus teleport into the desktop sidebar. The mobile drawer moves them into
+                    // its own slots when it opens, and gives them back when the desktop sidebar shows.
+                    const moveResourceMenus = toDrawer => this.$root.querySelectorAll('[data-mobile-nav-context]').forEach(drawerSlot => {
+                        const desktopSlot = document.getElementById('main-nav-context-' + drawerSlot.dataset.mobileNavContext);
+                        if (desktopSlot) {
+                            toDrawer ? drawerSlot.append(...desktopSlot.childNodes) : desktopSlot.append(...drawerSlot.childNodes);
+                        }
+                    });
+                    this.desktopQuery = window.matchMedia('(min-width: 64rem)');
+                    this.onDesktopChange = event => event.matches && moveResourceMenus(false);
+                    this.desktopQuery.addEventListener('change', this.onDesktopChange);
+                    // A closed drawer forgets where Back went: it opens again on the menu of the current page.
+                    this.$watch('open', isOpen => {
+                        if (isOpen) {
+                            moveResourceMenus(true);
+                        } else {
+                            this.navSwap = '';
+                            this.showCurrentPageMenu();
+                        }
+                    });
                 }
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
                     if (localStorage.getItem('theme') === 'system') { window.applyStoredTheme(); }
                 });
                 window.applyStoredTheme();
             },
+        destroy() {
+            this.desktopQuery?.removeEventListener('change', this.onDesktopChange);
+        },
     }">
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
@@ -153,18 +181,18 @@
                     ->all());
                 $activeSubmenu = $navSections->flatten(1)->first(fn (array $item): bool => isset($item['children']) && $item['active']);
                 // Resource menus by depth, registered by registerMainNavContext() (e.g. from
-                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth};
-                // only the desktop sidebar has the slots.
-                $navContext = $desktop ? request()->attributes->get('mainNavContext', []) : [];
+                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth}
+                // (the desktop sidebar); the mobile drawer moves it into its own slot while it shows (see init).
+                $navContext = request()->attributes->get('mainNavContext', []);
             @endphp
-            {{-- Wide screens on a resource page: the deepest resource menu replaces the main menu. Back shows the
+            {{-- On a resource page the deepest resource menu replaces the main menu. Back shows the
                  menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
             @foreach ($navContext as $depth => $navMenu)
                 @php
                     $previousDepth = collect($navContext)->keys()->filter(fn (int $key): bool => $key < $depth)->last() ?? -1;
                 @endphp
                 <li x-show="navLevel === {{ $depth }}" data-nav-level="{{ $depth }}" @unless ($loop->last) x-cloak @endunless
-                    class="hidden xl:contents">
+                    class="contents">
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="navLevel = {{ $previousDepth }}; navSwap = 'back'"
@@ -177,7 +205,8 @@
                                     :class="collapsed && 'lg:hidden'">{{ $navMenu['label'] }}</span>
                             </button>
                         </li>
-                        <li id="main-nav-context-{{ $depth }}" class="nav-context min-w-0"></li>
+                        <li @if ($desktop) id="main-nav-context-{{ $depth }}" @else data-mobile-nav-context="{{ $depth }}" @endif
+                            class="nav-context min-w-0"></li>
                     </ul>
                 </li>
             @endforeach
@@ -187,9 +216,9 @@
                 $renderedSubmenus = $navSections->flatten(1)->filter(fn (array $item): bool => isset($item['children']));
             @endphp
             @foreach ($renderedSubmenus as $submenuItem)
-                <li x-show="submenu === @js($submenuItem['label'])"
-                    @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @else x-cloak @endif
-                    @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+                <li x-show="navLevel === -1 && submenu === @js($submenuItem['label'])"
+                    @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @endif
+                    @if (! $submenuItem['active'] || $navContext) x-cloak @endif class="contents">
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="submenu = ''; navSwap = 'back'" title="Back to the main menu" aria-label="Back to the main menu"
@@ -231,7 +260,7 @@
                     </ul>
                 </li>
             @endforeach
-            <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+            <li x-show="navLevel === -1 && !submenu" @if ($activeSubmenu || $navContext) x-cloak @endif class="contents">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
             @foreach ($navSections as $sectionLabel => $sectionItems)
                 {{-- The first section needs no title. --}}
@@ -269,8 +298,7 @@
         @endif
         @if (auth()->id() === 0 && (isCloud() || isDev()))
             {{-- Part of the main menu: hidden while a submenu or a resource menu shows. --}}
-            <li x-show="!submenu" @if ($activeSubmenu ?? null) x-cloak @endif @class(['xl:hidden' => $navContext ?? []])
-                :class="{ 'xl:hidden': navLevel !== -1 }">
+            <li x-show="navLevel === -1 && !submenu" @if (($activeSubmenu ?? null) || ($navContext ?? [])) x-cloak @endif>
                 <a title="Admin" {{ wireNavigate() }}
                     class="nav-admin {{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">

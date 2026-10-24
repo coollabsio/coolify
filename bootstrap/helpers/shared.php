@@ -4628,7 +4628,7 @@ function wireNavigate(): string
 }
 
 /**
- * Registers a resource menu that the main sidebar shows in place of its main menu on wide screens
+ * Registers a resource menu that the main sidebar and the mobile drawer show in place of their main menu
  * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
  * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
  */

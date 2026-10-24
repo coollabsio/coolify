@@ -5,7 +5,7 @@
 
 <x-main-nav-menu :depth="1" back-label="Service" back-title="Back to the service menu">
     <nav aria-label="Compose resource settings"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-1 gap-0.5">
         <a class="menu-item" data-page-only {{ wireNavigate() }}
             href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
             <x-reicon name="logout" class="menu-item-icon rotate-180" />

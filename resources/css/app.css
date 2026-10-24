@@ -2167,6 +2167,16 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     }
 }
 
+/* A resource menu that the main sidebar (and the mobile drawer) shows instead
+   (navbar #main-nav-context-{depth}). */
+.application-settings-navigation.in-main-nav {
+    display: none;
+}
+
+.application-settings-navigation.in-main-nav ~ * {
+    grid-column: 1 / -1;
+}
+
 @media (min-width: 1280px) {
     /* Fixed like the main sidebar (3rem → bottom); left tracks its width (--sidebar-w).
        Fixed leaves the grid, so the content sibling is pinned to column 2 below. */
@@ -2191,15 +2201,6 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 
     .application-settings-navigation ~ * {
         grid-column: 2;
-    }
-
-    /* A resource menu that the main sidebar shows instead (navbar #main-nav-context-{depth}). */
-    .application-settings-navigation.in-main-nav {
-        display: none;
-    }
-
-    .application-settings-navigation.in-main-nav ~ * {
-        grid-column: 1 / -1;
     }
 
     html:not(.dark) .application-settings-navigation {
@@ -6788,12 +6789,12 @@ html.dark .project-card-stats-dot {
     }
 }
 
-/* Resource menu in the collapsed main sidebar: icons only. */
-.sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-children, .menu-item > :not(.menu-item-icon)) {
+/* Resource menu in the collapsed desktop sidebar: icons only (the mobile drawer never collapses). */
+.app-sidebar .sidebar-collapsed .nav-context-menu :is(.menu-item-label, .nav-children, .menu-item > :not(.menu-item-icon)) {
     display: none !important;
 }
 
-.sidebar-collapsed .nav-context-menu .menu-item {
+.app-sidebar .sidebar-collapsed .nav-context-menu .menu-item {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;
