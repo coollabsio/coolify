@@ -629,6 +629,24 @@ test('server view: a dragged card keeps its group as far from another group as t
   assert.equal(freeSpot({ ...start, x: start.x - 10 }, others, undefined, fits), null);
 });
 
+test('server view: cards still move when the measured cards put their group too close to another group', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [srv('a', 'application', 'Shop / prod'), srv('c', 'application', 'Blog / prod')],
+    links: [],
+    positions: {},
+  };
+  const before = layoutServerView(g);
+  // The layout uses estimated sizes; the real Blog card is wider, so the groups are less than GROUP_GAP apart.
+  const sizes = { c: { width: CARD_WIDTH + 20, height: estimateNodeHeight(g.nodes[1]) } };
+  const { fits } = dragRules(g, before, sizes, 'a');
+  const start = { ...before.a, w: CARD_WIDTH, h: estimateNodeHeight(g.nodes[0]) };
+  assert.ok(fits(start), 'the card can stay where it is');
+  assert.ok(fits({ ...start, x: start.x + 50 }), 'the card can move away from the other group');
+  assert.ok(!fits({ ...start, x: start.x - 10 }), 'the card cannot move its group closer to the other group');
+});
+
 test('groupKey: a group with only an empty-environment placeholder has no key, so it cannot be moved', () => {
   const environment = { uuid: 'env', name: 'production' };
   assert.equal(groupKey([{ id: 'empty:env', type: 'empty', environment }], 'empty'), null);
