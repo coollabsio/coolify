@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -228,6 +229,10 @@ class Metrics extends Component
         $clients = [];
         $summaryTasks = [];
         foreach ($targets as $server) {
+            // Coolify does not connect to an unreachable server, and its SSH retries would hold a worker past the process timeout.
+            if (! $server->isFunctional()) {
+                continue;
+            }
             $client = $clients[$server->uuid] = $this->metricsClient($server);
             $summaryTasks[$server->uuid] = static fn () => $client->summary();
         }
@@ -247,7 +252,7 @@ class Metrics extends Component
         $results = $this->runMetricTasks($tasks);
 
         foreach ($targets as $server) {
-            $summary = $summaries[$server->uuid];
+            $summary = $summaries[$server->uuid] ?? null;
             foreach (['cpu', 'memory', 'disk', 'load'] as $metric) {
                 $series[$metric][] = $results[$server->uuid.':'.$metric] ?? [];
             }
@@ -303,7 +308,13 @@ class Metrics extends Component
         }
         $results = [];
         foreach (array_chunk($tasks, 8, true) as $batch) {
-            $results += Concurrency::run($batch);
+            try {
+                $results += Concurrency::run($batch);
+            } catch (\Throwable $e) {
+                // A worker that runs past the process timeout fails its batch. Show those metrics as missing, not a server error.
+                Log::warning('Fleet metrics batch failed', ['error' => $e->getMessage()]);
+                $results += array_fill_keys(array_keys($batch), null);
+            }
         }
 
         return $results;

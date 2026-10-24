@@ -93,10 +93,11 @@ beforeEach(function () {
     $this->team = $team;
 });
 
-function metricsServer($team, $privateKey): Server
+function metricsServer($team, $privateKey, bool $reachable = true): Server
 {
     $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
     $server->settings->update(['is_metrics_enabled' => true]);
+    $server->settings->forceFill(['is_reachable' => $reachable, 'is_usable' => $reachable])->saveQuietly();
 
     return $server;
 }
@@ -112,7 +113,7 @@ function onlineSummary(array $overrides = []): array
 
 it('keeps an unreachable server in the table but excludes it from KPIs', function () {
     $ok = metricsServer($this->team, $this->privateKey);
-    $dead = metricsServer($this->team, $this->privateKey);
+    $dead = metricsServer($this->team, $this->privateKey, reachable: false);
 
     StubMetricsClient::$summaries = [
         $ok->uuid => onlineSummary(['cpu' => 30.0]),
@@ -134,7 +135,6 @@ it('keeps an unreachable server in the table but excludes it from KPIs', functio
 it('counts a reachable server as online when Sentinel returns no summary', function () {
     $server = metricsServer($this->team, $this->privateKey);
     $server->update(['name' => 'web-1']);
-    $server->settings->forceFill(['is_reachable' => true, 'is_usable' => true])->saveQuietly();
     StubMetricsClient::$summaries = [$server->uuid => null];
 
     $component = Livewire::test(TestableMetrics::class)
@@ -165,7 +165,7 @@ it('ranks containers across servers by the selected metric', function () {
 it('shows the KPI tiles, a stale badge for offline servers, and the container toggle', function () {
     $ok = metricsServer($this->team, $this->privateKey);
     $ok->update(['name' => 'web-1']);
-    $dead = metricsServer($this->team, $this->privateKey);
+    $dead = metricsServer($this->team, $this->privateKey, reachable: false);
     $dead->update(['name' => 'web-2']);
 
     StubMetricsClient::$summaries = [
@@ -297,6 +297,30 @@ it('permits team members to read metrics', function () {
     $this->actingAs($member);
 
     expect(Livewire::test(TestableMetrics::class)->get('kpis')['serversOnline'])->toBe(1);
+});
+
+it('does not query Sentinel on a server that Coolify cannot reach', function () {
+    $server = metricsServer($this->team, $this->privateKey, reachable: false);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    StubMetricsClient::$histories = [$server->uuid => ['cpu' => [[1000, 25.0]]]];
+
+    $component = Livewire::test(TestableMetrics::class);
+
+    $row = collect($component->get('serverRows'))->firstWhere('uuid', $server->uuid);
+    expect($row['online'])->toBeFalse();
+    expect($row['reporting'])->toBeFalse();
+    expect($component->get('chartData')['cpu'])->toBe([]);
+});
+
+it('shows the page when a metrics worker runs past the process timeout', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    Concurrency::shouldReceive('run')->andThrow(new RuntimeException('The process exceeded the timeout of 60 seconds.'));
+
+    $component = Livewire::test(TestableMetrics::class)->assertOk();
+
+    $row = collect($component->get('serverRows'))->firstWhere('uuid', $server->uuid);
+    expect($row['reporting'])->toBeFalse();
+    expect($component->get('kpis')['serversReporting'])->toBe(0);
 });
 
 it('keeps host trends when an older Sentinel has no summary endpoint', function () {

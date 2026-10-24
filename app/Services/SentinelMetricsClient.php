@@ -229,7 +229,9 @@ class SentinelMetricsClient
             ["docker exec coolify-sentinel sh -c 'curl -s --max-time 10 -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
             $this->server,
             false,
-            timeout: 15
+            timeout: 15,
+            // Metrics are read again on the next refresh. SSH retries would keep a worker past its timeout.
+            maxAttempts: 1
         );
     }
 
