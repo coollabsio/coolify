@@ -216,7 +216,14 @@
             );
 
             // Kept in state for the :style binding, because a Livewire morph resets the inline style.
-            this.panelPosition = { top: `${top}px`, left: `${left}px`, width: `${panelWidth}px` };
+            // minWidth and maxWidth too: a fixed panel resolves the CSS min-width: 100% against the viewport.
+            this.panelPosition = {
+                top: `${top}px`,
+                left: `${left}px`,
+                width: `${panelWidth}px`,
+                minWidth: panel.style.minWidth,
+                maxWidth: panel.style.maxWidth,
+            };
             this.positioned = true;
         },
     }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
