@@ -58,21 +58,21 @@
                     <x-application.settings-subsection id="docker-cleanup-configuration-section"
                         title="Schedule"
                         helper="Choose when cleanup runs and whether it should wait for a disk threshold.">
-                        <div class="grid gap-4 lg:grid-cols-2">
+                        <div class="grid gap-4 lg:grid-cols-3">
                             <x-forms.input canGate="update" :canResource="$server" placeholder="0 0 * * *"
                                 id="dockerCleanupFrequency" label="Cleanup frequency" required
                                 helper="Cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
-                            @if (!$forceDockerCleanup)
-                                <x-forms.input canGate="update" :canResource="$server" id="dockerCleanupThreshold"
-                                    type="number" min="1" max="99" label="Disk threshold" required
-                                    helper="Run cleanup after disk usage exceeds this percentage." />
-                            @endif
                             <x-forms.listbox id="forceDockerCleanup" label="Cleanup trigger"
                                 helper="Forced cleanup runs on every schedule without waiting for the threshold."
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Only above disk threshold'],
                                     ['value' => true, 'label' => 'Run on every schedule'],
                                 ]" />
+                            @if (!$forceDockerCleanup)
+                                <x-forms.input canGate="update" :canResource="$server" id="dockerCleanupThreshold"
+                                    type="number" min="1" max="99" label="Disk threshold" required
+                                    helper="Run cleanup after disk usage exceeds this percentage." />
+                            @endif
                         </div>
                     </x-application.settings-subsection>
                     <x-application.settings-subsection id="docker-cleanup-advanced-section" title="Advanced cleanup"
