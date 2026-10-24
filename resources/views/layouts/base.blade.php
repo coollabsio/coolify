@@ -379,7 +379,9 @@
         let theme = localStorage.theme
         let cpuColor = '#1e90ff'
         let ramColor = '#00ced1'
-        let textColor = '#ffffff'
+        // Chart text follows the CSS text color, so it stays readable after a theme change without a re-render
+        // (for example a page that Livewire restores from its cache on Back).
+        const textColor = 'currentColor'
         let editorBackground = '#181818'
         let editorTheme = 'blackboard'
 
@@ -391,13 +393,11 @@
             if (theme == 'dark' || (theme == 'custom' && document.documentElement.classList.contains('dark'))) {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
-                textColor = '#ffffff'
                 editorBackground = '#181818'
                 editorTheme = 'blackboard'
             } else {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
-                textColor = '#000000'
                 editorBackground = '#ffffff'
                 editorTheme = null
             }

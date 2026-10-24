@@ -91,3 +91,21 @@ test('console input cannot forward control sequences or send into a shell sessio
     component.submitConsoleCommand();
     assert.equal(messages.length, 0);
 });
+
+function systemTerminalTheme({ theme, dark }) {
+    const source = readFileSync(new URL('./terminal.js', import.meta.url), 'utf8');
+    const themeSource = source.slice(source.indexOf('const baseApplicationTerminalTheme'), source.indexOf('const applicationTerminalThemes'));
+    return vm.runInNewContext(`${themeSource}\ncreateSystemTerminalTheme();`, {
+        document: { documentElement: { dataset: { theme }, classList: { contains: (name) => name === 'dark' && dark } } },
+        localStorage: { getItem: (key) => (key === 'themeColor' ? '#c2410c' : null) },
+    });
+}
+
+test('system terminal theme uses dark text on light custom themes and light text on dark custom themes', () => {
+    const lightCustom = systemTerminalTheme({ theme: 'custom', dark: false });
+    assert.equal(lightCustom.foreground, '#18181b');
+    assert.equal(lightCustom.brightGreen, '#166534');
+    assert.equal(lightCustom.cursor, systemTerminalTheme({ theme: 'custom', dark: true }).cursor);
+    assert.equal(systemTerminalTheme({ theme: 'custom', dark: true }).foreground, '#eee9f2');
+    assert.equal(systemTerminalTheme({ theme: 'light', dark: false }).cursor, '#52525b');
+});

@@ -49,33 +49,11 @@
                     sessionStorage.setItem('navLevel', this.navLevel);
                     this.$watch('navLevel', level => sessionStorage.setItem('navLevel', level));
                 }
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                    const userSettings = localStorage.getItem('theme');
-                    if (userSettings !== 'system') { return; }
-                    document.documentElement.classList.toggle('dark', e.matches);
-                    document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                    if (localStorage.getItem('theme') === 'system') { window.applyStoredTheme(); }
                 });
-                this.queryTheme();
+                window.applyStoredTheme();
             },
-            queryTheme() {
-                const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const userSettings = localStorage.getItem('theme') || 'dark';
-                localStorage.setItem('theme', userSettings);
-                let isDark = false;
-                if (userSettings === 'dark' || userSettings === 'custom') {
-                    document.documentElement.classList.add('dark');
-                    isDark = true;
-                } else if (userSettings === 'light') {
-                    document.documentElement.classList.remove('dark');
-                } else if (darkModePreference) {
-                    document.documentElement.classList.add('dark');
-                    isDark = true;
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-                document.documentElement.dataset.theme = userSettings === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
-            }
     }">
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
