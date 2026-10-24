@@ -45,6 +45,9 @@ class StackForm extends Component
 
         // Add dynamic field rules
         foreach ($this->fields ?? collect() as $key => $field) {
+            if (data_get($field, 'isLocked')) {
+                continue;
+            }
             $rules = data_get($field, 'rules', 'nullable');
             $baseRules["fields.$key.value"] = $rules;
         }
@@ -128,16 +131,24 @@ class StackForm extends Component
             return $group;
         });
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->fields = $this->fields->map(function ($field) {
-                if (data_get($field, 'isPassword')) {
-                    $field['value'] = null;
-                }
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('manageEnvironment', $this->service) ?? false);
+        $lockedKeys = $this->lockedFieldKeys();
+        $this->fields = $this->fields->map(function ($field) use ($lockedKeys) {
+            $field['isLocked'] = $lockedKeys->contains(data_get($field, 'key'));
+            if ($field['isLocked'] || ($this->isPasswordHiddenForMember && data_get($field, 'isPassword'))) {
+                $field['value'] = null;
+            }
 
-                return $field;
-            });
-        }
+            return $field;
+        });
+    }
+
+    /**
+     * Keys of the service environment variables that are locked (shown once).
+     */
+    private function lockedFieldKeys(): Collection
+    {
+        return $this->service->environment_variables()->where('is_shown_once', true)->pluck('key');
     }
 
     public function saveCompose($raw)
@@ -173,7 +184,10 @@ class StackForm extends Component
             // Use transaction to ensure atomicity - if parse fails, save is rolled back
             DB::transaction(function () {
                 $this->service->save();
-                $this->service->saveExtraFields($this->fields);
+                $lockedKeys = $this->lockedFieldKeys();
+                $this->service->saveExtraFields(
+                    $this->fields->reject(fn ($field) => $lockedKeys->contains(data_get($field, 'key')))
+                );
                 $this->service->parse();
             });
             // Refresh and write files after a successful commit

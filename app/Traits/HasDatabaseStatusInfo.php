@@ -75,7 +75,6 @@ trait HasDatabaseStatusInfo
 
     public function mount(): void
     {
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
         $this->refresh();
     }
 
