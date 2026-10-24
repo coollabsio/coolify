@@ -7,7 +7,6 @@ use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
-use App\Jobs\VolumeCloneJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -23,7 +22,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
@@ -3337,149 +3335,10 @@ class ServicesController extends Controller
             : $service->name.'-clone-'.$uuid;
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
-        $newService = $service->replicate([
-            'id',
-            'created_at',
-            'updated_at',
-        ])->fill([
+        $newService = clone_service($service, $destination, [
             'uuid' => $uuid,
             'name' => $name,
-            'destination_id' => $destination->id,
-            'destination_type' => $destination->getMorphClass(),
-            'server_id' => $destination->server_id,
-        ]);
-        $newService->save();
-
-        foreach ($service->tags as $tag) {
-            $newService->tags()->attach($tag->id);
-        }
-
-        foreach ($service->scheduled_tasks()->get() as $task) {
-            $task->replicate([
-                'id',
-                'created_at',
-                'updated_at',
-            ])->fill([
-                'uuid' => new_public_id(),
-                'service_id' => $newService->id,
-                'team_id' => $teamId,
-            ])->save();
-        }
-
-        foreach ($service->environment_variables()->get() as $environmentVariable) {
-            $environmentVariable->replicate([
-                'id',
-                'created_at',
-                'updated_at',
-            ])->fill([
-                'resourceable_id' => $newService->id,
-                'resourceable_type' => $newService->getMorphClass(),
-            ])->save();
-        }
-
-        // Create applications/databases (and their volumes) for the clone first.
-        // Child rows are not copied by Service::replicate().
-        $newService->parse();
-        $newService->refresh();
-
-        $sourceApplicationsByName = $service->applications()->get()->keyBy('name');
-        $sourceDatabasesByName = $service->databases()->get()->keyBy('name');
-        $pendingVolumeClones = [];
-        $sourceServer = $service->destination?->server;
-        $targetServer = $newService->destination?->server;
-
-        foreach ($newService->applications()->get() as $application) {
-            $application->fill(['status' => 'exited'])->save();
-
-            $sourceApplication = $sourceApplicationsByName->get($application->name);
-            if (! $sourceApplication) {
-                continue;
-            }
-
-            if ($cloneVolumeData) {
-                $targetVolumesByMount = $application->persistentStorages()->get()->keyBy('mount_path');
-                foreach ($sourceApplication->persistentStorages()->get() as $sourceVolume) {
-                    $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
-                    if (! $targetVolume) {
-                        continue;
-                    }
-
-                    $pendingVolumeClones[] = [
-                        'source' => $sourceVolume->name,
-                        'target' => $targetVolume->name,
-                        'model' => $targetVolume,
-                    ];
-                }
-            }
-        }
-
-        foreach ($newService->databases()->get() as $database) {
-            $database->fill(['status' => 'exited'])->save();
-
-            $sourceDatabase = $sourceDatabasesByName->get($database->name);
-            if (! $sourceDatabase) {
-                continue;
-            }
-
-            if ($cloneVolumeData) {
-                $targetVolumesByMount = $database->persistentStorages()->get()->keyBy('mount_path');
-                foreach ($sourceDatabase->persistentStorages()->get() as $sourceVolume) {
-                    $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
-                    if (! $targetVolume) {
-                        continue;
-                    }
-
-                    $pendingVolumeClones[] = [
-                        'source' => $sourceVolume->name,
-                        'target' => $targetVolume->name,
-                        'model' => $targetVolume,
-                    ];
-                }
-            }
-
-            foreach ($sourceDatabase->scheduledBackups()->get() as $backup) {
-                $newBackup = $backup->replicate([
-                    'id',
-                    'created_at',
-                    'updated_at',
-                ])->fill([
-                    'uuid' => new_public_id(),
-                    'database_id' => $database->id,
-                    'database_type' => $database->getMorphClass(),
-                    'team_id' => $teamId,
-                ]);
-                $newBackup->save();
-                $backup->copyS3StoragesTo($newBackup);
-            }
-        }
-
-        if ($cloneVolumeData && $pendingVolumeClones !== [] && $sourceServer && $targetServer) {
-            try {
-                $chain = [
-                    function () use ($service) {
-                        StopService::run($service);
-                    },
-                ];
-
-                foreach ($pendingVolumeClones as $clone) {
-                    $chain[] = new VolumeCloneJob(
-                        $clone['source'],
-                        $clone['target'],
-                        $sourceServer,
-                        $targetServer,
-                        $clone['model'],
-                    );
-                }
-
-                $chain[] = function () use ($service) {
-                    StartService::run($service);
-                };
-
-                Bus::chain($chain)->onQueue('high')->dispatch();
-            } catch (\Exception $e) {
-                \Log::error('Failed to queue service volume clone for '.$service->uuid.': '.$e->getMessage());
-            }
-        }
+        ], $cloneVolumeData);
 
         auditLog('api.service.cloned', [
             'team_id' => $teamId,
