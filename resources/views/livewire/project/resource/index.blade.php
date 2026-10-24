@@ -93,8 +93,8 @@
                                 <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
                                     stroke-linecap="round" />
                             </svg>
-                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'"></span>
-                            <span x-show="activeFilterCount > 0"
+                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'">Filter</span>
+                            <span x-show="activeFilterCount > 0" x-cloak
                                 class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"
                                 x-text="activeFilterCount"></span>
                             </button>

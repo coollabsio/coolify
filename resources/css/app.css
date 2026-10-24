@@ -6583,15 +6583,15 @@ html.dark .view-toggle {
     border-color: color-mix(in srgb, var(--color-brand-light) 16%, transparent);
 }
 
-html.dark .view-toggle > :is(a, button) {
+html.dark .view-toggle :is(a, button) {
     color: oklch(from var(--color-brand-light) 80% 0.02 h);
 }
 
-html.dark .view-toggle > :is(a, button) svg {
+html.dark .view-toggle :is(a, button) svg {
     color: var(--color-brand-light);
 }
 
-html.dark .view-toggle > :is(a, button):not(.is-selected):hover {
+html.dark .view-toggle :is(a, button):not(.is-selected):hover {
     background-color: color-mix(in srgb, var(--color-brand) 14%, transparent);
     color: #fff;
 }

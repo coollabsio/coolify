@@ -22,8 +22,10 @@
             List view
         </a>
     @else
-        {{-- Only the views that are not current show, as icons: the button switches to that view. --}}
-        @unless ($singleList)
+        {{-- Only the view that is not current shows, as an icon: the button switches to that view.
+             The fixed-width slot keeps its width before Alpine starts, so the toolbar does not jump. --}}
+        @unless ($singleList || count($views) === 0)
+            <span class="flex w-7.5 shrink-0">
             @foreach ($views as $mode => [$label, $icon])
                 <button type="button" x-on:click="setViewMode(@js($mode))" x-show="viewMode !== @js($mode)" x-cloak
                     class="{{ $canvasItem }} {{ $idle }} w-7.5 justify-center px-0!"
@@ -31,6 +33,7 @@
                     <x-reicon :name="$icon" class="size-3.5" />
                 </button>
             @endforeach
+            </span>
         @endunless
         @if (filled($canvasUrl))
             {{-- A label and a purple "Try it" badge, so people notice the canvas view. --}}

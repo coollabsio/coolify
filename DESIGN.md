@@ -390,6 +390,7 @@ Class names below are examples. Keep the values and structure.
 
 - Use one primary button per area. Other actions are neutral buttons.
 - Destructive actions use the error color for text and focus ring.
+- With Appearance → Style → Flat, all buttons lose the raised edge.
 
 ### Menus, listboxes, and popovers
 
