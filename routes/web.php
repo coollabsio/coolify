@@ -138,6 +138,7 @@ use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
+use App\Livewire\TwoFactorRequired;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -191,6 +192,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
+    Route::get('/two-factor-required', TwoFactorRequired::class)->name('two-factor.required');
 
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');

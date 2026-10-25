@@ -28,6 +28,8 @@ class Index extends Component
 
     public bool $is_build_server_fallback_enabled = true;
 
+    public bool $is_two_factor_required = false;
+
     public $avatar;
 
     protected function rules(): array
@@ -37,6 +39,7 @@ class Index extends Component
             'description' => ValidationPatterns::descriptionRules(),
             'is_mcp_server_enabled' => 'boolean',
             'is_build_server_fallback_enabled' => 'boolean',
+            'is_two_factor_required' => 'boolean',
         ];
     }
 
@@ -68,6 +71,7 @@ class Index extends Component
             $this->team->description = $this->description;
             $this->team->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->team->is_build_server_fallback_enabled = $this->is_build_server_fallback_enabled;
+            $this->team->is_two_factor_required = $this->is_two_factor_required;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->team->name;
@@ -76,6 +80,7 @@ class Index extends Component
             // hydrated onto the in-memory model stored in session.
             $this->is_mcp_server_enabled = (bool) ($this->team->is_mcp_server_enabled ?? true);
             $this->is_build_server_fallback_enabled = (bool) ($this->team->is_build_server_fallback_enabled ?? true);
+            $this->is_two_factor_required = (bool) $this->team->is_two_factor_required;
         }
     }
 
@@ -133,6 +138,12 @@ class Index extends Component
         $this->validate();
         try {
             $this->authorize('update', $this->team);
+            if ($this->is_two_factor_required && ! $this->team->is_two_factor_required && blank(auth()->user()->two_factor_confirmed_at)) {
+                $this->is_two_factor_required = false;
+                $this->dispatch('error', 'Enable two-factor authentication on your profile before you require it for the team.');
+
+                return;
+            }
             $this->syncData(true);
             $this->team->save();
             refreshSession();
