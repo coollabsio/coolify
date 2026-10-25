@@ -24,6 +24,28 @@ class CheckUpdates
      */
     public const DNF_UPGRADES_COMMAND = 'LANG=C dnf repoquery -q --refresh --upgrades --latest-limit 1 --qf "%{name} %{arch} %{evr} %{repoid}\n"';
 
+    /**
+     * Simulations of `apt-get upgrade` without and with the phased updates. apt holds back an update in a phased rollout
+     * until this machine is in the rollout, but `apt list --upgradable` still shows it. The difference of the two runs
+     * gives the phased updates. Text matching is not possible: apt 2.4 (Ubuntu 22.04) prints them as "kept back".
+     *
+     * @see https://documentation.ubuntu.com/server/explanation/software/about-apt-upgrade-and-phased-updates/
+     */
+    public const APT_SIMULATE_UPGRADE_COMMAND = 'LANG=C apt-get -s upgrade 2>/dev/null';
+
+    public const APT_SIMULATE_PHASED_UPGRADE_COMMAND = 'LANG=C apt-get -s -o APT::Get::Always-Include-Phased-Updates=true upgrade 2>/dev/null';
+
+    /**
+     * Packages held with `apt-mark hold`. `apt list --upgradable` shows their updates, but apt does not install them.
+     */
+    public const APT_HELD_COMMAND = 'apt-mark showhold 2>/dev/null';
+
+    /**
+     * Simulation of `apk upgrade`. A version pin in /etc/apk/world (`name=1.2-r0`, `name<2`, `name~1.2`) blocks an
+     * update that `apk list --upgradable` still shows, and also the updates of packages that depend on that version.
+     */
+    public const APK_SIMULATE_UPGRADE_COMMAND = 'LANG=C apk upgrade -s 2>/dev/null';
+
     public const RPM_INSTALLED_COMMAND = 'rpm -qa --qf "%{NAME} %{ARCH} %{VERSION}-%{RELEASE}\n"';
 
     /**
@@ -103,6 +125,11 @@ SH;
         'system' => 'Restarts core system services',
     ];
 
+    public const HELD_REASON_LABELS = [
+        'phased' => 'Phased rollout',
+        'held' => 'Held',
+    ];
+
     public function handle(Server $server)
     {
         $osId = 'unknown';
@@ -179,7 +206,14 @@ SH;
                     break;
                 case 'apt':
                     instant_remote_process(['apt-get update -qq'], $server);
-                    $out = $this->parseAptOutput(instant_remote_process(['LANG=C apt list --upgradable 2>/dev/null'], $server));
+                    $out = $this->separateHeldUpdates(
+                        $this->parseAptOutput(instant_remote_process(['LANG=C apt list --upgradable 2>/dev/null'], $server)),
+                        $this->parseAptHeldPackages(
+                            (string) instant_remote_process([self::APT_HELD_COMMAND], $server, false),
+                            (string) instant_remote_process([self::APT_SIMULATE_UPGRADE_COMMAND], $server, false),
+                            (string) instant_remote_process([self::APT_SIMULATE_PHASED_UPGRADE_COMMAND], $server, false),
+                        ),
+                    );
                     break;
                 case 'pacman':
                     $out = $this->parsePacmanOutput(instant_remote_process([self::PACMAN_CHECK_COMMAND], $server));
@@ -187,6 +221,7 @@ SH;
                 case 'apk':
                     instant_remote_process(['apk update -q'], $server);
                     $out = $this->parseApkOutput(instant_remote_process(['LANG=C apk list --upgradable 2>/dev/null'], $server));
+                    $out = $this->separateHeldUpdates($out, $this->parseApkHeldPackages($out, (string) instant_remote_process([self::APK_SIMULATE_UPGRADE_COMMAND], $server, false)));
                     break;
                 default:
                     return [
@@ -412,6 +447,62 @@ SH;
             'total_updates' => count($updates),
             'updates' => $updates,
         ];
+    }
+
+    /**
+     * Moves the updates that the package manager does not install to `held_updates`, with the reason in `held_reason`.
+     *
+     * @param  array<string, 'phased'|'held'>  $heldPackages  Package name => reason.
+     */
+    public function separateHeldUpdates(array $out, array $heldPackages): array
+    {
+        $updates = collect($out['updates'] ?? [])->partition(fn (array $update) => isset($heldPackages[$update['package']]));
+        $out['updates'] = $updates[1]->values()->all();
+        $out['held_updates'] = $updates[0]->map(fn (array $update) => [...$update, 'held_reason' => $heldPackages[$update['package']]])->values()->all();
+        $out['total_updates'] = count($out['updates']);
+
+        return $out;
+    }
+
+    /**
+     * @param  string  $held  Output of APT_HELD_COMMAND.
+     * @param  string  $upgrade  Output of APT_SIMULATE_UPGRADE_COMMAND.
+     * @param  string  $upgradeWithPhased  Output of APT_SIMULATE_PHASED_UPGRADE_COMMAND.
+     * @return array<string, 'phased'|'held'>
+     */
+    public function parseAptHeldPackages(string $held, string $upgrade, string $upgradeWithPhased): array
+    {
+        $installs = function (string $output): ?array {
+            // Without the summary line, the simulation failed and tells nothing.
+            if (! preg_match('/^\d+ upgraded,/m', $output)) {
+                return null;
+            }
+            preg_match_all('/^Inst ([^\s:]+)/m', $output, $matches);
+
+            return $matches[1];
+        };
+        $installed = $installs($upgrade);
+        $installedWithPhased = $installs($upgradeWithPhased);
+        $phased = $installed === null || $installedWithPhased === null ? [] : array_diff($installedWithPhased, $installed);
+        preg_match_all('/^([^\s:]+)/m', $held, $heldMatches);
+
+        return [...array_fill_keys($phased, 'phased'), ...array_fill_keys($heldMatches[1], 'held')];
+    }
+
+    /**
+     * @param  string  $simulation  Output of APK_SIMULATE_UPGRADE_COMMAND.
+     * @return array<string, 'held'>
+     */
+    public function parseApkHeldPackages(array $out, string $simulation): array
+    {
+        // Without the summary line, the simulation failed and tells nothing.
+        if (! preg_match('/^OK: /m', $simulation)) {
+            return [];
+        }
+        preg_match_all('/^\(\s*\d+\/\d+\) Upgrading (\S+) \(/m', $simulation, $matches);
+        $held = array_diff(array_column($out['updates'] ?? [], 'package'), $matches[1]);
+
+        return array_fill_keys($held, 'held');
     }
 
     public function parsePacmanOutput(string $output): array

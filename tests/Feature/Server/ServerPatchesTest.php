@@ -205,6 +205,25 @@ describe('patches page', function () {
             ->assertSee('openssl');
     });
 
+    it('shows held back updates apart from the updates and does not update them', function () {
+        $result = [...patchesTestResult(0), 'held_updates' => [
+            ['package' => 'cloud-init', 'current_version' => '25.1.4-0ubuntu0~24.04.1', 'new_version' => '26.2-0ubuntu1~24.04.2', 'architecture' => 'all', 'repository' => 'noble-updates', 'held_reason' => 'phased'],
+            ['package' => 'tzdata', 'current_version' => '2025b-0ubuntu0.24.04', 'new_version' => '2025b-0ubuntu0.24.04.1', 'architecture' => 'all', 'repository' => 'noble-updates', 'held_reason' => 'held'],
+        ]];
+        $this->server->settings->forceFill(['patch_check_result' => $result, 'patch_checked_at' => now()])->saveQuietly();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->assertSee('Server is up to date')
+            ->assertSee('Held back updates')
+            ->assertSee('Phased rollout')
+            ->assertSee('26.2-0ubuntu1~24.04.2')
+            ->assertSee('2025b-0ubuntu0.24.04.1')
+            ->call('updatePackage', 'tzdata')
+            ->assertDispatched('error', message: 'This package has no update in the last check.');
+    });
+
     it('updates only a package from the saved result', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);

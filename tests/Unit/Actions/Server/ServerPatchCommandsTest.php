@@ -121,6 +121,102 @@ OUTPUT;
         ->and($result['updates'][0]['risk'])->toBe('system');
 });
 
+it('moves the apt updates that a phased rollout holds back to their own list', function () {
+    // Ubuntu 24.04: cloud-init 26.2 is phased at 80% and this machine is not in the rollout yet.
+    $list = <<<'OUTPUT'
+Listing...
+cloud-init/noble-updates 26.2-0ubuntu1~24.04.2 all [upgradable from: 25.1.4-0ubuntu0~24.04.1]
+zlib1g/noble-updates,noble-security 1:1.3.dfsg-3.1ubuntu2.3 amd64 [upgradable from: 1:1.3.dfsg-3.1ubuntu2.2]
+OUTPUT;
+    $upgrade = <<<'OUTPUT'
+Calculating upgrade...
+The following upgrades have been deferred due to phasing:
+  cloud-init
+The following packages will be upgraded:
+  zlib1g
+1 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+Inst zlib1g [1:1.3.dfsg-3.1ubuntu2.2] (1:1.3.dfsg-3.1ubuntu2.3 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])
+Conf zlib1g (1:1.3.dfsg-3.1ubuntu2.3 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])
+OUTPUT;
+    $upgradeWithPhased = <<<'OUTPUT'
+Calculating upgrade...
+The following packages will be upgraded:
+  cloud-init zlib1g
+2 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+Inst zlib1g [1:1.3.dfsg-3.1ubuntu2.2] (1:1.3.dfsg-3.1ubuntu2.3 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])
+Inst cloud-init [25.1.4-0ubuntu0~24.04.1] (26.2-0ubuntu1~24.04.2 Ubuntu:24.04/noble-updates [all])
+Conf zlib1g (1:1.3.dfsg-3.1ubuntu2.3 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])
+Conf cloud-init (26.2-0ubuntu1~24.04.2 Ubuntu:24.04/noble-updates [all])
+OUTPUT;
+    $action = new CheckUpdates;
+
+    $result = $action->separateHeldUpdates($action->parseAptOutput($list), $action->parseAptHeldPackages('', $upgrade, $upgradeWithPhased));
+
+    expect(collect($result['updates'])->pluck('package')->all())->toBe(['zlib1g'])
+        ->and($result['total_updates'])->toBe(1)
+        ->and($result['held_updates'])->toBe([[
+            'package' => 'cloud-init',
+            'repository' => 'noble-updates',
+            'new_version' => '26.2-0ubuntu1~24.04.2',
+            'architecture' => 'all',
+            'current_version' => '25.1.4-0ubuntu0~24.04.1',
+            'held_reason' => 'phased',
+        ]]);
+
+    // A failed simulation must not mark every update as phased.
+    expect($action->parseAptHeldPackages('', '', $upgradeWithPhased))->toBe([]);
+});
+
+it('moves the apt updates of held packages to the held list', function () {
+    // Debian 12 after `apt-mark hold tzdata`: `apt list --upgradable` still shows tzdata.
+    $list = <<<'OUTPUT'
+Listing...
+tzdata/stable-updates 2025b-0+deb12u2 all [upgradable from: 2025b-0+deb12u1]
+OUTPUT;
+    $action = new CheckUpdates;
+
+    $result = $action->separateHeldUpdates($action->parseAptOutput($list), $action->parseAptHeldPackages("tzdata\n", '', ''));
+
+    expect($result['updates'])->toBe([])
+        ->and($result['total_updates'])->toBe(0)
+        ->and(collect($result['held_updates'])->pluck('held_reason', 'package')->all())->toBe(['tzdata' => 'held']);
+});
+
+it('moves the apk updates that a version pin blocks to the held list', function () {
+    // Alpine 3.20.0 with `busybox=1.36.1-r28` in /etc/apk/world: busybox-binsh needs the same busybox version.
+    $list = <<<'OUTPUT'
+busybox-1.36.1-r31 x86_64 {busybox} (GPL-2.0-only) [upgradable from: busybox-1.36.1-r28]
+busybox-binsh-1.36.1-r31 x86_64 {busybox} (GPL-2.0-only) [upgradable from: busybox-binsh-1.36.1-r28]
+zlib-1.3.2-r0 x86_64 {zlib} (Zlib) [upgradable from: zlib-1.3.1-r1]
+OUTPUT;
+    $simulation = <<<'OUTPUT'
+WARNING: This simulation is not reliable as apk-tools upgrade is available.
+(1/1) Upgrading zlib (1.3.1-r1 -> 1.3.2-r0)
+OK: 8 MiB in 14 packages
+OUTPUT;
+    $action = new CheckUpdates;
+    $out = $action->parseApkOutput($list);
+
+    $result = $action->separateHeldUpdates($out, $action->parseApkHeldPackages($out, $simulation));
+
+    expect(collect($result['updates'])->pluck('package')->all())->toBe(['zlib'])
+        ->and(collect($result['held_updates'])->pluck('held_reason', 'package')->all())->toBe(['busybox' => 'held', 'busybox-binsh' => 'held'])
+        // apk-tools 3 pads the step number; a failed simulation has no OK line and marks nothing.
+        ->and($action->parseApkHeldPackages($out, "( 1/3) Upgrading busybox (1.36.1-r28 -> 1.36.1-r31)\n( 2/3) Upgrading busybox-binsh (1.36.1-r28 -> 1.36.1-r31)\n( 3/3) Upgrading zlib (1.3.1-r1 -> 1.3.2-r0)\nOK: 8 MiB in 14 packages\n"))->toBe([])
+        ->and($action->parseApkHeldPackages($out, "ERROR: unable to lock database\n"))->toBe([]);
+});
+
+it('runs the held package checks with sudo for a non-root user', function () {
+    $commands = [CheckUpdates::APT_HELD_COMMAND, CheckUpdates::APT_SIMULATE_UPGRADE_COMMAND, CheckUpdates::APT_SIMULATE_PHASED_UPGRADE_COMMAND, CheckUpdates::APK_SIMULATE_UPGRADE_COMMAND];
+
+    expect(parseCommandsByLineForSudo(collect($commands), patchCommandsNonRootServer()))->toBe([
+        'sudo apt-mark showhold 2>/dev/null',
+        'sudo LANG=C apt-get -s upgrade 2>/dev/null',
+        'sudo LANG=C apt-get -s -o APT::Get::Always-Include-Phased-Updates=true upgrade 2>/dev/null',
+        'sudo LANG=C apk upgrade -s 2>/dev/null',
+    ]);
+});
+
 it('reads the security packages of dnf4 and dnf5 advisories', function () {
     // Rocky Linux 9 (dnf4) and Fedora 42 (dnf5) `dnf updateinfo list --security`.
     $dnf4 = <<<'OUTPUT'
