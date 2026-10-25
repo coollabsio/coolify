@@ -148,7 +148,8 @@ function composeResourceDirectory(Application|Service $resource): string
  * Renders a long-syntax bind with its resolved source. It keeps the options that Docker Compose
  * accepts, such as read_only and bind, and removes other keys, which Compose rejects. Without
  * `bind.create_host_path`, a missing source is created, as with short syntax: Docker Compose
- * before v2.30 does not do that for long syntax.
+ * before v2.30 does not do that for long syntax. A short-syntax mode in the target
+ * (`/data/users.yml:ro`) becomes `read_only`, because Docker rejects it in long syntax.
  *
  * @param  array<string, mixed>  $volume
  * @return array<string, mixed>
@@ -160,6 +161,10 @@ function composeLongBindVolume(array $volume, string $source): array
         fn ($key) => in_array($key, ['type', 'source', 'target', 'read_only', 'consistency', 'bind'], true) || str_starts_with((string) $key, 'x-'),
         ARRAY_FILTER_USE_KEY
     );
+    if (preg_match('/^(.+):(ro|rw)$/', (string) ($volume['target'] ?? ''), $matches)) {
+        $volume['target'] = $matches[1];
+        $volume['read_only'] ??= $matches[2] === 'ro';
+    }
     $volume['source'] = $source;
     $volume['bind'] = is_array($volume['bind'] ?? null) ? $volume['bind'] : [];
     $volume['bind']['create_host_path'] ??= true;

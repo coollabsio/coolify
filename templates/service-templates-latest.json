@@ -1138,7 +1138,7 @@
     "dozzle-with-auth": {
         "documentation": "https://dozzle.dev/?utm_source=coolify.io",
         "slogan": "Dozzle is a simple and lightweight web UI for Docker logs.",
-        "compose": "c2VydmljZXM6CiAgZG96emxlOgogICAgaW1hZ2U6ICdhbWlyMjAvZG96emxlOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0RPWlpMRV84MDgwCiAgICAgIC0gRE9aWkxFX0FVVEhfUFJPVklERVI9c2ltcGxlCiAgICB2b2x1bWVzOgogICAgICAtICcvdmFyL3J1bi9kb2NrZXIuc29jazovdmFyL3J1bi9kb2NrZXIuc29jaycKICAgICAgLQogICAgICAgIHR5cGU6IGJpbmQKICAgICAgICBzb3VyY2U6IC4vZGF0YS91c2Vycy55bWwKICAgICAgICB0YXJnZXQ6ICcvZGF0YS91c2Vycy55bWw6cm8nCiAgICAgICAgY29udGVudDogInVzZXJzOlxuICAjIFwiYWRtaW5cIiBpcyB0aGUgdXNlcm5hbWVcbiAgYWRtaW46XG4gICAgZW1haWw6IHRlc3RAZW1haWwuY29tXG4gICAgbmFtZTogQWRtaW5cbiAgICAjIEEgYmNyeXB0IGhhc2ggb2YgdGhlIHBhc3N3b3JkIHlvdSB3YW50IHRvIHVzZS4gQ2FuIGJlIGNvbXB1dGVkIHdpdGggXCJweXRob24zIC1jICdpbXBvcnQgYmNyeXB0O3ByaW50KGJjcnlwdC5oYXNocHcoYlwieW91ci1wYXNzd29yZFwiLGJjcnlwdC5nZW5zYWx0KDExKSkuZGVjb2RlKCkpJyBcIi4gRGVmYXVsdCBwYXNzd29yZCBpcyBcInRlc3RcIi5cbiAgICBwYXNzd29yZDogJDJhJDExJHZpdWNDdkZMbEhXdkJOT09JNnV5cHVWVS5EMDlVV2IuenN3UnhFZzBNa0RQaTFxL2JLYmRHXG4iCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gL2RvenpsZQogICAgICAgIC0gaGVhbHRoY2hlY2sKICAgICAgaW50ZXJ2YWw6IDNzCiAgICAgIHRpbWVvdXQ6IDMwcwogICAgICByZXRyaWVzOiA1Cg==",
+        "compose": "c2VydmljZXM6CiAgZG96emxlOgogICAgaW1hZ2U6ICdhbWlyMjAvZG96emxlOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0RPWlpMRV84MDgwCiAgICAgIC0gRE9aWkxFX0FVVEhfUFJPVklERVI9c2ltcGxlCiAgICB2b2x1bWVzOgogICAgICAtICcvdmFyL3J1bi9kb2NrZXIuc29jazovdmFyL3J1bi9kb2NrZXIuc29jaycKICAgICAgLQogICAgICAgIHR5cGU6IGJpbmQKICAgICAgICBzb3VyY2U6IC4vZGF0YS91c2Vycy55bWwKICAgICAgICB0YXJnZXQ6IC9kYXRhL3VzZXJzLnltbAogICAgICAgIGNvbnRlbnQ6ICJ1c2VyczpcbiAgIyBcImFkbWluXCIgaXMgdGhlIHVzZXJuYW1lXG4gIGFkbWluOlxuICAgIGVtYWlsOiB0ZXN0QGVtYWlsLmNvbVxuICAgIG5hbWU6IEFkbWluXG4gICAgIyBBIGJjcnlwdCBoYXNoIG9mIHRoZSBwYXNzd29yZCB5b3Ugd2FudCB0byB1c2UuIENhbiBiZSBjb21wdXRlZCB3aXRoIFwicHl0aG9uMyAtYyAnaW1wb3J0IGJjcnlwdDtwcmludChiY3J5cHQuaGFzaHB3KGJcInlvdXItcGFzc3dvcmRcIixiY3J5cHQuZ2Vuc2FsdCgxMSkpLmRlY29kZSgpKScgXCIuIERlZmF1bHQgcGFzc3dvcmQgaXMgXCJ0ZXN0XCIuXG4gICAgcGFzc3dvcmQ6ICQyYSQxMSR2aXVjQ3ZGTGxIV3ZCTk9PSTZ1eXB1VlUuRDA5VVdiLnpzd1J4RWcwTWtEUGkxcS9iS2JkR1xuIgogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIC9kb3p6bGUKICAgICAgICAtIGhlYWx0aGNoZWNrCiAgICAgIGludGVydmFsOiAzcwogICAgICB0aW1lb3V0OiAzMHMKICAgICAgcmV0cmllczogNQo=",
         "tags": [
             "dozzle",
             "docker",
@@ -3509,7 +3509,7 @@
         "category": "messaging",
         "logo": "svgs/mosquitto.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-01-05T18:25:15+01:00",
+        "template_last_updated_at": "2026-10-23T22:58:59+02:00",
         "port": "1883"
     },
     "n8n-with-postgres-and-worker": {
