@@ -46,23 +46,23 @@ class RouteServiceProvider extends ServiceProvider
     {
         RateLimiter::for('api', function (Request $request) {
             if ($request->path() === 'api/health') {
-                return Limit::perMinute(1000)->by($request->user()?->id ?: auth_rate_limit_ip($request));
+                return Limit::perMinute(1000)->by($request->user()?->id ?: client_ip($request));
             }
 
-            return Limit::perMinute((int) config('api.rate_limit'))->by($request->user()?->id ?: auth_rate_limit_ip($request));
+            return Limit::perMinute((int) config('api.rate_limit'))->by($request->user()?->id ?: client_ip($request));
         });
         RateLimiter::for('5', function (Request $request) {
-            return Limit::perMinute(5)->by($request->user()?->id ?: auth_rate_limit_ip($request));
+            return Limit::perMinute(5)->by($request->user()?->id ?: client_ip($request));
         });
 
         RateLimiter::for('feedback', function (Request $request) {
-            return Limit::perMinute(3)->by($request->user()?->id ?: auth_rate_limit_ip($request));
+            return Limit::perMinute(3)->by($request->user()?->id ?: client_ip($request));
         });
 
         RateLimiter::for('login', function (Request $request) {
             $email = $request->input('email');
             $emailIdentity = normalize_email_identity(is_string($email) ? $email : null);
-            $limits = [Limit::perMinute(5)->by((is_string($email) ? $email : '').'|'.auth_rate_limit_ip($request))];
+            $limits = [Limit::perMinute(5)->by((is_string($email) ? $email : '').'|'.client_ip($request))];
             if ($emailIdentity !== null) {
                 $limits[] = Limit::perMinute(5)->by('login:email-identity:'.sha1($emailIdentity));
             }
@@ -75,12 +75,12 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('passkeys', function (Request $request) {
-            return Limit::perMinute(30)->by('passkeys:'.auth_rate_limit_ip($request));
+            return Limit::perMinute(30)->by('passkeys:'.client_ip($request));
         });
 
         RateLimiter::for('forgot-password', function (Request $request) {
             $limits = [
-                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1(auth_rate_limit_ip($request))),
+                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1(client_ip($request))),
             ];
 
             $emailIdentity = normalize_email_identity($request->input('email'));
@@ -92,7 +92,7 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('magic-link', function (Request $request) {
-            return Limit::perMinute(5)->by(hash('sha256', (string) $request->input('token').'|'.auth_rate_limit_ip($request)));
+            return Limit::perMinute(5)->by(hash('sha256', (string) $request->input('token').'|'.client_ip($request)));
         });
 
         RateLimiter::for('force-password-reset', function (Request $request) {
