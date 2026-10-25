@@ -17,7 +17,7 @@
         "firebase/php-jwt": "^7.2.1",
         "guzzlehttp/guzzle": "^7.15.5",
         "laravel/fortify": "^1.40.0",
-        "laravel/framework": "^12.69.3",
+        "laravel/framework": "^12.70.1",
         "laravel/horizon": "^5.50.0",
         "laravel/mcp": "^1.0.1",
         "laravel/pail": "^1.2.7",
