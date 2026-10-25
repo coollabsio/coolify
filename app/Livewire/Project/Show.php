@@ -64,7 +64,7 @@ class Show extends Component
         $canCreateResource = auth()->user()->can('createAnyResource');
 
         return view('livewire.project.show', [
-            'environmentsJs' => $this->project->environments->map(function (Environment $environment) use ($canCreateResource, $canUpdateProject): array {
+            'environmentsJs' => $this->project->environments->sort(fn (Environment $first, Environment $second): int => Environment::compareNames($first->name, $second->name))->values()->map(function (Environment $environment) use ($canCreateResource, $canUpdateProject): array {
                 $resourceCount = collect([
                     $environment->applications_count,
                     $environment->services_count,

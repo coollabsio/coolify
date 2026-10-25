@@ -56,6 +56,18 @@ class Environment extends BaseModel
         });
     }
 
+    /**
+     * Sort order of environment names: production, staging, and development first, then the others by name.
+     * resources/js/environment-order.js has the same order for the canvases.
+     */
+    public static function compareNames(string $first, string $second): int
+    {
+        $order = ['production', 'staging', 'development'];
+        $rank = fn (string $name): int => ($index = array_search(strtolower($name), $order, true)) === false ? count($order) : $index;
+
+        return $rank($first) <=> $rank($second) ?: strnatcasecmp($first, $second);
+    }
+
     public static function ownedByCurrentTeam()
     {
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');

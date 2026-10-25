@@ -211,13 +211,17 @@
     function projectEnvironments() {
         return {
             search: '',
-            sortBy: 'name-asc',
+            sortBy: 'default',
             sortOpen: false,
             viewMode: @js($this->listView('project', 'grid')),
             page: 1,
             pageSize: 12,
             environments: @js($environmentsJs),
             sortOptions: [{
+                    value: 'default',
+                    label: 'Default'
+                },
+                {
                     value: 'name-asc',
                     label: 'Name A–Z'
                 },
@@ -249,8 +253,12 @@
                         return second.resourceCount - first.resourceCount ||
                             first.name.localeCompare(second.name);
                     }
+                    if (this.sortBy === 'name-asc') {
+                        return first.name.localeCompare(second.name);
+                    }
 
-                    return first.name.localeCompare(second.name);
+                    // Default: the server order (production, staging, development, then by name).
+                    return 0;
                 });
             },
             get totalPages() {

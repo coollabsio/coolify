@@ -4,6 +4,7 @@
 // DOM-free: `node --test` imports this file.
 
 import { BOX_GAP, freeSpot, MAX_ZOOM, MIN_ZOOM } from './canvas-core.js';
+import { compareEnvironmentNames } from './environment-order.js';
 
 export const CARD_WIDTH = 260;
 export const COLUMN_GAP = 48;
@@ -130,7 +131,12 @@ const contextGroups = nodes => {
   }
   // Server view: the unmanaged containers group comes first, so it is not lost below many projects.
   const unmanaged = ([, members]) => (members[0]?.type === 'container' ? 0 : 1);
-  return [...groups.entries()].sort((a, b) => unmanaged(a) - unmanaged(b) || a[0].localeCompare(b[0]));
+  // Then by project, then production, staging, and development before the other environments.
+  const project = ([name, members]) => members[0]?.project?.name ?? name;
+  const environment = ([name, members]) => members[0]?.environment?.name ?? name;
+  return [...groups.entries()].sort(
+    (a, b) => unmanaged(a) - unmanaged(b) || project(a).localeCompare(project(b)) || compareEnvironmentNames(environment(a), environment(b)),
+  );
 };
 const byTypeAndName = (a, b) => columnOf(a) - columnOf(b) || String(a.name).localeCompare(String(b.name));
 
@@ -637,7 +643,7 @@ export function statusLabel(status) {
 }
 
 /**
- * Connect and server views: projects of the resources, each with its environments, sorted by name.
+ * Connect and server views: projects of the resources sorted by name, each with its environments in environment order.
  * @returns {{uuid: string, name: string, environments: {uuid: string, name: string}[]}[]}
  */
 export function filterOptions(graph) {
@@ -649,7 +655,7 @@ export function filterOptions(graph) {
   }
   const byName = (a, b) => String(a.name).localeCompare(String(b.name));
   return [...projects.values()]
-    .map(p => ({ uuid: p.uuid, name: p.name, environments: [...p.environments.values()].sort(byName) }))
+    .map(p => ({ uuid: p.uuid, name: p.name, environments: [...p.environments.values()].sort((a, b) => compareEnvironmentNames(a.name, b.name)) }))
     .sort(byName);
 }
 

@@ -258,6 +258,20 @@ test('server view: one frame per project / environment, and the frames do not ov
   assert.equal(positions.a.y, positions.b.y);
 });
 
+test('groups: production, staging, and development come before the other environments of a project', () => {
+  const env = (id, project, environment) =>
+    srv(id, 'application', `${project} / ${environment}`, { project: { uuid: project, name: project }, environment: { uuid: id, name: environment } });
+  const graph = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [env('a', 'Shop', 'deprecated'), env('b', 'Shop', 'development'), env('c', 'Shop', 'production'), env('d', 'Shop', 'qa'), env('e', 'Shop', 'staging'), env('f', 'Blog', 'zeta')],
+    links: [],
+    positions: {},
+  };
+  const frames = groupFrames(graph.nodes, layoutGraph(graph));
+  assert.deepEqual(frames.map(f => f.name), ['Blog / zeta', 'Shop / production', 'Shop / staging', 'Shop / development', 'Shop / deprecated', 'Shop / qa']);
+});
+
 const envNode = (id, type, zone, environment, extra = {}) => srv(id, type, `Shop / ${environment}`, { zone, project: { uuid: 'p' }, environment: { uuid: environment }, ...extra });
 
 test('server view: cards link only to cards of the same environment', () => {
@@ -498,15 +512,16 @@ test('variables view: filter resources by project and environment, keep every va
       node('variable:1', 'variable', 'sources'),
       node('a', 'application', 'resources', { project: shop, environment: { uuid: 'e1', name: 'production' } }),
       node('b', 'application', 'resources', { project: shop, environment: { uuid: 'e2', name: 'staging' } }),
+      node('d', 'application', 'resources', { project: shop, environment: { uuid: 'e4', name: 'deprecated' } }),
       node('c', 'application', 'resources', { project: blog, environment: { uuid: 'e3', name: 'production' } }),
     ],
     links: [{ id: 'l1', source: 'variable:1', target: 'a' }, { id: 'l2', source: 'variable:1', target: 'c' }],
   };
 
-  assert.deepEqual(filterOptions(g).map(p => [p.name, p.environments.map(e => e.name)]), [['Blog', ['production']], ['Shop', ['production', 'staging']]]);
+  assert.deepEqual(filterOptions(g).map(p => [p.name, p.environments.map(e => e.name)]), [['Blog', ['production']], ['Shop', ['production', 'staging', 'deprecated']]]);
   assert.equal(filterGraph(g, {}), g);
   const shopOnly = filterGraph(g, { project: 'p1' });
-  assert.deepEqual(shopOnly.nodes.map(n => n.id), ['variable:1', 'a', 'b']);
+  assert.deepEqual(shopOnly.nodes.map(n => n.id), ['variable:1', 'a', 'b', 'd']);
   assert.deepEqual(shopOnly.links.map(l => l.id), ['l1']);
   assert.deepEqual(filterGraph(g, { environment: 'e2' }).nodes.map(n => n.id), ['variable:1', 'b']);
   assert.deepEqual(filterGraph(g, { environment: 'e2' }).links, []);
