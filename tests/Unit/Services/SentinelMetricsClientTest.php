@@ -220,3 +220,30 @@ it('prefers the root mount over the Sentinel data mount', function () {
 
     expect($client->history('disk', '24h'))->toBe([[1699999800000, 60.0]]);
 });
+
+it('uses the host mount of the Coolify data directory when it is on its own disk', function (string $dataMount) {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/summary' => json_encode(['disk' => [
+            ['mount' => $dataMount, 'used' => 20, 'total' => 100, 'usedPercent' => 20],
+            ['mount' => '/boot', 'used' => 90, 'total' => 100, 'usedPercent' => 90],
+        ]]),
+        '/disk/history' => json_encode([
+            ['time' => 1700000000000, 'mount' => $dataMount, 'usedPercent' => 20],
+            ['time' => 1700000000000, 'mount' => '/boot', 'usedPercent' => 90],
+        ]),
+    ];
+
+    expect($client->summary()['diskPercent'])->toBe(20.0)
+        ->and($client->history('disk', '24h'))->toBe([[1699999800000, 20.0]]);
+})->with(['/data', '/data/coolify']);
+
+it('prefers the root mount over the host mount of the Coolify data directory', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = ['/disk/history' => json_encode([
+        ['time' => 1700000000000, 'mount' => '/data', 'usedPercent' => 20],
+        ['time' => 1700000000000, 'mount' => '/', 'usedPercent' => 60],
+    ])];
+
+    expect($client->history('disk', '24h'))->toBe([[1699999800000, 60.0]]);
+});

@@ -165,9 +165,10 @@ class SentinelMetricsClient
     }
 
     /**
-     * The mount that stands for the root disk: `/`, else Sentinel's data bind mount.
-     * Sentinel 1.1.2 and older run in a container and report only their own mounts,
-     * so the host disk that holds /data/coolify is reported as `/app/db`.
+     * The mount that stands for the root disk: `/`, else the disk that holds /data/coolify.
+     * Sentinel runs in a container and reports only the disks of its own mounts:
+     * 1.1.2 and older as `/app/db`, 1.1.3 and newer by host mount point, which is
+     * `/data` or `/data/coolify` when that directory is on its own disk.
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
@@ -175,7 +176,7 @@ class SentinelMetricsClient
     {
         $mounts = array_column($rows, 'mount');
 
-        return collect(['/', '/app/db'])->first(fn ($mount) => in_array($mount, $mounts, true));
+        return collect(['/', '/app/db', '/data/coolify', '/data'])->first(fn ($mount) => in_array($mount, $mounts, true));
     }
 
     /**
