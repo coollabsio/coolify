@@ -15,7 +15,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - type: bind
         source: ./data/users.yml
-        target: /data/users.yml:ro
+        target: /data/users.yml
+        read_only: true
         content: |
           users:
             # "admin" is the username
