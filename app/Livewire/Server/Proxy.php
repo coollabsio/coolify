@@ -27,6 +27,8 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
+    public ?string $customErrorPage = null;
+
     public bool $generateExactLabels = false;
 
     public ?string $certificateResolver = null;
@@ -53,6 +55,7 @@ class Proxy extends Component
             'generateExactLabels' => 'required|boolean',
             'redirectUrl' => ['nullable', new SafeExternalUrl],
             'certificateResolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
+            'customErrorPage' => ['nullable', 'string', proxyPageSizeRule('custom error page')],
         ];
     }
 
@@ -61,6 +64,7 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->customErrorPage = $this->server->proxy_error_page;
         $this->syncData(false);
         $this->clearAppliedTraefikBranchWarning();
     }
@@ -204,6 +208,20 @@ class Proxy extends Component
         }
     }
 
+    public function resetCustomErrorPage(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy_error_page = null;
+            $this->server->save();
+            $this->customErrorPage = null;
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Default error page restored.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {
@@ -211,6 +229,7 @@ class Proxy extends Component
             $this->validate();
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
+            $this->server->proxy_error_page = filled($this->customErrorPage) ? $this->customErrorPage : null;
             $this->server->save();
             $this->saveSettings();
             auditLog('ui.server.proxy.configuration_saved', $this->proxyAuditContext());

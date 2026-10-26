@@ -1,19 +1,28 @@
 <?php
 
 use App\Livewire\Server\Show;
+use App\Livewire\Server\TransferFinish;
+use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['app.env' => 'local']);
+    // A claim writes the owner marker on the host over SSH.
+    Process::fake();
+    Storage::fake('ssh-keys');
+    config(['app.env' => 'production']);
+    $this->withoutVite();
     InstanceSettings::forceCreate([
         'id' => 0,
         'fqdn' => 'https://coolify-a.test',
@@ -32,40 +41,13 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-test('owner can stop managing a server from this instance', function () {
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('toggleManagement')
-        ->assertDispatched('success');
-
-    $this->server->refresh();
-
-    expect($this->server->isTransferredAway())->toBeTrue()
-        ->and($this->server->isManagementDisabled())->toBeTrue()
-        ->and((bool) $this->server->settings->force_disabled)->toBeTrue()
-        ->and((bool) $this->server->settings->is_sentinel_enabled)->toBeFalse();
-});
-
-test('server with disabled management shows it is transferable, not transferred away', function () {
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('toggleManagement')
-        ->assertSee('Transferable to another instance')
-        ->assertSee(route('server.transfer', ['server_uuid' => $this->server->uuid]))
-        ->assertDontSee('Transferred to another instance')
-        ->assertDontSee('Transferred away')
-        ->assertDontSeeHtml('>Transferable<');
-});
-
-test('server transferred to another instance is not reported as management disabled', function () {
+test('server transferred to another instance shows where it was transferred', function () {
     app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
-
-    $this->server->refresh();
-
-    expect($this->server->isTransferredAway())->toBeTrue()
-        ->and($this->server->isManagementDisabled())->toBeFalse();
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->assertSee('Transferred to another instance')
-        ->assertDontSee('Transferable to another instance');
+        ->assertSee('https://coolify-b.test')
+        ->assertSee('Enable management');
 });
 
 test('owner can take management of a transferred server', function () {
@@ -79,7 +61,7 @@ test('owner can take management of a transferred server', function () {
     ])->save();
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('toggleManagement')
+        ->call('enableManagement')
         ->assertDispatched('success');
 
     $this->server->refresh();
@@ -112,7 +94,7 @@ test('cloud team over its server limit cannot take management of a transferred s
     markServerTransferredAway($this->server);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('toggleManagement')
+        ->call('enableManagement')
         ->assertDispatched('error')
         ->assertNotDispatched('success');
 
@@ -128,7 +110,7 @@ test('cloud team within its server limit can take management of a transferred se
     markServerTransferredAway($this->server);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('toggleManagement')
+        ->call('enableManagement')
         ->assertDispatched('success');
 
     $this->server->refresh();
@@ -137,7 +119,7 @@ test('cloud team within its server limit can take management of a transferred se
         ->and((bool) $this->server->settings->force_disabled)->toBeFalse();
 });
 
-test('claiming a server keeps it force disabled when the cloud team is over its server limit', function () {
+test('claiming a server fails without changes when the cloud team is over its server limit', function () {
     config()->set('constants.coolify.self_hosted', false);
     $this->team->forceFill(['custom_server_limit' => 1])->save();
     Server::factory()->create([
@@ -146,15 +128,18 @@ test('claiming a server keeps it force disabled when the cloud team is over its 
     ]);
     markServerTransferredAway($this->server);
 
-    app(ServerTransferClaimer::class)->claim($this->server);
+    expect(fn () => app(ServerTransferClaimer::class)->claim($this->server))
+        ->toThrow(RuntimeException::class, 'over its server limit');
 
     $this->server->refresh();
 
-    expect(data_get($this->server->server_metadata, 'transfer.status'))->toBe('claimed')
+    expect($this->server->isTransferredAway())->toBeTrue()
         ->and((bool) $this->server->settings->force_disabled)->toBeTrue();
+    Process::assertNothingRan();
 });
 
-test('team members cannot change server management ownership', function () {
+test('team members cannot take management of a transferred server', function () {
+    markServerTransferredAway($this->server);
     $member = User::factory()->create();
     $this->team->members()->attach($member, ['role' => 'member']);
 
@@ -162,27 +147,25 @@ test('team members cannot change server management ownership', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('toggleManagement')
+        ->call('enableManagement')
         ->assertForbidden();
 
-    expect($this->server->fresh()->isTransferredAway())->toBeFalse();
+    expect($this->server->fresh()->isTransferredAway())->toBeTrue();
 });
 
-test('server overview shows a management button that matches the ownership state', function () {
+test('a managed server has no management button and cannot be disabled from the server page', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Disable management')
         ->assertDontSee('Enable management')
-        ->assertDontSeeHtml('wire:confirm')
-        ->call('toggleManagement', '')
-        ->assertSee('Enable management')
-        ->assertDontSee('Disable management');
+        ->assertDontSee('Disable management')
+        ->call('enableManagement')
+        ->assertNotDispatched('success');
+
+    expect(data_get($this->server->fresh()->server_metadata, 'transfer.status'))->toBeNull();
 });
 
-test('server validation button is hidden while management is disabled or transferred away', function () {
+test('server validation button is hidden while the server is transferred away', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSeeHtml('wire:click.prevent="validateServer"')
-        ->call('toggleManagement')
-        ->assertDontSeeHtml('wire:click.prevent="validateServer"');
+        ->assertSeeHtml('wire:click.prevent="validateServer"');
 
     app(ServerTransferClaimer::class)->markTransferred($this->server->fresh(), targetInstanceUrl: 'https://coolify-b.test');
 
@@ -190,13 +173,37 @@ test('server validation button is hidden while management is disabled or transfe
         ->assertDontSeeHtml('wire:click.prevent="validateServer"');
 });
 
-test('management ownership is not available outside development', function () {
-    config(['app.env' => 'production']);
+test('taking back a transferred server fails without changes when the host cannot be reached', function () {
+    markServerTransferredAway($this->server);
+    Process::fake(['*' => Process::result(errorOutput: 'Connection refused', exitCode: 1)]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertDontSee('Disable management')
-        ->call('toggleManagement')
-        ->assertNotFound();
+        ->call('enableManagement')
+        ->assertNotDispatched('success');
 
-    expect($this->server->fresh()->isTransferredAway())->toBeFalse();
+    $this->server->refresh();
+
+    expect($this->server->isTransferredAway())->toBeTrue()
+        ->and((bool) $this->server->settings->force_disabled)->toBeTrue();
+});
+
+test('after a take back the server page shows the finish list until the user finishes the transfer', function () {
+    markServerTransferredAway($this->server);
+    Application::factory()->create([
+        'name' => 'shop',
+        'destination_id' => $this->server->standaloneDockers()->first()->id,
+        'destination_type' => StandaloneDocker::class,
+        'git_repository' => 'https://github.com/coollabsio/coolify',
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('enableManagement')
+        ->assertDispatched('transferFinishStarted');
+
+    Livewire::test(TransferFinish::class, ['server' => $this->server->fresh()])
+        ->assertSee('Finish the transfer')
+        ->assertSee('Manual webhook of shop')
+        ->call('finishTransfer')
+        ->assertDontSee('Finish the transfer');
+    expect(data_get($this->server->fresh()->server_metadata, 'transfer.finish.finished_at'))->not->toBeNull();
 });

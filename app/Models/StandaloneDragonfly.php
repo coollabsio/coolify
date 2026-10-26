@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneDragonfly extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -402,6 +403,15 @@ class StandaloneDragonfly extends BaseModel
         }
 
         return $environmentVariable;
+    }
+
+    /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->serverPasswordEnvironmentVariable()?->isLockedForLogs();
     }
 
     /**

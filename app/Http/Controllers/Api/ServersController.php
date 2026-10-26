@@ -18,6 +18,7 @@ use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,6 +51,27 @@ class ServersController extends Controller
 
         return serializeApiResponse($settings)
             ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD);
+    }
+
+    /**
+     * Another instance manages a transferred server. Changing its host or credentials would let
+     * "Enable management" connect to a different host, so these fields stay as they are.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function transferredServerConnectionChanges(Request $request, ModelsServer $server): array
+    {
+        $changed = [
+            'ip' => $request->filled('ip') && ModelsServer::normalizeIp($request->input('ip')) !== ModelsServer::normalizeIp($server->getRawOriginal('ip')),
+            'user' => $request->filled('user') && (string) $request->input('user') !== (string) $server->user,
+            'port' => $request->filled('port') && (int) $request->input('port') !== (int) $server->port,
+            'private_key_uuid' => $request->filled('private_key_uuid') && $request->input('private_key_uuid') !== $server->privateKey?->uuid,
+        ];
+
+        return collect($changed)
+            ->filter()
+            ->map(fn () => ['This field cannot be changed on a transferred server.'])
+            ->all();
     }
 
     /**
@@ -602,6 +624,9 @@ class ServersController extends Controller
         if ($foundServer) {
             return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
         }
+        if ($request->instant_validate) {
+            ModelsServer::throttleValidation($teamId, $request->ip);
+        }
 
         $proxyType = $request->proxy_type ? str($request->proxy_type)->upper() : ProxyTypes::TRAEFIK->value;
 
@@ -680,6 +705,9 @@ class ServersController extends Controller
                         'server_disk_usage_check_frequency' => ['type' => 'string', 'description' => 'Cron expression for disk usage check frequency.'],
                         'server_disk_usage_notification_interval_hours' => ['type' => 'integer', 'description' => 'Minimum hours between high disk usage notifications (1-720). Default: 24.'],
                         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds (1-300). Default: 10.'],
+                        'wildcard_domain' => ['type' => 'string', 'nullable' => true, 'description' => 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'],
+                        'server_timezone' => ['type' => 'string', 'description' => 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'],
+                        'backup_compression_cpu_percentage' => ['type' => 'integer', 'enum' => [25, 50, 75, 100], 'description' => 'Maximum CPU percentage that backup compression can use. Default: 25.'],
                     ],
                 ),
             ),
@@ -717,7 +745,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled', 'wildcard_domain', 'server_timezone', 'backup_compression_cpu_percentage'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -747,6 +775,13 @@ class ServersController extends Controller
             'server_disk_usage_notification_interval_hours' => 'integer|min:1|max:720',
             'connection_timeout' => 'integer|min:1|max:300',
             'is_terminal_enabled' => 'boolean|nullable',
+            'wildcard_domain' => 'nullable|url',
+            'server_timezone' => ['string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! validate_timezone($value)) {
+                    $fail('The server_timezone must be a valid timezone.');
+                }
+            }],
+            'backup_compression_cpu_percentage' => 'integer|in:25,50,75,100',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
             'name.not_regex' => 'The name must not contain control characters such as new lines.',
@@ -771,6 +806,15 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
+        if ($server->isTransferredAway() && ($connectionErrors = $this->transferredServerConnectionChanges($request, $server))) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $connectionErrors,
+            ], 422);
+        }
+        if ($request->instant_validate) {
+            ModelsServer::throttleValidation($teamId, $request->ip ?? $server->ip);
+        }
         if ($request->proxy_type) {
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
                 return str($proxyType->value)->lower();
@@ -852,9 +896,12 @@ class ServersController extends Controller
             ]);
         }
 
-        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout']);
+        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'server_timezone', 'backup_compression_cpu_percentage']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
+        }
+        if ($request->has('wildcard_domain')) {
+            $server->settings()->update(['wildcard_domain' => $request->input('wildcard_domain')]);
         }
 
         if ($proxyTypeChanged) {
@@ -966,6 +1013,17 @@ class ServersController extends Controller
         $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if (is_null($deleteFromProvider)) {
             return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
+        }
+        // Another Coolify instance manages a transferred server. This instance deletes only its own records:
+        // never the cloud server, the containers, or the DNS records that the other instance uses.
+        if ($server->isTransferredAway()) {
+            if ($deleteFromProvider) {
+                return response()->json(['message' => 'This server is managed by another Coolify instance. Delete its cloud server from that instance.'], 422);
+            }
+            app(ServerTransferClaimer::class)->deleteArchive($server);
+            auditLog('api.server.deleted', ['team_id' => $teamId, 'server_uuid' => $server->uuid, 'server_name' => $server->name, 'ip' => $server->ip, 'archive' => true]);
+
+            return response()->json(['message' => 'Server deleted.']);
         }
 
         if ($server->definedResources()->count() > 0 && ! $force) {
@@ -1125,6 +1183,7 @@ class ServersController extends Controller
         if ($install && ($response = $this->deployAbilityForbiddenResponse($request, 'Installing the server runs commands on it and starts the proxy, so it needs a token with the deploy permission.'))) {
             return $response;
         }
+        ModelsServer::throttleValidation($teamId, $server->ip);
         if ($install) {
             ValidateAndInstallServerJob::dispatch($server);
         } else {

@@ -30,7 +30,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Reject releases outside the production branch
-        if: ${{ github.ref_name != 'main' }}
+        # tmp: allow the 4.4.7 security release from fix/v4.4.7
+        if: ${{ github.ref_name != 'main' && !startsWith(github.ref_name, 'fix/v') }}
         run: |
           echo "Stable releases must run from main, not ${{ github.ref_name }}."
           exit 1

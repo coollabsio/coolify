@@ -2,6 +2,7 @@
 
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -12,6 +13,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -159,3 +161,17 @@ it('denies preview setting changes without application update permission', funct
         ->is_preview_deployments_enabled->toBeFalse()
         ->is_pr_deployments_public_enabled->toBeFalse();
 })->with([['member', false], ['owner', true]]);
+
+it('saves the docker tag of the remaining preview after another preview is deleted', function () {
+    $this->application->update(['build_pack' => 'dockerimage']);
+    $previewA = ApplicationPreview::create(['application_id' => $this->application->id, 'pull_request_id' => 2, 'pull_request_html_url' => '', 'docker_registry_image_tag' => 'tag-a']);
+    $previewB = ApplicationPreview::create(['application_id' => $this->application->id, 'pull_request_id' => 1, 'pull_request_html_url' => '', 'docker_registry_image_tag' => 'tag-b']);
+    Queue::fake();
+
+    Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->call('delete', 2)
+        ->call('save_preview', $previewB->id)
+        ->assertHasNoErrors();
+
+    expect($previewB->fresh()->docker_registry_image_tag)->toBe('tag-b');
+});

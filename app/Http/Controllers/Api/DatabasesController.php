@@ -18,6 +18,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -32,6 +33,8 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
@@ -155,6 +158,77 @@ class DatabasesController extends Controller
         }
     }
 
+    /**
+     * Resolves the S3 destinations of a backup request, primary first. `s3_storage_uuids` lists every destination;
+     * `s3_storage_uuid` alone selects a single destination, and sent with `s3_storage_uuids` it must be in the list and
+     * becomes the primary destination.
+     *
+     * @return Collection<int, S3Storage>|JsonResponse|null Null when the request does not select destinations.
+     */
+    private function requestedBackupS3Storages(Request $request, int|string $teamId): Collection|JsonResponse|null
+    {
+        $hasList = $request->has('s3_storage_uuids');
+        if (! $hasList && ! $request->filled('s3_storage_uuid')) {
+            return null;
+        }
+
+        $uuids = collect($hasList ? $request->input('s3_storage_uuids') : [$request->input('s3_storage_uuid')])->unique()->values();
+        $primaryUuid = $request->input('s3_storage_uuid') ?? $uuids->first();
+        $errorField = $hasList ? 's3_storage_uuids' : 's3_storage_uuid';
+
+        if (filled($primaryUuid) && ! $uuids->contains($primaryUuid)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid must be one of the s3_storage_uuids.']],
+            ], 422);
+        }
+
+        $storages = S3Storage::ownedByCurrentTeamAPI($teamId)->whereIn('uuid', $uuids->all())->get();
+        if ($storages->count() !== $uuids->count()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [$errorField => ['The selected S3 storage is invalid for this team.']],
+            ], 422);
+        }
+
+        return $storages->sortBy(fn (S3Storage $storage): int => $storage->uuid === $primaryUuid ? 0 : 1)->values();
+    }
+
+    /**
+     * Adds the S3 destination UUIDs (primary first) to a serialized backup without exposing the storages themselves.
+     */
+    private function withBackupS3StorageUuids(ScheduledDatabaseBackup $backup): ScheduledDatabaseBackup
+    {
+        $storages = $backup->s3Storages->sortBy(fn (S3Storage $storage): int => $storage->id === $backup->s3_storage_id ? 0 : 1);
+        if ($storages->isEmpty() && $backup->s3) {
+            $storages = collect([$backup->s3]);
+        }
+
+        $backup->setAttribute('s3_storage_uuid', $backup->s3?->uuid);
+        $backup->setAttribute('s3_storage_uuids', $storages->pluck('uuid')->values()->all());
+
+        return $backup->unsetRelation('s3Storages')->unsetRelation('s3');
+    }
+
+    /**
+     * Build the create response; the connection URLs contain credentials, so they need sensitive read access.
+     *
+     * @return array{uuid: string, internal_db_url?: string, external_db_url?: string}
+     */
+    private function createdDatabasePayload(Request $request, $database): array
+    {
+        $payload = ['uuid' => $database->uuid];
+        if ($request->attributes->get('can_read_sensitive', false) !== true) {
+            return $payload;
+        }
+        $payload['internal_db_url'] = $database->internal_db_url;
+        if ($database->is_public && $database->public_port) {
+            $payload['external_db_url'] = $database->external_db_url;
+        }
+
+        return $payload;
+    }
+
     private function removeSensitiveData($database, bool $loadNestedServerSecrets = false)
     {
         $database->makeHidden([
@@ -182,7 +256,19 @@ class DatabasesController extends Controller
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        return serializeApiResponse($database);
+        $payload = serializeApiResponse($database);
+
+        // A locked password variable is never shown again, also not inside the connection URLs.
+        if (request()->attributes->get('can_read_sensitive', false) === true
+            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
+            foreach (['internal_db_url', 'external_db_url'] as $key) {
+                if ($payload->has($key)) {
+                    $payload->put($key, null);
+                }
+            }
+        }
+
+        return $payload;
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void
@@ -304,10 +390,19 @@ class DatabasesController extends Controller
         }
 
         $databaseIds = $databases->pluck('id')->toArray();
+        $databasesByMorphKey = $databases->keyBy(fn ($database) => $database->getMorphClass().':'.$database->id);
+        $messageSecrets = [];
 
-        $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
+        $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['latest_log', 's3', 's3Storages'])
             ->whereIn('database_id', $databaseIds)
             ->get()
+            ->map(function (ScheduledDatabaseBackup $backup) use ($databasesByMorphKey, &$messageSecrets): ScheduledDatabaseBackup {
+                if ($backup->latest_log) {
+                    $this->redactBackupExecutionMessage($backup->latest_log, $databasesByMorphKey->get($backup->database_type.':'.$backup->database_id), $messageSecrets);
+                }
+
+                return $this->withBackupS3StorageUuids($backup);
+            })
             ->groupBy(fn (ScheduledDatabaseBackup $backup) => $backup->database_type.':'.$backup->database_id);
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
@@ -343,7 +438,7 @@ class DatabasesController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all backups for a database',
+                description: 'Get all backups for a database. Each backup includes s3_storage_uuid (primary S3 destination) and s3_storage_uuids (every S3 destination, primary first).',
                 content: new OA\JsonContent(
                     type: 'string',
                     example: 'Content is very complex. Will be implemented later.',
@@ -379,7 +474,15 @@ class DatabasesController extends Controller
 
         $this->authorize('view', $database);
 
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('executions')->where('database_id', $database->id)->get();
+        $messageSecrets = [];
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->where('database_type', $database->getMorphClass())->get()
+            ->map(function (ScheduledDatabaseBackup $backup) use ($database, &$messageSecrets): ScheduledDatabaseBackup {
+                $backup->executions->each(function (ScheduledDatabaseBackupExecution $execution) use ($database, &$messageSecrets): void {
+                    $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
+                });
+
+                return $this->withBackupS3StorageUuids($backup);
+            });
 
         return response()->json($backupConfig);
     }
@@ -521,6 +624,9 @@ class DatabasesController extends Controller
                         'health_check_timeout' => ['type' => 'integer', 'description' => 'Healthcheck timeout in seconds.', 'minimum' => 1, 'default' => 5],
                         'health_check_retries' => ['type' => 'integer', 'description' => 'Healthcheck retries count.', 'minimum' => 1, 'default' => 5],
                         'health_check_start_period' => ['type' => 'integer', 'description' => 'Healthcheck start period in seconds.', 'minimum' => 0, 'default' => 5],
+                        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'],
+                        'include_coolify_default_variables' => ['type' => 'boolean', 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Restart the database to apply it.'],
+                        'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Send the database logs to the log drain of the server. Log drain must be enabled on the server. Restart the database to apply it.'],
                     ],
                 ),
             )
@@ -580,6 +686,9 @@ class DatabasesController extends Controller
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
             'instant_deploy' => 'boolean',
+            'redact_all_env_values_in_logs' => 'boolean',
+            'include_coolify_default_variables' => 'boolean',
+            'is_log_drain_enabled' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -590,6 +699,9 @@ class DatabasesController extends Controller
         }
         $uuid = $request->uuid;
         $instantDeploy = $request->boolean('instant_deploy');
+        $redactAllEnvValuesInLogs = $request->has('redact_all_env_values_in_logs') ? $request->boolean('redact_all_env_values_in_logs') : null;
+        $isLogDrainEnabled = $request->has('is_log_drain_enabled') ? $request->boolean('is_log_drain_enabled') : null;
+        $includeCoolifyDefaultVariables = $request->has('include_coolify_default_variables') ? $request->boolean('include_coolify_default_variables') : null;
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
@@ -601,6 +713,17 @@ class DatabasesController extends Controller
         if ($instantDeploy) {
             abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
             $this->authorize('manage', $database);
+        }
+
+        if ($redactAllEnvValuesInLogs !== null || $includeCoolifyDefaultVariables !== null) {
+            $this->authorize('manageEnvironment', $database);
+        }
+
+        if ($isLogDrainEnabled && ! $database->destination->server->isLogDrainEnabled()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_log_drain_enabled' => ['Log drain is not enabled on the server. Enable it on the server first.']],
+            ], 422);
         }
 
         if ($request->has('is_public') && (bool) $request->is_public !== (bool) $database->is_public) {
@@ -853,6 +976,15 @@ class DatabasesController extends Controller
         }
 
         // Only update database fields, not backup configuration
+        if ($redactAllEnvValuesInLogs !== null) {
+            $database->redact_all_env_values_in_logs = $redactAllEnvValuesInLogs;
+        }
+        if ($isLogDrainEnabled !== null) {
+            $database->is_log_drain_enabled = $isLogDrainEnabled;
+        }
+        if ($includeCoolifyDefaultVariables !== null) {
+            $database->include_coolify_default_variables = $includeCoolifyDefaultVariables;
+        }
         $database->update($request->only($allowedFields));
         // The Redis password is stored in the REDIS_PASSWORD variable, not in a column.
         if ($database instanceof StandaloneRedis && filled($request->redis_password)) {
@@ -876,12 +1008,25 @@ class DatabasesController extends Controller
             'database_uuid' => $database->uuid,
             'database_name' => $database->name,
             'database_type' => $database->type(),
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+            'changed_fields' => [
+                ...array_values(array_intersect($allowedFields, array_keys($request->all()))),
+                ...($redactAllEnvValuesInLogs === null ? [] : ['redact_all_env_values_in_logs']),
+                ...($isLogDrainEnabled === null ? [] : ['is_log_drain_enabled']),
+                ...($includeCoolifyDefaultVariables === null ? [] : ['include_coolify_default_variables']),
+            ],
         ]);
 
         return response()->json([
             'message' => 'Database updated.',
         ]);
+    }
+
+    private function disableLocalBackupWithoutS3Response(): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['disable_local_backup' => ['Local backups can only be disabled when save_s3 is true.']],
+        ], 422);
     }
 
     #[OA\Post(
@@ -916,7 +1061,9 @@ class DatabasesController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'Backup frequency (cron expression or: every_minute, hourly, daily, weekly, monthly, yearly)'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled', 'default' => true],
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether to save backups to S3', 'default' => false],
-                        's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID (required if save_s3 is true)'],
+                        'disable_local_backup' => ['type' => 'boolean', 'description' => 'Delete the local backup file after the upload to S3. Only allowed when save_s3 is true.', 'default' => false],
+                        's3_storage_uuid' => ['type' => 'string', 'description' => 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true.'],
+                        's3_storage_uuids' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation. Needs a token with the deploy permission.'],
@@ -968,7 +1115,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout', 'missing_backup_notification_days'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 's3_storage_uuids', 'timeout', 'missing_backup_notification_days', 'disable_local_backup'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -985,9 +1132,12 @@ class DatabasesController extends Controller
             'frequency' => 'required|string',
             'enabled' => 'boolean',
             'save_s3' => 'boolean',
+            'disable_local_backup' => 'boolean',
             'dump_all' => 'boolean',
             'backup_now' => 'boolean|nullable',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
+            's3_storage_uuids' => 'array',
+            's3_storage_uuids.*' => 'string|distinct',
             'databases_to_backup' => 'string|nullable',
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
@@ -1040,22 +1190,18 @@ class DatabasesController extends Controller
             ], 422);
         }
 
-        // Validate S3 storage if save_s3 is true
-        if ($request->boolean('save_s3') && ! $request->filled('s3_storage_uuid')) {
+        $s3Storages = $this->requestedBackupS3Storages($request, $teamId);
+        if ($s3Storages instanceof JsonResponse) {
+            return $s3Storages;
+        }
+        if ($request->boolean('save_s3') && blank($s3Storages)) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid field is required when save_s3 is true.']],
+                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid or s3_storage_uuids field is required when save_s3 is true.']],
             ], 422);
         }
-
-        if ($request->filled('s3_storage_uuid')) {
-            $existsInTeam = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->s3_storage_uuid)->exists();
-            if (! $existsInTeam) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
-                ], 422);
-            }
+        if ($request->boolean('disable_local_backup') && ! $request->boolean('save_s3')) {
+            return $this->disableLocalBackupWithoutS3Response();
         }
 
         // Check for extra fields
@@ -1072,20 +1218,9 @@ class DatabasesController extends Controller
             ], 422);
         }
 
-        $backupData = $request->only($backupConfigFields);
-
-        // Convert s3_storage_uuid to s3_storage_id
-        if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $backupData['s3_storage_uuid'])->first();
-            if ($s3Storage) {
-                $backupData['s3_storage_id'] = $s3Storage->id;
-            } elseif ($request->boolean('save_s3')) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
-                ], 422);
-            }
-            unset($backupData['s3_storage_uuid']);
+        $backupData = Arr::except($request->only($backupConfigFields), ['s3_storage_uuid', 's3_storage_uuids']);
+        if ($s3Storages !== null) {
+            $backupData['s3_storage_id'] = $s3Storages->first()?->id;
         }
 
         // Set default databases_to_backup based on database type if not provided
@@ -1124,6 +1259,9 @@ class DatabasesController extends Controller
         }
 
         $backupConfig = ScheduledDatabaseBackup::create($backupData);
+        if ($s3Storages !== null) {
+            $backupConfig->syncS3Storages($s3Storages->pluck('id')->all());
+        }
 
         // Trigger immediate backup if requested
         if ($request->backup_now) {
@@ -1183,7 +1321,9 @@ class DatabasesController extends Controller
                     type: 'object',
                     properties: [
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether data is saved in s3 or not'],
-                        's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID'],
+                        'disable_local_backup' => ['type' => 'boolean', 'description' => 'Delete the local backup file after the upload to S3. Only allowed when save_s3 is true. Turning save_s3 off also turns this off.'],
+                        's3_storage_uuid' => ['type' => 'string', 'description' => 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay.'],
+                        's3_storage_uuids' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to take a backup now or not. Needs a token with the deploy permission.'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled or not'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
@@ -1230,7 +1370,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout', 'missing_backup_notification_days'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 's3_storage_uuids', 'timeout', 'missing_backup_notification_days', 'disable_local_backup'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1243,10 +1383,13 @@ class DatabasesController extends Controller
         }
         $validator = customApiValidator($request->all(), [
             'save_s3' => 'boolean',
+            'disable_local_backup' => 'boolean',
             'backup_now' => 'boolean|nullable',
             'enabled' => 'boolean',
             'dump_all' => 'boolean',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
+            's3_storage_uuids' => 'array',
+            's3_storage_uuids.*' => 'string|distinct',
             'databases_to_backup' => 'string|nullable',
             'frequency' => 'string',
             'database_backup_retention_amount_locally' => 'integer|min:0',
@@ -1301,27 +1444,24 @@ class DatabasesController extends Controller
             }
         }
 
-        if ($request->boolean('save_s3') && ! $request->filled('s3_storage_uuid')) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid field is required when save_s3 is true.']],
-            ], 422);
-        }
-        if ($request->filled('s3_storage_uuid')) {
-            $existsInTeam = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->s3_storage_uuid)->exists();
-            if (! $existsInTeam) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
-                ], 422);
-            }
+        $s3Storages = $this->requestedBackupS3Storages($request, $teamId);
+        if ($s3Storages instanceof JsonResponse) {
+            return $s3Storages;
         }
 
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
         if (! $backupConfig) {
             return response()->json(['message' => 'Backup config not found.'], 404);
+        }
+
+        $saveToS3 = $request->has('save_s3') ? $request->boolean('save_s3') : (bool) $backupConfig->save_s3;
+        if (($request->boolean('save_s3') && $s3Storages === null) || ($saveToS3 && $s3Storages?->isEmpty())) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid or s3_storage_uuids field is required when save_s3 is true.']],
+            ], 422);
         }
 
         $extraFields = array_diff(array_keys($request->all()), $backupConfigFields, ['backup_now']);
@@ -1336,21 +1476,17 @@ class DatabasesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        if ($request->boolean('disable_local_backup') && ! $saveToS3) {
+            return $this->disableLocalBackupWithoutS3Response();
+        }
 
-        $backupData = $request->only($backupConfigFields);
-
-        // Convert s3_storage_uuid to s3_storage_id
-        if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $backupData['s3_storage_uuid'])->first();
-            if ($s3Storage) {
-                $backupData['s3_storage_id'] = $s3Storage->id;
-            } elseif ($request->boolean('save_s3')) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
-                ], 422);
-            }
-            unset($backupData['s3_storage_uuid']);
+        $backupData = Arr::except($request->only($backupConfigFields), ['s3_storage_uuid', 's3_storage_uuids']);
+        if ($s3Storages !== null) {
+            $backupData['s3_storage_id'] = $s3Storages->first()?->id;
+        }
+        // Without S3 the backup must stay on the server, as in the UI.
+        if (! $saveToS3) {
+            $backupData['disable_local_backup'] = false;
         }
 
         // Validate databases_to_backup input
@@ -1365,7 +1501,19 @@ class DatabasesController extends Controller
             }
         }
 
+        $storageIds = $s3Storages?->pluck('id');
+        // An older client sends only s3_storage_uuid. When it is already a destination, the other destinations stay.
+        if ($storageIds !== null && ! $request->has('s3_storage_uuids')) {
+            $currentStorageIds = $backupConfig->selectedS3Storages()->pluck('id');
+            if ($currentStorageIds->contains($storageIds->first())) {
+                $storageIds = $currentStorageIds;
+            }
+        }
+
         $backupConfig->update($backupData);
+        if ($storageIds !== null) {
+            $backupConfig->syncS3Storages($storageIds->all());
+        }
 
         if ($request->backup_now) {
             dispatch(new DatabaseBackupJob($backupConfig));
@@ -2201,13 +2349,7 @@ class DatabasesController extends Controller
                 $this->attachTagsToResource($database, $tagNames, $teamId);
             }
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2273,13 +2415,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2345,13 +2481,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2414,13 +2544,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2516,13 +2640,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2565,13 +2683,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2636,13 +2748,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2803,7 +2909,10 @@ class DatabasesController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = getContainerLogs($database->destination->server, $container['ID'], $lines, $showTimestamps);
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($database->destination->server, $container['ID'], $lines, $showTimestamps),
+            EnvironmentVariable::logRedactionSecretsFor($database),
+        );
 
         return response()->json([
             'logs' => $logs,
@@ -2984,7 +3093,7 @@ class DatabasesController extends Controller
         $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3004,9 +3113,10 @@ class DatabasesController extends Controller
                 if ($execution->filename) {
                     deleteBackupsLocally($execution->filename, $database->destination->server);
 
-                    if ($deleteS3 && $backup->s3) {
-                        deleteBackupsS3($execution->filename, $backup->s3);
-                    }
+                }
+
+                if ($deleteS3) {
+                    $execution->deleteS3Copies();
                 }
 
                 $execution->delete();
@@ -3119,7 +3229,7 @@ class DatabasesController extends Controller
         $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3139,9 +3249,10 @@ class DatabasesController extends Controller
             if ($execution->filename) {
                 deleteBackupsLocally($execution->filename, $database->destination->server);
 
-                if ($deleteS3 && $backup->s3) {
-                    deleteBackupsS3($execution->filename, $backup->s3);
-                }
+            }
+
+            if ($deleteS3) {
+                $execution->deleteS3Copies();
             }
 
             $execution->delete();
@@ -3164,7 +3275,7 @@ class DatabasesController extends Controller
 
     #[OA\Get(
         summary: 'List backup executions',
-        description: 'Get all executions for a specific backup configuration.',
+        description: 'Get all executions for a specific backup configuration. The execution `message` is only returned (redacted) to tokens with the `read:sensitive` or `root` ability; otherwise it is `null`.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/executions',
         operationId: 'list-backup-executions',
         security: [
@@ -3204,7 +3315,7 @@ class DatabasesController extends Controller
                                     new OA\Property(property: 'filename', type: 'string'),
                                     new OA\Property(property: 'size', type: 'integer'),
                                     new OA\Property(property: 'created_at', type: 'string'),
-                                    new OA\Property(property: 'message', type: 'string'),
+                                    new OA\Property(property: 'message', type: 'string', nullable: true, description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.'),
                                     new OA\Property(property: 'status', type: 'string'),
                                 ]
                             )
@@ -3236,7 +3347,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3245,10 +3356,13 @@ class DatabasesController extends Controller
         }
 
         // Get all executions for this backup configuration
+        $messageSecrets = [];
         $executions = $backup->executions()
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($execution) {
+            ->map(function ($execution) use ($database, &$messageSecrets) {
+                $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
+
                 return [
                     'uuid' => $execution->uuid,
                     'filename' => $execution->filename,
@@ -5273,7 +5387,7 @@ class DatabasesController extends Controller
         }
 
         foreach ($database->scheduledBackups()->get() as $backup) {
-            $backup->replicate([
+            $newBackup = $backup->replicate([
                 'id',
                 'created_at',
                 'updated_at',
@@ -5283,7 +5397,9 @@ class DatabasesController extends Controller
                 'database_id' => $newDatabase->id,
                 'database_type' => $newDatabase->getMorphClass(),
                 'team_id' => $teamId,
-            ])->save();
+            ]);
+            $newBackup->save();
+            $backup->copyS3StoragesTo($newBackup);
         }
 
         foreach ($database->environment_variables()->get() as $environmentVariable) {
@@ -5310,5 +5426,35 @@ class DatabasesController extends Controller
             'uuid' => $newDatabase->uuid,
             'message' => 'Database cloned.',
         ], 201);
+    }
+
+    /**
+     * Execution output can embed credentials: hide it unless the token can read sensitive data, and redact it when shown.
+     * The database secrets are loaded once per database and kept in $secretsByDatabase for the rest of the request.
+     *
+     * @param  array<string, array{known: array<int, string>, locked: array<int, string>}|null>  $secretsByDatabase
+     */
+    private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution, ?Model $database, array &$secretsByDatabase): void
+    {
+        $message = $execution->message;
+        if (request()->attributes->get('can_read_sensitive', false) !== true || ! is_string($message) || ! $database) {
+            $execution->setAttribute('message', null);
+
+            return;
+        }
+
+        $key = $database->getMorphClass().':'.$database->getKey();
+        if (! array_key_exists($key, $secretsByDatabase)) {
+            try {
+                // Use a copy so the relations loaded for redaction do not end up in the response.
+                $secretsByDatabase[$key] = EnvironmentVariable::logRedactionSecretsFor(clone $database);
+            } catch (\Throwable $e) {
+                report($e);
+                $secretsByDatabase[$key] = null;
+            }
+        }
+
+        // Without the database secrets the message cannot be redacted reliably, so hide it.
+        $execution->setAttribute('message', $secretsByDatabase[$key] === null ? null : sanitizeLogsForExport($message, $secretsByDatabase[$key]));
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\IntegrationToken;
+
 /**
  * Validates an integration token against its provider API before it is saved.
  */
@@ -16,11 +18,13 @@ class IntegrationTokenValidator
                 (string) data_get($metadata, 'base_url', 'https://app.infisical.com'),
                 (string) data_get($metadata, 'client_id'),
                 $token,
+                IntegrationToken::requestTimeout($metadata),
             ))->validate(),
             'vault' => (new VaultService(
                 (string) data_get($metadata, 'base_url'),
                 $token,
                 data_get($metadata, 'namespace'),
+                IntegrationToken::requestTimeout($metadata),
             ))->validate(),
             default => false,
         };

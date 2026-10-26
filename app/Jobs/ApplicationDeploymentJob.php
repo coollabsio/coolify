@@ -13,7 +13,9 @@ use App\Exceptions\DeploymentException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
@@ -85,8 +87,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public static int $batch_counter = 0;
 
-    private bool $newVersionIsHealthy = false;
-
     private ApplicationDeploymentQueue $application_deployment_queue;
 
     private Application $application;
@@ -109,7 +109,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $dockerImagePreviewTag = null;
 
-    private GithubApp|GitlabApp|string $source = 'other';
+    private GithubApp|GitlabApp|GiteaApp|string $source = 'other';
 
     private StandaloneDocker|SwarmDocker $destination;
 
@@ -292,9 +292,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->preview) {
                 if ($this->application->build_pack === 'dockercompose') {
-                    $this->preview->generate_preview_fqdn_compose();
+                    $this->preview->generate_preview_fqdn_compose(keepExistingDomains: true);
                 } else {
-                    $this->preview->generate_preview_fqdn();
+                    $this->preview->generate_preview_fqdn(keepExistingDomains: true);
                 }
             }
             if ($this->application->isGithubAppSource()) {
@@ -633,6 +633,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->run_post_deployment_command();
         } catch (Exception $e) {
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
+        }
+
+        // Domains can change with a deployment, so the maintenance routes follow them.
+        if ($this->pull_request_id === 0 && $this->application->is_maintenance_enabled) {
+            try {
+                $this->application->syncMaintenancePage();
+            } catch (Exception $e) {
+                \Log::warning('Maintenance page update failed for '.$this->deployment_uuid.': '.$e->getMessage());
+            }
         }
 
     }
@@ -1527,6 +1536,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->rolling_update();
 
                 return true;
+            } elseif ($configurationDiff->isLegacyFallback()) {
+                $this->application_deployment_queue->addLogEntry('The last deployment stored no configuration snapshot. Rebuilding image.');
             } else {
                 $this->application_deployment_queue->addLogEntry('Build configuration changed. Rebuilding image.');
             }
@@ -1575,6 +1586,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'save' => 'local_image_found',
         ]);
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
+            $this->application_deployment_queue->addLogEntry("Image ({$this->production_image_name}) not found on the server. Pulling it from the Docker registry.");
             $this->execute_remote_command([
                 'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
                 'ignore_errors' => true,
@@ -2697,6 +2709,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('Rolling update started.');
                     $this->start_by_compose_file();
                     $this->health_check();
+                    $this->wait_for_proxy_to_route_new_container();
                     $this->stop_running_container();
                     $this->application_deployment_queue->addLogEntry('Rolling update completed.');
                 }
@@ -2706,6 +2719,46 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * The proxy adds the new container some seconds after it is healthy. Stopping the old
+     * container before that sends requests to a closed port (502), see #8627.
+     */
+    private function wait_for_proxy_to_route_new_container(): void
+    {
+        $seconds = $this->application->settings->rollingUpdateDrainSeconds();
+        if ($seconds === 0 || ! $this->newVersionIsHealthy()) {
+            return;
+        }
+        $oldContainerNames = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id)
+            ->filter(fn ($container) => data_get($container, 'State') === 'running' && data_get($container, 'Names') !== $this->container_name)
+            ->pluck('Names');
+        if ($oldContainerNames->isEmpty()) {
+            return;
+        }
+        if ($this->proxyLabelsChanged($oldContainerNames)) {
+            // The proxy drops a route that two containers define differently until the old one stops.
+            $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop without waiting.');
+
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry("Waiting {$seconds} seconds for the proxy to send traffic to the new container.");
+        Sleep::for($seconds)->seconds();
+    }
+
+    private function proxyLabelsChanged(Collection $oldContainerNames): bool
+    {
+        $containerNames = $oldContainerNames->prepend($this->container_name)->map(fn (string $name) => escapeshellarg($name))->implode(' ');
+        $output = instant_remote_process(["docker inspect --format '{{json .Config.Labels}}' {$containerNames}"], $this->server, false);
+
+        return collect(preg_split('/\R/', trim((string) $output)))
+            ->map(fn (string $labels) => collect(json_decode($labels, true) ?: [])
+                ->filter(fn ($value, string $key) => str_starts_with($key, 'traefik.') || str_starts_with($key, 'caddy'))
+                ->sortKeys()
+                ->all())
+            ->unique()
+            ->count() > 1;
+    }
+
     private function health_check()
     {
         try {
@@ -2713,7 +2766,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 // Implement healthcheck for swarm
             } else {
                 if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
-                    $this->newVersionIsHealthy = true;
+                    $this->markNewVersionHealthy(true);
 
                     return;
                 }
@@ -2761,12 +2814,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                         $healthCheckStatus = $this->trimmedSavedOutput('health_check')->replace('"', '')->value();
                         if ($healthCheckStatus === 'healthy') {
-                            $this->newVersionIsHealthy = true;
+                            $this->markNewVersionHealthy(true);
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
                         } elseif ($healthCheckStatus === 'unhealthy') {
-                            $this->newVersionIsHealthy = false;
+                            $this->markNewVersionHealthy(false);
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
                             break;
@@ -2786,6 +2839,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Health check failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * Laravel runs failed() on a fresh copy of the job, so the health of the new version is kept outside the job instance.
+     */
+    private function markNewVersionHealthy(bool $healthy): void
+    {
+        $key = "deployment-new-version-healthy:{$this->deployment_uuid}";
+        if ($healthy) {
+            Cache::put($key, true, now()->addDay());
+        } else {
+            Cache::forget($key);
+        }
+    }
+
+    private function newVersionIsHealthy(): bool
+    {
+        return Cache::has("deployment-new-version-healthy:{$this->deployment_uuid}");
     }
 
     private function query_logs()
@@ -2818,7 +2889,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
-        $this->newVersionIsHealthy = true;
+        $this->markNewVersionHealthy(true);
         $this->generate_image_names();
         $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         $this->prepare_builder_image();
@@ -3554,11 +3625,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $variables;
     }
 
+    /**
+     * Without the `...` entry, the list replaces the packages that Railpack generates
+     * (for example libatomic1, which Node.js 25+ needs at runtime).
+     */
     private function merge_railpack_deploy_apt_packages(Collection $variables): Collection
     {
         $packages = collect(preg_split('/\s+/', trim((string) $variables->get('RAILPACK_DEPLOY_APT_PACKAGES', ''))) ?: [])
             ->filter()
             ->values();
+
+        if (! $packages->contains('...')) {
+            $packages->prepend('...');
+        }
 
         foreach (['curl', 'wget'] as $package) {
             if (! $packages->contains($package)) {
@@ -3645,7 +3724,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." {$this->workdir}";
 
         return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
+            ."\n".railpackBuilderLockedScript('('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
     }
 
     private function decode_railpack_config(string $config, string $source): array
@@ -4245,25 +4324,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }
         if ($this->mainServer->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
-            $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$this->container_name]['logging'] = generate_log_drain_configuration($this->mainServer);
         }
         if ($this->application->settings->is_gpu_enabled) {
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
-                [
-                    'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
-                    'capabilities' => ['gpu'],
-                    'options' => data_get($this->application, 'settings.gpu_options', []),
-                ],
+                $this->application->settings->gpuDeviceReservation(),
             ];
-            if (data_get($this->application, 'settings.gpu_count')) {
-                $count = data_get($this->application, 'settings.gpu_count');
-                if ($count === 'all') {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = $count;
-                } else {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = (int) $count;
-                }
-            } elseif (data_get($this->application, 'settings.gpu_device_ids')) {
-                $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['ids'] = data_get($this->application, 'settings.gpu_device_ids');
+            if (ApplicationSetting::parseGpuOptions($this->application->settings->gpu_options) === null) {
+                $this->application_deployment_queue->addLogEntry('GPU options are not a valid key=value list or YAML mapping. They are ignored.');
             }
         }
         if ($this->application->isHealthcheckDisabled()) {
@@ -4293,6 +4361,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->pull_request_id === 0) {
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
+            if ($this->application->settings->is_gpu_enabled && data_get($custom_compose, 'deploy.resources.reservations.devices')) {
+                data_forget($custom_compose, 'deploy.resources.reservations.devices');
+                $this->application_deployment_queue->addLogEntry('GPU access is enabled in the GPU settings, so --gpus in Custom Docker Options is ignored.');
+            }
             $unsupported_options = unsupportedDockerRunOptions($this->application->custom_docker_run_options);
             if (count($unsupported_options) > 0) {
                 $this->application_deployment_queue->addLogEntry('Warning: These custom Docker options are not supported and were not applied: '.implode(', ', $unsupported_options).'. See https://coolify.io/docs/applications/builds/custom-docker-options for the supported options.', 'stderr');
@@ -4931,7 +5003,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
-            if ($this->newVersionIsHealthy || $force) {
+            if ($this->newVersionIsHealthy() || $force) {
                 if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
@@ -4960,7 +5032,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         } catch (Exception $e) {
             // If new version is healthy, this is just cleanup - don't fail the deployment
-            if ($this->newVersionIsHealthy || $force) {
+            if ($this->newVersionIsHealthy() || $force) {
                 $this->application_deployment_queue->addLogEntry(
                     "Warning: Could not remove old container: {$e->getMessage()}",
                     'stderr',
@@ -6054,9 +6126,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $unsuccessful = $deployments->first(fn (ApplicationDeploymentQueue $deployment) => $deployment->status !== ApplicationDeploymentStatus::FINISHED->value);
+        // Additional servers pull the image and do not clone, so only the main deployment has the commit message.
+        $parentDeployment = ApplicationDeploymentQueue::query()->where('deployment_uuid', $parentDeploymentUuid)->first();
         $this->application->environment->project->team?->notify($unsuccessful
-            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview)
-            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview));
+            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview, $parentDeployment)
+            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview, $parentDeployment));
     }
 
     /**
@@ -6065,7 +6139,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function sendDeploymentNotification(string $notificationClass): void
     {
         $this->application->environment->project->team?->notify(
-            new $notificationClass($this->application, $this->deployment_uuid, $this->preview)
+            new $notificationClass($this->application, $this->deployment_uuid, $this->preview, $this->application_deployment_queue)
         );
     }
 
@@ -6091,7 +6165,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->failDeployment();
 
-        // Log comprehensive error information
+        // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
+        // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written
+        // because their truncated arguments can hold partial secrets that redaction cannot match.
         $errorMessage = $exception->getMessage() ?: 'Unknown error occurred';
         $errorCode = $exception->getCode();
         $errorClass = get_class($exception);
@@ -6119,14 +6195,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry("  {$previousClass}: {$previousMessage}", 'stderr', hidden: true);
             $this->application_deployment_queue->addLogEntry("  at {$previous->getFile()}:{$previous->getLine()}", 'stderr', hidden: true);
         }
-
-        // Log first few lines of stack trace for debugging
-        $trace = $exception->getTraceAsString();
-        $traceLines = explode("\n", $trace);
-        $this->application_deployment_queue->addLogEntry('Stack trace (first 5 lines):', 'stderr', hidden: true);
-        foreach (array_slice($traceLines, 0, 5) as $traceLine) {
-            $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr', hidden: true);
-        }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
 
         if ($this->application->build_pack !== 'dockercompose') {
@@ -6135,7 +6203,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
                 if ($this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0) {
                     // do not remove already running container for PR deployments
-                } elseif ($this->newVersionIsHealthy) {
+                } elseif ($this->newVersionIsHealthy()) {
                     // The new container passed its health check, so the old container may already be removed.
                     // A later failure (additional destinations, queue advancement, ...) must not remove the only running version.
                     $this->application_deployment_queue->addLogEntry('Deployment failed after the new version became healthy. Keeping the new version of your application running.', 'stderr');

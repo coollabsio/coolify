@@ -74,8 +74,20 @@ class SshMultiplexingHelper
         }
     }
 
+    /**
+     * A disabled server, such as the archive of a transferred server, gets no SSH or scp connection.
+     */
+    private static function assertNotDisabled(Server $server): void
+    {
+        // Read the saved flag too: a job that loaded the server before a transfer finished must stop.
+        if ($server->settings->force_disabled || ($server->exists && $server->settings()->value('force_disabled'))) {
+            throw new \RuntimeException('Server is disabled.');
+        }
+    }
+
     public static function establishNewMultiplexedConnection(Server $server): bool
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
@@ -83,7 +95,7 @@ class SshMultiplexingHelper
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = "ssh -fN -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        $establishCommand = 'ssh -fN -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
@@ -143,6 +155,7 @@ class SshMultiplexingHelper
 
     public static function generateScpCommand(Server $server, string $source, string $dest): string
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
@@ -183,6 +196,7 @@ class SshMultiplexingHelper
      */
     public static function generateScpDownloadCommand(Server $server, string $remoteSource, string $localDest): string
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
@@ -244,9 +258,7 @@ class SshMultiplexingHelper
 
     private static function sshCommandPrefix(Server $server, bool $disableMultiplexing, ?int $commandTimeout): string
     {
-        if ($server->settings->force_disabled) {
-            throw new \RuntimeException('Server is disabled.');
-        }
+        self::assertNotDisabled($server);
 
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
@@ -298,7 +310,7 @@ class SshMultiplexingHelper
     {
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
-        $healthCommand = "ssh -o ControlMaster=auto -o ControlPath=$muxSocket ";
+        $healthCommand = 'ssh -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
@@ -381,7 +393,7 @@ class SshMultiplexingHelper
 
     private static function muxControlCommand(Server $server, string $operation): string
     {
-        $command = "ssh -O {$operation} -o ControlPath=".self::muxSocket($server).' ';
+        $command = "ssh -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
@@ -392,7 +404,7 @@ class SshMultiplexingHelper
     private static function multiplexingOptions(Server $server): string
     {
         return '-o ControlMaster=auto '
-            .'-o ControlPath='.self::muxSocket($server).' '
+            .'-o ControlPath='.escapeshellarg(self::muxSocket($server)).' '
             .'-o ControlPersist='.config('constants.ssh.mux_persist_time').' ';
     }
 
@@ -448,7 +460,7 @@ class SshMultiplexingHelper
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
-        $options = "-i {$sshKeyLocation} "
+        $options = '-i '.escapeshellarg($sshKeyLocation).' '
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "

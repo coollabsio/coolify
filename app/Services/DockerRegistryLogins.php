@@ -6,10 +6,12 @@ use App\Helpers\SshMultiplexingHelper;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyProcessTimedOutException;
 
 class DockerRegistryLogins
 {
@@ -274,7 +276,12 @@ class DockerRegistryLogins
     private static function run(Server $server, string $command, array $secrets = [], ?string $emptyErrorMessage = null): void
     {
         $commands = $server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $server) : [$command];
-        $process = Process::timeout(60)->run(SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands)));
+        try {
+            $process = Process::timeout(60)->run(SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands)));
+        } catch (ProcessTimedOutException|SymfonyProcessTimedOutException) {
+            // The timeout message contains the full SSH command, including the registry password.
+            throw new RuntimeException('The command on the server timed out after 60 seconds.', 124);
+        }
 
         if ($process->exitCode() === 0) {
             return;

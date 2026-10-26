@@ -7,7 +7,17 @@
         </header>
 
         <div class="flex flex-col gap-6">
-        <section class="application-settings-section" x-data="{
+        <form wire:submit="submit">
+            <x-unsaved-bar action="submit" />
+            <section class="application-settings-section">
+                <div class="application-settings-section-header">
+                    <div>
+                        <h2>Project details</h2>
+                        <p>Icon, name, and description shown across the dashboard.</p>
+                    </div>
+                </div>
+                <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
+                    <div class="sm:col-span-2" x-data="{
             preview: null,
             processing: false,
             uploadError: null,
@@ -55,48 +65,38 @@
                 }
             },
         }">
-            <div class="application-settings-section-header">
-                <div>
-                    <h2>Project icon</h2>
-                    <p>Upload a JPG, PNG, or WebP image. It will appear in the projects list.</p>
-                </div>
-            </div>
-            <div class="application-settings-section-body flex items-center gap-4">
-                <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                    <img x-cloak x-show="preview" :src="preview" alt="Project icon preview" class="h-full w-full object-cover">
-                    @if ($project->icon_path)
-                        <img x-show="!preview" src="{{ project_icon_url($project) }}"
-                            alt="{{ $project->name }} icon" class="h-full w-full object-cover">
-                    @else
-                        <x-reicon x-show="!preview" name="projects" class="size-6" />
-                    @endif
-                </div>
-                <div class="flex min-w-0 flex-1 flex-col gap-3">
-                    <div class="flex flex-wrap gap-2">
-                        <input x-ref="iconInput" type="file" x-on:change="prepareIcon($event)" accept="image/jpeg,image/png,image/webp" class="hidden">
-                        <x-forms.button type="button" x-on:click="$refs.iconInput.click()" x-bind:disabled="processing">
-                            <span x-text="processing ? 'Uploading…' : 'Browse…'"></span>
-                        </x-forms.button>
-                        @if ($project->icon_path)
-                            <x-forms.button type="button" wire:click="removeIcon" x-bind:disabled="processing" isError>Remove</x-forms.button>
-                        @endif
+                        <div class="mb-2 text-sm font-medium leading-4">Icon</div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-200 text-neutral-700 dark:bg-white/[0.1] dark:text-fg">
+                                <img x-cloak x-show="preview" :src="preview" alt="Project icon preview" class="h-full w-full object-cover">
+                                @if ($project->icon_path)
+                                    <img x-show="!preview" src="{{ project_icon_url($project) }}"
+                                        alt="{{ $project->name }} icon" class="h-full w-full object-cover">
+                                @else
+                                    <x-reicon x-show="!preview" name="projects" class="size-6" />
+                                @endif
+                            </div>
+                            <div class="flex min-w-0 flex-1 flex-col gap-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <input x-ref="iconInput" type="file" x-on:change="prepareIcon($event)"
+                                        accept="image/jpeg,image/png,image/webp" class="hidden">
+                                    <x-forms.button type="button" x-on:click="$refs.iconInput.click()"
+                                        x-bind:disabled="processing">
+                                        <span x-text="processing ? 'Uploading…' : 'Browse…'"></span>
+                                    </x-forms.button>
+                                    @if ($project->icon_path)
+                                        <x-forms.button type="button" wire:click="removeIcon" x-bind:disabled="processing"
+                                            isError>Remove</x-forms.button>
+                                    @endif
+                                </div>
+                                <p class="text-xs text-neutral-500 dark:text-fg-dim">JPG, PNG, or WebP. Shown in the projects list.</p>
+                                <p x-cloak x-show="uploadError" x-text="uploadError" class="text-xs text-red-500"></p>
+                                @error('icon')
+                                    <p class="text-xs text-red-500">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
                     </div>
-                    <p x-cloak x-show="uploadError" x-text="uploadError" class="text-xs text-red-500"></p>
-                    @error('icon') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
-                </div>
-            </div>
-        </section>
-
-        <form wire:submit="submit">
-            <x-unsaved-bar action="submit" />
-            <section class="application-settings-section">
-                <div class="application-settings-section-header">
-                    <div>
-                        <h2>Project details</h2>
-                        <p>Name and describe this project across the dashboard.</p>
-                    </div>
-                </div>
-                <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
                     <x-forms.input label="Name" id="name" />
                     <x-forms.input label="Description" id="description" />
                 </div>

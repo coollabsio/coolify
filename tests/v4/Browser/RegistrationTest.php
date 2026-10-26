@@ -65,3 +65,21 @@ it('shows login link when a user already exists', function () {
         ->assertDontSee('Full instance access')
         ->screenshot(filename: 'registration-existing-user');
 });
+
+it('keeps the auth card heading visible on short viewports', function (int $width, int $height) {
+    $page = visit('/register')->resize($width, $height);
+
+    $page->assertSee('Create account');
+
+    $headingTop = $page->script('document.querySelector(".auth-card-heading h1").getBoundingClientRect().top');
+    $submitBottom = $page->script('document.querySelector("button[type=submit]").getBoundingClientRect().bottom');
+    $scrollHeight = $page->script('document.documentElement.scrollHeight');
+
+    expect($headingTop)->toBeGreaterThanOrEqual(0)
+        ->and($scrollHeight)->toBeGreaterThanOrEqual($submitBottom);
+
+    $page->screenshot(filename: "registration-short-viewport-{$width}x{$height}");
+})->with([
+    'issue 11100 viewport' => [1422, 612],
+    'short laptop viewport' => [1280, 480],
+]);

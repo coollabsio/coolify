@@ -160,10 +160,24 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->toContain('<span>DNS status</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain("service-domain-group-{$this->webApp->id}")
-        ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(substr_count($html, '<span>Domain</span>'))->toBe(1)
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
+
+it('loads no domain favicon when proxy labels add HTTP basic auth to the service', function (string $labels) {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n    labels:\n{$labels}",
+    ]);
+
+    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSee('https://api.example.com')
+        ->html();
+
+    expect($html)->not->toContain('https://api.example.com/favicon.ico');
+})->with([
+    'traefik list' => ["      - traefik.http.middlewares.auth.basicauth.users=admin:hash\n"],
+    'caddy map' => ["      caddy.basic_auth.admin: hash\n"],
+]);
 
 it('removes consecutive service domains by stable row identity after indexes change', function () {
     $this->apiApp->update([
@@ -327,7 +341,7 @@ it('does not add a single-label hostname as a service domain', function () {
 it('shows dns entries control next to Add', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 

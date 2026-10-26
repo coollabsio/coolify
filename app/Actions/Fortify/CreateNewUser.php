@@ -93,7 +93,7 @@ class CreateNewUser implements CreatesNewUsers
     {
         $keys = [
             [
-                'key' => 'registration:ip:'.sha1(auth_rate_limit_ip(request())),
+                'key' => 'registration:ip:'.sha1(client_ip(request())),
                 'max' => self::REGISTRATION_IP_MAX_ATTEMPTS,
                 'decay' => self::REGISTRATION_IP_DECAY_SECONDS,
             ],

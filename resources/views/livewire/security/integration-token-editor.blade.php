@@ -20,12 +20,16 @@
                 <x-forms.input required id="metadata.base_url" label="Base URL"
                     placeholder="https://app.infisical.com" />
                 <x-forms.input required id="metadata.client_id" label="Client ID" />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @elseif ($integrationToken->provider === 'vault')
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input required id="metadata.base_url" label="Base URL"
                     placeholder="https://vault.example.com:8200" />
                 <x-forms.input id="metadata.namespace" label="Namespace (optional)" />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @endif
 
@@ -34,9 +38,14 @@
                 <legend class="text-sm font-medium text-black dark:text-fg">Capabilities</legend>
                 <div class="mt-3 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
                     <x-forms.checkbox id="edit-dns-capability" label="DNS" domValue="dns" fullWidth
-                        wire:model.live="capabilities" />
+                        :disabled="in_array('tunnel', $capabilities, true)" wire:model.live="capabilities" />
                     <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
                         Manage Cloudflare DNS records.
+                    </p>
+                    <x-forms.checkbox id="edit-tunnel-capability" label="Cloudflare Tunnel" domValue="tunnel" fullWidth
+                        wire:model.live="capabilities" />
+                    <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                        Create and manage tunnels for server SSH. Needs DNS.
                     </p>
                 </div>
                 @error('capabilities')
@@ -71,10 +80,13 @@
                 <ul class="list-inside list-disc">
                     <li>Zone - DNS - Edit</li>
                     <li>Zone - Zone - Read</li>
+                    @if (in_array('tunnel', $capabilities, true))
+                        <li>Account - Cloudflare Tunnel - Edit</li>
+                    @endif
                 </ul>
-                <a href="https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management"
+                <a href="{{ \App\Models\IntegrationToken::cloudflareTokenTemplateUrl($capabilities) }}"
                     target="_blank" rel="noopener noreferrer"
-                    class="font-medium text-coollabs hover:underline dark:text-warning">
+                    class="font-medium text-coollabs hover:underline dark:text-brand-light">
                     Create a replacement token in Cloudflare
                 </a>
             </div>

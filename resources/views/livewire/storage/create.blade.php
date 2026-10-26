@@ -1,6 +1,6 @@
 @can('create', App\Models\S3Storage::class)
     <div class="w-full">
-        <div class="mb-4">For more details, please visit the <a class="underline dark:text-warning"
+        <div class="mb-4">For more details, please visit the <a class="underline dark:text-brand-light"
                 href="https://coolify.io/docs/knowledge-base/s3/introduction" target="_blank">Coolify Docs</a>.</div>
         <form class="flex flex-col gap-2" wire:submit='submit'>
             <div class="flex gap-2">

@@ -38,14 +38,15 @@ function recordScheduledTaskLivewireStatuses(mixed $page): void
     JS);
 }
 
-it('deletes a service scheduled task and returns to the task list', function () {
+it('deletes a service scheduled task from its modal and stays on the task list', function () {
     loginAndSkipBoarding();
 
-    $page = visit("{$this->base}/tasks/{$this->task->uuid}")
+    $page = visit("{$this->base}/scheduled-tasks?task_uuid={$this->task->uuid}")
         ->assertSee('Task configuration');
     recordScheduledTaskLivewireStatuses($page);
 
-    $page->click('button:visible:has-text("Delete")')
+    $page->click('button:visible:has-text("Danger Zone")')
+        ->click('button:visible:has-text("Delete task")')
         ->fill('input[x-model="userConfirmationText"]', 'nightly-cleanup')
         ->click('button:visible:has-text("Permanently delete")')
         ->wait(3);
@@ -54,17 +55,18 @@ it('deletes a service scheduled task and returns to the task list', function () 
         ->and($page->script('window.livewireStatuses'))->not->toContain(404);
 
     $page->assertPathIs(parse_url("{$this->base}/scheduled-tasks", PHP_URL_PATH))
+        ->assertDontSee('Task configuration')
         ->screenshot(filename: 'scheduled-task-deleted');
 });
 
 it('keeps polling executions without a 404 after the task is deleted', function () {
     loginAndSkipBoarding();
 
-    $page = visit("{$this->base}/tasks/{$this->task->uuid}")
-        ->assertSee('Recent executions');
+    $page = visit("{$this->base}/scheduled-tasks?task_uuid={$this->task->uuid}")
+        ->assertSee('Task configuration');
     recordScheduledTaskLivewireStatuses($page);
 
-    // The executions list polls every 5 seconds, so a poll can run after the delete and before the list page loads.
+    // The executions list polls every 5 seconds, so a poll can run after the delete and before the modal closes.
     $this->task->delete();
     $page->script(<<<'JS'
         Livewire.all().find((component) => component.name === 'project.shared.scheduled-task.executions')
