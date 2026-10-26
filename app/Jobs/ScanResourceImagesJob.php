@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\ImageScan\ScanImage;
+use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -37,15 +39,22 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
     /** A service or database scan waits this long after the start was queued, so the image is pulled first. */
     public const START_DELAY_SECONDS = 30;
 
+    /** Attempts of a job after a start: later ones wait for an image that is still being pulled. */
+    public const START_MAX_ATTEMPTS = 3;
+
+    public const START_RETRY_DELAY_SECONDS = 120;
+
     public $tries = 1;
 
     public $timeout;
 
     /**
      * @param  list<string>  $imageRefs  Empty: the images of the resource (imageRefsFor()).
+     * @param  bool  $retryWhenImageMissing  A job after a service or database start retries an image that is not pulled yet.
      */
-    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [])
+    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [], public bool $retryWhenImageMissing = false)
     {
+        $this->tries = $retryWhenImageMissing ? self::START_MAX_ATTEMPTS : 1;
         // Self-hosted Horizon works through 'high' first, so scans there would delay deployments.
         $this->onQueue(isCloud() ? maintenance_queue() : 'default');
         $images = $imageRefs === [] ? $this->derivedImageCount() : count($imageRefs);
@@ -62,7 +71,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            self::dispatch($resource)->delay(now()->addSeconds(self::START_DELAY_SECONDS));
+            self::dispatch($resource, null, [], true)->delay(now()->addSeconds(self::START_DELAY_SECONDS));
         } catch (Throwable $e) {
             report($e);
         }
@@ -76,8 +85,64 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        $done = $this->doneTargets();
+        $missing = [];
         foreach ($this->scanTargets() as [$resource, $imageRef]) {
-            ScanImage::run($server, $resource, $imageRef, $deployment, self::LOCK_WAIT_SECONDS);
+            $key = $this->targetKey($resource, $imageRef);
+            if (in_array($key, $done, true)) {
+                continue;
+            }
+
+            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, self::LOCK_WAIT_SECONDS);
+
+            if ($this->shouldRetry($scan)) {
+                // Only the last attempt leaves the error visible.
+                Cache::forget(ScanImage::lastErrorCacheKey($resource));
+                $missing[] = $key;
+            } else {
+                $done[] = $key;
+            }
+        }
+
+        if ($missing !== []) {
+            $this->rememberDoneTargets($done);
+            $this->release(self::START_RETRY_DELAY_SECONDS);
+        }
+    }
+
+    private function shouldRetry(ImageScan $scan): bool
+    {
+        return $this->retryWhenImageMissing
+            && $this->attempts() < $this->tries
+            && $scan->status === ImageScanStatus::Failed
+            && $scan->error_code === ImageScanErrorCode::ImageMissing;
+    }
+
+    private function targetKey(Model $resource, string $imageRef): string
+    {
+        return $resource->getMorphClass().':'.$resource->getKey().':'.$imageRef;
+    }
+
+    /**
+     * A released job runs again from its stored payload, so the targets of earlier attempts are kept in the cache.
+     *
+     * @return list<string>
+     */
+    private function doneTargets(): array
+    {
+        $uuid = $this->job?->uuid();
+
+        return $uuid === null ? [] : (array) Cache::get("image-scan:start-done:{$uuid}", []);
+    }
+
+    /**
+     * @param  list<string>  $done
+     */
+    private function rememberDoneTargets(array $done): void
+    {
+        $uuid = $this->job?->uuid();
+        if ($uuid !== null) {
+            Cache::put("image-scan:start-done:{$uuid}", $done, now()->addHours(2));
         }
     }
 
@@ -125,8 +190,11 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 
         return array_values(array_filter($targets, function (array $target) use (&$seen): bool {
             [$resource, $imageRef] = $target;
-            $key = $resource->getMorphClass().':'.$resource->getKey().':'.(is_string($imageRef) ? $imageRef : '');
-            if (! is_string($imageRef) || isset($seen[$key])) {
+            if (! is_string($imageRef)) {
+                return false;
+            }
+            $key = $this->targetKey($resource, $imageRef);
+            if (isset($seen[$key])) {
                 return false;
             }
             $seen[$key] = true;
@@ -176,11 +244,12 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * The server of the deployment (an additional server runs its own copy of the image), else the main server.
+     * The server of the deployment (an additional server runs its own copy of the image), else the server the
+     * scan policy of the resource uses.
      */
     private function server(?ApplicationDeploymentQueue $deployment): ?Server
     {
-        $server = $deployment?->server ?? data_get($this->resource, 'destination.server');
+        $server = $deployment?->server ?? ImageScanPolicyResolver::for($this->resource)->scanServer;
 
         return $server instanceof Server ? $server : null;
     }

@@ -3,6 +3,8 @@
 use App\Actions\Database\StartPostgresql;
 use App\Actions\ImageScan\ScanImage;
 use App\Actions\Service\StartService;
+use App\Enums\ImageScanErrorCode;
+use App\Enums\ImageScanStatus;
 use App\Jobs\ScanResourceImagesJob;
 use App\Models\Environment;
 use App\Models\ImageScan;
@@ -17,7 +19,10 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\DatabaseStartCommandExecutor;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -182,5 +187,103 @@ describe('service start', function () {
         StartService::run($service);
 
         Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $job) => $job->resource->is($service));
+    });
+});
+
+describe('image not pulled yet', function () {
+    function startScansMissingScan(Model $resource, string $ref): ImageScan
+    {
+        Cache::put(ScanImage::lastErrorCacheKey($resource), ['code' => 'image_missing']);
+
+        return (new ImageScan)->forceFill(['status' => ImageScanStatus::Failed, 'error_code' => ImageScanErrorCode::ImageMissing, 'image_ref' => $ref]);
+    }
+
+    function startScansQueuedJob(ScanResourceImagesJob $scanJob, int $attempt): Job
+    {
+        $queueJob = Mockery::mock(Job::class);
+        $queueJob->shouldReceive('uuid')->andReturn('job-uuid');
+        $queueJob->shouldReceive('attempts')->andReturn($attempt);
+        $scanJob->setJob($queueJob);
+
+        return $queueJob;
+    }
+
+    it('retries only the images that are missing and keeps the error hidden until the last attempt', function () {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        $db = startScansServiceDatabase($service, 'postgres:16');
+        $calls = [];
+        $pulled = false;
+        ScanImage::shouldRun()->times(3)
+            ->withArgs(function ($server, $resource, $ref) use (&$calls) {
+                $calls[] = [$resource->getKey(), $ref];
+
+                return true;
+            })
+            ->andReturnUsing(function ($server, $resource, $ref) use (&$pulled) {
+                if ($ref === 'nginx:1.27' && ! $pulled) {
+                    $pulled = true;
+
+                    return startScansMissingScan($resource, $ref);
+                }
+
+                return new ImageScan;
+            });
+
+        $first = new ScanResourceImagesJob($service, retryWhenImageMissing: true);
+        $queueJob = startScansQueuedJob($first, 1);
+        $queueJob->shouldReceive('release')->once()->with(120);
+        $first->handle();
+
+        expect(Cache::has(ScanImage::lastErrorCacheKey($web)))->toBeFalse();
+
+        $second = new ScanResourceImagesJob($service, retryWhenImageMissing: true);
+        $queueJob = startScansQueuedJob($second, 2);
+        $queueJob->shouldReceive('release')->never();
+        $second->handle();
+
+        expect($calls)->toBe([[$web->id, 'nginx:1.27'], [$db->id, 'postgres:16'], [$web->id, 'nginx:1.27']]);
+    });
+
+    it('releases at most twice and leaves the error on the last attempt', function () {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        ScanImage::shouldRun()->once()->andReturnUsing(fn ($server, $resource, $ref) => startScansMissingScan($resource, $ref));
+
+        $job = new ScanResourceImagesJob($service, retryWhenImageMissing: true);
+        startScansQueuedJob($job, 3)->shouldReceive('release')->never();
+        $job->handle();
+
+        expect($job->tries)->toBe(3)
+            ->and(Cache::has(ScanImage::lastErrorCacheKey($web)))->toBeTrue();
+    });
+
+    it('does not retry a job that was not queued by a start', function () {
+        $service = startScansService();
+        startScansServiceApplication($service, 'nginx:1.27');
+        ScanImage::shouldRun()->once()->andReturnUsing(fn ($server, $resource, $ref) => startScansMissingScan($resource, $ref));
+
+        $job = new ScanResourceImagesJob($service);
+        startScansQueuedJob($job, 1)->shouldReceive('release')->never();
+        $job->handle();
+
+        expect($job->tries)->toBe(1);
+    });
+
+    it('queues the start job with retries', function () {
+        ScanResourceImagesJob::dispatchAfterStart(startScansService());
+
+        Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $job) => $job->retryWhenImageMissing && $job->tries === 3);
+    });
+
+    it('uses the server of the scan policy when the service has no destination', function () {
+        $service = startScansService();
+        $service->forceFill(['destination_id' => 999999])->saveQuietly();
+        startScansServiceApplication($service, 'nginx:1.27');
+        ScanImage::shouldRun()->once()
+            ->withArgs(fn ($server) => $server->is(test()->server))
+            ->andReturn(new ImageScan);
+
+        (new ScanResourceImagesJob($service->fresh()))->handle();
     });
 });
