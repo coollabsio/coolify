@@ -5872,6 +5872,17 @@ function deviceLabel(?string $device): string
 }
 
 /**
+ * Whether a raw User-Agent comes from container tooling (Docker CLI and Engine,
+ * BuildKit, containerd, Podman, Skopeo) instead of a person or a bot. The
+ * analytics views hide these rows behind a toggle: image pulls and builds are
+ * normal, but the raw strings look like an attack or a leak of internal data.
+ */
+function isContainerToolingUserAgent(?string $userAgent): bool
+{
+    return preg_match('#^(docker|docker-client|buildkit|containerd|podman|skopeo|cri-o)/#i', trim((string) $userAgent)) === 1;
+}
+
+/**
  * Prepare aggregated `city` breakdown rows (`CC|subdivision|City`, from
  * TrafficAnalyticsAggregator::breakdowns(), not raw Sentinel rows) for display,
  * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
