@@ -19,11 +19,11 @@ use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanFailed;
+use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\ScanNotifications;
 use App\Services\ImageScan\SyftPackageParser;
 use App\Services\ImageScan\TagSelector;
-use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -51,8 +51,6 @@ class RefreshCandidates
     public const MAX_CANDIDATE_SCANS = 2;
 
     public const DAILY_CANDIDATE_SCANS = 20;
-
-    public const LOCK_WAIT_SECONDS = 600;
 
     /** A check newer than this is not repeated after a scan. The daily rescan is always older. */
     public const FRESH_HOURS = 20;
@@ -91,8 +89,17 @@ class RefreshCandidates
 
     private ?string $error = null;
 
-    public function handle(ImageScan $scan, int $lockWaitSeconds = self::LOCK_WAIT_SECONDS): void
+    private bool $retryWhenBusy = false;
+
+    /**
+     * @param  int  $lockWaitSeconds  A deploy gate waits for the server lock; 0 tries once (background checks).
+     * @param  bool  $retryWhenBusy  Throw ScanLockBusy instead of storing `lock_busy`, so the caller retries later.
+     *
+     * @throws ScanLockBusy
+     */
+    public function handle(ImageScan $scan, int $lockWaitSeconds = 0, bool $retryWhenBusy = false): void
     {
+        $this->retryWhenBusy = $retryWhenBusy && $lockWaitSeconds <= 0;
         $scan = ImageScan::query()->with(['resource', 'server.settings', 'sbom'])->find($scan->id);
         if (! $scan instanceof ImageScan || ! self::needsCandidates($scan)) {
             return;
@@ -142,6 +149,8 @@ class RefreshCandidates
 
         try {
             $result = $check();
+        } catch (ScanLockBusy $e) {
+            throw $e;
         } catch (Throwable $e) {
             report($e);
             $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => [], 'attributable' => null, 'attributable_ids' => [], 'current_digest' => null];
@@ -497,7 +506,8 @@ class RefreshCandidates
 
     /**
      * Runs Grype on the SBOM of a candidate digest; makes the SBOM from the registry first when this server has none.
-     * Takes the scan lock of the server, so a deploy scan waits at most one candidate scan.
+     * Takes the scan lock of the server, so a deploy scan waits at most one candidate scan. A background check never
+     * waits for the lock and leaves it to a deploy gate that waits.
      *
      * @return array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}|null
      */
@@ -505,13 +515,10 @@ class RefreshCandidates
     {
         $server = $this->commands->server;
         $lock = ScanImage::serverLock($server);
-        try {
-            if (! $lock->block(max(1, $lockWaitSeconds))) {
-                $this->error ??= 'lock_busy';
-
-                return null;
+        if (! ScanImage::acquireServerLock($lock, $server, $lockWaitSeconds)) {
+            if ($this->retryWhenBusy) {
+                throw new ScanLockBusy;
             }
-        } catch (LockTimeoutException) {
             $this->error ??= 'lock_busy';
 
             return null;

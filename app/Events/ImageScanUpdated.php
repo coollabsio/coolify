@@ -12,7 +12,10 @@ class ImageScanUpdated implements ShouldBroadcast
 {
     use BroadcastsToTeam, Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(?int $teamId, public string $resourceUuid, public string $scanUuid)
+    /**
+     * @param  bool  $final  False for a progress update of a running scan; pages that show only results ignore it.
+     */
+    public function __construct(?int $teamId, public string $resourceUuid, public string $scanUuid, public bool $final = true)
     {
         $this->teamId = $teamId;
     }
@@ -23,10 +26,10 @@ class ImageScanUpdated implements ShouldBroadcast
     }
 
     /**
-     * @return array{resourceUuid: string, scanUuid: string}
+     * @return array{resourceUuid: string, scanUuid: string, final: bool}
      */
     public function broadcastWith(): array
     {
-        return ['resourceUuid' => $this->resourceUuid, 'scanUuid' => $this->scanUuid];
+        return ['resourceUuid' => $this->resourceUuid, 'scanUuid' => $this->scanUuid, 'final' => $this->final];
     }
 }

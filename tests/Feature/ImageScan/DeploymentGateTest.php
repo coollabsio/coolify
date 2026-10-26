@@ -699,7 +699,7 @@ it('scans the started images one at a time on the deployment server in the queue
         ->withArgs(function ($server, $resource, $ref, $deployment, $wait) use (&$scanned) {
             $scanned[] = $ref;
 
-            return $server->is(test()->server) && $resource->is(test()->application) && $deployment->id === test()->queue->id && $wait === 600;
+            return $server->is(test()->server) && $resource->is(test()->application) && $deployment->id === test()->queue->id && $wait === 0;
         })
         ->andReturn(deployGateReturnedScan([]));
 
@@ -707,8 +707,7 @@ it('scans the started images one at a time on the deployment server in the queue
     $job->handle();
 
     expect($scanned)->toBe(['nginx:1.27', 'redis:7'])
-        ->and($job->tries)->toBe(1)
-        ->and($job->timeout)->toBe(2 * (600 + ScanImage::LOCK_TTL));
+        ->and($job->timeout)->toBe(2 * ScanImage::LOCK_TTL);
 });
 
 it('scans the images of the latest completed scans when no image is given', function () {

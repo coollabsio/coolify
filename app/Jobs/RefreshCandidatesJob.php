@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\ImageScan\RefreshCandidates;
 use App\Models\ImageScan;
+use App\Services\ImageScan\ScanLockBusy;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,15 +13,19 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Looks for newer versions of a scanned image after the scan, so deploys never wait for it.
+ * Looks for newer versions of a scanned image after the scan, so deploys never wait for it. The job never sleeps on
+ * the scan lock of the server: when it is busy (or a deploy gate waits for it), the job runs again later.
  */
 class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 1;
+    public $tries = ScanResourceImagesJob::MAX_ATTEMPTS;
 
-    /** Two candidate scans with their lock waits and disk checks, plus the registry calls (about 6,400 s). */
+    /** An unexpected error fails the job; only a busy lock retries it. */
+    public $maxExceptions = 1;
+
+    /** Two candidate scans and the scan of the current base image, plus the registry calls. */
     public $timeout = 7200;
 
     public $uniqueFor = 7200;
@@ -40,6 +45,16 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        RefreshCandidates::run($this->scan);
+        $scan = $this->scan->fresh();
+        // The deploy gate or the daily rescan checked it meanwhile.
+        if (! $scan instanceof ImageScan || RefreshCandidates::isFresh($scan)) {
+            return;
+        }
+
+        try {
+            RefreshCandidates::run($scan, 0, retryWhenBusy: $this->attempts() < $this->tries);
+        } catch (ScanLockBusy) {
+            $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
+        }
     }
 }

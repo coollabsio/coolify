@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\ImageScan\RefreshCandidates;
+use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanStatus;
 use App\Jobs\RefreshCandidatesJob;
@@ -21,6 +22,7 @@ use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
@@ -433,6 +435,68 @@ it('is a unique queued job per scan', function () {
     expect($job)->toBeInstanceOf(ShouldBeUnique::class)
         ->and($job->uniqueId())->toBe((string) $scan->id)
         ->and($job->queue)->toBe('default');
+});
+
+function candidatesQueuedJob(RefreshCandidatesJob $refreshJob, int $attempt): Job
+{
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldReceive('attempts')->andReturn($attempt);
+    $refreshJob->setJob($queueJob);
+
+    return $queueJob;
+}
+
+it('does not wait for a busy server lock in the queued job and runs again later', function () {
+    candidatesFake();
+    $lock = ScanImage::serverLock($this->server);
+    $lock->get();
+    $scan = candidatesScan();
+
+    $job = new RefreshCandidatesJob($scan);
+    candidatesQueuedJob($job, 2)->shouldReceive('release')->once()->with(120);
+    $job->handle();
+    $lock->release();
+
+    expect(candidatesRan("'registry:"))->toBe(0)
+        ->and($scan->fresh()->candidates)->toBeNull()
+        ->and(candidatesScansToday())->toBe(0);
+});
+
+it('leaves the server lock to a deploy gate that waits for it', function () {
+    candidatesFake();
+    Cache::put(ScanImage::gateWaitingCacheKey($this->server), true, 120);
+    $scan = candidatesScan();
+
+    $job = new RefreshCandidatesJob($scan);
+    candidatesQueuedJob($job, 1)->shouldReceive('release')->once()->with(60);
+    $job->handle();
+
+    expect(candidatesRan("'registry:"))->toBe(0)
+        ->and($scan->fresh()->candidates)->toBeNull();
+});
+
+it('records the busy lock on the last attempt of the queued job', function () {
+    candidatesFake();
+    $lock = ScanImage::serverLock($this->server);
+    $lock->get();
+    $scan = candidatesScan();
+
+    $job = new RefreshCandidatesJob($scan);
+    candidatesQueuedJob($job, $job->tries)->shouldReceive('release')->never();
+    $job->handle();
+    $lock->release();
+
+    expect($scan->fresh()->candidates['error'])->toBe('lock_busy');
+});
+
+it('skips the queued job when the candidates were checked meanwhile', function () {
+    Process::fake();
+    $scan = candidatesScan();
+    $scan->forceFill(['candidates' => ['status' => 'no_better', 'checked_at' => now()->toIso8601String(), 'error' => null, 'entries' => []]])->save();
+
+    (new RefreshCandidatesJob($scan))->handle();
+
+    Process::assertNothingRan();
 });
 
 it('checks the disk space for the current image size before a registry scan', function () {

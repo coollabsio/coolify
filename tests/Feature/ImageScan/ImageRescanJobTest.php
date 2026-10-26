@@ -25,6 +25,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Bus\UniqueLock;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -161,6 +162,16 @@ function rescanTestCommandKey(string $command): ?string
         str_contains($command, 'coolify-scan-exit grype') => 'grype',
         default => null,
     };
+}
+
+function rescanTestQueuedJob(ImageRescanJob $rescanJob, int $attempt): Job
+{
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldReceive('uuid')->andReturn('rescan-job-uuid');
+    $queueJob->shouldReceive('attempts')->andReturn($attempt);
+    $rescanJob->setJob($queueJob);
+
+    return $queueJob;
 }
 
 function rescanTestRun(?Server $server = null): void
@@ -580,13 +591,62 @@ describe('retention', function () {
         $lock = ScanImage::serverLock($this->server);
         $lock->get();
         $job = new ImageRescanJob($this->server);
-        $job->retentionLockWaitSeconds = 0;
+        rescanTestQueuedJob($job, $job->tries)->shouldReceive('release')->never();
 
         $job->handle();
         $lock->release();
 
         expect(ImageScan::query()->count())->toBe(7)
             ->and(ImageSbom::query()->whereKey($unused->id)->exists())->toBeTrue();
+    });
+
+    it('does not wait for a busy scan lock and runs again later from where it stopped', function () {
+        rescanTestFake();
+        rescanTestApplicationContainer($this->application);
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+
+        $first = new ImageRescanJob($this->server);
+        rescanTestQueuedJob($first, 1)->shouldReceive('release')->once()->with(60);
+        $first->handle();
+
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        expect(ImageScan::query()->count())->toBe(0);
+
+        $lock->release();
+        $second = new ImageRescanJob($this->server);
+        rescanTestQueuedJob($second, 2)->shouldReceive('release')->never();
+        $second->handle();
+
+        expect(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(1)
+            ->and(ImageScan::query()->where('status', ImageScanStatus::Completed)->count())->toBe(1)
+            ->and(Cache::has('image-rescan:progress:rescan-job-uuid'))->toBeFalse();
+    });
+
+    it('rescans an image after a deploy gate that waited for the lock', function () {
+        rescanTestFake();
+        rescanTestApplicationContainer($this->application);
+        Cache::put(ScanImage::gateWaitingCacheKey($this->server), true, 120);
+
+        $job = new ImageRescanJob($this->server);
+        rescanTestQueuedJob($job, 1)->shouldReceive('release')->once()->with(60);
+        $job->handle();
+
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        expect(ScanImage::serverLock($this->server)->get())->toBeTrue();
+    });
+
+    it('updates the database under the scan lock', function () {
+        $lockHeld = null;
+        rescanTestFake(['db-update' => function () use (&$lockHeld) {
+            $lockHeld = ! ScanImage::serverLock(test()->server)->get();
+
+            return 'coolify-scan-exit db-update 0';
+        }]);
+
+        rescanTestRun();
+
+        expect($lockHeld)->toBeTrue();
     });
 
     it('deletes the scans of a preview that no longer exists', function () {

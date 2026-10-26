@@ -544,6 +544,28 @@ describe('one scanned rule', function () {
             ->and(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
     });
 
+    it('counts a resource scanned on a build server that does not scan like the markers do', function () {
+        $application = fleetApplication('built-app');
+        $buildServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id]);
+        fleetScan($application, ['high' => 2], 2, ['server_id' => $buildServer->id]);
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+
+        expect($buildServer->settings->is_image_scan_enabled)->toBeFalse()
+            ->and(VulnerabilityMarkers::for(collect([$application->fresh()])))->not->toBe([])
+            ->and(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
+    });
+
+    it('does not reload the page for progress updates of a running scan', function () {
+        $component = fleetPage($this->admin);
+
+        $component->call('scanUpdated', ['resourceUuid' => 'x', 'scanUuid' => 'run', 'final' => false]);
+        expect($component->effects)->not->toHaveKey('html');
+
+        $component->call('scanUpdated', ['resourceUuid' => 'x', 'scanUuid' => 'scan', 'final' => true]);
+        expect($component->effects)->toHaveKey('html');
+    });
+
     it('counts only the dashboard resources a limited member can see', function () {
         fleetScan(fleetApplication('visible-app'), ['high' => 1], 1);
         $hiddenEnvironment = Environment::factory()->create([

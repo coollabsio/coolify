@@ -2,6 +2,7 @@
 
 namespace App\Actions\ImageScan;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
 use App\Events\ImageScanUpdated;
@@ -49,6 +50,9 @@ class ScanImage
 
     public const LOCK_TTL = 2700;
 
+    /** A deploy gate waits this long for the server lock (spec 5); background scans never wait. */
+    public const GATE_LOCK_WAIT_SECONDS = 120;
+
     public const LAST_ERROR_TTL_DAYS = 7;
 
     /** ScannerCommands budgets plus 60 s. */
@@ -79,9 +83,12 @@ class ScanImage
      * unsaved scan with status Failed and an error code, and a completed scan row of the same image keeps its results.
      * A Failed row is saved only when no row exists yet for the inspected image.
      *
+     * @param  int  $lockWaitSeconds  A deploy gate waits for the server lock; 0 tries once (background scans).
      * @param  ?string  $baseImageRef  The base image of the final stage of a Dockerfile build (spec 7.4), stored on the scan.
+     * @param  bool  $queueCandidateCheck  Queue the check for newer versions; the deploy gate checks them itself.
+     * @param  bool  $retryWhenBusy  The caller retries later when the lock is busy: a busy lock is not recorded as the last error.
      */
-    public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null): ImageScan
+    public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null, bool $queueCandidateCheck = true, bool $retryWhenBusy = false): ImageScan
     {
         $this->runId = Str::lower(Str::random(24));
         $this->startedAt = CarbonImmutable::now();
@@ -99,8 +106,10 @@ class ScanImage
         }
 
         $lock = self::serverLock($server);
-        if (! $this->acquire($lock, $lockWaitSeconds)) {
-            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::LockBusy, $context);
+        if (! self::acquireServerLock($lock, $server, $lockWaitSeconds)) {
+            return $retryWhenBusy
+                ? $this->unsavedFailure($server, $resource, $imageRef, null, ImageScanErrorCode::LockBusy, $context)
+                : $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::LockBusy, $context);
         }
 
         try {
@@ -110,7 +119,9 @@ class ScanImage
         }
 
         $this->notifyAfterScan($scan, $deployment?->id);
-        $this->queueCandidateCheck($scan);
+        if ($queueCandidateCheck) {
+            $this->queueCandidateCheck($scan);
+        }
 
         return $scan;
     }
@@ -148,9 +159,10 @@ class ScanImage
      * resource like in handle(), and completed rows keep their results.
      *
      * @param  list<array{0: Model, 1: string}>  $targets  Each resource with the image ref of its container.
+     * @param  bool  $retryWhenBusy  The caller retries later when the lock is busy: a busy lock is not recorded as the last error.
      * @return list<ImageScan>
      */
-    public function rescan(Server $server, string $imageId, array $targets, int $lockWaitSeconds = 0): array
+    public function rescan(Server $server, string $imageId, array $targets, int $lockWaitSeconds = 0, bool $retryWhenBusy = false): array
     {
         $this->runId = Str::lower(Str::random(24));
         $this->startedAt = CarbonImmutable::now();
@@ -173,8 +185,10 @@ class ScanImage
         }
 
         $lock = self::serverLock($server);
-        if (! $this->acquire($lock, $lockWaitSeconds)) {
-            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], $imageId, ImageScanErrorCode::LockBusy, $context), $targets);
+        if (! self::acquireServerLock($lock, $server, $lockWaitSeconds)) {
+            return array_map(fn (array $target) => $retryWhenBusy
+                ? $this->unsavedFailure($server, $target[0], $target[1], $imageId, ImageScanErrorCode::LockBusy, $context)
+                : $this->failBeforeRow($server, $target[0], $target[1], $imageId, ImageScanErrorCode::LockBusy, $context), $targets);
         }
 
         try {
@@ -196,6 +210,52 @@ class ScanImage
     public static function serverLock(Server $server): Lock
     {
         return Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
+    }
+
+    /**
+     * Takes the server lock. A deploy gate ($lockWaitSeconds > 0) that has to wait marks it with
+     * `gateWaitingCacheKey()`, so background scans leave the lock to it. A background run ($lockWaitSeconds 0) tries
+     * once and does not take the lock while a gate waits; it retries later.
+     */
+    public static function acquireServerLock(Lock $lock, Server $server, int $lockWaitSeconds): bool
+    {
+        if ($lockWaitSeconds <= 0) {
+            return ! self::isGateWaiting($server) && (bool) $lock->get();
+        }
+
+        if ($lock->get()) {
+            return true;
+        }
+
+        Cache::put(self::gateWaitingCacheKey($server), true, $lockWaitSeconds + 5);
+        try {
+            return (bool) $lock->block($lockWaitSeconds);
+        } catch (LockTimeoutException) {
+            return false;
+        } finally {
+            Cache::forget(self::gateWaitingCacheKey($server));
+        }
+    }
+
+    public static function gateWaitingCacheKey(Server $server): string
+    {
+        return "image-scan:gate-waiting:{$server->id}";
+    }
+
+    /**
+     * A deploy gate waits for the server lock.
+     */
+    public static function isGateWaiting(Server $server): bool
+    {
+        return Cache::has(self::gateWaitingCacheKey($server));
+    }
+
+    /**
+     * The scan could not run because the server lock was busy and the caller retries later (see `$retryWhenBusy`).
+     */
+    public static function lockWasBusy(ImageScan $scan): bool
+    {
+        return ! $scan->exists && $scan->status === ImageScanStatus::Failed && $scan->error_code === ImageScanErrorCode::LockBusy;
     }
 
     public static function progressCacheKey(Model $resource): string
@@ -255,7 +315,7 @@ class ScanImage
 
             throw $e;
         } finally {
-            Cache::forget(self::progressCacheKey($resource));
+            $this->forgetProgress($resource);
             instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         }
     }
@@ -306,7 +366,7 @@ class ScanImage
             throw $e;
         } finally {
             foreach ($resources as $resource) {
-                Cache::forget(self::progressCacheKey($resource));
+                $this->forgetProgress($resource);
             }
             instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         }
@@ -322,19 +382,6 @@ class ScanImage
             ->where('resource_id', $resource->getKey());
     }
 
-    private function acquire(Lock $lock, int $lockWaitSeconds): bool
-    {
-        if ($lockWaitSeconds <= 0) {
-            return (bool) $lock->get();
-        }
-
-        try {
-            return (bool) $lock->block($lockWaitSeconds);
-        } catch (LockTimeoutException) {
-            return false;
-        }
-    }
-
     private function progress(Model $resource, string $stage): void
     {
         Cache::put(self::progressCacheKey($resource), [
@@ -342,7 +389,7 @@ class ScanImage
             'stage' => $stage,
             'started_at' => $this->startedAt->toIso8601String(),
         ], self::LOCK_TTL);
-        $this->broadcast($resource, $this->runId);
+        $this->broadcast($resource, $this->runId, final: false);
     }
 
     /**
@@ -548,7 +595,8 @@ class ScanImage
         $findings = $report['findings'];
 
         $buildsImage = $this->buildsImage($resource, $imageRef);
-        $classifierScan = $this->resourceScans($resource)->where('image_id', $image['id'])->first() ?? new ImageScan;
+        $existing = $this->resourceScans($resource)->where('image_id', $image['id'])->with('deploymentQueue:id,pull_request_id')->first();
+        $classifierScan = $existing !== null ? clone $existing : new ImageScan;
         $classifierScan->forceFill(['builds_image' => $buildsImage])->setRelation('resource', $resource);
 
         $summary = ScanSummary::build(
@@ -565,7 +613,7 @@ class ScanImage
             'image_sbom_id' => $sbom->id,
             'repo_digest' => $image['repo_digest'],
             'image_ref' => mb_substr($imageRef, 0, 512),
-            ...($deployment !== null ? ['deployment_queue_id' => $deployment->id] : []),
+            ...$this->deploymentLink($resource, $existing, $deployment),
             ...($baseImageRef !== null ? ['base_image_ref' => $baseImageRef] : []),
             'status' => ImageScanStatus::Completed,
             'error_code' => null,
@@ -580,10 +628,43 @@ class ScanImage
         $scan->setRelation('resource', $resource);
 
         Cache::forget(self::lastErrorCacheKey($resource));
-        Cache::forget(self::progressCacheKey($resource));
+        $this->forgetProgress($resource);
         $this->broadcast($resource, (string) $scan->uuid);
 
         return $scan;
+    }
+
+    /**
+     * The deployment a scan row belongs to, which decides the current scans of an application (all images of one
+     * deployment). A scan without a deployment (rescan, Scan now) joins the latest finished deployment of the
+     * application, unless the row belongs to a newer deployment. A preview never takes over the row of the application.
+     *
+     * @return array{deployment_queue_id?: int}
+     */
+    private function deploymentLink(Model $resource, ?ImageScan $existing, ?ApplicationDeploymentQueue $deployment): array
+    {
+        $linked = $existing?->deployment_queue_id;
+        $linkedToPreview = $linked !== null && (int) ($existing->deploymentQueue?->pull_request_id ?? 0) !== 0;
+
+        if ($deployment !== null) {
+            return (int) $deployment->pull_request_id !== 0 && $existing !== null && ! $linkedToPreview
+                ? []
+                : ['deployment_queue_id' => (int) $deployment->id];
+        }
+
+        if (! $resource instanceof Application || $linkedToPreview) {
+            return [];
+        }
+
+        $latest = ApplicationDeploymentQueue::query()
+            ->where('application_id', (string) $resource->getKey())
+            ->where('pull_request_id', 0)
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->max('id');
+
+        return $latest === null || ($linked !== null && (int) $linked >= (int) $latest)
+            ? []
+            : ['deployment_queue_id' => (int) $latest];
     }
 
     /**
@@ -654,7 +735,7 @@ class ScanImage
 
         $scan->setRelation('resource', $resource);
         $this->rememberError($resource, $code, $context);
-        Cache::forget(self::progressCacheKey($resource));
+        $this->forgetProgress($resource);
         $this->broadcast($resource, (string) $scan->uuid);
 
         return $scan;
@@ -667,11 +748,26 @@ class ScanImage
     {
         $scan = $this->unsavedFailure($server, $resource, $imageRef, $imageId, $code, $context, $repoDigest);
 
-        $this->rememberError($resource, $code, $context);
-        Cache::forget(self::progressCacheKey($resource));
+        // Another run of the resource is scanning: its progress stays, and a busy lock is not its error.
+        $otherRun = data_get(Cache::get(self::progressCacheKey($resource)), 'run_id');
+        $otherRunActive = is_string($otherRun) && $otherRun !== $this->runId;
+        if (! ($otherRunActive && $code === ImageScanErrorCode::LockBusy)) {
+            $this->rememberError($resource, $code, $context);
+        }
+        $this->forgetProgress($resource);
         $this->broadcast($resource, $this->runId);
 
         return $scan;
+    }
+
+    /**
+     * Removes the progress of the resource only when it is the progress of this run.
+     */
+    private function forgetProgress(Model $resource): void
+    {
+        if (data_get(Cache::get(self::progressCacheKey($resource)), 'run_id') === $this->runId) {
+            Cache::forget(self::progressCacheKey($resource));
+        }
     }
 
     /**
@@ -807,10 +903,13 @@ class ScanImage
         return [$payload, $cut];
     }
 
-    private function broadcast(Model $resource, string $scanUuid): void
+    /**
+     * @param  bool  $final  False for a progress update while the scan runs.
+     */
+    private function broadcast(Model $resource, string $scanUuid, bool $final = true): void
     {
         $teamId = method_exists($resource, 'team') ? $resource->team()?->id : null;
 
-        ImageScanUpdated::dispatch($teamId, (string) $resource->getAttribute('uuid'), $scanUuid);
+        ImageScanUpdated::dispatch($teamId, (string) $resource->getAttribute('uuid'), $scanUuid, $final);
     }
 }

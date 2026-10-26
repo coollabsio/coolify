@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ImageScan\ScanImage;
 use App\Events\ImageScanUpdated;
 use App\Jobs\PrepareImageScannerJob;
 use App\Livewire\ImageScan\ServerImageScanning;
@@ -11,6 +12,7 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,7 +83,7 @@ describe('server image scanning page', function () {
 
         expect($this->server->settings->fresh()->is_image_scan_enabled)->toBeTrue()
             ->and(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('pulling');
-        Queue::assertPushed(PrepareImageScannerJob::class, fn ($job) => $job->server->is($this->server) && $job->queue === maintenance_queue());
+        Queue::assertPushed(PrepareImageScannerJob::class, fn ($job) => $job->server->is($this->server) && $job->queue === 'default');
     });
 
     it('turns image scanning off without queueing a job', function () {
@@ -252,6 +254,23 @@ describe('prepare image scanner job', function () {
         (new PrepareImageScannerJob($this->server))->handle();
 
         expect(Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server)))->toBe(1234);
+    });
+
+    it('updates the database under the scan lock and runs again later when it is busy', function () {
+        fakeScannerPreparation();
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+
+        $job = new PrepareImageScannerJob($this->server);
+        $queueJob = Mockery::mock(Job::class);
+        $queueJob->shouldReceive('attempts')->andReturn(1);
+        $queueJob->shouldReceive('release')->once()->with(60);
+        $job->setJob($queueJob);
+        $job->handle();
+        $lock->release();
+
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('updating_database');
     });
 
     it('is unique per server', function () {

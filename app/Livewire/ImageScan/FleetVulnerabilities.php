@@ -46,9 +46,17 @@ class FleetVulnerabilities extends Component
     }
 
     /**
-     * A scan finished somewhere in the team: render again with the new results.
+     * A scan finished somewhere in the team: render again with the new results. Progress updates of a running scan
+     * change no result, so they do not reload the page.
+     *
+     * @param  array<string, mixed>  $event
      */
-    public function scanUpdated(): void {}
+    public function scanUpdated(array $event = []): void
+    {
+        if (data_get($event, 'final', true) === false) {
+            $this->skipRender();
+        }
+    }
 
     public function updated(string $property): void
     {

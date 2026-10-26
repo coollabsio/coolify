@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\ImageScan\ScanImage;
 use App\Events\ImageScanUpdated;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -21,7 +22,8 @@ use Illuminate\Support\Str;
  * Pulls the pinned scanner images on a server and updates the Grype database.
  *
  * The progress is kept in the cache (`image-scan-prepare:{server_id}`: pulling, updating_database, ready,
- * failed) and broadcast as ImageScanUpdated with the scan UUID `prepare`.
+ * failed) and broadcast as ImageScanUpdated with the scan UUID `prepare`. The database update runs under the scan
+ * lock of the server; when it is busy, the job runs again later instead of waiting for it.
  */
 class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -39,7 +41,10 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
 
     public $timeout = 3600;
 
-    public $tries = 1;
+    public $tries = ScanResourceImagesJob::MAX_ATTEMPTS;
+
+    /** An unexpected error fails the job; only a busy scan lock retries it. */
+    public $maxExceptions = 1;
 
     public $uniqueFor = 3600;
 
@@ -51,7 +56,8 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
 
     public function __construct(public Server $server)
     {
-        $this->onQueue(maintenance_queue());
+        // Same queue as the other scan jobs: self-hosted Horizon works through 'high' first.
+        $this->onQueue(isCloud() ? maintenance_queue() : 'default');
     }
 
     public function uniqueId(): string
@@ -131,7 +137,23 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         }
 
         $this->setState($server, self::STATE_UPDATING_DATABASE);
-        $updated = self::run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
+        $lock = ScanImage::serverLock($server);
+        if (! ScanImage::acquireServerLock($lock, $server, 0)) {
+            if ($this->attempts() >= $this->tries) {
+                $this->setState($server, self::STATE_FAILED);
+
+                return;
+            }
+            $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
+
+            return;
+        }
+
+        try {
+            $updated = self::run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
+        } finally {
+            $lock->release();
+        }
         if (($updated['exit_codes']['db-update'] ?? null) !== 0) {
             $this->setState($server, self::STATE_FAILED);
 

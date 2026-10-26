@@ -30,8 +30,11 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Each image waits at most this long for the scan lock of the server. */
-    public const LOCK_WAIT_SECONDS = 600;
+    /** Waits before the next attempt when the scan lock of the server is busy or a deploy gate waits for it. */
+    public const LOCK_RETRY_DELAYS = [60, 120, 300];
+
+    /** Attempts of a job, for a busy lock and for an image that is still being pulled. */
+    public const MAX_ATTEMPTS = 10;
 
     /** Images scanned when the job derives them from the resource. */
     public const MAX_DERIVED_IMAGES = 5;
@@ -44,7 +47,10 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 
     public const START_RETRY_DELAY_SECONDS = 120;
 
-    public $tries = 1;
+    public $tries = self::MAX_ATTEMPTS;
+
+    /** An unexpected error fails the job; only a busy lock or a missing image retry it. */
+    public $maxExceptions = 1;
 
     public $timeout;
 
@@ -55,11 +61,10 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [], public bool $retryWhenImageMissing = false, public ?string $baseImageRef = null)
     {
-        $this->tries = $retryWhenImageMissing ? self::START_MAX_ATTEMPTS : 1;
         // Self-hosted Horizon works through 'high' first, so scans there would delay deployments.
         $this->onQueue(isCloud() ? maintenance_queue() : 'default');
         $images = $imageRefs === [] ? $this->derivedImageCount() : count($imageRefs);
-        $this->timeout = $images * (self::LOCK_WAIT_SECONDS + ScanImage::LOCK_TTL);
+        $this->timeout = $images * ScanImage::LOCK_TTL;
     }
 
     /**
@@ -68,7 +73,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
     public static function dispatchAfterStart(Model $resource): void
     {
         try {
-            if (! ImageScanPolicyResolver::for($resource)->scanEnabled) {
+            if (! ImageScanPolicyResolver::isScanOn($resource)) {
                 return;
             }
 
@@ -88,6 +93,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 
         $done = $this->doneTargets();
         $missing = [];
+        $lastAttempt = $this->attempts() >= $this->tries;
         foreach ($this->scanTargets() as [$resource, $imageRef]) {
             $key = $this->targetKey($resource, $imageRef);
             if (in_array($key, $done, true)) {
@@ -95,7 +101,15 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $baseImageRef = $resource === $this->resource && $resource instanceof Application ? $this->baseImageRef : null;
-            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, self::LOCK_WAIT_SECONDS, $baseImageRef);
+            // Never sleeps on the server lock: a deploy gate may need it. A busy lock retries the job later.
+            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, 0, $baseImageRef, retryWhenBusy: ! $lastAttempt);
+
+            if (! $lastAttempt && ScanImage::lockWasBusy($scan)) {
+                $this->rememberDoneTargets($done);
+                $this->release(self::lockRetryDelay($this->attempts()));
+
+                return;
+            }
 
             if ($this->shouldRetry($scan)) {
                 // Only the last attempt leaves the error visible.
@@ -112,10 +126,18 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * The wait before attempt $attempt + 1 after a busy lock: 60, 120, then 300 seconds.
+     */
+    public static function lockRetryDelay(int $attempt): int
+    {
+        return self::LOCK_RETRY_DELAYS[min(max($attempt, 1), count(self::LOCK_RETRY_DELAYS)) - 1];
+    }
+
     private function shouldRetry(ImageScan $scan): bool
     {
         return $this->retryWhenImageMissing
-            && $this->attempts() < $this->tries
+            && $this->attempts() < min(self::START_MAX_ATTEMPTS, $this->tries)
             && $scan->status === ImageScanStatus::Failed
             && $scan->error_code === ImageScanErrorCode::ImageMissing;
     }
@@ -251,7 +273,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function server(?ApplicationDeploymentQueue $deployment): ?Server
     {
-        $server = $deployment?->server ?? ImageScanPolicyResolver::for($this->resource)->scanServer;
+        $server = $deployment?->server ?? ImageScanPolicyResolver::mainServerOf($this->resource);
 
         return $server instanceof Server ? $server : null;
     }

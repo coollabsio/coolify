@@ -267,6 +267,41 @@ it('fails with lock busy after the wait when another scan holds the server lock'
     Process::assertNothingRan();
 });
 
+it('keeps the progress of another run of the resource and records no busy lock for it', function () {
+    scanImageTestFake();
+    $progress = ['run_id' => 'otherrun123456', 'stage' => 'sbom', 'started_at' => now()->toIso8601String()];
+    Cache::put(ScanImage::progressCacheKey($this->application), $progress, 600);
+    Cache::lock("image-scan:{$this->server->id}", 1800)->get();
+
+    $scan = scanImageTestRun();
+
+    expect($scan->error_code)->toBe(ImageScanErrorCode::LockBusy)
+        ->and(Cache::get(ScanImage::progressCacheKey($this->application)))->toBe($progress)
+        ->and(Cache::has(ScanImage::lastErrorCacheKey($this->application)))->toBeFalse();
+});
+
+it('records nothing for a busy lock that the caller retries later', function () {
+    scanImageTestFake();
+    Event::fake([ImageScanUpdated::class]);
+    Cache::lock("image-scan:{$this->server->id}", 1800)->get();
+
+    $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', null, 0, retryWhenBusy: true);
+
+    expect(ScanImage::lockWasBusy($scan))->toBeTrue()
+        ->and(Cache::has(ScanImage::lastErrorCacheKey($this->application)))->toBeFalse();
+    Event::assertNotDispatched(ImageScanUpdated::class);
+});
+
+it('marks progress broadcasts as not final and results as final', function () {
+    scanImageTestFake();
+    Event::fake([ImageScanUpdated::class]);
+
+    $scan = scanImageTestRun();
+
+    Event::assertDispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->scanUuid === $scan->uuid && $event->final && $event->broadcastWith()['final'] === true);
+    Event::assertDispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->scanUuid !== $scan->uuid && ! $event->final);
+});
+
 it('does not change a completed scan when a concurrent call finds the lock busy', function () {
     scanImageTestFake();
     $deployment = ApplicationDeploymentQueue::create([

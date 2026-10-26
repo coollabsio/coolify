@@ -13,10 +13,10 @@ use App\Models\ImageSbom;
 use App\Models\ImageScan;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Bus\Queueable;
 use Illuminate\Bus\UniqueLock;
-use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,9 +37,6 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Each image waits at most this long for the scan lock of the server. */
-    public const LOCK_WAIT_SECONDS = 600;
-
     /** Scans kept per resource besides the running image and the rollback list. */
     public const KEEP_LATEST_SCANS = 5;
 
@@ -55,10 +52,10 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     /** The failed-day count of a server is kept this long after the last failure. */
     private const FAILURE_STATE_DAYS = 7;
 
-    /** Retention and SBOM deletion wait at most this long for the scan lock of the server, else they skip a day. */
-    public int $retentionLockWaitSeconds = 120;
+    public $tries = ScanResourceImagesJob::MAX_ATTEMPTS;
 
-    public $tries = 1;
+    /** An unexpected error fails the job; only a busy scan lock retries it. */
+    public $maxExceptions = 1;
 
     public $timeout = 36000;
 
@@ -146,31 +143,52 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         }
 
         $commands = new ScannerCommands($server, Str::lower(Str::random(24)));
-        $this->updateDatabase($server, $commands);
+        // Never sleeps on the scan lock, so a deploy gate gets it first. A busy lock runs the job again later and it
+        // goes on where it stopped; the last attempt runs without the busy steps.
+        $lastAttempt = $this->attempts() >= $this->tries;
+        $progress = $this->progress();
+
+        if (! $progress['database']) {
+            if (! $this->updateDatabase($server, $commands) && ! $lastAttempt) {
+                $this->retryLater($progress);
+
+                return;
+            }
+            $progress['database'] = true;
+        }
 
         $listing = $this->runningContainers($server, $commands);
         if ($listing === null) {
             self::recordRescanResult($server, false);
+            $this->forgetProgress();
 
             return;
         }
 
         [$targets, $runningRefs] = $this->targets($server, $listing['containers']);
-        $scanned = 0;
-        $completed = 0;
-        $errors = 0;
         foreach ($targets as $imageId => $imageTargets) {
+            if (in_array($imageId, $progress['done'], true)) {
+                continue;
+            }
+
             try {
-                $scans = ScanImage::make()->rescan($server, $imageId, $imageTargets, self::LOCK_WAIT_SECONDS);
-                $scanned += count($scans);
-                $completed += count(array_filter($scans, fn (ImageScan $scan): bool => $scan->status === ImageScanStatus::Completed));
+                $scans = ScanImage::make()->rescan($server, $imageId, $imageTargets, 0, retryWhenBusy: ! $lastAttempt);
+                if (! $lastAttempt && $scans !== [] && collect($scans)->every(fn (ImageScan $scan): bool => ScanImage::lockWasBusy($scan))) {
+                    $this->retryLater($progress);
+
+                    return;
+                }
+                $progress['scanned'] += count($scans);
+                $progress['completed'] += count(array_filter($scans, fn (ImageScan $scan): bool => $scan->status === ImageScanStatus::Completed));
                 $this->refreshCandidates($scans);
             } catch (Throwable $e) {
-                $errors++;
+                $progress['errors']++;
                 report($e);
             }
+            $progress['done'][] = $imageId;
         }
-        self::recordRescanResult($server, $completed > 0 || ($scanned === 0 && $errors === 0));
+        self::recordRescanResult($server, $progress['completed'] > 0 || ($progress['scanned'] === 0 && $progress['errors'] === 0));
+        $this->forgetProgress();
 
         // A cut list would make running images look stopped.
         if (! $listing['truncated']) {
@@ -179,9 +197,54 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     }
 
     /**
+     * What earlier attempts of this job did: database updated, image IDs rescanned, and the counts of the result.
+     *
+     * @return array{database: bool, done: list<string>, scanned: int, completed: int, errors: int}
+     */
+    private function progress(): array
+    {
+        $empty = ['database' => false, 'done' => [], 'scanned' => 0, 'completed' => 0, 'errors' => 0];
+        $key = $this->progressCacheKey();
+        $stored = $key === null ? null : Cache::get($key);
+
+        return is_array($stored) ? [...$empty, ...$stored] : $empty;
+    }
+
+    /**
+     * @param  array{database: bool, done: list<string>, scanned: int, completed: int, errors: int}  $progress
+     */
+    private function retryLater(array $progress): void
+    {
+        $key = $this->progressCacheKey();
+        if ($key !== null) {
+            Cache::put($key, $progress, now()->addHours(12));
+        }
+        $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
+    }
+
+    private function forgetProgress(): void
+    {
+        $key = $this->progressCacheKey();
+        if ($key !== null) {
+            Cache::forget($key);
+        }
+    }
+
+    /**
+     * A released job runs again from its stored payload, which keeps its UUID.
+     */
+    private function progressCacheKey(): ?string
+    {
+        $uuid = $this->job?->uuid();
+
+        return $uuid === null ? null : "image-rescan:progress:{$uuid}";
+    }
+
+    /**
      * Looks for newer versions of each rescanned image that has a package fix at the alert level (spec 4.5, 7.1).
      * The rescan released the lock; each candidate scan takes it again. Runs here, one image after the other, under
-     * the unique lock of RefreshCandidatesJob: a queued or running job of the same scan does the check instead.
+     * the unique lock of RefreshCandidatesJob: a queued or running job of the same scan does the check instead. When
+     * the scan lock is busy, the check moves to a queued job that retries later.
      *
      * @param  list<ImageScan>  $scans
      */
@@ -198,10 +261,16 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
                 if (! $uniqueLock->acquire($job)) {
                     continue;
                 }
+                $busy = false;
                 try {
-                    RefreshCandidates::run($scan, self::LOCK_WAIT_SECONDS);
+                    RefreshCandidates::run($scan, 0, retryWhenBusy: true);
+                } catch (ScanLockBusy) {
+                    $busy = true;
                 } finally {
                     $uniqueLock->release($job);
+                }
+                if ($busy) {
+                    RefreshCandidatesJob::dispatch($scan);
                 }
             } catch (Throwable $e) {
                 report($e);
@@ -210,7 +279,8 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Retention and SBOM deletion under the scan lock, so a scan that starts meanwhile keeps its SBOM and rows.
+     * Retention and SBOM deletion under the scan lock, so a scan that starts meanwhile keeps its SBOM and rows. When
+     * the lock is busy they skip a day.
      *
      * @param  array<string, list<array{0: Model, 1: string}>>  $targets
      * @param  array<string, list<string>>  $runningRefs
@@ -218,11 +288,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     private function cleanUp(Server $server, ScannerCommands $commands, array $targets, array $runningRefs): void
     {
         $lock = ScanImage::serverLock($server);
-        try {
-            if (! $lock->block($this->retentionLockWaitSeconds)) {
-                return;
-            }
-        } catch (LockTimeoutException) {
+        if (! ScanImage::acquireServerLock($lock, $server, 0)) {
             return;
         }
 
@@ -237,10 +303,16 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * A failed update keeps the existing database; the scans report when it is too old.
+     * Updates the database under the scan lock, so no scan reads it while it changes. A failed update keeps the
+     * existing database; the scans report when it is too old. False when the lock is busy.
      */
-    private function updateDatabase(Server $server, ScannerCommands $commands): void
+    private function updateDatabase(Server $server, ScannerCommands $commands): bool
     {
+        $lock = ScanImage::serverLock($server);
+        if (! ScanImage::acquireServerLock($lock, $server, 0)) {
+            return false;
+        }
+
         $url = InstanceSettings::get()->image_scan_db_url;
 
         try {
@@ -250,7 +322,11 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             }
         } catch (Throwable $e) {
             report($e);
+        } finally {
+            $lock->release();
         }
+
+        return true;
     }
 
     /**

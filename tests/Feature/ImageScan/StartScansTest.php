@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\DatabaseStartCommandExecutor;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -159,7 +160,7 @@ describe('service start', function () {
             ->withArgs(function ($server, $resource, $ref, $deployment, $wait) use (&$scanned) {
                 $scanned[] = [$resource::class, $resource->getKey(), $ref];
 
-                return $server->is(test()->server) && $deployment === null && $wait === ScanResourceImagesJob::LOCK_WAIT_SECONDS;
+                return $server->is(test()->server) && $deployment === null && $wait === 0;
             })
             ->andReturn(new ImageScan);
 
@@ -254,7 +255,7 @@ describe('image not pulled yet', function () {
         startScansQueuedJob($job, 3)->shouldReceive('release')->never();
         $job->handle();
 
-        expect($job->tries)->toBe(3)
+        expect(ScanResourceImagesJob::START_MAX_ATTEMPTS)->toBe(3)
             ->and(Cache::has(ScanImage::lastErrorCacheKey($web)))->toBeTrue();
     });
 
@@ -267,13 +268,13 @@ describe('image not pulled yet', function () {
         startScansQueuedJob($job, 1)->shouldReceive('release')->never();
         $job->handle();
 
-        expect($job->tries)->toBe(1);
+        expect($job->retryWhenImageMissing)->toBeFalse();
     });
 
     it('queues the start job with retries', function () {
         ScanResourceImagesJob::dispatchAfterStart(startScansService());
 
-        Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $job) => $job->retryWhenImageMissing && $job->tries === 3);
+        Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $job) => $job->retryWhenImageMissing && $job->tries === ScanResourceImagesJob::MAX_ATTEMPTS);
     });
 
     it('uses the server of the scan policy when the service has no destination', function () {
@@ -285,5 +286,103 @@ describe('image not pulled yet', function () {
             ->andReturn(new ImageScan);
 
         (new ScanResourceImagesJob($service->fresh()))->handle();
+    });
+});
+
+describe('busy scan lock', function () {
+    it('does not wait for a busy lock and runs again later with a growing delay', function (int $attempt, int $delay) {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+
+        $job = new ScanResourceImagesJob($service);
+        startScansQueuedJob($job, $attempt)->shouldReceive('release')->once()->with($delay);
+        $job->handle();
+        $lock->release();
+
+        expect(Cache::has(ScanImage::lastErrorCacheKey($web)))->toBeFalse();
+        Process::assertNothingRan();
+    })->with([
+        'first attempt' => [1, 60],
+        'second attempt' => [2, 120],
+        'third attempt' => [3, 300],
+        'later attempt' => [6, 300],
+    ]);
+
+    it('keeps the images that were scanned before the lock was busy', function () {
+        $service = startScansService();
+        startScansServiceApplication($service, 'nginx:1.27');
+        startScansServiceApplication($service, 'redis:7');
+        $scanned = [];
+        ScanImage::shouldRun()->times(3)
+            ->andReturnUsing(function ($server, $resource, $ref) use (&$scanned) {
+                $scanned[] = $ref;
+
+                return count($scanned) === 2
+                    ? (new ImageScan)->forceFill(['status' => ImageScanStatus::Failed, 'error_code' => ImageScanErrorCode::LockBusy])
+                    : new ImageScan;
+            });
+
+        $first = new ScanResourceImagesJob($service);
+        startScansQueuedJob($first, 1)->shouldReceive('release')->once()->with(60);
+        $first->handle();
+        $second = new ScanResourceImagesJob($service);
+        startScansQueuedJob($second, 2)->shouldReceive('release')->never();
+        $second->handle();
+
+        expect($scanned)->toBe(['nginx:1.27', 'redis:7', 'redis:7']);
+    });
+
+    it('leaves a free lock to a deploy gate that waits for it', function () {
+        $service = startScansService();
+        startScansServiceApplication($service, 'nginx:1.27');
+        Cache::put(ScanImage::gateWaitingCacheKey($this->server), true, 120);
+
+        $job = new ScanResourceImagesJob($service);
+        startScansQueuedJob($job, 1)->shouldReceive('release')->once()->with(60);
+        $job->handle();
+
+        expect(ScanImage::serverLock($this->server)->get())->toBeTrue();
+        Process::assertNothingRan();
+    });
+
+    it('records the busy lock on the last attempt', function () {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+
+        $job = new ScanResourceImagesJob($service);
+        startScansQueuedJob($job, ScanResourceImagesJob::MAX_ATTEMPTS)->shouldReceive('release')->never();
+        $job->handle();
+        $lock->release();
+
+        expect(data_get(Cache::get(ScanImage::lastErrorCacheKey($web)), 'code'))->toBe(ImageScanErrorCode::LockBusy->value);
+    });
+
+    it('marks a deploy gate that waits for the lock so background scans back off', function () {
+        $gateWaiting = null;
+        $lock = Mockery::mock(Lock::class);
+        $lock->shouldReceive('get')->once()->andReturnFalse();
+        $lock->shouldReceive('block')->once()->with(120)->andReturnUsing(function () use (&$gateWaiting) {
+            $gateWaiting = ScanImage::isGateWaiting(test()->server);
+
+            return true;
+        });
+
+        expect(ScanImage::acquireServerLock($lock, $this->server, ScanImage::GATE_LOCK_WAIT_SECONDS))->toBeTrue()
+            ->and($gateWaiting)->toBeTrue()
+            ->and(ScanImage::isGateWaiting($this->server))->toBeFalse();
+    });
+
+    it('does not mark a deploy gate that gets the lock right away', function () {
+        $lock = Mockery::mock(Lock::class);
+        $lock->shouldReceive('get')->once()->andReturnTrue();
+        $lock->shouldReceive('block')->never();
+        Cache::spy();
+
+        expect(ScanImage::acquireServerLock($lock, $this->server, ScanImage::GATE_LOCK_WAIT_SECONDS))->toBeTrue();
+        Cache::shouldNotHaveReceived('put');
     });
 });
