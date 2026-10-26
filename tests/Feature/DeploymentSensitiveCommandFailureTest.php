@@ -562,6 +562,22 @@ it('resolves a literal vault reference when the application has a secret manager
     expect($runtime->first(fn (string $line): bool => str_starts_with($line, 'LITERAL_REF=')))->toBe('LITERAL_REF='.escapeComposeEnvFileValue('resolved-remote-value'));
 });
 
+it('tells how to log in when the build server has no Docker config for the SSH user', function () {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    $server->forceFill(['user' => 'coolify', 'name' => 'build-1'])->save();
+    setSensitiveFailureJobProperties($job, $reflection, ['server' => $server->fresh(), 'use_build_server' => true]);
+    Process::fake(fn (PendingProcess $process) => Process::result(output: str_contains($process->command, 'echo $HOME') ? '/home/coolify' : 'NOK'));
+
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image'));
+
+    expect($exception->getMessage())
+        ->toContain('of the SSH user (coolify) not found on the build server (build-1)')
+        ->toContain('Server → Docker Registries')
+        ->toContain('"sudo docker login" is saved for root');
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'docker run -d'));
+});
+
 it('mounts the seccomp profile from custom docker options into the helper container', function () {
     [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob();
     $application->update(['custom_docker_run_options' => '--security-opt seccomp=/etc/docker/seccomp-profile.json']);

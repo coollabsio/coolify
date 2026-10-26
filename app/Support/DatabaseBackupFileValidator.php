@@ -100,13 +100,24 @@ class DatabaseBackupFileValidator
             return false;
         }
 
-        $withoutComments = self::stripSqlComments($sql);
+        // Token separator PostgreSQL treats as whitespace: real whitespace, a block comment
+        // (the lazy match can extend to the outer end of a nested comment), or a line
+        // comment. Comment forms also match inside string literals, which can only block
+        // more input, never less.
+        $sep = '(?:\s|/\*.*?\*/|--[^\r\n]*[\r\n])';
 
-        if (preg_match('/^\s*\\\\(?:!|copy\b[^\r\n]*\bprogram\b|(?:o|g)\s*\|)/mi', $withoutComments) === 1) {
+        // psql meta-commands that can run a shell command, anywhere on a line. Same rules as
+        // the restore scan in DatabaseImportCommandBuilder::buildPostgresRestoreScanScript().
+        // A regex error (for example the backtrack limit) returns false and blocks.
+        if (preg_match('~(?:^|[^\\\\])(?:\\\\\\\\)*\\\\(?:!|(?:o|out|gx?|w|write)[^\S\n][^\\\\\n]*\||copy[^\S\n].*program|(?:setenv|e|edit|ef|ev|i|ir|include|include_relative)(?:\s|$)|(?:[^nbv\s\\\\]|[nbv][^\s\\\\])[^\s\\\\]*[^\S\n][^\\\\\n]*`)~mi', $sql) !== 0) {
             return true;
         }
 
-        return preg_match('/(?:^|;)\s*copy\b[^;]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
+        // A TO/FROM PROGRAM token pair anywhere (dynamic SQL, DO blocks, function bodies),
+        // a server-side large-object import or export, or ALTER SYSTEM. Comments are no
+        // longer stripped first, because that cut inside string literals; a commented-out
+        // PROGRAM statement is now blocked too, which is the safer default.
+        return preg_match('~(?:from|to)'.$sep.'+program|lo_(?:import|export)'.$sep.'*\(|alter'.$sep.'+system'.$sep.'+(?:set|reset)~is', $sql) !== 0;
     }
 
     private static function extensionFor(string $name): ?string
@@ -209,12 +220,5 @@ class DatabaseBackupFileValidator
         $fileSize = filesize($path) ?: 0;
 
         return $documentLength >= 5 && $documentLength <= $fileSize;
-    }
-
-    private static function stripSqlComments(string $sql): string
-    {
-        $sql = preg_replace('/\/\*[\s\S]*?\*\//', ' ', $sql) ?? $sql;
-
-        return preg_replace('/--[^\r\n]*/', ' ', $sql) ?? $sql;
     }
 }

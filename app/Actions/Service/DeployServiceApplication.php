@@ -39,7 +39,7 @@ class DeployServiceApplication
 
         if ($pullLatestImages) {
             $commands->push('echo Pulling image for service.');
-            $commands->push("docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName} < /dev/null");
+            $commands->push(serverDockerConfigPrefix($service->server)."docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName} < /dev/null");
         }
 
         if ($service->networks()->count() > 0) {
@@ -48,7 +48,7 @@ class DeployServiceApplication
         }
 
         $connectToPredefinedNetwork = (bool) data_get($service, 'connect_to_docker_network');
-        $upCommand = "docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} up -d --no-deps";
+        $upCommand = serverDockerConfigPrefix($service->server)."docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} up -d --no-deps";
         if ($forceRebuild) {
             $upCommand .= ' --build';
         }
