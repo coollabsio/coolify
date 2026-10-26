@@ -3,6 +3,7 @@
 namespace App\Livewire\ImageScan;
 
 use App\Actions\ImageScan\ScanImage;
+use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanFixState;
 use App\Jobs\RefreshImageScanSummariesJob;
@@ -13,9 +14,11 @@ use App\Models\ImageScanIgnore;
 use App\Models\Server;
 use App\Models\Service;
 use App\Services\ImageScan\Finding;
+use App\Services\ImageScan\FixPanel;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\ImageUpdateRefused;
 use App\Services\ImageScan\ResourceScans;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
@@ -106,6 +109,10 @@ class Vulnerabilities extends Component
         $this->resourceType = $resourceType;
         $this->resourceUuid = $resourceUuid;
         $this->resource();
+
+        if (FixPanel::hasUpdate($this->resource(), $this->currentScans())) {
+            $this->view = 'cve';
+        }
     }
 
     /**
@@ -210,6 +217,38 @@ class Vulnerabilities extends Component
             'resource_uuid' => $this->resourceUuid,
         ]);
         $this->dispatch('success', 'Scan started');
+    }
+
+    /**
+     * Updates the image to a candidate of the fix panel. The confirmation modal passes the password field last; it is
+     * not used.
+     *
+     * @param  string|null  $ownerUuid  On a service page: the application or database whose scan offers the candidate.
+     */
+    public function updateImage(string $candidateRef, ?string $ownerUuid = null): bool
+    {
+        $resource = $this->resource();
+        $this->authorize('update', $resource);
+
+        $target = $resource;
+        if ($resource instanceof Service) {
+            $target = $this->owners()->first(fn (Model $owner): bool => filled($ownerUuid) && $owner->getAttribute('uuid') === $ownerUuid);
+            abort_unless($target instanceof Model, 404);
+        }
+
+        try {
+            UpdateResourceImage::run($target, $candidateRef, auth()->user());
+        } catch (ImageUpdateRefused $e) {
+            $this->dispatch('error', $e->getMessage());
+
+            return true;
+        }
+
+        $this->scans = null;
+        $this->rows = null;
+        $this->dispatch('success', 'Update started.');
+
+        return true;
     }
 
     /**
@@ -696,6 +735,7 @@ class Vulnerabilities extends Component
                 ? (int) $scannedAt->diffInDays(now())
                 : null,
             'eolDistro' => $this->eolDistro($scans),
+            'fixPanel' => FixPanel::items($resource, $scans, $user),
             'truncated' => $scans->contains(fn (ImageScan $scan): bool => (bool) data_get($scan->summary, 'truncated', false)),
             'fixableBySeverity' => $fixableBySeverity,
             'stateCounts' => $stateCounts,

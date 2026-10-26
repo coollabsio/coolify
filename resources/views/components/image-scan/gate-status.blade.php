@@ -59,7 +59,7 @@
                     @if ($isBlocked && $updateTo)
                         <p class="mt-1 text-[11px] leading-4 text-neutral-600 dark:text-fg-dim">
                             A newer version fixes vulnerabilities.
-                            <a href="{{ $vulnerabilitiesUrl }}" {{ wireNavigate() }} class="{{ $linkClasses }}">Update to {{ $updateTo }}</a>
+                            <a href="{{ $vulnerabilitiesUrl }}#fix-panel" {{ wireNavigate() }} class="{{ $linkClasses }}">Update to {{ $updateTo }}</a>
                         </p>
                     @endif
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] leading-4">

@@ -1319,7 +1319,7 @@ Relevant classes:
 Create a page-specific grid class when columns differ. Add responsive rules
 that hide secondary columns before allowing horizontal overflow.
 
-### Severity badge, severity bar, and vulnerability marker
+### Severity badge, severity bar, vulnerability marker, and fix panel
 
 Image scan findings use three shared pieces in
 `resources/views/components/image-scan/`. All three keep the status badge rule:
@@ -1366,6 +1366,23 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   in the in-flow heading below `xl`, for the latest non-preview deployment
   only. "Deploy anyway" shows only where the page can run it and the user has
   Write access; otherwise "Ask someone with write access to deploy anyway."
+- `<x-image-scan.fix-panel :items="$fixPanel" :can-update="$canUpdate" />` is
+  the fix panel of the Vulnerabilities findings card: a band between the header
+  callouts and the toolbar, one row per scanned image (`#fix-panel`, the target
+  of the gate popover's "Update to" link). Each row has a neutral icon tile, the
+  image ref in mono 11px, and one sentence with exact numbers fixed and left, in
+  the words of the alert level ("Update to 15.15-alpine: fixes 17 critical and
+  high. 3 critical are left, waiting for a fix from the image maintainer.").
+  The action is a compact neutral `.button` on the right ("Update to {tag}", or
+  "Pull latest and restart" for a newer build of the same tag) that opens
+  `x-modal-confirmation` with the change as `old → new` (each service
+  application or database on its own line), what restarts, and the warning for
+  the resource type. Without Write access the sentence stays and the button is
+  hidden. When there is no version to update to, the row explains why (no
+  better version, cannot compare + Docker Hub link, login needed + registry
+  logins link). A newer major version is never an action: it sits in a
+  collapsed "Newer major version" detail with a warning callout. The panel is
+  not rendered for resources with `id = 0`; their findings still show.
 
 ---
 
@@ -1531,7 +1548,7 @@ Use these as implementation references:
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
 | Empty state | `resources/views/components/empty.blade.php` |
 | Status pill | `resources/views/components/status-badge.blade.php` |
-| Severity badge, severity bar, vulnerability marker | `resources/views/components/image-scan/` |
+| Severity badge, severity bar, vulnerability marker, fix panel | `resources/views/components/image-scan/` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
 | Command palette / global search | `resources/views/livewire/global-search.blade.php` |

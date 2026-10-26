@@ -119,7 +119,8 @@
                     </x-empty>
                 @endunless
             @else
-                {{-- Fix panel slot: version and base image recommendations (spec 7.3) render here. --}}
+                {{-- Version recommendations (spec 7.3). The Dockerfile base image recommendation (7.4) goes here too. --}}
+                <x-image-scan.fix-panel :items="$fixPanel" :can-update="$canUpdate" />
 
                 <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
                     <x-slot:search>
