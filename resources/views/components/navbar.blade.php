@@ -337,7 +337,7 @@
                 class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
                 <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
                     <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
-                    <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                    <path :d="collapsed ? 'M16 9v6' : 'M8 9v6'" d="M8 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
             </button>
         </div>
