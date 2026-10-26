@@ -27,7 +27,7 @@ beforeEach(function () {
         ->update(['value' => 'https://preview-api.example.com']);
 });
 
-it('shows the same as production badge and updates it when the production value changes', function () {
+it('keeps the production value badge after production changes and removes it when the preview value changes', function () {
     loginAndSkipBoarding();
 
     $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application);
@@ -37,9 +37,9 @@ it('shows the same as production badge and updates it when the production value 
         ->assertSee('Preview deployments');
 
     expect($page->script('document.querySelectorAll(".env-table-item").length'))->toBe(4)
-        ->and($page->script('[...document.querySelectorAll(".env-table-item")].map((row) => row.dataset.envKey + ":" + row.textContent.includes("Same as production"))'))
+        ->and($page->script('[...document.querySelectorAll(".env-table-item")].map((row) => row.dataset.envKey + ":" + row.textContent.includes("Production value"))'))
         ->toBe(['API_URL:false', 'DB_PASSWORD:false', 'API_URL:false', 'DB_PASSWORD:true']);
-    $page->screenshot(filename: 'preview-env-same-as-production-badge');
+    $page->screenshot(filename: 'preview-env-production-value-badge');
 
     $page->click('button[title="DB_PASSWORD"] >> nth=0')
         ->wait(1)
@@ -48,7 +48,17 @@ it('shows the same as production badge and updates it when the production value 
         ->assertSee('Environment variable updated.')
         ->wait(1);
 
-    expect($page->script('[...document.querySelectorAll(".env-table-item")].some((row) => row.textContent.includes("Same as production"))'))->toBeFalse();
+    expect($page->script('[...document.querySelectorAll(".env-table-item")].map((row) => row.dataset.envKey + ":" + row.textContent.includes("Production value"))'))
+        ->toBe(['API_URL:false', 'DB_PASSWORD:false', 'API_URL:false', 'DB_PASSWORD:true']);
+
+    $page->click('button[title="DB_PASSWORD"] >> nth=1')
+        ->wait(1)
+        ->fill('input[name="value"]:visible', 'preview-secret')
+        ->click('[data-environment-variable-update-actions] button[type="submit"]:visible')
+        ->assertSee('Environment variable updated.')
+        ->wait(1);
+
+    expect($page->script('[...document.querySelectorAll(".env-table-item")].some((row) => row.textContent.includes("Production value"))'))->toBeFalse();
 
     $page->navigate($url.'/preview-deployments')
         ->assertSee('Use production values in previews')
