@@ -156,6 +156,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /** @var array<string, string>|null */
     private ?array $remote_secrets_cache = null;
 
+    /** @var array<int, int>|null */
+    private ?array $previewVariableIdsWithProductionValues = null;
+
     private ?bool $has_secret_manager_source = null;
 
     private $env_nixpacks_args;
@@ -1738,10 +1741,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $sort = $this->application->settings->is_env_sorting_enabled;
         if ($sort) {
             $sorted_environment_variables = $this->application->runtime_environment_variables->sortBy('key');
-            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview->sortBy('key');
+            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get()->sortBy('key');
         } else {
             $sorted_environment_variables = $this->application->runtime_environment_variables->sortBy('id');
-            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview->sortBy('id');
+            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get()->sortBy('id');
         }
         if ($this->build_pack === 'dockercompose') {
             $sorted_environment_variables = $sorted_environment_variables->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
@@ -1878,33 +1881,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
-            // Fall back to production env vars for keys not overridden by preview vars,
-            // but only when preview vars are configured. This ensures variables like
-            // DB_PASSWORD that are only set for production will be available in the
-            // preview .env file (fixing ${VAR} interpolation in docker-compose YAML),
-            // while avoiding leaking production values when previews aren't configured.
-            if ($runtime_environment_variables_preview->isNotEmpty()) {
-                $previewKeys = $runtime_environment_variables_preview->pluck('key')->toArray();
-                $fallback_production_vars = $sorted_environment_variables->filter(function ($env) use ($previewKeys) {
-                    return $env->is_runtime && ! in_array($env->key, $previewKeys);
-                });
-                foreach ($fallback_production_vars as $env) {
-                    if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
-                        continue;
-                    }
-
-                    $envs->push($this->runtimeEnvironmentAssignment($env));
-                }
-            }
-
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                if ($this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty()) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
             // Add HOST if not exists
-            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
+            if ($this->deployedPreviewVariables()->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
         }
@@ -2247,6 +2231,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $sorted_environment_variables = $this->application->environment_variables_preview()
+                ->whereNotIn('id', $this->previewVariableIdsWithProductionValues())
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
@@ -2463,6 +2448,39 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $this->application_deployment_queue->addLogEntry('   Suggested name: '.ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey), type: 'info');
+    }
+
+    /**
+     * IDs of preview variables that have the same value as the production variable with the same key.
+     * Coolify copies each new production variable to the previews. With public PR deployments, a
+     * preview can run code from a fork, so it gets only the preview values that the user changed.
+     *
+     * @return array<int, int>
+     */
+    private function previewVariableIdsWithProductionValues(): array
+    {
+        if ($this->previewVariableIdsWithProductionValues !== null) {
+            return $this->previewVariableIdsWithProductionValues;
+        }
+
+        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled) {
+            return $this->previewVariableIdsWithProductionValues = [];
+        }
+
+        $productionValues = $this->application->environment_variables()->get()->pluck('value', 'key');
+
+        return $this->previewVariableIdsWithProductionValues = $this->application->environment_variables_preview()->get()
+            ->filter(fn (EnvironmentVariable $env) => $productionValues->has($env->key) && $productionValues->get($env->key) === $env->value)
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * The preview variables that this preview deployment uses.
+     */
+    private function deployedPreviewVariables(): Collection
+    {
+        return $this->application->environment_variables_preview->whereNotIn('id', $this->previewVariableIdsWithProductionValues());
     }
 
     /**
@@ -3448,7 +3466,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } else {
-            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
+            foreach ($this->application->nixpacks_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get() as $env) {
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue) && $resolvedValue !== '') {
                     $value = ($env->is_literal || $env->is_multiline) ? trim($resolvedValue, "'") : $resolvedValue;
@@ -3530,11 +3548,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $genericBuildVariables = $this->pull_request_id === 0
             ? $this->application->environment_variables()->withoutBuildpackControlVariables()->where('is_buildtime', true)->get()
-            : $this->application->environment_variables_preview()->withoutBuildpackControlVariables()->where('is_buildtime', true)->get();
+            : $this->application->environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->withoutBuildpackControlVariables()->where('is_buildtime', true)->get();
 
         $railpackVariables = $this->pull_request_id === 0
             ? $this->application->railpack_environment_variables()->get()
-            : $this->application->railpack_environment_variables_preview()->get();
+            : $this->application->railpack_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get();
 
         $variables = $this->withoutLegacyEnvironmentVariableKeys($genericBuildVariables->merge($railpackVariables))
             ->mapWithKeys(function (EnvironmentVariable $environmentVariable) {
@@ -3944,7 +3962,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
             // SOURCE_COMMIT changes with each commit and breaks Docker cache if included in build
             if (! $forBuildTime || $this->application->settings->include_source_commit_in_build) {
-                if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                if ($this->deployedPreviewVariables()->where('key', 'SOURCE_COMMIT')->isEmpty()) {
                     if (! is_null($this->commit)) {
                         $coolify_envs->put('SOURCE_COMMIT', $this->commit);
                     } else {
@@ -3952,14 +3970,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                 }
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+            if ($this->deployedPreviewVariables()->where('key', 'COOLIFY_FQDN')->isEmpty()) {
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $coolify_envs->put('COOLIFY_URL', $this->preview->fqdn);
                 } else {
                     $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
                 }
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
+            if ($this->deployedPreviewVariables()->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $coolify_envs->put('COOLIFY_FQDN', $url);
@@ -3968,15 +3986,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                if ($this->deployedPreviewVariables()->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $coolify_envs->put('COOLIFY_BRANCH', $local_branch);
                 }
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                if ($this->deployedPreviewVariables()->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
                     $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
                 }
                 // Only add COOLIFY_CONTAINER_NAME for runtime (not build-time) - it changes every deployment and breaks Docker cache
                 if (! $forBuildTime) {
-                    if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    if ($this->deployedPreviewVariables()->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
                         $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
                     }
                 }
@@ -3984,7 +4002,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             // Runtime only, so a project or server change does not break the Docker build cache
             if (! $forBuildTime) {
-                $coolify_envs = $coolify_envs->merge(coolifyDefaultEnvironmentVariables($this->application, $this->application->environment_variables_preview->pluck('key'), $this->mainServer));
+                $coolify_envs = $coolify_envs->merge(coolifyDefaultEnvironmentVariables($this->application, $this->deployedPreviewVariables()->pluck('key'), $this->mainServer));
             }
 
         } else {
@@ -4081,6 +4099,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         } else {
             $envs = $this->application->environment_variables_preview()
+                ->whereNotIn('id', $this->previewVariableIdsWithProductionValues())
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)
                 ->get();
@@ -5295,6 +5314,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             // Only add preview environment variables that are available during build
             $envs = $this->application->environment_variables_preview()
+                ->whereNotIn('id', $this->previewVariableIdsWithProductionValues())
                 ->withoutBuildpackControlVariables()
                 ->where('is_buildtime', true)
                 ->get();
