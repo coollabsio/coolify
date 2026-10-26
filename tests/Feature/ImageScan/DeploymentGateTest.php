@@ -279,7 +279,27 @@ it('starts without a scan when the gate is off and scans after the deploy', func
 
     Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->resource->is(test()->application)
         && $scanJob->deploymentQueueId === test()->queue->id
-        && $scanJob->imageRef === test()->application->uuid.':'.GATE_COMMIT);
+        && $scanJob->imageRefs === [test()->application->uuid.':'.GATE_COMMIT]
+        && $scanJob->queue === 'default');
+});
+
+it('does not queue a scan after a skipped build or on an additional server when the gate is off', function (array $overrides) {
+    Queue::fake();
+
+    deployGateCall(deployGateJob($overrides), 'post_deployment');
+
+    Queue::assertNotPushed(ScanResourceImagesJob::class);
+})->with([
+    'skipped build' => [['skip_build' => true]],
+    'additional server' => [['is_this_additional_server' => true]],
+]);
+
+it('queues a scan after a rollback that skipped the build', function () {
+    Queue::fake();
+
+    deployGateCall(deployGateJob(['skip_build' => true, 'rollback' => true]), 'post_deployment');
+
+    Queue::assertPushed(ScanResourceImagesJob::class);
 });
 
 it('does not queue a scan after the deploy when scanning is off on the server', function () {
@@ -379,37 +399,80 @@ it('blocks a restart that skips the build with the stored scan', function () {
         ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, ' up ')))->toBeFalse();
 });
 
-it('does not gate a rollback to an image from the rollback list', function () {
+function deployGatePreviousDeployment(string $uuid, ApplicationDeploymentStatus $status, string $commit = GATE_COMMIT, array $attributes = []): ApplicationDeploymentQueue
+{
+    return ApplicationDeploymentQueue::create([
+        'deployment_uuid' => $uuid,
+        'application_id' => test()->application->id,
+        'server_id' => test()->server->id,
+        'status' => $status->value,
+        'commit' => $commit,
+        ...$attributes,
+    ]);
+}
+
+it('does not gate a rollback to a commit with a finished deployment', function () {
     deployGatePolicy(onScanError: 'block');
     ScanImage::shouldRun()->never();
-    GetRollbackImages::shouldRun()->andReturn([
-        'current' => null,
-        'images' => [['tag' => GATE_COMMIT, 'created_at' => null, 'is_current' => false, 'source' => 'local']],
-    ]);
+    deployGatePreviousDeployment('gate-earlier', ApplicationDeploymentStatus::FINISHED);
     deployGateStoredScan([deployGateFindingRow()]);
     $job = deployGateJob(['rollback' => true]);
-
-    deployGateCall($job, 'rememberImageScanRollbackTarget');
 
     expect(deployGateReachesStart($job))->toBeTrue()
         ->and(test()->queue->fresh()->scan_gate_result)->toBeNull()
         ->and(deployGateLogs())->toContain('Rollback to an image that ran before');
 });
 
+it('does not gate a rollback to an image that ran before scanning was turned on', function () {
+    deployGatePolicy(onScanError: 'block');
+    ScanImage::shouldRun()->never();
+    deployGatePreviousDeployment('gate-earlier', ApplicationDeploymentStatus::FINISHED);
+    $job = deployGateJob(['rollback' => true]);
+
+    expect(deployGateReachesStart($job))->toBeTrue()
+        ->and(ImageScan::query()->count())->toBe(0)
+        ->and(test()->queue->fresh()->scan_gate_result)->toBeNull();
+});
+
+it('gates a rollback to the commit of a blocked deployment', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->never();
+    // The blocked image stays tagged on the server, so it is in the rollback list. That alone does not count.
+    GetRollbackImages::shouldNotRun();
+    $blocked = deployGatePreviousDeployment('gate-blocked', ApplicationDeploymentStatus::FAILED, attributes: [
+        'scan_gate_result' => ['blocked' => true, 'scan_ran' => true, 'error' => null, 'count' => 1, 'headline' => 'Deploy blocked: 1 critical vulnerability with a fix.', 'top' => []],
+    ]);
+    deployGateStoredScan([deployGateFindingRow()], ['deployment_queue_id' => $blocked->id]);
+    $job = deployGateJob(['rollback' => true]);
+
+    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
+});
+
+it('gates a rollback to a commit that a finished deployment of another application ran', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+    $other = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'gate-other-app',
+        'application_id' => $other->id,
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::FINISHED->value,
+        'commit' => GATE_COMMIT,
+    ]);
+
+    expect(deployGateBlocked(deployGateJob(['rollback' => true]))->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
+});
+
 it('does not gate a rollback to an image that a finished deployment scanned', function () {
     deployGatePolicy(onScanError: 'block');
     ScanImage::shouldRun()->never();
-    GetRollbackImages::shouldRun()->andReturn(['current' => null, 'images' => []]);
-    $finished = ApplicationDeploymentQueue::create([
-        'deployment_uuid' => 'gate-finished',
-        'application_id' => $this->application->id,
-        'server_id' => $this->server->id,
-        'status' => ApplicationDeploymentStatus::FINISHED->value,
-    ]);
+    $finished = deployGatePreviousDeployment('gate-finished', ApplicationDeploymentStatus::FINISHED, commit: 'HEAD');
     deployGateStoredScan([deployGateFindingRow()], ['deployment_queue_id' => $finished->id]);
     $job = deployGateJob(['rollback' => true]);
-
-    deployGateCall($job, 'rememberImageScanRollbackTarget');
 
     expect(deployGateReachesStart($job))->toBeTrue()
         ->and(test()->queue->fresh()->scan_gate_result)->toBeNull();
@@ -417,11 +480,8 @@ it('does not gate a rollback to an image that a finished deployment scanned', fu
 
 it('gates a rollback to an image that never ran', function () {
     deployGatePolicy();
-    GetRollbackImages::shouldRun()->andReturn(['current' => null, 'images' => [['tag' => 'other', 'created_at' => null, 'is_current' => false, 'source' => 'local']]]);
     ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
     $job = deployGateJob(['rollback' => true]);
-
-    deployGateCall($job, 'rememberImageScanRollbackTarget');
 
     expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
 });
@@ -553,6 +613,18 @@ it('resolves the rules with the build server and reports when scanning is off th
         ->and(test()->queue->fresh()->scan_gate_result['error'])->toBe(ImageScanErrorCode::BuildServerOff->value);
 });
 
+it('scans a restart on the deployment server with its rules when the application has a build server', function () {
+    deployGatePolicy(onScanError: 'block');
+    $buildServer = deployGateServer($this->team, 'build-server', scanning: false);
+    ScanImage::shouldRun()->once()
+        ->withArgs(fn ($server) => $server->is(test()->server))
+        ->andReturn(deployGateReturnedScan([]));
+    $job = deployGateJob(['use_build_server' => true, 'build_server' => $buildServer, 'restart_only' => true]);
+
+    expect(deployGateReachesStart($job))->toBeTrue()
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'error' => null, 'scan_ran' => true]);
+});
+
 it('blocks a Compose deploy with a custom start command when the rule says block', function () {
     deployGatePolicy(onScanError: 'block');
     ScanImage::shouldRun()->never();
@@ -565,6 +637,42 @@ it('blocks a Compose deploy with a custom start command when the rule says block
     } catch (DeploymentException $exception) {
         expect($exception->getMessage())->toBe('Deploy blocked: Coolify cannot check the image because this application uses a custom build or start command.');
     }
+});
+
+it('reports the custom command for a raw Compose deploy whose services have no image', function () {
+    deployGatePolicy(onScanError: 'block');
+    ScanImage::shouldRun()->never();
+    $this->application->update(['build_pack' => 'dockercompose']);
+    $job = deployGateJob([
+        'docker_compose_custom_build_command' => 'docker compose build',
+        'generated_docker_compose' => Yaml::dump(['services' => ['web' => ['build' => '.']]], 10),
+    ]);
+
+    try {
+        deployGateCall($job, 'checkComposeImageScanGate');
+        $this->fail('Expected the gate to block the deploy.');
+    } catch (DeploymentException $exception) {
+        expect($exception->getMessage())->toBe('Deploy blocked: Coolify cannot check the image because this application uses a custom build or start command.')
+            ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, 'docker image inspect')))->toBeFalse();
+    }
+});
+
+it('keeps the worst gate result of a Compose deploy', function () {
+    deployGatePolicy(onScanError: 'deploy');
+    $this->application->update(['build_pack' => 'dockercompose']);
+    ScanImage::shouldRun()->twice()->andReturn(
+        (new ImageScan)->forceFill(['status' => ImageScanStatus::Failed, 'error_code' => ImageScanErrorCode::Timeout, 'error_context' => []]),
+        deployGateReturnedScan([]),
+    );
+    $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => [
+        'web' => ['image' => 'nginx:1.27'],
+        'cache' => ['image' => 'redis:7'],
+    ]], 10)]);
+    $job->outputs = ['docker image inspect' => ''];
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+
+    expect(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'error' => ImageScanErrorCode::Timeout->value]);
 });
 
 it('scans each Compose image and stops Compose from pulling the scanned images', function () {
@@ -585,11 +693,38 @@ it('scans each Compose image and stops Compose from pulling the scanned images',
         ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, 'tee /artifacts/gate-deployment/docker-compose.yaml')))->toBeTrue();
 });
 
-it('scans the started image on the deployment server in the queued job', function () {
-    ScanImage::shouldRun()->once()
-        ->withArgs(fn ($server, $resource, $ref, $deployment) => $server->is(test()->server) && $resource->is(test()->application)
-            && $ref === 'nginx:1.27' && $deployment->id === test()->queue->id)
+it('scans the started images one at a time on the deployment server in the queued job', function () {
+    $scanned = [];
+    ScanImage::shouldRun()->twice()
+        ->withArgs(function ($server, $resource, $ref, $deployment, $wait) use (&$scanned) {
+            $scanned[] = $ref;
+
+            return $server->is(test()->server) && $resource->is(test()->application) && $deployment->id === test()->queue->id && $wait === 600;
+        })
         ->andReturn(deployGateReturnedScan([]));
 
-    (new ScanResourceImagesJob($this->application, $this->queue->id, 'nginx:1.27'))->handle();
+    $job = new ScanResourceImagesJob($this->application, $this->queue->id, ['nginx:1.27', 'redis:7']);
+    $job->handle();
+
+    expect($scanned)->toBe(['nginx:1.27', 'redis:7'])
+        ->and($job->tries)->toBe(1)
+        ->and($job->timeout)->toBe(2 * (600 + ScanImage::LOCK_TTL));
+});
+
+it('scans the images of the latest completed scans when no image is given', function () {
+    deployGateStoredScan([], ['image_ref' => 'old:1', 'image_id' => 'sha256:'.str_repeat('c', 64), 'scanned_at' => now()->subDay()]);
+    deployGateStoredScan([], ['image_ref' => 'new:2', 'scanned_at' => now()]);
+    deployGateStoredScan([], ['image_ref' => 'failed:3', 'image_id' => 'sha256:'.str_repeat('d', 64), 'status' => ImageScanStatus::Failed]);
+    $scanned = [];
+    ScanImage::shouldRun()->twice()
+        ->withArgs(function ($server, $resource, $ref) use (&$scanned) {
+            $scanned[] = $ref;
+
+            return true;
+        })
+        ->andReturn(deployGateReturnedScan([]));
+
+    (new ScanResourceImagesJob($this->application))->handle();
+
+    expect($scanned)->toBe(['new:2', 'old:1']);
 });

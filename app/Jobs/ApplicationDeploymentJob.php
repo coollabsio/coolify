@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Actions\Application\GetRollbackImages;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\ImageScan\ScanImage;
 use App\Actions\Shared\EnsureContentFilesOnServer;
@@ -247,7 +246,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?int $imageScanPolicyServerId = null;
 
-    private bool $imageScanRollbackRanBefore = false;
+    private ?bool $imageScanRollbackRanBefore = null;
+
+    /** @var array<string, mixed>|null The worst gate result of this deployment (blocked, then error, then pass). */
+    private ?array $imageScanGateResult = null;
 
     /** The gate decided for the whole deployment (bypass, rollback, or a scan that cannot run). */
     private bool $imageScanGateSettled = false;
@@ -442,7 +444,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->selectBuildServer();
             $this->detectBuildKitCapabilities();
-            $this->rememberImageScanRollbackTarget();
             $this->decide_what_to_do();
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->isGithubAppSource()) {
@@ -2935,18 +2936,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->checkForCancellation();
 
-        $bypassedBy = $this->imageScanGateBypassedBy();
-        if ($bypassedBy !== null) {
-            $this->imageScanGateSettled = true;
-            $this->logImageScanGateBypass($bypassedBy);
-
-            return;
-        }
-
-        if ($this->rollback && $this->imageScanRollbackRanBefore) {
-            $this->imageScanGateSettled = true;
-            $this->application_deployment_queue->addLogEntry('Rollback to an image that ran before. The image scan does not block it.');
-
+        if ($this->settleImageScanGateForDeployment()) {
             return;
         }
 
@@ -2971,18 +2961,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->pinScannedImage($image['repo_digest']);
         }
 
-        $policy = $this->imageScanPolicy();
-        if (! $policy->scanEnabled) {
+        $error = $this->imageScanErrorBeforeScan();
+        if ($error !== null) {
             $this->imageScanGateSettled = true;
-            $error = $this->use_build_server ? ImageScanErrorCode::BuildServerOff : ImageScanErrorCode::ScanningOff;
-            $this->applyImageScanGate(null, $error, ['server' => (string) ($policy->scanServer?->name ?? $this->server->name)]);
-
-            return;
-        }
-
-        if (filled($this->docker_compose_custom_start_command) || filled($this->docker_compose_custom_build_command)) {
-            $this->imageScanGateSettled = true;
-            $this->applyImageScanGate(null, ImageScanErrorCode::CustomCommand, ['server' => (string) $this->server->name]);
+            $this->applyImageScanGate(null, ...$error);
 
             return;
         }
@@ -3000,6 +2982,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function checkComposeImageScanGate(): void
     {
         if (! $this->imageScanGateApplies()) {
+            return;
+        }
+
+        if ($this->usesCustomComposeCommand()) {
+            // The command can build or pull other images than the Compose file names, so no image is checked.
+            if (! $this->imageScanGateSettled && ! $this->settleImageScanGateForDeployment()) {
+                $this->imageScanGateSettled = true;
+                $this->applyImageScanGate(null, ...$this->imageScanErrorBeforeScan());
+            }
+
             return;
         }
 
@@ -3048,11 +3040,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Rules resolve through the build server when the application builds on one, else through its main server.
+     * Rules resolve through the build server when the image is there, else through the main server.
      */
     private function imageScanPolicy(): ResolvedImageScanPolicy
     {
-        $server = $this->use_build_server ? $this->build_server : null;
+        $server = $this->imageIsOnBuildServer() ? $this->build_server : null;
 
         if ($this->imageScanPolicy === null || $this->imageScanPolicyServerId !== $server?->id) {
             $this->imageScanPolicy = ImageScanPolicyResolver::for($this->application, $server);
@@ -3063,23 +3055,80 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * A rollback to an image in the rollback list is not gated (spec 4.4). The list is read before the build,
-     * because the build of an unknown commit adds its tag to it.
+     * The image is on the build server when the deployment built there. A restart and a Docker image app keep the
+     * image on the deployment server, even with a build server.
      */
-    private function rememberImageScanRollbackTarget(): void
+    private function imageIsOnBuildServer(): bool
     {
-        if (! $this->rollback || ! $this->imageScanGateApplies()) {
-            return;
+        return $this->use_build_server && isset($this->build_server) && $this->server->is($this->build_server);
+    }
+
+    private function usesCustomComposeCommand(): bool
+    {
+        return filled($this->docker_compose_custom_start_command) || filled($this->docker_compose_custom_build_command);
+    }
+
+    /**
+     * Decisions for the whole deployment that need no image: "Deploy anyway", and a rollback to a commit that ran before.
+     */
+    private function settleImageScanGateForDeployment(): bool
+    {
+        $bypassedBy = $this->imageScanGateBypassedBy();
+        if ($bypassedBy !== null) {
+            $this->imageScanGateSettled = true;
+            $this->logImageScanGateBypass($bypassedBy);
+
+            return true;
         }
 
-        try {
-            $tag = substr($this->commit, 0, 128);
-            $images = GetRollbackImages::run($this->application)['images'] ?? [];
-            $this->imageScanRollbackRanBefore = collect($images)->contains(fn ($image) => data_get($image, 'tag') === $tag);
-        } catch (Throwable $e) {
-            \Log::warning("Deployment {$this->deployment_uuid} could not read the rollback images: {$e->getMessage()}");
-            $this->imageScanRollbackRanBefore = false;
+        if ($this->rollback && $this->rollbackCommitRanBefore()) {
+            $this->imageScanGateSettled = true;
+            $this->application_deployment_queue->addLogEntry('Rollback to an image that ran before. The image scan does not block it.');
+
+            return true;
         }
+
+        return false;
+    }
+
+    /**
+     * The reason the gate cannot scan: scanning is off where the image is, or a custom Compose command.
+     *
+     * @return array{0: ImageScanErrorCode, 1: array{server: string}}|null
+     */
+    private function imageScanErrorBeforeScan(): ?array
+    {
+        $policy = $this->imageScanPolicy();
+
+        if (! $policy->scanEnabled) {
+            $error = $this->imageIsOnBuildServer() ? ImageScanErrorCode::BuildServerOff : ImageScanErrorCode::ScanningOff;
+
+            return [$error, ['server' => (string) ($policy->scanServer?->name ?? $this->server->name)]];
+        }
+
+        if ($this->usesCustomComposeCommand()) {
+            return [ImageScanErrorCode::CustomCommand, ['server' => (string) $this->server->name]];
+        }
+
+        return null;
+    }
+
+    /**
+     * A rollback is not gated when a finished deployment of this application ran its commit (spec 4.4). A local tag
+     * alone does not count: the image of a blocked deployment stays tagged on the server.
+     */
+    private function rollbackCommitRanBefore(): bool
+    {
+        if (blank($this->commit) || $this->commit === 'HEAD') {
+            return false;
+        }
+
+        return $this->imageScanRollbackRanBefore ??= ApplicationDeploymentQueue::query()
+            ->where('application_id', (string) $this->application->id)
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->where('commit', $this->commit)
+            ->where('pull_request_id', $this->pull_request_id)
+            ->exists();
     }
 
     /**
@@ -3190,7 +3239,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $gate = app(ImageScanGate::class);
         $result = $gate->evaluate($scan, $this->imageScanPolicy(), IgnoreMatcher::forResource($this->application), $error, $errorContext);
 
-        $this->application_deployment_queue->update(['scan_gate_result' => $result->toArray()]);
+        // A Compose deployment gates several images: keep the worst result (blocked, then error, then pass).
+        $rank = fn (?array $gateResult): int => match (true) {
+            $gateResult === null => -1,
+            (bool) ($gateResult['blocked'] ?? false) => 2,
+            ($gateResult['error'] ?? null) !== null => 1,
+            default => 0,
+        };
+        if ($rank($result->toArray()) >= $rank($this->imageScanGateResult)) {
+            $this->imageScanGateResult = $result->toArray();
+            $this->application_deployment_queue->update(['scan_gate_result' => $this->imageScanGateResult]);
+        }
         $this->imageScanGateScanned = $this->imageScanGateScanned || $result->scanRan;
 
         foreach ($gate->logLines($result, $completed ? (array) $scan->summary : []) as $line) {
@@ -3239,12 +3298,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Queues the scan of the started images when the gate did not scan them before the start.
+     * Queues one scan of the started images when the gate did not scan them before the start. Restarts, skipped
+     * builds, and additional servers run an image that was scanned before, so they get no scan (spec 4.4), except
+     * for a rollback.
      */
     private function dispatchImageScanAfterStart(): void
     {
         try {
             if ($this->imageScanGateScanned
+                || (($this->skip_build || $this->is_this_additional_server) && ! $this->rollback)
                 || ! $this->application->settings?->is_image_scan_enabled
                 || ! InstanceSettings::query()->whereKey(0)->value('is_image_scanning_allowed')
                 || ! ImageScanPolicyResolver::for($this->application, $this->mainServer)->scanEnabled) {
@@ -3256,13 +3318,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ->map(fn ($service) => data_get($service, 'image'))
                     ->filter(fn ($image) => is_string($image) && $image !== '')
                     ->unique()
-                    ->values();
+                    ->values()
+                    ->all();
             } else {
-                $images = collect(isset($this->production_image_name) ? [$this->imageScanPinnedImage ?? $this->production_image_name] : []);
+                $images = isset($this->production_image_name) ? [$this->imageScanPinnedImage ?? $this->production_image_name] : [];
             }
 
-            foreach ($images as $image) {
-                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $image);
+            if ($images !== []) {
+                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $images);
             }
         } catch (Throwable $e) {
             \Log::warning("Deployment {$this->deployment_uuid} could not queue the image scan: {$e->getMessage()}");

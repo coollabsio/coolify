@@ -3,9 +3,10 @@
 namespace App\Jobs;
 
 use App\Actions\ImageScan\ScanImage;
-use App\Enums\ImageScanErrorCode;
+use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ImageScan;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -16,40 +17,72 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Scans the images of a resource after it started, so the scan is not in the critical path of a deploy (spec 4.4).
+ * Scans the images of a resource one at a time, after it started, so the scan is not in the critical path of a
+ * deploy (spec 4.4).
  */
 class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = ScanImage::LOCK_TTL;
+    /** Each image waits at most this long for the scan lock of the server. */
+    public const LOCK_WAIT_SECONDS = 600;
 
-    public $tries = 3;
+    /** Images scanned when the job derives them from the resource. */
+    public const MAX_DERIVED_IMAGES = 5;
 
-    private const LOCK_BUSY_RETRY_SECONDS = 300;
+    public $tries = 1;
 
-    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public ?string $imageRef = null)
+    public $timeout;
+
+    /**
+     * @param  list<string>  $imageRefs  Empty: the images of the resource (imageRefsFor()).
+     */
+    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [])
     {
-        $this->onQueue(maintenance_queue());
+        // Self-hosted Horizon works through 'high' first, so scans there would delay deployments.
+        $this->onQueue(isCloud() ? maintenance_queue() : 'default');
+        $images = $imageRefs === [] ? self::MAX_DERIVED_IMAGES : count($imageRefs);
+        $this->timeout = $images * (self::LOCK_WAIT_SECONDS + ScanImage::LOCK_TTL);
     }
 
     public function handle(): void
     {
-        if (blank($this->imageRef)) {
-            return;
-        }
-
         $deployment = $this->deployment();
         $server = $this->server($deployment);
         if (! $server instanceof Server) {
             return;
         }
 
-        $scan = ScanImage::run($server, $this->resource, $this->imageRef, $deployment);
+        $imageRefs = $this->imageRefs !== [] ? $this->imageRefs : $this->imageRefsFor($this->resource);
 
-        if ($scan->error_code === ImageScanErrorCode::LockBusy && $this->attempts() < $this->tries) {
-            $this->release(self::LOCK_BUSY_RETRY_SECONDS);
+        foreach (array_values(array_unique(array_filter($imageRefs, 'is_string'))) as $imageRef) {
+            ScanImage::run($server, $this->resource, $imageRef, $deployment, self::LOCK_WAIT_SECONDS);
         }
+    }
+
+    /**
+     * The images a resource runs. Applications: the images of their latest completed scans. Services and
+     * standalone databases are added in Task 11.
+     *
+     * @return list<string>
+     */
+    public function imageRefsFor(Model $resource): array
+    {
+        if ($resource instanceof Application) {
+            return ImageScan::query()
+                ->where('resource_type', $resource->getMorphClass())
+                ->where('resource_id', $resource->getKey())
+                ->where('status', ImageScanStatus::Completed)
+                ->orderByDesc('scanned_at')
+                ->orderByDesc('id')
+                ->pluck('image_ref')
+                ->unique()
+                ->take(self::MAX_DERIVED_IMAGES)
+                ->values()
+                ->all();
+        }
+
+        return [];
     }
 
     private function deployment(): ?ApplicationDeploymentQueue
