@@ -50,22 +50,17 @@ function setServiceDeleteServerReachable(Server $server, bool $reachable): void
     Server::flushIdentityMap();
 }
 
-test('explicit delete from coolify only does not claim the server is unreachable', function (bool $serverReachable) {
-    setServiceDeleteServerReachable($this->server, $serverReachable);
-
+test('delete from coolify only is rejected and deletes nothing', function () {
     $this->withToken($this->bearerToken)
         ->deleteJson("/api/v1/services/{$this->service->uuid}?delete_from_coolify_only=true")
-        ->assertOk()
-        ->assertJsonPath('message', 'The service will be removed from Coolify only; Docker resources will remain.');
+        ->assertUnprocessable();
 
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job): bool => $job->deleteFromCoolifyOnly);
-})->with([
-    'reachable server' => [true],
-    'unreachable server' => [false],
-]);
+    expect(Service::find($this->service->id))->not->toBeNull();
+    Queue::assertNotPushed(DeleteResourceJob::class);
+});
 
-test('delete on a reachable server queues a full deletion', function () {
-    setServiceDeleteServerReachable($this->server, true);
+test('delete queues a full deletion whether the server is reachable or not', function (bool $serverReachable) {
+    setServiceDeleteServerReachable($this->server, $serverReachable);
 
     $this->withToken($this->bearerToken)
         ->deleteJson("/api/v1/services/{$this->service->uuid}")
@@ -73,15 +68,7 @@ test('delete on a reachable server queues a full deletion', function () {
         ->assertJsonPath('message', 'Service deletion request queued.');
 
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job): bool => ! $job->deleteFromCoolifyOnly);
-});
-
-test('delete on an unreachable server falls back to removing from coolify only', function () {
-    setServiceDeleteServerReachable($this->server, false);
-
-    $this->withToken($this->bearerToken)
-        ->deleteJson("/api/v1/services/{$this->service->uuid}")
-        ->assertOk()
-        ->assertJsonPath('message', 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.');
-
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job): bool => $job->deleteFromCoolifyOnly);
-});
+})->with([
+    'reachable server' => [true],
+    'unreachable server' => [false],
+]);

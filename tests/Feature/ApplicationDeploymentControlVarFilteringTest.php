@@ -155,7 +155,7 @@ it('keeps deployment logging available if value formatting fails', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
     $variable = new class extends EnvironmentVariable
     {
-        public function logRedactionValues(): array
+        public function logRedactionValues(?Collection $sharedVariables = null): array
         {
             throw new RuntimeException('Harmless formatting failure');
         }
@@ -897,24 +897,12 @@ it('filters docker compose generated service variables from build args', functio
     expect($envArgs->has('SERVICE_URL_APP'))->toBeFalse();
 });
 
-it('filters buildpack control vars from preview runtime env fallback', function () {
+it('does not fall back to production vars when preview copies are deleted', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 
     createApplicationEnvironmentVariable($application, [
         'key' => 'APP_NAME',
         'value' => 'coolify',
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'NIXPACKS_NODE_VERSION',
-        'value' => '22',
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'RAILPACK_NODE_VERSION',
-        'value' => '20',
         'is_runtime' => true,
         'is_buildtime' => false,
     ]);
@@ -926,9 +914,7 @@ it('filters buildpack control vars from preview runtime env fallback', function 
         'is_buildtime' => false,
     ]);
 
-    $application->environment_variables_preview()
-        ->whereIn('key', ['APP_NAME', 'NIXPACKS_NODE_VERSION', 'RAILPACK_NODE_VERSION'])
-        ->delete();
+    $application->environment_variables_preview()->where('key', 'APP_NAME')->delete();
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
         'pull_request_id' => 99,
@@ -937,10 +923,95 @@ it('filters buildpack control vars from preview runtime env fallback', function 
     /** @var Collection $runtimeEnvs */
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBeTrue();
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBeFalse();
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('PREVIEW_FLAG=')))->toBeTrue();
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('NIXPACKS_NODE_VERSION=')))->toBeFalse();
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
+});
+
+it('does not give production runtime values to a preview copy that is not a runtime variable', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n",
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'DB_PASSWORD',
+        'value' => 'production-secret',
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'PREVIEW_FLAG',
+        'value' => 'enabled',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    $application->environment_variables_preview()->where('key', 'DB_PASSWORD')->update(['is_runtime' => false]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->filter(fn (string $env) => str($env)->contains('production-secret')))->toBeEmpty();
+});
+
+it('keeps copied production values out of previews when public PR deployments are on', function (string $buildPack) {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => $buildPack,
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n",
+    ]);
+    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+    createApplicationEnvironmentVariable($application, ['key' => 'API_URL', 'value' => 'https://api.example.com']);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+    $application->environment_variables_preview()->where('key', 'API_URL')->first()
+        ->update(['value' => 'https://preview-api.example.com']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+        'remote_secrets_cache' => [],
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+    /** @var Collection $envArgs */
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+    /** @var Collection $railpackVariables */
+    $railpackVariables = invokeDeploymentJobMethod($job, $reflection, 'railpack_build_variables');
+
+    foreach ([$runtimeEnvs, $buildtimeEnvs] as $envLines) {
+        expect($envLines->filter(fn (string $env) => str($env)->contains('production-secret')))->toBeEmpty()
+            ->and($envLines->contains(fn (string $env) => str($env)->startsWith('API_URL=') && str($env)->contains('preview-api.example.com')))->toBeTrue();
+    }
+    expect($envArgs->has('DB_PASSWORD'))->toBeFalse()
+        ->and($envArgs->get('API_URL'))->toBe('https://preview-api.example.com')
+        ->and($railpackVariables->has('DB_PASSWORD'))->toBeFalse()
+        ->and($railpackVariables->get('API_URL'))->toBe('https://preview-api.example.com');
+    if ($buildPack !== 'dockercompose') {
+        expect($runtimeEnvs)->toContain('PORT='.$application->main_port()[0]);
+    }
+})->with(['dockerfile', 'dockercompose']);
+
+it('keeps copied production values for previews when public PR deployments are off', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=')))->toBeTrue();
 });
 
 it('keeps buildpack variables read at container start in the runtime env', function (int $pullRequestId, bool $isPreview) {
@@ -1546,7 +1617,7 @@ it('builds railpack variables from generic buildtime vars railpack vars and cool
     expect($variables->get('APP_ENV'))->toBe('production');
     expect($variables->get('RAILPACK_NODE_VERSION'))->toBe('20');
     expect($variables->get('RAILPACK_INSTALL_CMD'))->toBe('pnpm install --frozen-lockfile');
-    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('curl wget');
+    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('... curl wget');
     expect($variables->get('COOLIFY_RESOURCE_UUID'))->toBe($application->uuid);
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('RUNTIME_ONLY'))->toBeFalse();
@@ -1631,7 +1702,7 @@ it('builds preview railpack variables without leaking stale nixpacks vars', func
 
     expect($variables->get('PREVIEW_BUILD_FLAG'))->toBe('enabled');
     expect($variables->get('RAILPACK_NODE_VERSION'))->toBe('20');
-    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('curl wget');
+    expect($variables->get('RAILPACK_DEPLOY_APT_PACKAGES'))->toBe('... curl wget');
     expect($variables->get('COOLIFY_RESOURCE_UUID'))->toBe($application->uuid);
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('PREVIEW_RUNTIME_ONLY'))->toBeFalse();
@@ -1718,39 +1789,6 @@ it('writes compose-safe preview runtime env files for user values', function () 
 
     expect($runtimeEnvs)
         ->toContain('PREVIEW_QUOTED_VALUE='.escapeComposeEnvFileValue('preview quotes" \'$`'));
-});
-
-it('writes compose-safe production fallbacks to preview runtime env files', function () {
-    [$application, $server] = makeDeploymentControlVarFixture();
-
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'PREVIEW_TRIGGER',
-        'value' => 'preview-value',
-        'is_preview' => true,
-        'is_literal' => false,
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'FALLBACK_QUOTED_VALUE',
-        'value' => 'fallback quotes" \'$`',
-        'is_literal' => true,
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    $application->environment_variables_preview()
-        ->where('key', 'FALLBACK_QUOTED_VALUE')
-        ->delete();
-
-    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
-        'pull_request_id' => 42,
-    ]);
-
-    /** @var Collection $runtimeEnvs */
-    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
-
-    expect($runtimeEnvs)
-        ->toContain('FALLBACK_QUOTED_VALUE='.escapeComposeEnvFileValue('fallback quotes" \'$`'));
 });
 
 it('writes compose-safe runtime env values for remote secret references', function () {

@@ -22,7 +22,7 @@ class Charts extends Component
 
     public int $interval = 5;
 
-    public bool $poll = true;
+    public bool $live = true;
 
     #[Validate(['required', 'integer', 'min:1'])]
     public int|string $sentinelMetricsRefreshRateSeconds;
@@ -89,27 +89,40 @@ class Charts extends Component
         }
     }
 
-    public function pollData()
-    {
-        if ($this->poll || $this->interval <= 10) {
-            $this->loadData();
-            if ($this->interval > 10) {
-                $this->poll = false;
-            }
-        }
-    }
-
     public function loadData()
     {
         try {
+            $this->server->prefetchMetrics(['cpu', 'memory', 'disk', 'load', 'network'], $this->interval);
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
+            // Disk/network/load arrived in a later Sentinel; fetch each optionally so an
+            // older Sentinel (which 404s them) still shows CPU and memory.
+            $diskMetrics = $this->optionalMetric(fn () => $this->server->getDiskMetrics($this->interval));
+            $loadMetrics = $this->optionalMetric(fn () => $this->server->getLoadMetrics($this->interval));
+            $networkMetrics = $this->optionalMetric(fn () => $this->server->getNetworkMetrics($this->interval)) ?? [];
             $this->dispatch("refreshChartData-{$this->chartId}-metrics", [
                 'cpuSeries' => $cpuMetrics,
                 'memorySeries' => $memoryMetrics,
+                'diskSeries' => $diskMetrics,
+                'loadSeries' => $loadMetrics,
+                'networkRxSeries' => $networkMetrics['rx'] ?? [],
+                'networkTxSeries' => $networkMetrics['tx'] ?? [],
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Fetch a metric that may not exist on an older Sentinel; a failure yields null
+     * rather than breaking the whole chart refresh.
+     */
+    private function optionalMetric(callable $fetch): mixed
+    {
+        try {
+            return $fetch();
+        } catch (\Throwable) {
+            return null;
         }
     }
 
@@ -134,9 +147,21 @@ class Charts extends Component
 
     public function setInterval()
     {
-        if ($this->interval <= 10) {
-            $this->poll = true;
-        }
         $this->loadData();
+    }
+
+    public function updatedLive(): void
+    {
+        if ($this->live) {
+            $this->loadData();
+        }
+    }
+
+    /**
+     * Short ranges refresh every 5 seconds; longer ranges change slowly, so they refresh every minute.
+     */
+    public function pollSeconds(): int
+    {
+        return $this->interval <= 60 ? 5 : 60;
     }
 }

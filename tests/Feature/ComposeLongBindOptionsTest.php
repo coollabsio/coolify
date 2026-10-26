@@ -224,3 +224,33 @@ it('uses the value that the resource sets for a ${VAR:-default} long-form bind s
 it('rejects an unsafe value for a ${VAR:-default} long-form bind source', function (string $kind) {
     parseLongBind($kind, longBindCompose("'\${AO_CONFIG_FILE:-./agent-orchestrator.yaml}'", LONG_BIND_READ_ONLY_OPTIONS), ['AO_CONFIG_FILE' => '/opt/x;touch /tmp/pwned']);
 })->with(['service', 'application'])->throws(Exception::class, 'the value of AO_CONFIG_FILE is not a safe path');
+
+it('keeps a ${VAR:-default} long-form bind source for Docker Compose when the value of the variable is not a plain path', function (string $kind, string $value) {
+    $source = '${AO_CONFIG_FILE:-./agent-orchestrator.yaml}';
+    $result = parseLongBind($kind, longBindCompose("'{$source}'", LONG_BIND_READ_ONLY_OPTIONS), ['BASE_DIR' => '/srv', 'AO_CONFIG_FILE' => $value]);
+
+    expect($result['volume']['source'])->toBe($source);
+})->with(['service', 'application'])->with([
+    'braced variable reference' => ['${BASE_DIR}/ao.yaml'],
+    'variable reference' => ['$BASE_DIR/ao.yaml'],
+    'vault reference' => ['{{vault.AO_CONFIG_FILE}}'],
+]);
+
+it('moves a mode suffix from the target of a long-form bind to read_only', function (string $kind, string $mode, bool $readOnly) {
+    $result = parseLongBind($kind, <<<YAML
+services:
+  probe:
+    image: alpine:3.22
+    volumes:
+      - type: bind
+        source: ./data/users.yml
+        target: /fixture:{$mode}
+        content: 'users: {}'
+YAML);
+
+    expect($result['volume']['target'])->toBe('/fixture')
+        ->and($result['volume']['read_only'])->toBe($readOnly);
+})->with(['service', 'application'])->with([
+    'read-only' => ['ro', true],
+    'read-write' => ['rw', false],
+]);

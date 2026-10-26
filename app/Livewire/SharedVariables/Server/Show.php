@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SharedVariables\Server;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Server $server;
 
@@ -58,6 +60,9 @@ class Show extends Component
         }
         $this->authorize('view', $server);
         $this->server = $server;
+        if ($this->prefersCanvasView('server_variables')) {
+            return $this->redirectRoute('shared-variables.server.canvas', ['server_uuid' => $server->uuid], navigate: true);
+        }
         $this->getDevView();
     }
 

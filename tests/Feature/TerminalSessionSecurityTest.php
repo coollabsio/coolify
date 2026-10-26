@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\TerminalSessionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 uses(RefreshDatabase::class);
@@ -100,6 +101,29 @@ it('constructs fixed ssh arguments from the authorized server record', function 
         ->not->toContain('ProxyCommand=');
 
     $this->postJson('/terminal/session', ['token' => $token])->assertForbidden();
+});
+
+it('carries the console mode in the token and attaches instead of exec on redeem', function () {
+    $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $privateKey->id,
+    ]);
+    $service = app(TerminalSessionService::class);
+    Process::fake([
+        '*docker inspect*' => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+        '*' => Process::result(),
+    ]);
+
+    $attachCommand = $service->redeem($this->user, $service->issue($this->user, $server, 'minecraft-abc123', 'attach'));
+    $shellCommand = $service->redeem($this->user, $service->issue($this->user, $server, 'minecraft-abc123'));
+
+    expect($attachCommand)
+        ->toContain('docker attach --detach-keys="ctrl-p,ctrl-q" --sig-proxy=false')
+        ->not->toContain('docker exec')
+        ->and($shellCommand)
+        ->toContain('docker exec -it')
+        ->not->toContain('docker attach');
 });
 
 it('rejects option-like and traversal container identifiers before command construction', function (string $container) {

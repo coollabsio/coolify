@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Database\FlushDatabase;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -114,6 +115,8 @@ class Danger extends Component
 
         try {
             $this->authorize('delete', $this->resource);
+            // Soft delete first, so the environment page after the redirect does not list the resource.
+            $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,
@@ -131,29 +134,28 @@ class Danger extends Component
         }
     }
 
-    public function deleteFromCoolifyOnly(string $password): mixed
+    public function flush($password)
     {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return 'The provided password is incorrect.';
-        }
-
-        if (! $this->resource instanceof Service) {
-            return 'Service not found.';
-        }
-
         try {
-            $this->authorize('delete', $this->resource);
-            DeleteResourceJob::dispatch(
-                resource: $this->resource,
-                deleteFromCoolifyOnly: true,
-            )->afterResponse();
+            $this->authorize('manage', $this->resource);
 
-            return redirectRoute($this, 'project.resource.index', [
-                'project_uuid' => $this->projectUuid,
-                'environment_uuid' => $this->environmentUuid,
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            FlushDatabase::run($this->resource);
+            auditLog('ui.database.flushed', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
             ]);
+            $this->dispatch('success', 'Database flushed.');
+
+            return true;
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
+
+            return false;
         }
     }
 

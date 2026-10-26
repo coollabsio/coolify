@@ -78,7 +78,10 @@ class Domains extends Component
 
     public ?string $editingGeneratedHost = null;
 
-    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool}> */
+    /** The internal port the edited domain uses when its Port field is empty. */
+    public ?int $editingInheritedPort = null;
+
+    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool, inherited_port?: ?int}> */
     #[Locked]
     public array $domainRows = [];
 
@@ -561,7 +564,7 @@ class Domains extends Component
 
     /**
      * @param  array<string, array{status?: string, message?: string, expected_ip?: ?string, checked_at?: ?string}>  $stored
-     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool}
+     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool, inherited_port?: ?int}
      */
     protected function domainRowFromStored(string $url, ?string $service, array $stored): array
     {
@@ -574,6 +577,7 @@ class Domains extends Component
             'service' => $service,
             'internal_port' => $port['internal_port'],
             'has_port_override' => $port['has_port_override'],
+            'inherited_port' => $this->inheritedDomainInternalPort($service),
             'dns_status' => 'pending',
             'dns_message' => 'Not checked yet.',
             'expected_ip' => $this->serverIp,
@@ -621,37 +625,35 @@ class Domains extends Component
             ];
         }
 
+        return [
+            'internal_port' => $this->inheritedDomainInternalPort($service),
+            'has_port_override' => false,
+        ];
+    }
+
+    /**
+     * The internal port a domain uses when it has no per-domain override.
+     */
+    protected function inheritedDomainInternalPort(?string $service = null): ?int
+    {
         $composePort = dockerComposeServicePort($this->application->docker_compose_raw, $service);
         if ($composePort !== null) {
-            return [
-                'internal_port' => $composePort,
-                'has_port_override' => false,
-            ];
+            return $composePort;
         }
 
         if ($this->isCompose && $service !== null) {
-            return [
-                'internal_port' => null,
-                'has_port_override' => false,
-            ];
+            return null;
         }
 
         if ($this->application->settings?->is_static) {
-            return [
-                'internal_port' => 80,
-                'has_port_override' => false,
-            ];
+            return 80;
         }
 
         $exposed = $this->application->ports_exposes_array;
-        $defaultPort = isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
+
+        return isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
             ? (int) $exposed[0]
             : null;
-
-        return [
-            'internal_port' => $defaultPort,
-            'has_port_override' => false,
-        ];
     }
 
     /**
@@ -1342,6 +1344,7 @@ class Domains extends Component
         $this->editingOriginalRedirect = $this->editingRedirect;
         $this->editingDomainWasRegenerated = false;
         $this->editingGeneratedHost = null;
+        $this->editingInheritedPort = $this->domainRows[$index]['inherited_port'] ?? null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
@@ -1432,6 +1435,7 @@ class Domains extends Component
         $this->editingOriginalRedirect = 'both';
         $this->editingDomainWasRegenerated = false;
         $this->editingGeneratedHost = null;
+        $this->editingInheritedPort = null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         if ($this->pendingAction === 'update') {

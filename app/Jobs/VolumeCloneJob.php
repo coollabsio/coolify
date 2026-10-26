@@ -69,7 +69,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
         instant_remote_process([
             $createTargetVolume,
-            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'",
+            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/'",
         ], $this->sourceServer);
         $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
     }
@@ -123,7 +123,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
             instant_remote_process([
                 $createTargetVolume,
-                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz && chown -R 1000:1000 /target'",
+                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz'",
             ], $this->targetServer);
             $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
         } catch (\Exception $e) {

@@ -360,8 +360,7 @@ function contentHostPathFakeGitCompose(string $compose): void
         $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
 
         return Process::result(output: match (true) {
-            str_contains($command, 'git --version') => 'git version 2.43.0',
-            str_contains($command, 'head -c') => $compose,
+            str_contains($command, 'git cat-file blob') => $compose,
             default => '',
         });
     });

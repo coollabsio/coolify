@@ -2,6 +2,7 @@
 
 use App\Models\InstanceSettings;
 use App\Models\User;
+use App\Support\RootSetupWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Fortify;
@@ -9,6 +10,8 @@ use Laravel\Fortify\Fortify;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    RootSetupWindow::openIfNoUserExists();
+
     // `id` is not mass-assignable; forceCreate so InstanceSettings::get() (id 0) works.
     InstanceSettings::forceCreate([
         'id' => 0,

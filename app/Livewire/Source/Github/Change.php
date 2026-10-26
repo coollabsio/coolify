@@ -305,7 +305,7 @@ class Change extends Component
             $this->authorize('view', $this->github_app);
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
-            $this->applications = $this->github_app->applications;
+            $this->applications = $this->github_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
             $settings = instanceSettings();
 
             // Sync data from model to properties
@@ -372,14 +372,7 @@ class Change extends Component
 
     public function getGithubAppNameUpdatePath()
     {
-        $name = encodeGithubPathSegment($this->github_app->name);
-        $organization = normalizeGithubOrganization($this->github_app->organization);
-
-        if (filled($organization)) {
-            return rtrim($this->github_app->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
-        }
-
-        return rtrim($this->github_app->html_url, '/')."/settings/apps/{$name}";
+        return $this->github_app->settingsUrl();
     }
 
     public function updateGithubAppName()

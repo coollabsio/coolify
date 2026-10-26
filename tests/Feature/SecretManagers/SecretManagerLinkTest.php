@@ -187,6 +187,25 @@ test('a vault link uses the base url and namespace from the token metadata', fun
     Http::assertSent(fn ($request) => $request->hasHeader('X-Vault-Namespace', 'team-a'));
 });
 
+test('an infisical link uses the request timeout from the token metadata', function () {
+    $timeouts = [];
+    Http::fake(function ($request, array $options) use (&$timeouts) {
+        $timeouts[] = [$options['connect_timeout'], $options['timeout']];
+
+        return str_contains($request->url(), '/auth/universal-auth/login')
+            ? Http::response(['accessToken' => 'short-lived-token'])
+            : Http::response(['secrets' => [['secretKey' => 'KEY', 'secretValue' => 'value']]]);
+    });
+
+    $link = createSecretManagerLink('infisical',
+        ['project_id' => 'project-1', 'environment' => 'prod'],
+        ['base_url' => 'https://example.com', 'client_id' => 'client-id', 'timeout' => '30'],
+    );
+
+    expect($link->fetchSecrets())->toBe(['KEY' => 'value'])
+        ->and($timeouts)->toBe([[30, 30], [30, 30]]);
+});
+
 test('services resolve environment variables from their configured secret manager', function () {
     Http::fake([
         'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([

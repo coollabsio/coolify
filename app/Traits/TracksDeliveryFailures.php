@@ -40,8 +40,13 @@ trait TracksDeliveryFailures
         });
     }
 
+    /**
+     * The reason must not contain a provider response body. It is shared with the
+     * team, the team admins, and the instance admins, so it is redacted once more.
+     */
     public function recordDeliveryFailure(string $reason): void
     {
+        $reason = remove_iip($reason);
         $this->increment('failure_count');
 
         Log::warning('Notification delivery failed', [

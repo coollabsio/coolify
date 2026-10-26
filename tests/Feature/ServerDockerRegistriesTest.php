@@ -125,6 +125,8 @@ it('lists the team servers for admins on the registries page', function () {
         ->assertOk()
         ->assertSee('href="'.route('registries.index').'"', false);
 
+    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
     $this->get(route('server.registries', ['server_uuid' => $this->server->uuid]))
         ->assertOk()
         ->assertSee('href="'.route('server.registries', ['server_uuid' => $this->server->uuid]).'"', false);

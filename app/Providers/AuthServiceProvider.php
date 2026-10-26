@@ -12,6 +12,7 @@ use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -51,6 +52,7 @@ use App\Policies\CloudProviderTokenPolicy;
 use App\Policies\DatabasePolicy;
 use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
+use App\Policies\GiteaAppPolicy;
 use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
@@ -133,6 +135,7 @@ class AuthServiceProvider extends ServiceProvider
         // Git source policies
         GithubApp::class => GithubAppPolicy::class,
         GitlabApp::class => GitlabAppPolicy::class,
+        GiteaApp::class => GiteaAppPolicy::class,
 
         // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,

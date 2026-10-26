@@ -222,6 +222,16 @@ test('admin sees terminal link for service', function () {
         ->assertSee('Terminal');
 });
 
+test('service configuration page sidebar links to the file browser', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+    Team::query()->update(['show_boarding' => false]);
+
+    $this->get(route('project.service.configuration', $this->serviceParams))
+        ->assertOk()
+        ->assertSee(route('project.service.files', $this->serviceParams), false);
+});
+
 test('admin sees deploy button for service', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
