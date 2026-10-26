@@ -28,6 +28,7 @@ use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -36,13 +37,17 @@ use Throwable;
 
 /**
  * Scans one local image on a server with Syft and Grype and stores the result for a resource (spec 4.1).
- * Scan problems never throw: the returned scan has status Failed and an error code.
+ *
+ * A scan row exists only for an image ID that was inspected. Progress lives in the cache
+ * (`progressCacheKey()`), the last failure too (`lastErrorCacheKey()`).
  */
 class ScanImage
 {
     use AsAction;
 
-    private const LOCK_TTL = 1800;
+    public const LOCK_TTL = 2700;
+
+    public const LAST_ERROR_TTL_DAYS = 7;
 
     /** ScannerCommands budgets plus 60 s. */
     private const TIMEOUT_DEFAULT = 120;
@@ -57,132 +62,92 @@ class ScanImage
 
     private const DISK_RESERVE_BYTES = 1073741824;
 
-    /** Exit code of `timeout`. */
-    private const EXIT_TIMEOUT = 124;
+    /** Exit codes of `timeout`: stopped, or killed after the grace period. */
+    private const EXIT_TIMEOUT = [124, 137];
 
     /** Exit code of a failed `docker run`, for example a missing bind mount source. */
     private const EXIT_DOCKER_RUN = 125;
 
-    /** Image ID of a scan row before `docker image inspect` ran. */
-    private const PENDING_IMAGE_ID = '';
+    private string $runId = '';
 
+    private CarbonImmutable $startedAt;
+
+    /**
+     * Never throws for scan problems. Callers such as the deploy gate must use the returned scan: on a failure it is an
+     * unsaved scan with status Failed and an error code, and a completed scan row of the same image keeps its results.
+     * A Failed row is saved only when no row exists yet for the inspected image.
+     */
     public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0): ImageScan
     {
+        $this->runId = Str::lower(Str::random(24));
+        $this->startedAt = CarbonImmutable::now();
         $policy = ImageScanPolicyResolver::for($resource, $server);
         $context = ['server' => (string) $server->name];
 
         if ($server->isTransferredAway() || ! $policy->scanEnabled) {
-            return (new ImageScan)->forceFill([
-                'server_id' => $server->id,
-                'resource_type' => $resource->getMorphClass(),
-                'resource_id' => $resource->getKey(),
-                'image_id' => self::PENDING_IMAGE_ID,
-                'image_ref' => mb_substr($imageRef, 0, 512),
-                'status' => ImageScanStatus::Failed,
-                'error_code' => ImageScanErrorCode::ScanningOff,
-                'error_context' => $context,
-            ]);
+            return $this->unsavedFailure($server, $resource, $imageRef, null, ImageScanErrorCode::ScanningOff, $context);
         }
-
-        $scan = $this->pendingScan($server, $resource, $imageRef, $deployment);
 
         try {
             ImageRef::parse($imageRef);
         } catch (InvalidArgumentException) {
-            return $this->fail($scan, $resource, ImageScanErrorCode::Unknown, $context);
+            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $context);
         }
 
         $lock = Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
         if (! $this->acquire($lock, $lockWaitSeconds)) {
-            return $this->fail($scan, $resource, ImageScanErrorCode::LockBusy, $context);
+            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::LockBusy, $context);
         }
 
         try {
-            return $this->scan($scan, $server, $resource, $imageRef, $deployment, $policy, $context);
+            return $this->scan($server, $resource, $imageRef, $deployment, $policy, $context);
         } finally {
             $lock->release();
         }
     }
 
+    public static function progressCacheKey(Model $resource): string
+    {
+        return "image-scan:progress:{$resource->getMorphClass()}:{$resource->getKey()}";
+    }
+
+    public static function lastErrorCacheKey(Model $resource): string
+    {
+        return "image-scan:last-error:{$resource->getMorphClass()}:{$resource->getKey()}";
+    }
+
     /**
      * @param  array{server: string}  $context
      */
-    private function scan(ImageScan $scan, Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, array $context): ImageScan
+    private function scan(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, array $context): ImageScan
     {
-        $commands = new ScannerCommands($server, Str::lower(Str::random(24)));
+        $commands = new ScannerCommands($server, $this->runId);
         $isBaseline = ! $this->resourceScans($resource)->where('status', ImageScanStatus::Completed)->exists();
-
-        $scan->forceFill([
-            'status' => ImageScanStatus::Running,
-            'error_code' => null,
-            'error_context' => null,
-            'builds_image' => $this->buildsImage($resource, $imageRef),
-        ])->save();
-        $this->broadcast($scan, $resource);
+        $image = null;
 
         try {
+            $this->progress($resource, 'database');
             $databaseBuiltAt = $this->databaseBuiltAt($commands);
+            $this->progress($resource, 'inspect');
             $image = $this->inspect($commands, $imageRef);
-            $scan = $this->claimRow($scan, $resource, $image['id'], $deployment);
-            $this->checkDiskSpace($commands, $image['size']);
-            [$sbom, $grype] = $this->sbomAndReport($commands, $imageRef, $image);
+            $this->progress($resource, 'sbom');
+            [$sbom, $grype] = $this->sbomAndReport($commands, $resource, $imageRef, $image);
 
-            return $this->complete($scan, $resource, $policy, $sbom, $grype, $image, $databaseBuiltAt, $isBaseline);
+            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $grype, $image, $databaseBuiltAt, $isBaseline);
         } catch (ScanFailed $e) {
-            return $this->fail($scan, $resource, $e->errorCode, [...$context, ...$e->context]);
+            $errorContext = [...$context, ...$e->context];
+
+            return $image === null
+                ? $this->failBeforeRow($server, $resource, $imageRef, null, $e->errorCode, $errorContext)
+                : $this->failAfterInspect($server, $resource, $imageRef, $deployment, $image, $e->errorCode, $errorContext);
         } catch (Throwable $e) {
-            $this->fail($scan, $resource, ImageScanErrorCode::Unknown, $context);
+            $this->rememberError($resource, ImageScanErrorCode::Unknown, $context);
 
             throw $e;
         } finally {
+            Cache::forget(self::progressCacheKey($resource));
             instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         }
-    }
-
-    /**
-     * The row that shows the scan until the image ID is known: the row of the resource without an image ID.
-     */
-    private function pendingScan(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment): ImageScan
-    {
-        $scan = $this->resourceScans($resource)->where('image_id', self::PENDING_IMAGE_ID)->first()
-            ?? (new ImageScan)->forceFill([
-                'resource_type' => $resource->getMorphClass(),
-                'resource_id' => $resource->getKey(),
-                'image_id' => self::PENDING_IMAGE_ID,
-            ]);
-
-        $scan->forceFill(['server_id' => $server->id, 'image_ref' => mb_substr($imageRef, 0, 512)]);
-        if ($deployment !== null) {
-            $scan->deployment_queue_id = $deployment->id;
-        }
-
-        return $scan;
-    }
-
-    /**
-     * Moves the running scan to the row of (resource, image ID); an earlier row of that image is reused.
-     */
-    private function claimRow(ImageScan $scan, Model $resource, string $imageId, ?ApplicationDeploymentQueue $deployment): ImageScan
-    {
-        $existing = $this->resourceScans($resource)->where('image_id', $imageId)->whereKeyNot($scan->getKey())->first();
-
-        if ($existing === null) {
-            $scan->forceFill(['image_id' => $imageId])->save();
-
-            return $scan;
-        }
-
-        $existing->forceFill([
-            ...$scan->only(['server_id', 'image_ref', 'builds_image']),
-            ...($deployment !== null ? ['deployment_queue_id' => $deployment->id] : []),
-            'status' => ImageScanStatus::Running,
-            'error_code' => null,
-            'error_context' => null,
-        ])->save();
-        $scan->delete();
-        $this->broadcast($existing, $resource);
-
-        return $existing;
     }
 
     /**
@@ -208,6 +173,16 @@ class ScanImage
         }
     }
 
+    private function progress(Model $resource, string $stage): void
+    {
+        Cache::put(self::progressCacheKey($resource), [
+            'run_id' => $this->runId,
+            'stage' => $stage,
+            'started_at' => $this->startedAt->toIso8601String(),
+        ], self::LOCK_TTL);
+        $this->broadcast($resource, $this->runId);
+    }
+
     /**
      * Updates a missing database once. Grype refuses a database older than 5 days.
      */
@@ -216,7 +191,7 @@ class ScanImage
         $builtAt = $this->databaseStatus($commands);
 
         if ($builtAt === null) {
-            instant_remote_process($commands->dbUpdate(InstanceSettings::get()->image_scan_db_url), $commands->server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
+            $this->updateDatabase($commands);
             $builtAt = $this->databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing);
         }
 
@@ -227,10 +202,23 @@ class ScanImage
         return $builtAt;
     }
 
+    private function updateDatabase(ScannerCommands $commands): void
+    {
+        $url = InstanceSettings::get()->image_scan_db_url;
+
+        try {
+            $update = $commands->dbUpdate(is_string($url) && trim($url) !== '' ? trim($url) : null);
+        } catch (InvalidArgumentException) {
+            return;
+        }
+
+        instant_remote_process($update, $commands->server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
+    }
+
     private function databaseStatus(ScannerCommands $commands): ?CarbonImmutable
     {
         $result = $this->runStep($commands->server, $commands->dbStatus(), 'db-status', self::TIMEOUT_DEFAULT);
-        if ($result['code'] === self::EXIT_TIMEOUT) {
+        if (in_array($result['code'], self::EXIT_TIMEOUT, true)) {
             throw new ScanFailed(ImageScanErrorCode::Timeout);
         }
 
@@ -290,17 +278,18 @@ class ScanImage
     }
 
     /**
-     * Reuses the SBOM of the image on this server. When its file is gone, Grype cannot mount it: the row is
-     * deleted and the SBOM is created once more.
+     * Reuses the SBOM of the image on this server. When its file is gone, Grype cannot mount it: the file is
+     * created once more and the row is updated in place (scans of other resources keep their link).
      *
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
      * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}}
      */
-    private function sbomAndReport(ScannerCommands $commands, string $imageRef, array $image): array
+    private function sbomAndReport(ScannerCommands $commands, Model $resource, string $imageRef, array $image): array
     {
         $sbom = ImageSbom::query()->where('server_id', $commands->server->id)->where('image_id', $image['id'])->first();
 
         if ($sbom !== null) {
+            $this->progress($resource, 'vulnerabilities');
             $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
@@ -310,10 +299,11 @@ class ScanImage
                 return [$sbom, $grype];
             }
 
-            $sbom->delete();
+            $this->progress($resource, 'sbom');
         }
 
-        $sbom = $this->createSbom($commands, $imageRef, $image);
+        $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
+        $this->progress($resource, 'vulnerabilities');
         $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
         $this->assertSucceeded($grype['code']);
 
@@ -323,8 +313,10 @@ class ScanImage
     /**
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
      */
-    private function createSbom(ScannerCommands $commands, string $imageRef, array $image): ImageSbom
+    private function createSbom(ScannerCommands $commands, string $imageRef, array $image, ?ImageSbom $sbom): ImageSbom
     {
+        $this->checkDiskSpace($commands, $image['size']);
+
         $result = $this->runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
         $this->assertSucceeded($result['code']);
         $this->assertSucceeded($result['exit_codes']['sbom'] ?? null);
@@ -334,14 +326,24 @@ class ScanImage
         [$payload, $cut] = $this->readPayload($packages);
         $parsed = (new SyftPackageParser)->parse($payload);
 
+        $values = [
+            'platform' => $image['platform'],
+            'packages' => array_map(fn (Package $package) => $package->toArray(), $parsed['packages']),
+            'packages_truncated' => $parsed['truncated'] || $cut,
+            'last_used_at' => now(),
+        ];
+
+        if ($sbom !== null) {
+            $sbom->forceFill($values)->save();
+
+            return $sbom;
+        }
+
         return ImageSbom::query()->create([
             'server_id' => $commands->server->id,
             'image_id' => $image['id'],
-            'platform' => $image['platform'],
-            'packages' => array_map(fn (Package $package) => $package->toArray(), $parsed['packages']),
             'base_layer_ids' => [],
-            'packages_truncated' => $parsed['truncated'] || $cut,
-            'last_used_at' => now(),
+            ...$values,
         ]);
     }
 
@@ -349,41 +351,170 @@ class ScanImage
      * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}  $grype
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
      */
-    private function complete(ImageScan $scan, Model $resource, ResolvedImageScanPolicy $policy, ImageSbom $sbom, array $grype, array $image, CarbonImmutable $databaseBuiltAt, bool $isBaseline): ImageScan
+    private function complete(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, ImageSbom $sbom, array $grype, array $image, CarbonImmutable $databaseBuiltAt, bool $isBaseline): ImageScan
     {
         [$payload, $cut] = $this->readPayload($grype);
         $report = (new GrypeReportParser)->parse($payload);
         $findings = $this->withLayers($report['findings'], $sbom);
         usort($findings, fn (Finding $a, Finding $b) => ($b->risk ?? 0.0) <=> ($a->risk ?? 0.0));
 
-        $scan->forceFill([
-            'image_sbom_id' => $sbom->id,
-            'repo_digest' => $image['repo_digest'],
-            'grype_db_built_at' => $databaseBuiltAt,
-            'scanned_at' => now(),
-            'is_baseline' => $isBaseline,
-        ]);
-        $scan->setRelation('resource', $resource);
+        $buildsImage = $this->buildsImage($resource, $imageRef);
+        $classifierScan = $this->resourceScans($resource)->where('image_id', $image['id'])->first() ?? new ImageScan;
+        $classifierScan->forceFill(['builds_image' => $buildsImage])->setRelation('resource', $resource);
 
         $summary = ScanSummary::build(
             $findings,
-            ImageScanGate::classifierFor($scan),
+            ImageScanGate::classifierFor($classifierScan),
             IgnoreMatcher::forResource($resource),
             $policy->alertLevel,
             $report['eol'],
             $report['truncated'] || $cut,
         );
 
-        $scan->forceFill([
+        $scan = $this->upsert($resource, $image['id'], [
+            'server_id' => $server->id,
+            'image_sbom_id' => $sbom->id,
+            'repo_digest' => $image['repo_digest'],
+            'image_ref' => mb_substr($imageRef, 0, 512),
+            ...($deployment !== null ? ['deployment_queue_id' => $deployment->id] : []),
             'status' => ImageScanStatus::Completed,
             'error_code' => null,
             'error_context' => null,
             'summary' => $summary,
             'findings' => array_map(fn (Finding $finding) => $finding->toArray(), $findings),
-        ])->save();
-        $this->broadcast($scan, $resource);
+            'builds_image' => $buildsImage,
+            'is_baseline' => $isBaseline,
+            'grype_db_built_at' => $databaseBuiltAt,
+            'scanned_at' => now(),
+        ]);
+        $scan->setRelation('resource', $resource);
+
+        Cache::forget(self::lastErrorCacheKey($resource));
+        Cache::forget(self::progressCacheKey($resource));
+        $this->broadcast($resource, (string) $scan->uuid);
 
         return $scan;
+    }
+
+    /**
+     * Creates or updates the row of (resource, image ID). A row that another run inserts at the same time is updated.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    private function upsert(Model $resource, string $imageId, array $values): ImageScan
+    {
+        $scan = $this->firstOrCreateScan($resource, $imageId, $values) ?? throw new ScanFailed(ImageScanErrorCode::Unknown);
+
+        if (! $scan->wasRecentlyCreated) {
+            $scan->forceFill($values)->save();
+        }
+
+        return $scan;
+    }
+
+    /**
+     * `firstOrCreate` catches a unique violation and reads the other row. Its savepoint can roll back that row inside
+     * an outer transaction, so one more attempt is made before giving up.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    private function firstOrCreateScan(Model $resource, string $imageId, array $values): ?ImageScan
+    {
+        $keys = [
+            'resource_type' => $resource->getMorphClass(),
+            'resource_id' => $resource->getKey(),
+            'image_id' => $imageId,
+        ];
+
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            try {
+                return ImageScan::query()->firstOrCreate($keys, $values);
+            } catch (UniqueConstraintViolationException) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Keeps an existing row of the image (and its results). Saves a Failed row only for an image without one.
+     *
+     * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
+     * @param  array<string, int|string>  $context
+     */
+    private function failAfterInspect(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, array $image, ImageScanErrorCode $code, array $context): ImageScan
+    {
+        $values = [
+            'server_id' => $server->id,
+            'repo_digest' => $image['repo_digest'],
+            'image_ref' => mb_substr($imageRef, 0, 512),
+            'deployment_queue_id' => $deployment?->id,
+            'status' => ImageScanStatus::Failed,
+            'error_code' => $code,
+            'error_context' => $context,
+            'builds_image' => $this->buildsImage($resource, $imageRef),
+        ];
+
+        $scan = $this->firstOrCreateScan($resource, $image['id'], $values);
+
+        if ($scan === null || ! $scan->wasRecentlyCreated) {
+            return $this->failBeforeRow($server, $resource, $imageRef, $image['id'], $code, $context, $image['repo_digest']);
+        }
+
+        $scan->setRelation('resource', $resource);
+        $this->rememberError($resource, $code, $context);
+        Cache::forget(self::progressCacheKey($resource));
+        $this->broadcast($resource, (string) $scan->uuid);
+
+        return $scan;
+    }
+
+    /**
+     * @param  array<string, int|string>  $context
+     */
+    private function failBeforeRow(Server $server, Model $resource, string $imageRef, ?string $imageId, ImageScanErrorCode $code, array $context, ?string $repoDigest = null): ImageScan
+    {
+        $scan = $this->unsavedFailure($server, $resource, $imageRef, $imageId, $code, $context, $repoDigest);
+
+        $this->rememberError($resource, $code, $context);
+        Cache::forget(self::progressCacheKey($resource));
+        $this->broadcast($resource, $this->runId);
+
+        return $scan;
+    }
+
+    /**
+     * @param  array<string, int|string>  $context
+     */
+    private function unsavedFailure(Server $server, Model $resource, string $imageRef, ?string $imageId, ImageScanErrorCode $code, array $context, ?string $repoDigest = null): ImageScan
+    {
+        $scan = (new ImageScan)->forceFill([
+            'server_id' => $server->id,
+            'resource_type' => $resource->getMorphClass(),
+            'resource_id' => $resource->getKey(),
+            'image_id' => $imageId,
+            'repo_digest' => $repoDigest,
+            'image_ref' => mb_substr($imageRef, 0, 512),
+            'status' => ImageScanStatus::Failed,
+            'error_code' => $code,
+            'error_context' => $context,
+        ]);
+        $scan->setRelation('resource', $resource);
+
+        return $scan;
+    }
+
+    /**
+     * @param  array<string, int|string>  $context
+     */
+    private function rememberError(Model $resource, ImageScanErrorCode $code, array $context): void
+    {
+        Cache::put(self::lastErrorCacheKey($resource), [
+            'code' => $code->value,
+            'context' => $context,
+            'at' => now()->toIso8601String(),
+        ], now()->addDays(self::LAST_ERROR_TTL_DAYS));
     }
 
     /**
@@ -458,7 +589,7 @@ class ScanImage
 
     private function assertSucceeded(?int $code): void
     {
-        if ($code === self::EXIT_TIMEOUT) {
+        if (in_array($code, self::EXIT_TIMEOUT, true)) {
             throw new ScanFailed(ImageScanErrorCode::Timeout);
         }
         if ($code !== 0) {
@@ -486,25 +617,10 @@ class ScanImage
         return [$payload, $cut];
     }
 
-    /**
-     * @param  array<string, int|string>  $context
-     */
-    private function fail(ImageScan $scan, Model $resource, ImageScanErrorCode $code, array $context): ImageScan
-    {
-        $scan->forceFill([
-            'status' => ImageScanStatus::Failed,
-            'error_code' => $code,
-            'error_context' => $context,
-        ])->save();
-        $this->broadcast($scan, $resource);
-
-        return $scan;
-    }
-
-    private function broadcast(ImageScan $scan, Model $resource): void
+    private function broadcast(Model $resource, string $scanUuid): void
     {
         $teamId = method_exists($resource, 'team') ? $resource->team()?->id : null;
 
-        ImageScanUpdated::dispatch($teamId, (string) $resource->getAttribute('uuid'), (string) $scan->uuid);
+        ImageScanUpdated::dispatch($teamId, (string) $resource->getAttribute('uuid'), $scanUuid);
     }
 }

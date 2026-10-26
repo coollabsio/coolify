@@ -176,6 +176,7 @@ it('reuses the SBOM of an image that was scanned on the server before', function
     $scan = scanImageTestRun();
 
     Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker save'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'df -P'), 1);
     expect($scan->status)->toBe(ImageScanStatus::Completed)
         ->and($scan->findings)->toHaveCount(166)
         ->and($scan->is_baseline)->toBeFalse()
@@ -200,8 +201,9 @@ it('creates the SBOM again when the stored SBOM file is missing', function () {
     Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker save'), 1);
     expect($scan->status)->toBe(ImageScanStatus::Completed)
         ->and($grypeRuns)->toBe(2)
-        ->and(ImageSbom::query()->whereKey($oldSbom->id)->exists())->toBeFalse()
-        ->and($scan->sbom->packages)->toHaveCount(46);
+        ->and($scan->image_sbom_id)->toBe($oldSbom->id)
+        ->and(ImageSbom::query()->sole()->packages)->toHaveCount(46);
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'df -P'), 1);
 });
 
 it('fails with the needed disk space when the server has too little', function () {
@@ -227,11 +229,44 @@ it('fails with lock busy after the wait when another scan holds the server lock'
     $scan = scanImageTestRun(lockWaitSeconds: 1);
 
     expect(microtime(true) - $started)->toBeGreaterThanOrEqual(0.5)
-        ->and($scan->exists)->toBeTrue()
+        ->and($scan->exists)->toBeFalse()
         ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::LockBusy)
-        ->and($scan->error_context)->toBe(['server' => $this->server->name]);
+        ->and($scan->error_context)->toBe(['server' => $this->server->name])
+        ->and(ImageScan::query()->count())->toBe(0)
+        ->and(Cache::get(ScanImage::lastErrorCacheKey($this->application)))->toMatchArray([
+            'code' => 'lock_busy',
+            'context' => ['server' => $this->server->name],
+        ]);
     Process::assertNothingRan();
+});
+
+it('does not change a completed scan when a concurrent call finds the lock busy', function () {
+    scanImageTestFake();
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-a',
+        'server_id' => $this->server->id,
+    ]);
+    $completed = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', $deployment);
+    $otherDeployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-b',
+        'server_id' => $this->server->id,
+    ]);
+    $otherServer = scanImageTestServer(Team::factory()->create());
+    Cache::lock("image-scan:{$otherServer->id}", 1800)->get();
+
+    $busy = ScanImage::run($otherServer, $this->application, 'postgres:15.0-alpine', $otherDeployment);
+
+    $row = $completed->fresh();
+    expect($busy->exists)->toBeFalse()
+        ->and($busy->error_code)->toBe(ImageScanErrorCode::LockBusy)
+        ->and(ImageScan::query()->count())->toBe(1)
+        ->and($row->status)->toBe(ImageScanStatus::Completed)
+        ->and($row->error_code)->toBeNull()
+        ->and($row->deployment_queue_id)->toBe($deployment->id)
+        ->and($row->server_id)->toBe($this->server->id);
 });
 
 it('releases the server lock after a scan', function () {
@@ -312,8 +347,8 @@ it('broadcasts the running and the final state to the resource team', function (
 
     Event::assertDispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->teamId === $this->team->id
         && $event->resourceUuid === $this->application->uuid);
-    Event::assertDispatchedTimes(ImageScanUpdated::class, 2);
-    Event::assertDispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->scanUuid === $scan->uuid);
+    Event::assertDispatchedTimes(ImageScanUpdated::class, 5);
+    expect(Event::dispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->scanUuid === $scan->uuid))->toHaveCount(1);
     expect((new ImageScanUpdated($this->team->id, 'r', 's'))->broadcastAs())->toBe('ImageScanUpdated');
 });
 
@@ -351,6 +386,111 @@ it('fails with a timeout when grype is stopped by the server timeout, and still 
     Process::assertRan(fn ($process) => str_contains($process->command, "-name 'tmp-*' -mmin +60"));
 });
 
+it('fails with a timeout when the server timeout kills grype', function () {
+    scanImageTestFake(['grype' => scanImageTestPayload('grype', '', 0, 137)]);
+
+    $scan = scanImageTestRun();
+
+    expect($scan->error_code)->toBe(ImageScanErrorCode::Timeout);
+});
+
+it('keeps a completed scan when a rescan of the same image fails', function () {
+    scanImageTestFake();
+    $completed = scanImageTestRun();
+    scanImageTestFake(['grype' => scanImageTestPayload('grype', '', 0, 124)]);
+
+    $failed = scanImageTestRun();
+
+    $row = $completed->fresh();
+    expect($failed->exists)->toBeFalse()
+        ->and($failed->status)->toBe(ImageScanStatus::Failed)
+        ->and($failed->error_code)->toBe(ImageScanErrorCode::Timeout)
+        ->and($failed->image_id)->toBe('sha256:'.SCAN_TEST_IMAGE_HEX)
+        ->and(ImageScan::query()->count())->toBe(1)
+        ->and($row->status)->toBe(ImageScanStatus::Completed)
+        ->and($row->error_code)->toBeNull()
+        ->and($row->findings)->toHaveCount(166)
+        ->and(Cache::get(ScanImage::lastErrorCacheKey($this->application))['code'])->toBe('timeout');
+});
+
+it('clears the last error after a successful scan', function () {
+    scanImageTestFake();
+    Cache::put(ScanImage::lastErrorCacheKey($this->application), ['code' => 'lock_busy'], 60);
+
+    scanImageTestRun();
+
+    expect(Cache::has(ScanImage::lastErrorCacheKey($this->application)))->toBeFalse();
+});
+
+it('updates a scan row that another run inserted at the same time', function () {
+    scanImageTestFake();
+    $inserted = false;
+    ImageScan::creating(function (ImageScan $scan) use (&$inserted) {
+        if ($inserted) {
+            return;
+        }
+        $inserted = true;
+        ImageScan::factory()->create([
+            'server_id' => $this->server->id,
+            'resource_type' => $this->application->getMorphClass(),
+            'resource_id' => $this->application->id,
+            'image_id' => 'sha256:'.SCAN_TEST_IMAGE_HEX,
+            'status' => ImageScanStatus::Failed,
+        ]);
+    });
+
+    $scan = scanImageTestRun();
+
+    expect($inserted)->toBeTrue()
+        ->and(ImageScan::query()->count())->toBe(1)
+        ->and($scan->status)->toBe(ImageScanStatus::Completed)
+        ->and(ImageScan::query()->sole()->status)->toBe(ImageScanStatus::Completed)
+        ->and(ImageScan::query()->sole()->findings)->toHaveCount(166);
+});
+
+it('updates a scan row that appeared while the scan ran', function () {
+    $created = null;
+    scanImageTestFake(['grype' => function () use (&$created) {
+        $created ??= ImageScan::factory()->create([
+            'server_id' => $this->server->id,
+            'resource_type' => $this->application->getMorphClass(),
+            'resource_id' => $this->application->id,
+            'image_id' => 'sha256:'.SCAN_TEST_IMAGE_HEX,
+            'status' => ImageScanStatus::Failed,
+            'error_code' => ImageScanErrorCode::LockBusy,
+        ]);
+
+        return scanImageTestPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/grype.ndjson')));
+    }]);
+
+    $scan = scanImageTestRun();
+
+    $row = $created->fresh();
+    expect($scan->id)->toBe($created->id)
+        ->and($row->status)->toBe(ImageScanStatus::Completed)
+        ->and($row->error_code)->toBeNull()
+        ->and($row->error_context)->toBeNull()
+        ->and($row->findings)->toHaveCount(166);
+});
+
+it('keeps the progress in the cache while the scan runs and forgets it after', function () {
+    $seen = null;
+    $key = ScanImage::progressCacheKey($this->application);
+    scanImageTestFake(['grype' => function () use (&$seen, $key) {
+        $seen = Cache::get($key);
+
+        return scanImageTestPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/grype.ndjson')));
+    }]);
+
+    scanImageTestRun();
+
+    expect($seen)->toBeArray()
+        ->and($seen['stage'])->toBe('vulnerabilities')
+        ->and($seen['run_id'])->toMatch('/\A[a-z0-9]{24}\z/')
+        ->and($seen['started_at'])->toBeString()
+        ->and(Cache::has($key))->toBeFalse();
+});
+
 it('fails as unknown when the server returns no output', function () {
     scanImageTestFake(['grype' => '']);
 
@@ -367,11 +507,15 @@ it('fails with image missing when the image is not on the server', function () {
 
     $scan = scanImageTestRun();
 
+    expect($scan->exists)->toBeFalse()
+        ->and(ImageScan::query()->count())->toBe(0);
+
     expect($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::ImageMissing);
 });
 
-it('updates the vulnerability database once when it is missing', function () {
+it('updates the vulnerability database once when it is missing', function (?string $url) {
+    InstanceSettings::get()->forceFill(['image_scan_db_url' => $url])->save();
     $statusRuns = 0;
     $valid = scanImageTestPayload('db-status', json_encode(['built' => now()->subDay()->toIso8601ZuluString(), 'valid' => true]));
     scanImageTestFake(['db-status' => function () use (&$statusRuns, $valid) {
@@ -382,14 +526,16 @@ it('updates the vulnerability database once when it is missing', function () {
 
     expect($scan->status)->toBe(ImageScanStatus::Completed);
     Process::assertRanTimes(fn ($process) => str_contains($process->command, 'coolify-scan-exit db-update'), 1);
-});
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'GRYPE_DB_UPDATE_URL'));
+})->with(['no mirror' => [null], 'empty mirror' => ['']]);
 
 it('fails when the vulnerability database is older than 5 days', function () {
     scanImageTestFake(['db-status' => scanImageTestPayload('db-status', json_encode(['built' => now()->subDays(7)->toIso8601ZuluString(), 'valid' => true]))]);
 
     $scan = scanImageTestRun();
 
-    expect($scan->status)->toBe(ImageScanStatus::Failed)
+    expect($scan->exists)->toBeFalse()
+        ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::DbTooOld)
         ->and($scan->error_context)->toBe(['server' => $this->server->name, 'n' => 7]);
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'coolify-scan-exit db-update'));
@@ -456,7 +602,7 @@ it('fails without running a command when the image reference is invalid', functi
 
     $scan = ScanImage::run($this->server, $this->application, 'postgres:15;rm -rf /');
 
-    expect($scan->exists)->toBeTrue()
+    expect($scan->exists)->toBeFalse()
         ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::Unknown);
     Process::assertNothingRan();
