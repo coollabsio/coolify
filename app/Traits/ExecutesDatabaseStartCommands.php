@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Jobs\ScanResourceImagesJob;
 use App\Services\DatabaseStartCommandExecutor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -12,10 +13,13 @@ trait ExecutesDatabaseStartCommands
     private function executeDatabaseStartCommands(array $commands, Model $database, ?Activity $activity = null): Activity
     {
         if ($activity) {
-            return app(DatabaseStartCommandExecutor::class)->execute($commands, $database, $activity);
+            $activity = app(DatabaseStartCommandExecutor::class)->execute($commands, $database, $activity);
+        } else {
+            $activity = remote_process($commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged', queue: deployment_queue());
         }
+        ScanResourceImagesJob::dispatchAfterStart($database);
 
-        return remote_process($commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged', queue: deployment_queue());
+        return $activity;
     }
 
     /**
