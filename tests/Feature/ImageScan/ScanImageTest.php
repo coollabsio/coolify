@@ -12,6 +12,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
+use App\Models\ImageScanNotificationState;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -719,7 +720,7 @@ describe('notifications', function () {
 
         expect($baseline->is_baseline)->toBeTrue()
             ->and($rescan->is_baseline)->toBeFalse()
-            ->and($rescan->fresh()->notified_ids)->toContain('CVE-2026-7777');
+            ->and(ImageScanNotificationState::query()->sole()->notified_ids)->toContain('CVE-2026-7777');
         Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
         Notification::assertSentTo($this->team, KnownExploitedFound::class, fn (KnownExploitedFound $notification) => $notification->count === 1);
     });

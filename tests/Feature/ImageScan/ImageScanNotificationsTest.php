@@ -16,6 +16,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
+use App\Models\ImageScanNotificationState;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -106,13 +107,18 @@ function notifyFinding(string $id, array $overrides = []): array
 }
 
 /**
- * A completed scan that is not the first of its resource, with nothing notified yet.
+ * A completed scan. Unless `$state` is false, the resource also gets a state row that is not a baseline and has
+ * nothing notified yet (when it has none).
  *
  * @param  list<array<string, mixed>>  $findings
  * @param  array<string, mixed>  $attributes
  */
-function notifyScan(Model $resource, array $findings, array $attributes = []): ImageScan
+function notifyScan(Model $resource, array $findings, array $attributes = [], bool $state = true): ImageScan
 {
+    if ($state && notifyStateOf($resource) === null) {
+        notifyState($resource, []);
+    }
+
     return ImageScan::factory()->create([
         'server_id' => test()->server->id,
         'resource_type' => $resource->getMorphClass(),
@@ -122,10 +128,36 @@ function notifyScan(Model $resource, array $findings, array $attributes = []): I
         'findings' => $findings,
         'summary' => [],
         'is_baseline' => false,
-        'notified_ids' => [],
-        'notified_candidates' => [],
         ...$attributes,
     ]);
+}
+
+/**
+ * @param  list<string>  $ids
+ * @param  list<string>  $candidates
+ */
+function notifyState(Model $resource, array $ids, array $candidates = [], bool $baseline = false, ?int $deploymentId = null): ImageScanNotificationState
+{
+    return ImageScanNotificationState::query()->updateOrCreate(
+        ['resource_type' => $resource->getMorphClass(), 'resource_id' => $resource->getKey()],
+        ['team_id' => test()->team->id, 'notified_ids' => $ids, 'notified_candidates' => $candidates, 'is_baseline' => $baseline, 'baseline_deployment_queue_id' => $deploymentId],
+    );
+}
+
+function notifyStateOf(Model $resource): ?ImageScanNotificationState
+{
+    return ImageScanNotificationState::query()->where('resource_type', $resource->getMorphClass())->where('resource_id', $resource->getKey())->first();
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function notifyCandidates(string $ref = 'nginx:1.28'): array
+{
+    return ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [[
+        'ref' => $ref, 'digest' => 'sha256:'.str_repeat('b', 64), 'kind' => 'line', 'better' => true,
+        'fixed_ids' => ['CVE-2026-0001'], 'fixes' => ['critical' => 1], 'left' => [],
+    ]]];
 }
 
 function notifyDeployment(Application $application, int $pullRequestId = 0): ApplicationDeploymentQueue
@@ -188,38 +220,110 @@ function notifyChatPayloads(object $notification): array
     ];
 }
 
-describe('notified IDs', function () {
-    it('sends nothing for a baseline scan and remembers its fixable IDs', function () {
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002', ['fixState' => 'not-fixed', 'fixedIn' => null])], [
-            'is_baseline' => true,
-            'notified_ids' => null,
-        ]);
+describe('notification state', function () {
+    it('creates a baseline for the first deploy of an image and sends nothing', function () {
+        $deployment = notifyDeployment($this->application);
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001', ['kev' => true]), notifyFinding('CVE-2026-0002'), notifyFinding('CVE-2026-0003', ['fixState' => 'not-fixed', 'fixedIn' => null])], [
+            'is_baseline' => true, 'deployment_queue_id' => $deployment->id,
+        ], state: false);
 
-        ScanNotifications::afterScan($scan);
+        ScanNotifications::afterScan($scan, $deployment->id);
         notifyRunDigest();
 
         Notification::assertNothingSent();
-        expect($scan->fresh()->notified_ids)->toBe(['CVE-2026-0001']);
+        expect(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001', 'CVE-2026-0002'])
+            ->and(notifyStateOf($this->application)->is_baseline)->toBeFalse();
     });
 
-    it('treats a scan without notified IDs as a baseline in the digest', function () {
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['notified_ids' => null]);
+    it('treats both images of a first Compose deployment as a baseline', function () {
+        $deployment = notifyDeployment($this->application);
+        $web = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['is_baseline' => true, 'deployment_queue_id' => $deployment->id, 'image_ref' => 'web:1'], state: false);
+        ScanNotifications::afterScan($web, $deployment->id);
+        $worker = notifyScan($this->application, [notifyFinding('CVE-2026-0002', ['kev' => true])], ['deployment_queue_id' => $deployment->id, 'image_ref' => 'worker:1'], state: false);
+        ScanNotifications::afterScan($worker, $deployment->id);
+        $worker->update(['candidates' => notifyCandidates('worker:2')]);
+        ScanNotifications::afterScan($worker->fresh(), candidateCheck: true);
 
+        notifyRunDigest();
         notifyRunDigest();
 
         Notification::assertNothingSent();
-        expect($scan->fresh()->notified_ids)->toBe(['CVE-2026-0001']);
+        expect(notifyStateOf($this->application)->notified_ids)->toEqualCanonicalizing(['CVE-2026-0001', 'CVE-2026-0002']);
     });
+
+    it('reports a new critical of a redeploy that comes before the first digest', function () {
+        $first = notifyDeployment($this->application);
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['is_baseline' => true, 'deployment_queue_id' => $first->id, 'scanned_at' => now()->subHour()], state: false);
+        ScanNotifications::afterScan($scan, $first->id);
+
+        $second = notifyDeployment($this->application);
+        $redeploy = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002')], ['deployment_queue_id' => $second->id], state: false);
+        ScanNotifications::afterScan($redeploy, $second->id);
+        notifyRunDigest();
+
+        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
+        expect(notifySentDigest()->digest['resources'][0]['ids'])->toBe(['CVE-2026-0002']);
+    });
+
+    it('alerts right away for a new Compose service image with a known exploited finding, in any order', function (array $order) {
+        $old = notifyDeployment($this->application);
+        $rows = [
+            'web' => notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['deployment_queue_id' => $old->id, 'image_ref' => 'web:1', 'scanned_at' => now()->subDay()], state: false),
+            'worker' => notifyScan($this->application, [notifyFinding('CVE-2026-0002', ['kev' => true])], ['deployment_queue_id' => $old->id, 'image_ref' => 'worker:1', 'scanned_at' => now()->subDay()], state: false),
+        ];
+        notifyState($this->application, ['CVE-2026-0001', 'CVE-2026-0002']);
+        $new = notifyDeployment($this->application);
+        // The image of the new Compose service, before the deploy scan writes its results.
+        $rows['cache'] = notifyScan($this->application, [notifyFinding('CVE-2026-0003', ['kev' => true])], ['image_ref' => 'cache:1', 'scanned_at' => now()->subDays(5)], state: false);
+
+        foreach ($order as $name) {
+            // The deploy rescans reused rows, which then belong to the new deployment.
+            $rows[$name]->update(['deployment_queue_id' => $new->id, 'scanned_at' => now()]);
+            ScanNotifications::afterScan($rows[$name]->fresh(), $new->id);
+            $this->travel(1)->seconds();
+        }
+        notifyRunDigest();
+
+        Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
+        Notification::assertSentTo($this->team, KnownExploitedFound::class, fn (KnownExploitedFound $notification) => $notification->ids === ['CVE-2026-0003'] && $notification->imageRef === 'cache:1');
+        Notification::assertNotSentTo($this->team, VulnerabilityDigest::class);
+    })->with([
+        'new image first' => [['cache', 'web', 'worker']],
+        'new image last' => [['web', 'worker', 'cache']],
+    ]);
+
+    it('does not notify again when unchanged images are rescanned in any order', function (array $order) {
+        $old = notifyDeployment($this->application);
+        $rows = [
+            'web' => notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['deployment_queue_id' => $old->id, 'image_ref' => 'web:1', 'scanned_at' => now()->subDay()], state: false),
+            'worker' => notifyScan($this->application, [notifyFinding('CVE-2026-0002', ['kev' => true])], ['deployment_queue_id' => $old->id, 'image_ref' => 'worker:1', 'scanned_at' => now()->subDay()], state: false),
+        ];
+        notifyState($this->application, ['CVE-2026-0001', 'CVE-2026-0002']);
+        $new = notifyDeployment($this->application);
+
+        foreach ($order as $name) {
+            $rows[$name]->update(['deployment_queue_id' => $new->id, 'scanned_at' => now()]);
+            ScanNotifications::afterScan($rows[$name]->fresh(), $new->id);
+            $this->travel(1)->seconds();
+        }
+        foreach ($order as $name) {
+            ScanNotifications::afterScan($rows[$name]->fresh());
+        }
+        notifyRunDigest();
+
+        Notification::assertNothingSent();
+    })->with([
+        'web first' => [['web', 'worker']],
+        'worker first' => [['worker', 'web']],
+    ]);
 
     it('sends one digest for new fixable findings on the next run, not two', function () {
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['is_baseline' => true, 'notified_ids' => null]);
-        ScanNotifications::afterScan($scan);
-
-        $scan->update(['is_baseline' => false, 'findings' => [
+        notifyScan($this->application, [
             notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002'), notifyFinding('CVE-2026-0003'),
             notifyFinding('CVE-2026-0004', ['severity' => 'low']),
-        ]]);
-        ScanNotifications::afterScan($scan->fresh());
+        ]);
+        notifyState($this->application, ['CVE-2026-0001']);
+
         notifyRunDigest();
         notifyRunDigest();
 
@@ -231,7 +335,7 @@ describe('notified IDs', function () {
             ->and($resource['worst'])->toBe('critical')
             ->and($resource['ids'])->toBe(['CVE-2026-0002', 'CVE-2026-0003'])
             ->and($resource['url'])->toBe("https://coolify.example.com/project/{$this->environment->project->uuid}/environment/{$this->environment->uuid}/application/{$this->application->uuid}/vulnerabilities")
-            ->and($scan->fresh()->notified_ids)->toBe(['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0003']);
+            ->and(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0003']);
     });
 
     it('sends one digest for the team when 20 resources have the same new vulnerability', function () {
@@ -246,37 +350,36 @@ describe('notified IDs', function () {
     });
 
     it('notifies again when a fixed vulnerability comes back', function () {
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['notified_ids' => ['CVE-2026-0001']]);
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0009', ['fixState' => 'not-fixed', 'fixedIn' => null])]);
+        notifyState($this->application, ['CVE-2026-0001']);
 
-        $scan->update(['findings' => [notifyFinding('CVE-2026-0009', ['fixState' => 'not-fixed', 'fixedIn' => null])]]);
-        ScanNotifications::afterScan($scan->fresh());
-        expect($scan->fresh()->notified_ids)->toBe([]);
         notifyRunDigest();
         Notification::assertNothingSent();
+        expect(notifyStateOf($this->application)->notified_ids)->toBe([]);
 
         $scan->update(['findings' => [notifyFinding('CVE-2026-0001')]]);
-        ScanNotifications::afterScan($scan->fresh());
         notifyRunDigest();
 
         Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
         expect(notifySentDigest()->digest['resources'][0]['ids'])->toBe(['CVE-2026-0001']);
     });
 
-    it('keeps the notified IDs of the previous image of the resource for a new image', function () {
-        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['notified_ids' => ['CVE-2026-0001'], 'scanned_at' => now()->subDay()]);
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002')], ['notified_ids' => null]);
+    it('keeps notified IDs while a deployment of the application runs', function () {
+        notifyScan($this->application, []);
+        notifyState($this->application, ['CVE-2026-0001']);
+        notifyDeployment($this->application)->update(['status' => ApplicationDeploymentStatus::IN_PROGRESS->value]);
 
-        ScanNotifications::afterScan($scan);
         notifyRunDigest();
 
-        expect(notifySentDigest()->digest['resources'][0]['ids'])->toBe(['CVE-2026-0002']);
+        expect(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001']);
     });
 
     it('matches notified IDs by alias and skips ignored findings', function () {
         notifyScan($this->application, [
             notifyFinding('CVE-2026-0001', ['aliases' => ['GHSA-aaaa-bbbb-cccc']]),
             notifyFinding('CVE-2026-0002'),
-        ], ['notified_ids' => ['GHSA-aaaa-bbbb-cccc']]);
+        ]);
+        notifyState($this->application, ['GHSA-aaaa-bbbb-cccc']);
         ImageScanIgnore::create(['team_id' => $this->team->id, 'vulnerability_id' => 'CVE-2026-0002', 'reason' => 'Not used.']);
 
         notifyRunDigest();
@@ -285,11 +388,59 @@ describe('notified IDs', function () {
     });
 
     it('sends no digest when nothing changed', function () {
-        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['notified_ids' => ['CVE-2026-0001']]);
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')]);
+        notifyState($this->application, ['CVE-2026-0001']);
 
         notifyRunDigest();
 
         Notification::assertNothingSent();
+    });
+
+    it('never notifies for a preview scan and leaves the state alone', function () {
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')]);
+        notifyState($this->application, ['CVE-2026-0001']);
+        $preview = notifyDeployment($this->application, 7);
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0009', ['kev' => true])], ['deployment_queue_id' => $preview->id]);
+
+        ScanNotifications::afterScan($scan, $preview->id);
+        notifyRunDigest();
+
+        Notification::assertNothingSent();
+        expect(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001']);
+    });
+
+    it('does not report a released fix again after a redeploy to a new image', function () {
+        notifyScan($this->application, [], ['candidates' => notifyCandidates(), 'scanned_at' => now()->subDay()]);
+        notifyRunDigest();
+        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
+
+        $deployment = notifyDeployment($this->application);
+        $scan = notifyScan($this->application, [], ['deployment_queue_id' => $deployment->id, 'candidates' => notifyCandidates()]);
+        ScanNotifications::afterScan($scan, $deployment->id);
+        notifyRunDigest();
+
+        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
+    });
+
+    it('keeps the IDs of a known exploited alert that comes while the digest runs', function () {
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002')]);
+        notifyState($this->application, ['CVE-2026-0001']);
+        $plan = ScanNotifications::digestPlan($this->application);
+
+        $scan->update(['findings' => [...$scan->findings, notifyFinding('CVE-2026-0003', ['kev' => true])]]);
+        ScanNotifications::afterScan($scan->fresh());
+        ScanNotifications::applyDigest($plan['mark']);
+
+        Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
+        expect(notifyStateOf($this->application)->notified_ids)->toEqualCanonicalizing(['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0003']);
+    });
+
+    it('deletes the state with the resource', function () {
+        notifyState($this->application, ['CVE-2026-0001']);
+
+        $this->application->delete();
+
+        expect(ImageScanNotificationState::query()->count())->toBe(0);
     });
 });
 
@@ -309,14 +460,6 @@ describe('known exploited', function () {
         Notification::assertNotSentTo($this->team, VulnerabilityDigest::class);
     });
 
-    it('never alerts for a baseline scan', function () {
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001', ['kev' => true])], ['is_baseline' => true, 'notified_ids' => null]);
-
-        ScanNotifications::afterScan($scan);
-
-        Notification::assertNothingSent();
-    });
-
     it('uses the image scan thread on Telegram', function () {
         $this->team->telegramNotificationSettings->update([
             'telegram_enabled' => true,
@@ -331,86 +474,6 @@ describe('known exploited', function () {
         (new TelegramChannel)->send($this->team->fresh(), new KnownExploitedFound($scan, 1));
 
         Bus::assertDispatched(SendMessageToTelegramJob::class, fn ($job) => $job->threadId === '77');
-    });
-});
-
-describe('images and deployments', function () {
-    it('treats every image of a first Compose deployment as a baseline', function () {
-        $deployment = notifyDeployment($this->application);
-        $first = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['is_baseline' => true, 'notified_ids' => null, 'notified_candidates' => null, 'deployment_queue_id' => $deployment->id, 'image_ref' => 'web:1']);
-        $second = notifyScan($this->application, [notifyFinding('CVE-2026-0002', ['kev' => true])], ['notified_ids' => null, 'notified_candidates' => null, 'deployment_queue_id' => $deployment->id, 'image_ref' => 'worker:1']);
-
-        ScanNotifications::afterScan($first);
-        ScanNotifications::afterScan($second);
-
-        expect($second->fresh()->notified_ids)->toBe(['CVE-2026-0002'])
-            ->and($second->fresh()->notified_candidates)->toBeNull();
-
-        $second->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [[
-            'ref' => 'worker:2', 'digest' => 'sha256:'.str_repeat('c', 64), 'kind' => 'line', 'better' => true, 'fixed_ids' => [], 'fixes' => [], 'left' => [],
-        ]]]]);
-        notifyRunDigest();
-        notifyRunDigest();
-
-        Notification::assertNothingSent();
-    });
-
-    it('starts each image of a Compose redeploy from what the previous deployment notified', function () {
-        $old = notifyDeployment($this->application);
-        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['notified_ids' => ['CVE-2026-0001'], 'deployment_queue_id' => $old->id, 'image_ref' => 'web:1', 'scanned_at' => now()->subDay()]);
-        notifyScan($this->application, [notifyFinding('CVE-2026-0002', ['kev' => true])], ['notified_ids' => ['CVE-2026-0002'], 'deployment_queue_id' => $old->id, 'image_ref' => 'worker:1', 'scanned_at' => now()->subDay()]);
-        $new = notifyDeployment($this->application);
-        $web = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0003')], ['notified_ids' => null, 'deployment_queue_id' => $new->id, 'image_ref' => 'web:2']);
-        $worker = notifyScan($this->application, [notifyFinding('CVE-2026-0002', ['kev' => true])], ['notified_ids' => null, 'deployment_queue_id' => $new->id, 'image_ref' => 'worker:2']);
-
-        ScanNotifications::afterScan($web);
-        ScanNotifications::afterScan($worker);
-        notifyRunDigest();
-
-        Notification::assertNotSentTo($this->team, KnownExploitedFound::class);
-        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
-        expect(notifySentDigest()->digest['resources'][0]['ids'])->toBe(['CVE-2026-0003'])
-            ->and($worker->fresh()->notified_ids)->toBe(['CVE-2026-0002']);
-    });
-
-    it('never notifies for a preview scan', function () {
-        $preview = notifyDeployment($this->application, 7);
-        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['notified_ids' => ['CVE-2026-0001'], 'scanned_at' => now()->subDay()]);
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0009', ['kev' => true])], ['notified_ids' => null, 'deployment_queue_id' => $preview->id]);
-
-        ScanNotifications::afterScan($scan);
-        notifyRunDigest();
-
-        Notification::assertNothingSent();
-        expect($scan->fresh()->notified_ids)->toBeNull();
-    });
-
-    it('does not report a fix again after a redeploy to a new image', function () {
-        $candidates = ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [[
-            'ref' => 'nginx:1.28', 'digest' => 'sha256:'.str_repeat('b', 64), 'kind' => 'line', 'better' => true,
-            'fixed_ids' => [], 'fixes' => ['critical' => 1], 'left' => [],
-        ]]];
-        notifyScan($this->application, [], ['candidates' => $candidates, 'scanned_at' => now()->subDay()]);
-        notifyRunDigest();
-        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
-
-        $scan = notifyScan($this->application, [], ['notified_ids' => null, 'notified_candidates' => null]);
-        ScanNotifications::afterScan($scan);
-        $scan->update(['candidates' => $candidates]);
-        notifyRunDigest();
-
-        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
-    });
-
-    it('keeps IDs that an alert added while the digest ran', function () {
-        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002', ['kev' => true])]);
-        $plan = ScanNotifications::digestPlan($scan, $this->application);
-
-        ImageScan::query()->whereKey($scan->id)->update(['notified_ids' => json_encode(['CVE-2026-0002']), 'summary' => json_encode(['changed' => true])]);
-        ScanNotifications::applyMark($plan['mark']);
-
-        expect($scan->fresh()->notified_ids)->toEqualCanonicalizing(['CVE-2026-0001', 'CVE-2026-0002'])
-            ->and($scan->fresh()->summary)->toBe(['changed' => true]);
     });
 });
 
@@ -470,7 +533,6 @@ describe('digest sections', function () {
 
     it('reports a newly released fix once', function () {
         notifyScan($this->application, [], [
-            'notified_ids' => [],
             'candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [[
                 'ref' => 'nginx:1.28', 'digest' => 'sha256:'.str_repeat('b', 64), 'kind' => 'line', 'better' => true,
                 'fixed_ids' => ['CVE-2026-0001'], 'fixes' => ['critical' => 1], 'left' => [],
@@ -485,8 +547,8 @@ describe('digest sections', function () {
     });
 
     it('names the recommended fix of a resource with new findings', function () {
+        notifyState($this->application, [], ['nginx:1.28@sha256:'.str_repeat('b', 64)]);
         notifyScan($this->application, [notifyFinding('CVE-2026-0001')], [
-            'notified_candidates' => ['nginx:1.28@sha256:'.str_repeat('b', 64)],
             'candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [[
                 'ref' => 'nginx:1.28', 'digest' => 'sha256:'.str_repeat('b', 64), 'kind' => 'line', 'better' => true,
                 'fixed_ids' => ['CVE-2026-0001'], 'fixes' => ['critical' => 1], 'left' => [],

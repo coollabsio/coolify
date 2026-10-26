@@ -24,8 +24,9 @@ use Throwable;
 /**
  * The daily image vulnerability digest of one team (spec 8): new fixable-now findings at the alert level and new
  * fixes per scanned resource of the team, ignores that end within 7 days, and servers whose rescans failed 2 days in
- * a row. Sends one VulnerabilityDigest only when something changed, then records what it covered (see
- * ScanNotifications). An ignore is named once per end date (cache); a failing server once per failure run.
+ * a row. Sends one VulnerabilityDigest only when something changed, then records what it covered in the
+ * notification state of each scan owner (see ScanNotifications). An ignore is named once per end date (cache); a
+ * failing server once per run of failures.
  */
 class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -55,7 +56,7 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
             return;
         }
 
-        /** @var list<array{id: int, read: list<string>, ids: list<string>, candidates: list<string>}> $marks */
+        /** @var list<array<string, mixed>> $marks */
         $marks = [];
         $resources = [];
         foreach (TeamVulnerabilities::load($this->team->id)->entries as $entry) {
@@ -105,7 +106,7 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
 
         foreach ($marks as $mark) {
             try {
-                ScanNotifications::applyMark($mark);
+                ScanNotifications::applyDigest($mark);
             } catch (Throwable $e) {
                 report($e);
             }
@@ -118,29 +119,32 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
     }
 
     /**
-     * New findings and fixes of one resource page (a service covers its applications and databases). Loads and
-     * decodes one scan at a time and keeps only counts, IDs, and the marks to write after sending.
+     * New findings and fixes of one resource page (a service covers its applications and databases). Each scan owner
+     * has its own notification state; its current scans are decoded one owner at a time, and only counts, IDs, and
+     * the marks to record after sending are kept.
      *
      * @param  Collection<int, ImageScan>  $current  The current scans, with their owner.
-     * @param  list<array{id: int, read: list<string>, ids: list<string>, candidates: list<string>}>  $marks
+     * @param  list<array<string, mixed>>  $marks
      * @return array<string, mixed>|null
      */
     private function resourceDigest(Model $resource, Collection $current, array &$marks): ?array
     {
+        $owners = $current->map(fn (ImageScan $scan) => $scan->resource)
+            ->filter(fn ($owner): bool => $owner instanceof Model)
+            ->unique(fn (Model $owner): string => $owner->getMorphClass().':'.$owner->getKey());
+
         $counts = [];
         $total = 0;
         $knownExploited = 0;
         $ids = [];
         $updates = [];
         $fix = null;
-        foreach ($current as $currentScan) {
-            $owner = $currentScan->resource;
-            $scan = ImageScan::query()->find($currentScan->id);
-            if (! $owner instanceof Model || ! $scan instanceof ImageScan) {
+        foreach ($owners as $owner) {
+            $plan = ScanNotifications::digestPlan($owner);
+            if ($plan === null) {
                 continue;
             }
 
-            $plan = ScanNotifications::digestPlan($scan, $owner);
             $marks[] = $plan['mark'];
             $updates = [...$updates, ...$plan['newCandidates']];
             if ($plan['new'] === []) {

@@ -109,7 +109,7 @@ class ScanImage
             $lock->release();
         }
 
-        $this->notifyAfterScan($scan);
+        $this->notifyAfterScan($scan, $deployment?->id);
         $this->queueCandidateCheck($scan);
 
         return $scan;
@@ -119,10 +119,10 @@ class ScanImage
      * Records what the notifications covered and alerts for a new known exploited finding (spec 8). The alert is a
      * queued notification, so a deploy never waits for it.
      */
-    private function notifyAfterScan(ImageScan $scan): void
+    private function notifyAfterScan(ImageScan $scan, ?int $deploymentId = null): void
     {
         try {
-            ScanNotifications::afterScan($scan);
+            ScanNotifications::afterScan($scan, $deploymentId);
         } catch (Throwable $e) {
             report($e);
         }

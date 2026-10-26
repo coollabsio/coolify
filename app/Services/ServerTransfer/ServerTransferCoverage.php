@@ -24,6 +24,7 @@ use App\Models\GitlabApp;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
+use App\Models\ImageScanNotificationState;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
@@ -363,6 +364,7 @@ final class ServerTransferCoverage
         ApplicationDeploymentQueue::class => 'Deployment history.',
         ImageScan::class => 'Rebuilt by the next rescan.',
         ImageSbom::class => 'Rebuilt by the next rescan.',
+        ImageScanNotificationState::class => 'Notification state restarts as a baseline after a transfer.',
         ScheduledTaskExecution::class => 'Execution history.',
         ScheduledDatabaseBackupExecution::class => 'Execution history.',
         ScheduledVolumeBackupExecution::class => 'Execution history.',

@@ -773,7 +773,7 @@ class RefreshCandidates
 
         // A newer image can make a known exploited finding fixable now.
         try {
-            ScanNotifications::afterScan($fresh);
+            ScanNotifications::afterScan($fresh, candidateCheck: true);
         } catch (Throwable $e) {
             report($e);
         }
