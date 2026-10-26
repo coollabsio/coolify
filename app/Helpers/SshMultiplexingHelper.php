@@ -316,13 +316,11 @@ class SshMultiplexingHelper
         }
         $healthCommand .= self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
-        try {
-            $process = Process::timeout((int) config('constants.ssh.mux_health_check_timeout'))->run($healthCommand);
-        } catch (ProcessTimedOutException) {
-            return false;
-        }
+        // The health check goes over the network, so a slow link gets at least the server's connection timeout.
+        $timeout = max((int) config('constants.ssh.mux_health_check_timeout'), self::getConnectionTimeout($server));
+        $process = self::runWithTimeout($healthCommand, $timeout);
 
-        return $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
+        return $process?->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
     }
 
     public static function refreshMultiplexedConnection(Server $server): bool
@@ -365,14 +363,29 @@ class SshMultiplexingHelper
     }
 
     /**
+     * Run `ssh -O <operation>` against a mux socket file. Returns null when the master does not answer in time.
+     */
+    public static function runMuxSocketCommand(string $muxSocket, string $operation): ?ProcessResult
+    {
+        return self::runWithTimeout(
+            "ssh -O {$operation} -o ControlPath=".escapeshellarg($muxSocket).' localhost',
+            (int) config('constants.ssh.mux_health_check_timeout'),
+        );
+    }
+
+    private static function runMuxControlCommand(Server $server, string $operation): ?ProcessResult
+    {
+        return self::runWithTimeout(self::muxControlCommand($server, $operation), (int) config('constants.ssh.mux_health_check_timeout'));
+    }
+
+    /**
      * Use a PHP-side timeout, not the `timeout` binary: BusyBox `timeout` in the Coolify image
      * kills ssh with SIGTERM, and Symfony turns that into an exception. Returns null on timeout.
      */
-    private static function runMuxControlCommand(Server $server, string $operation): ?ProcessResult
+    private static function runWithTimeout(string $command, int $timeout): ?ProcessResult
     {
         try {
-            return Process::timeout((int) config('constants.ssh.mux_health_check_timeout'))
-                ->run(self::muxControlCommand($server, $operation));
+            return Process::timeout($timeout)->run($command);
         } catch (ProcessTimedOutException) {
             return null;
         }
