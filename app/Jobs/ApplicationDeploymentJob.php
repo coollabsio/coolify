@@ -2922,14 +2922,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                     return;
                 }
-                if ($this->application->custom_healthcheck_found) {
-                    $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
+                if ($this->application->isHealthcheckDisabled()) {
+                    $this->application_deployment_queue->addLogEntry('Using the custom healthcheck from the Dockerfile.');
                 }
                 if ($this->container_name) {
                     $escapedContainerName = escapeshellarg($this->container_name);
                     $counter = 1;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
-                    if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
+                    if ($this->full_healthcheck_url) {
                         $healthcheckLabel = $this->application->health_check_type === 'cmd' ? 'Healthcheck command' : 'Healthcheck URL';
                         $this->application_deployment_queue->addLogEntry("{$healthcheckLabel} (inside the container): {$this->full_healthcheck_url}");
                     }
@@ -4445,10 +4445,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $docker_compose['services'][$this->container_name]['stop_grace_period'] = $this->application->settings->stopGracePeriodSeconds().'s';
         }
 
-        // Only add Coolify healthcheck if no custom HEALTHCHECK found in Dockerfile
-        // If custom_healthcheck_found is true, the Dockerfile's HEALTHCHECK will be used
-        // If healthcheck is disabled, no healthcheck will be added
-        if (! $this->application->custom_healthcheck_found && ! $this->application->isHealthcheckDisabled()) {
+        // An enabled Coolify healthcheck replaces any HEALTHCHECK from the image or Dockerfile.
+        // When it is disabled, the container keeps the HEALTHCHECK of the image (if any).
+        if (! $this->application->isHealthcheckDisabled()) {
             $healthcheck_command = $this->generate_healthcheck_commands();
             if ($healthcheck_command !== null) {
                 $docker_compose['services'][$this->container_name]['healthcheck'] = [
