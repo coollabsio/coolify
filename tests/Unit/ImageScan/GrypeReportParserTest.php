@@ -76,7 +76,7 @@ it('drops lines whose id does not match the id pattern', function (string $id) {
 it('maps severities to lowercase and unknown values to unknown', function (string $raw, string $expected) {
     $r = (new GrypeReportParser)->parse(grypeLine(['sev' => $raw]));
     expect($r['findings'][0]->severity)->toBe($expected);
-})->with([['Critical', 'critical'], ['HIGH', 'high'], ['Medium', 'medium'], ['Low', 'low'], ['Negligible', 'unknown'], ['', 'unknown'], ['weird', 'unknown']]);
+})->with([['Critical', 'critical'], ['HIGH', 'high'], ['Medium', 'medium'], ['Low', 'low'], ['Negligible', 'low'], ['', 'unknown'], ['weird', 'unknown']]);
 
 it('cuts strings longer than their caps', function () {
     $r = (new GrypeReportParser)->parse(grypeLine([
@@ -108,6 +108,12 @@ it('ignores lines nested deeper than the allowed depth', function () {
     $deep = str_repeat('[', 20).str_repeat(']', 20);
     $r = (new GrypeReportParser)->parse($deep."\n".grypeLine());
     expect($r['findings'])->toHaveCount(1);
+});
+
+it('keeps the other fields when setting the layer', function () {
+    $f = (new GrypeReportParser)->parse(imageScanFixture('grype-kev.ndjson'))['findings'][0];
+    $base = $f->withLayer('base');
+    expect($base->layer)->toBe('base')->and([...$base->toArray(), 'layer' => 'app'])->toBe($f->toArray());
 });
 
 it('round trips a finding through toArray and fromArray', function () {

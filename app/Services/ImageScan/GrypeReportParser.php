@@ -83,6 +83,7 @@ class GrypeReportParser
         }
 
         $severity = strtolower(ScannerText::clean($row['sev'] ?? null, 16));
+        $severity = $severity === 'negligible' ? 'low' : $severity;
         $fixState = ScannerText::clean($row['fix'] ?? null, 32);
         $fixVersions = is_array($row['fixv'] ?? null) ? array_values($row['fixv']) : [];
         $fixedIn = ScannerText::clean($row['sugg'] ?? null, 128);

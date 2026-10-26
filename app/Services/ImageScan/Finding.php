@@ -26,11 +26,7 @@ final readonly class Finding
 
     public function withLayer(string $layer): self
     {
-        return new self(
-            $this->id, $this->aliases, $this->severity, $this->package, $this->version, $this->type,
-            $this->artifactId, $this->fixedIn, $this->fixState, $this->kev, $this->epss, $this->risk,
-            $this->summary, $layer,
-        );
+        return self::fromArray([...$this->toArray(), 'layer' => $layer]);
     }
 
     /**
