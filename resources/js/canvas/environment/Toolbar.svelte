@@ -2,7 +2,7 @@
   import BetaBadge from '../BetaBadge.svelte';
   import Select from './Select.svelte';
   // Filters and view toggles. The root docks it (use:dock) into the zoom controls bar
-  // (CanvasControls, bottom left) on desktop, or in a rounded box above the canvas on small screens.
+  // (CanvasControls, bottom center) on desktop, or in a rounded box above the canvas on small screens.
 
   let { viewOnly, viewOnlyTitle, filter, projects, environments, views, dock, onfilter } = $props();
 
