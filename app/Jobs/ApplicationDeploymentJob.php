@@ -2822,6 +2822,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $this->checkForCancellation();
+            $this->write_compose_file_to_workdir();
             if ($this->server->isSwarm()) {
                 $this->application_deployment_queue->addLogEntry('Rolling update started.');
                 $this->execute_remote_command(
@@ -4572,6 +4573,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->generated_docker_compose = $this->docker_compose;
+    }
+
+    /**
+     * The workdir is the build context, so the generated compose file is written only after the image
+     * build. Otherwise `COPY . .`, Nixpacks, and Railpack put it (with the proxy labels) into the image.
+     */
+    private function write_compose_file_to_workdir(): void
+    {
         $this->execute_remote_command([
             "docker exec {$this->deployment_uuid} rm -f {$this->workdir}/docker-compose.yaml",
             'hidden' => true,
