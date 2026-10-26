@@ -50,7 +50,13 @@ trait MatchesManualWebhookApplications
 
         // Git hosts (GitHub, GitLab, Gitea, Bitbucket) treat owner/repo names
         // case-insensitively, so compare the canonical paths case-insensitively.
-        return hash_equals(mb_strtolower($fullName), mb_strtolower($repositoryPath));
+        $fullName = mb_strtolower($fullName);
+        $repositoryPath = mb_strtolower($repositoryPath);
+
+        // A self-hosted Git host can serve repositories under a sub-path
+        // (https://example.com/gitea/owner/repo), which is not part of the
+        // repository name in the webhook payload.
+        return $repositoryPath === $fullName || str_ends_with($repositoryPath, '/'.$fullName);
     }
 
     /**

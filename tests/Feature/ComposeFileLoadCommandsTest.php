@@ -140,3 +140,105 @@ test('a symlinked base directory is not followed to a folder on the server', fun
         ->and($process->getErrorOutput())->toContain('No such file')
         ->and($process->getErrorOutput())->not->toContain('server-secret-value');
 });
+
+test('the Compose file loads from inside a Git submodule', function (string $submodulePath, string $composeLocation, string $user) {
+    $submoduleSource = $this->root.'/infra-src';
+    $composeDir = substr('infra/templates/wordpress-staging', strlen($submodulePath) + 1);
+    mkdir("{$submoduleSource}/{$composeDir}", 0755, true);
+    file_put_contents("{$submoduleSource}/{$composeDir}/docker-compose.yml", $this->compose);
+    // Git refuses local submodule URLs unless the file protocol is allowed.
+    $gitEnv = ['GIT_CONFIG_COUNT' => '1', 'GIT_CONFIG_KEY_0' => 'protocol.file.allow', 'GIT_CONFIG_VALUE_0' => 'always'];
+    foreach ([
+        [$submoduleSource, ['git', 'init', '-q', '-b', 'main']],
+        [$submoduleSource, ['git', 'add', '-A']],
+        [$submoduleSource, ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'infra']],
+        [$submoduleSource, ['git', 'clone', '-q', '--bare', '.', $this->root.'/infra.git']],
+        [$this->root.'/src', ['git', 'submodule', '-q', 'add', $this->root.'/infra.git', $submodulePath]],
+        [$this->root.'/src', ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'add infra']],
+        [$this->root.'/src', ['git', 'push', '-q', $this->root.'/repo.git', 'main']],
+    ] as [$cwd, $command]) {
+        (new Process($command, $cwd, $gitEnv))->mustRun();
+    }
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $this->root.'/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => '/',
+        'docker_compose_location' => $composeLocation,
+    ]);
+    $application->settings->update(['is_git_submodules_enabled' => true]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
+    if ($user !== 'root') {
+        $server = Mockery::mock(Server::class)->makePartial();
+        $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
+        $server->shouldReceive('setAttribute')->andReturnSelf();
+        $commands = collect(parseCommandsByLineForSudo($commands, $server));
+    }
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $this->root.'/bin:'.getenv('PATH')] + $gitEnv);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    expect($process->getErrorOutput())->not->toContain('syntax error');
+    if (str_contains($composeLocation, 'missing')) {
+        // loadComposeFile() turns this error into "Docker Compose file not found".
+        expect($process->getExitCode())->not->toBe(0)
+            ->and($process->getErrorOutput())->toContain('No such file');
+    } else {
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toBe($this->compose);
+    }
+})->with([
+    'submodule at the top level' => ['infra', '/infra/templates/wordpress-staging/docker-compose.yml'],
+    'nested submodule' => ['infra/templates', '/infra/templates/wordpress-staging/docker-compose.yml'],
+    'missing file' => ['infra', '/infra/missing/docker-compose.yml'],
+])->with([
+    'root' => ['root'],
+    'non-root' => ['ubuntu'],
+]);
+
+test('a symlinked Compose file inside a Git submodule is not followed to a file on the server', function () {
+    $submoduleSource = $this->root.'/infra-src';
+    mkdir($submoduleSource);
+    file_put_contents($this->root.'/server-secret.yml', "services:\n  secret:\n    image: server-secret-value\n");
+    symlink($this->root.'/server-secret.yml', "{$submoduleSource}/docker-compose.yml");
+    $gitEnv = ['GIT_CONFIG_COUNT' => '1', 'GIT_CONFIG_KEY_0' => 'protocol.file.allow', 'GIT_CONFIG_VALUE_0' => 'always'];
+    foreach ([
+        [$submoduleSource, ['git', 'init', '-q', '-b', 'main']],
+        [$submoduleSource, ['git', 'add', '-A']],
+        [$submoduleSource, ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'infra']],
+        [$submoduleSource, ['git', 'clone', '-q', '--bare', '.', $this->root.'/infra.git']],
+        [$this->root.'/src', ['git', 'submodule', '-q', 'add', $this->root.'/infra.git', 'infra']],
+        [$this->root.'/src', ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'add infra']],
+        [$this->root.'/src', ['git', 'push', '-q', $this->root.'/repo.git', 'main']],
+    ] as [$cwd, $command]) {
+        (new Process($command, $cwd, $gitEnv))->mustRun();
+    }
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $this->root.'/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => '/',
+        'docker_compose_location' => '/infra/docker-compose.yml',
+    ]);
+    $application->settings->update(['is_git_submodules_enabled' => true]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $this->root.'/bin:'.getenv('PATH')] + $gitEnv);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getOutput())->toBe('')
+        ->and($process->getErrorOutput())->toContain('symbolic link')
+        ->and($process->getErrorOutput())->not->toContain('server-secret-value');
+});

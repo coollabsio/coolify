@@ -48,11 +48,11 @@
                                 wire:click="selectServer('{{ $server->id }}', '{{ $destination->uuid }}')"
                                 @class([
                                     'data-table-row clone-destinations-table-grid w-full border-b border-neutral-200 text-left last:border-b-0 dark:border-white/[0.06]',
-                                    'bg-coollabs/5 dark:bg-warning/[0.06]' => $selectedDestination === $destination->uuid,
+                                    'bg-coollabs/5 dark:bg-brand/[0.08]' => $selectedDestination === $destination->uuid,
                                 ])>
                                 <span @class([
                                     'flex size-4 items-center justify-center rounded-full border',
-                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selectedDestination === $destination->uuid,
+                                    'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $selectedDestination === $destination->uuid,
                                     'border-neutral-300 dark:border-white/[0.15]' => $selectedDestination !== $destination->uuid,
                                 ])>
                                     @if ($selectedDestination === $destination->uuid)

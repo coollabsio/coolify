@@ -2,13 +2,18 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class All extends Component
 {
+    use AuthorizesRequests;
+
     #[Locked]
     public $resource;
 
@@ -18,6 +23,18 @@ class All extends Component
     public Collection $containerNames;
 
     public ?string $variables = null;
+
+    #[Url(as: 'task_uuid', except: '')]
+    public string $taskUuid = '';
+
+    public bool $taskModalOpen = false;
+
+    public function getListeners(): array
+    {
+        return [
+            'modalClosed' => 'closeTask',
+        ];
+    }
 
     public function mount()
     {
@@ -34,11 +51,44 @@ class All extends Component
                 $this->containerNames = collect([]);
             }
         }
+
+        if ($this->taskUuid !== '') {
+            $this->openTask($this->taskUuid);
+        }
+    }
+
+    public function openTask(string $taskUuid): void
+    {
+        $this->authorize('view', $this->resource);
+        $this->taskUuid = $this->resource->scheduled_tasks()->where('uuid', $taskUuid)->firstOrFail()->uuid;
+        $this->taskModalOpen = true;
+    }
+
+    public function closeTask(): void
+    {
+        $this->taskUuid = '';
+        $this->taskModalOpen = false;
+        $this->resource->refresh();
+    }
+
+    #[On('scheduledTaskDeleted')]
+    public function taskDeleted(): void
+    {
+        $this->closeTask();
     }
 
     #[On('refreshTasks')]
     public function refreshTasks()
     {
         $this->resource->refresh();
+    }
+
+    public function render(): View
+    {
+        return view('livewire.project.shared.scheduled-task.all', [
+            'selectedTask' => $this->taskUuid === ''
+                ? null
+                : $this->resource->scheduled_tasks()->where('uuid', $this->taskUuid)->first(),
+        ]);
     }
 }

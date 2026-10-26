@@ -12,6 +12,9 @@ use App\Support\AtomicFilesystem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Console\ConfigCacheCommand;
 use Illuminate\Foundation\Console\RouteCacheCommand;
+use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -44,6 +47,18 @@ class AppServiceProvider extends ServiceProvider
         $this->configureGitLabHttp();
         $this->configureOidcSocialite();
         $this->configureQueue();
+        $this->configureServerTransferImport();
+    }
+
+    /**
+     * A server transfer bundle carries stored values (files, variables, keys, compose files) that must
+     * arrive unchanged, so the import request skips the global trimming and empty-string conversion.
+     */
+    private function configureServerTransferImport(): void
+    {
+        $isImport = fn (Request $request): bool => $request->is('api/v1/servers/import');
+        TrimStrings::skipWhen($isImport);
+        ConvertEmptyStringsToNull::skipWhen($isImport);
     }
 
     /**
@@ -139,6 +154,14 @@ class AppServiceProvider extends ServiceProvider
     private function configureGitLabHttp(): void
     {
         Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
+            $client = Http::GitSource($api_url)->withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+
+            return $access_token ? $client->withToken($access_token) : $client;
+        });
+
+        Http::macro('Gitea', function (string $api_url, ?string $access_token = null) {
             $client = Http::GitSource($api_url)->withHeaders([
                 'Accept' => 'application/json',
             ])->baseUrl($api_url);

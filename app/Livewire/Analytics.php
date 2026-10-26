@@ -56,8 +56,7 @@ class Analytics extends Component
     #[Url(as: 'app')]
     public string $appUuid = '';
 
-    // Realtime refresh; off by default (click "Live" to arm it). Only meaningful on the
-    // 24h range, which matches the 60s Sentinel cache TTL.
+    // Realtime refresh every 60s (the Sentinel cache TTL); off by default, works with every range.
     public bool $live = false;
 
     public ?array $overview = null;
@@ -109,7 +108,7 @@ class Analytics extends Component
     private const MAX_LEADERBOARD_APPS = 200;
 
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = ['country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
 
     /**
      * Per-request cache of Sentinel key => display metadata, so resolving a name/domain/link
@@ -186,12 +185,11 @@ class Analytics extends Component
         $this->loadData();
     }
 
-    public function toggleLive(): void
+    public function updatedLive(): void
     {
-        if ($this->range !== '24h') {
-            return;
+        if ($this->live) {
+            $this->loadData();
         }
-        $this->live = ! $this->live;
     }
 
     #[On('trafficAnalyticsStateChanged')]
@@ -209,11 +207,6 @@ class Analytics extends Component
             $this->refreshAppOptions();
             $this->loadData();
         }
-    }
-
-    public function isLivePollable(): bool
-    {
-        return $this->live && $this->range === '24h';
     }
 
     public function updatedServerUuid(): void

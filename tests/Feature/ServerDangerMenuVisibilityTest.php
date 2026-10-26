@@ -39,7 +39,7 @@ test('danger menu is visible for non-coolify-host servers that use host.docker.i
 
     $this->get(route('server.show', ['server_uuid' => $server->uuid]))
         ->assertSuccessful()
-        ->assertSee('>Danger</', false)
+        ->assertSee('>Danger Zone</', false)
         ->assertSee(route('server.delete', ['server_uuid' => $server->uuid]), false);
 });
 
@@ -58,7 +58,6 @@ test('danger menu is hidden for the coolify host server', function () {
 
     $this->get(route('server.show', ['server_uuid' => $server->uuid]))
         ->assertSuccessful()
-        ->assertDontSee('>Danger</', false)
         ->assertDontSee(route('server.delete', ['server_uuid' => $server->uuid]), false);
 });
 

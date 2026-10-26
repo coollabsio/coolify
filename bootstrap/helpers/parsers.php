@@ -9,6 +9,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
@@ -147,7 +148,8 @@ function composeResourceDirectory(Application|Service $resource): string
  * Renders a long-syntax bind with its resolved source. It keeps the options that Docker Compose
  * accepts, such as read_only and bind, and removes other keys, which Compose rejects. Without
  * `bind.create_host_path`, a missing source is created, as with short syntax: Docker Compose
- * before v2.30 does not do that for long syntax.
+ * before v2.30 does not do that for long syntax. A short-syntax mode in the target
+ * (`/data/users.yml:ro`) becomes `read_only`, because Docker rejects it in long syntax.
  *
  * @param  array<string, mixed>  $volume
  * @return array<string, mixed>
@@ -159,6 +161,10 @@ function composeLongBindVolume(array $volume, string $source): array
         fn ($key) => in_array($key, ['type', 'source', 'target', 'read_only', 'consistency', 'bind'], true) || str_starts_with((string) $key, 'x-'),
         ARRAY_FILTER_USE_KEY
     );
+    if (preg_match('/^(.+):(ro|rw)$/', (string) ($volume['target'] ?? ''), $matches)) {
+        $volume['target'] = $matches[1];
+        $volume['read_only'] ??= $matches[2] === 'ro';
+    }
     $volume['source'] = $source;
     $volume['bind'] = is_array($volume['bind'] ?? null) ? $volume['bind'] : [];
     $volume['bind']['create_host_path'] ??= true;
@@ -235,6 +241,57 @@ function validateComposeContentVolumeSource(array $volume): void
     }
 
     validateComposeArrayVolumeSource($source);
+}
+
+/**
+ * Replaces a `${VAR:-default}` volume source with its default, as the short volume syntax does.
+ * An empty default becomes `${VAR}`. Other sources do not change.
+ */
+function resolveComposeVolumeSourceDefault(string $source): string
+{
+    if (! preg_match('/^\$\{([^}]+)\}$/', $source, $matches) || ! str_contains($matches[1], ':-')) {
+        return $source;
+    }
+
+    [$varName, $defaultValue] = explode(':-', $matches[1], 2);
+
+    return $defaultValue !== '' ? $defaultValue : '${'.$varName.'}';
+}
+
+/**
+ * Resolves a long-syntax bind source as Docker Compose does with the `.env` file that Coolify writes:
+ * `${VAR:-default}` is the value of VAR when the resource sets it to a non-empty value, else the default.
+ * A value with a variable or vault reference stays for Docker Compose to resolve.
+ *
+ * @throws Exception If the value of the variable is not a shell-safe path
+ */
+function resolveComposeLongBindSource(string $source, Application|Service $resource, bool $isPreview = false): string
+{
+    if (! preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}$/', $source, $matches)) {
+        return resolveComposeVolumeSourceDefault($source);
+    }
+
+    $variables = match (true) {
+        $resource instanceof Service => $resource->environment_variables(),
+        $isPreview => $resource->runtime_environment_variables_preview()->where('is_runtime', true),
+        default => $resource->runtime_environment_variables()->where('is_runtime', true),
+    };
+    $value = $variables->where('key', $matches[1])->first()?->real_value;
+    if (blank($value)) {
+        return resolveComposeVolumeSourceDefault($source);
+    }
+    // Docker Compose expands variable references in the `.env` file, and Coolify writes vault secrets to it.
+    if (str_contains($value, '$') || RemoteSecretReferences::containsReference($value)) {
+        return $source;
+    }
+
+    try {
+        validateShellSafePath($value, 'volume source');
+    } catch (Exception $e) {
+        throw new Exception("Invalid Docker volume definition (array syntax): the value of {$matches[1]} is not a safe path. ".$e->getMessage(), 0, $e);
+    }
+
+    return $value;
 }
 
 /**
@@ -932,26 +989,8 @@ function parseDockerVolumeString(string $volumeString): array
         }
     }
 
-    // Handle environment variable expansion in source
-    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
-    if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
-        $varContent = $matches[1];
-
-        // Check if there's a default value with :-
-        if (strpos($varContent, ':-') !== false) {
-            $parts = explode(':-', $varContent, 2);
-            $varName = $parts[0];
-            $defaultValue = isset($parts[1]) ? $parts[1] : '';
-
-            // If there's a non-empty default value, use it for source
-            if ($defaultValue !== '') {
-                $source = $defaultValue;
-            } else {
-                // Empty default value, keep the variable reference for env resolution
-                $source = '${'.$varName.'}';
-            }
-        }
-        // Otherwise keep the variable as-is for later expansion (no default value)
+    if ($source) {
+        $source = resolveComposeVolumeSourceDefault((string) $source);
     }
 
     // Validate source path for command injection attempts
@@ -1428,7 +1467,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
         if ($server->isLogDrainEnabled()) {
             if ($resource->isLogDrainEnabled()) {
-                $logging = generate_fluentd_configuration();
+                $logging = generate_log_drain_configuration($server);
             }
         }
         $volumes = collect(data_get($service, 'volumes', []));
@@ -1500,6 +1539,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource, $isPullRequest));
+                        }
                     }
                     validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
@@ -1980,6 +2023,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
                     $coolifyEnvironments->put('SERVICE_URL_'.$serviceEnvKey, $coolifyUrl->__toString());
                     $coolifyEnvironments->put('SERVICE_FQDN_'.$serviceEnvKey, $coolifyFqdn);
+                    // A preview uses its own domains; the stored variables belong to the main application.
+                    if ($isPullRequest) {
+                        continue;
+                    }
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
@@ -1996,7 +2043,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'value' => $coolifyFqdn,
                         'is_preview' => false,
                     ]);
-                } else {
+                } elseif (! $isPullRequest) {
                     $resource->environment_variables()->where('resourceable_type', Application::class)
                         ->where('resourceable_id', $resource->id)
                         ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
@@ -2061,7 +2108,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
-            })->map(function ($value, $key) use ($resource) {
+            })->map(function ($value, $key) use ($resource, $isPullRequest) {
                 // Preserve empty strings and null values with correct Docker Compose semantics:
                 // - Empty string: Variable is set to "" (e.g., HTTP_PROXY="" means "no proxy")
                 // - Null: Variable is unset/removed from container environment (may inherit from host)
@@ -2069,8 +2116,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // User explicitly wants variable unset - respect that
                     // NEVER override from database - null means "inherit from environment"
                     // Keep as null (will be excluded from container environment)
-                } elseif ($value === '') {
-                    // Empty string - allow database override for backward compatibility
+                } elseif ($value === '' && ! ($isPullRequest && str($key)->startsWith('SERVICE_URL_'))) {
+                    // Empty string - allow database override for backward compatibility.
+                    // The stored service URLs belong to the main application, so a preview does not use them.
                     $dbEnv = $resource->environment_variables()->where('key', $key)->first();
                     // Only use database override if it exists AND has a non-empty value
                     if ($dbEnv && str($dbEnv->value)->isNotEmpty()) {
@@ -2810,7 +2858,7 @@ function serviceParser(Service $resource): Collection
 
         if ($server->isLogDrainEnabled()) {
             if ($serviceAppsLogDrainEnabledMap->get($serviceName)) {
-                $logging = generate_fluentd_configuration();
+                $logging = generate_log_drain_configuration($server);
             }
         }
         $volumes = collect(data_get($service, 'volumes', []));
@@ -2921,6 +2969,10 @@ function serviceParser(Service $resource): Collection
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource));
+                        }
                     }
                     validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {

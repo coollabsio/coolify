@@ -38,7 +38,7 @@ it('shows application configuration sections and navigation', function () {
         ->assertSee('Application details')
         ->assertSee('Internal access')
         ->assertSee('Docker network')
-        ->assertSee('Build pipeline')
+        ->assertSee('Build & deploy')
         ->screenshot(filename: 'application-configuration-overview');
 });
 
@@ -97,6 +97,59 @@ it('keeps the PR suffix listbox visible outside the volumes table while scrollin
         ->screenshot(filename: 'application-persistent-storage-pr-suffix-listbox');
 });
 
+it('floats the backup target listbox over the new backup modal instead of scrolling it', function () {
+    foreach (range(1, 6) as $index) {
+        LocalPersistentVolume::create([
+            'uuid' => (string) new Cuid2,
+            'name' => $this->application->uuid.'-data-'.$index,
+            'mount_path' => '/data/'.$index,
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+    }
+
+    loginAndSkipBoarding();
+
+    $url = applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ).'/backups';
+
+    $page = visit($url);
+    $page->assertSee('Storage backups')
+        ->click('button:visible:has-text("Add")')
+        ->assertSee('New scheduled backup')
+        ->assertScript(<<<'JS'
+            () => {
+                document.querySelector('#targetKey-trigger').click();
+
+                return true;
+            }
+            JS)
+        ->wait(0.3)
+        ->assertScript(<<<'JS'
+            () => {
+                const panel = document.querySelector('#targetKey-panel');
+                const modalBody = panel.closest('.application-settings-section-body');
+                const panelRect = panel.getBoundingClientRect();
+
+                return modalBody.scrollHeight <= modalBody.clientHeight
+                    && panelRect.bottom > modalBody.getBoundingClientRect().bottom
+                    && panelRect.bottom <= window.innerHeight
+                    && document.elementFromPoint(panelRect.left + 10, panelRect.bottom - 10)?.closest('#targetKey-panel') === panel;
+            }
+            JS)
+        ->screenshot(filename: 'application-backup-target-listbox');
+
+    selectListboxOption($page, 'targetKey', 'Volume: '.$this->application->uuid.'-data-6');
+
+    $page->assertScript(<<<'JS'
+        () => document.querySelector('#targetKey-trigger').textContent.includes('-data-6')
+        JS)
+        ->assertNoJavaScriptErrors();
+});
+
 it('saves application name description and ports from the general form', function () {
     loginAndSkipBoarding();
 
@@ -111,23 +164,33 @@ it('saves application name description and ports from the general form', functio
     $page->assertSee('General')
         ->fill('name', $updatedName)
         ->fill('description', 'Updated via browser test')
+        ->click('#internal-access-section button:has-text("Edit networking")')
         ->fill('portsExposes', '8080')
+        ->fill('customNetworkAliases', 'api.internal')
         ->screenshot(filename: 'application-general-before-save');
 
-    submitLivewireForm($page);
-
-    $page->assertValue('name', $updatedName)
+    $page->click('form button[type="submit"]:visible:has-text("Save")')
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('#internal-access-section label')]
+                .find((label) => label.textContent.trim() === 'Network aliases')
+                ?.parentElement.querySelector('input')?.value === 'api.internal'
+            JS)
+        ->assertValue('name', $updatedName)
         ->assertScript(<<<'JS'
             () => [...document.querySelectorAll('#internal-access-section label')]
                 .find((label) => label.textContent.trim() === 'Exposed ports')
                 ?.parentElement.querySelector('input')?.value === '8080'
             JS)
+        ->wait(0.5)
+        ->assertScript("() => document.querySelector('input[name=portsExposes]')?.checkVisibility() === false")
+        ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-general-after-save');
 
     $this->application->refresh();
     expect($this->application->name)->toBe($updatedName)
         ->and($this->application->description)->toBe('Updated via browser test')
-        ->and($this->application->ports_exposes)->toBe('8080');
+        ->and($this->application->ports_exposes)->toBe('8080')
+        ->and($this->application->custom_network_aliases)->toBe('api.internal');
 
     $reloaded = visit($url);
     $reloaded->assertValue('name', $updatedName)
@@ -191,6 +254,59 @@ it('saves custom docker run options from the UI', function () {
     $page->assertValue('customDockerRunOptions', $options)
         ->screenshot(filename: 'application-docker-run-options');
 });
+
+it('warns when the Dockerfile location repeats the base directory and applies the suggested fix', function () {
+    $this->application->update([
+        'build_pack' => 'dockerfile',
+        'base_directory' => '/apps/api',
+        'dockerfile_location' => '/apps/api/Dockerfile',
+    ]);
+
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    $page->assertSee('Base directory is repeated')
+        ->assertSee('/apps/api/apps/api/Dockerfile')
+        ->screenshot(filename: 'application-dockerfile-location-repeats-base-directory')
+        ->click('Use /Dockerfile')
+        ->assertDontSee('Base directory is repeated')
+        ->assertSee('/apps/api/Dockerfile');
+
+    submitLivewireForm($page);
+
+    $page->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-dockerfile-location-fixed');
+
+    $this->application->refresh();
+    expect($this->application->base_directory)->toBe('/apps/api')
+        ->and($this->application->dockerfile_location)->toBe('/Dockerfile');
+});
+
+it('restores the default file location when the field is cleared', function (string $buildPack, string $column, string $default) {
+    $this->application->update(['build_pack' => $buildPack, $column => '/docker/custom']);
+
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    $page->clear("input[placeholder='{$default}']")
+        ->keys("input[placeholder='{$default}']", 'Tab')
+        ->assertValue("input[placeholder='{$default}']", $default)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: "application-{$buildPack}-location-cleared");
+})->with([
+    'Dockerfile' => ['dockerfile', 'dockerfile_location', '/Dockerfile'],
+    'Docker Compose' => ['dockercompose', 'docker_compose_location', '/docker-compose.yaml'],
+]);
 
 it('opens environment variables page for the application', function () {
     loginAndSkipBoarding();
@@ -267,7 +383,11 @@ it('uses compact application domains with unified settings and a form save butto
     $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->screenshot(filename: 'application-domains-dns-menu')
+        ->click('[title="DNS checks and records for this server"]')
+        ->assertSee('Redirect type')
         ->assertSee('Protocol redirect')
         ->assertSee('Search indexing')
         ->assertDontSee('Search engine indexing')

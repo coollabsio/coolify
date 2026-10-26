@@ -42,11 +42,13 @@ class General extends Component
 
     public string $redisUsername;
 
-    public string $redisPassword;
+    public ?string $redisPassword = null;
 
     public string $redisVersion;
 
     public bool $isPasswordHiddenForMember = false;
+
+    public bool $isPasswordLocked = false;
 
     protected $listeners = [
         'envsUpdated' => 'refresh',
@@ -68,9 +70,11 @@ class General extends Component
             'redisUsername' => ValidationPatterns::databaseIdentifierRules(
                 enforcePattern: $this->redisUsername !== $this->database->redis_username,
             ),
-            'redisPassword' => ValidationPatterns::databasePasswordRules(
-                enforcePattern: $this->redisPassword !== $this->database->redis_password,
-            ),
+            'redisPassword' => $this->database->isCredentialLocked()
+                ? ['nullable']
+                : ValidationPatterns::databasePasswordRules(
+                    enforcePattern: $this->redisPassword !== $this->database->redis_password,
+                ),
         ];
     }
 
@@ -122,7 +126,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     private function syncData(bool $toModel = false): void
@@ -143,7 +147,6 @@ class General extends Component
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->redisConf = $this->database->redis_conf;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
@@ -154,7 +157,9 @@ class General extends Component
             $this->redisVersion = $this->database->getRedisVersion();
             $this->redisUsername = $this->database->redis_username;
             $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
-            $this->redisPassword = $canSeeCredentials ? $this->database->redis_password : '';
+            $this->redisConf = $canSeeCredentials ? $this->database->redis_conf : null;
+            $this->isPasswordLocked = $this->database->isCredentialLocked();
+            $this->redisPassword = $canSeeCredentials && ! $this->isPasswordLocked ? $this->database->redis_password : null;
         }
     }
 
@@ -193,10 +198,13 @@ class General extends Component
                     ['value' => $this->redisUsername, 'resourceable_id' => $this->database->id]
                 );
             }
-            $this->database->runtime_environment_variables()->updateOrCreate(
-                ['key' => 'REDIS_PASSWORD'],
-                ['value' => $this->redisPassword, 'resourceable_id' => $this->database->id]
-            );
+            // The form never loads a locked password, so saving its empty value would overwrite it.
+            if (! $this->database->isCredentialLocked()) {
+                $this->database->runtime_environment_variables()->updateOrCreate(
+                    ['key' => 'REDIS_PASSWORD'],
+                    ['value' => $this->redisPassword, 'resourceable_id' => $this->database->id]
+                );
+            }
 
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('databaseUpdated');

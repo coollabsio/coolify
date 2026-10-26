@@ -45,46 +45,13 @@ class Show extends Component
     #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
     public $timeout = 300;
 
-    #[Locked]
-    public ?string $application_uuid;
-
-    #[Locked]
-    public ?string $service_uuid;
-
-    #[Locked]
-    public string $task_uuid;
-
-    public function mount()
+    public function mount(Application|Service $resource, ScheduledTask $task): void
     {
-        try {
-            $task_uuid = request()->route('task_uuid');
-            $project_uuid = request()->route('project_uuid');
-            $environment_uuid = request()->route('environment_uuid');
-            $application_uuid = request()->route('application_uuid');
-            $service_uuid = request()->route('service_uuid');
-
-            $this->task_uuid = $task_uuid;
-            if ($application_uuid) {
-                $this->type = 'application';
-                $this->application_uuid = $application_uuid;
-                $this->resource = Application::ownedByCurrentTeam()->where('uuid', $application_uuid)->firstOrFail();
-            } elseif ($service_uuid) {
-                $this->type = 'service';
-                $this->service_uuid = $service_uuid;
-                $this->resource = Service::ownedByCurrentTeamCached()->where('uuid', $service_uuid)->firstOrFail();
-            }
-            $this->parameters = [
-                'environment_uuid' => $environment_uuid,
-                'project_uuid' => $project_uuid,
-                'application_uuid' => $application_uuid,
-                'service_uuid' => $service_uuid,
-            ];
-
-            $this->task = $this->resource->scheduled_tasks()->where('uuid', $task_uuid)->firstOrFail();
-            $this->syncData();
-        } catch (\Exception $e) {
-            return handleError($e);
-        }
+        $this->resource = $resource;
+        $this->type = $resource->type();
+        $this->parameters = get_route_parameters();
+        $this->task = $resource->scheduled_tasks()->whereKey($task->id)->firstOrFail();
+        $this->syncData();
     }
 
     /**
@@ -178,10 +145,10 @@ class Show extends Component
             $this->authorize('delete', $this->task);
             $this->task->delete();
             auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());
+            $this->dispatch('success', 'Scheduled task deleted.');
+            $this->dispatch('scheduledTaskDeleted')->to(All::class);
 
-            redirectRoute($this, "project.{$this->type}.scheduled-tasks.show", $this->parameters);
-
-            // Without true, the confirmation modal refreshes this deleted task while wire:navigate loads the list.
+            // Without true, the confirmation modal refreshes this deleted task.
             return true;
         } catch (\Exception $e) {
             return handleError($e);

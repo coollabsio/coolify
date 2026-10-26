@@ -75,6 +75,7 @@ test('a local clone creates the target volume with the driver options of the sou
     expect($commands)->toContain('docker volume inspect '.escapeshellarg('clone-source'))
         ->and($commands)->toContain(escapeshellarg("docker volume create --opt 'type=nfs' --opt 'o=addr=10.0.0.5,rw,nfsvers=4' --opt 'device=:/exports/data' 'clone-target'"))
         ->and($commands)->toContain('cp -a /source/. /target/')
+        ->and($commands)->not->toContain('chown')
         ->and($this->volume->fresh()->ignores_compose_driver_options)->toBeFalse();
 });
 
@@ -150,7 +151,8 @@ test('a remote clone creates the target volume with the source driver options on
 
     $commands = volumeCloneCommands();
     expect($commands)->toContain(escapeshellarg("docker volume create --opt 'type=nfs' --opt 'o=addr=10.0.0.5' --opt 'device=:/exports/data' 'clone-target'"))
-        ->and($commands)->toContain('tar xzf /clone/volume-data.tar.gz');
+        ->and($commands)->toContain('tar xzf /clone/volume-data.tar.gz')
+        ->and($commands)->not->toContain('chown');
 });
 
 test('a remote bind-type clone gets independent empty storage without copying the host folder', function () {

@@ -6,16 +6,6 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         <div class="flex flex-wrap items-center gap-2">
-            @if (isDev())
-                @can('create', App\Models\Server::class)
-                    <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
-                        class="button w-fit shrink-0 whitespace-nowrap">
-                        <x-reicon name="upload" class="size-3.5" />
-                        Import server
-                        <x-status-badge label="Dev" />
-                    </a>
-                @endcan
-            @endif
             @can('createAnyResource')
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
@@ -28,7 +18,7 @@
 
     @php
         $serverRows = $servers->map(function ($server) {
-            $isTransferredAway = isDev() && $server->isTransferredAway();
+            $isTransferredAway = $server->isTransferredAway();
             $isReady = $server->settings->is_reachable
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
@@ -38,7 +28,6 @@
             $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
-                $isTransferredAway && $server->isManagementDisabled() => 'Transferable',
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
@@ -53,6 +42,20 @@
                 default => 'error',
             };
 
+            $patchStatus = auth()->user()?->can('viewSecurity', $server) ? $server->settings->patchStatus() : null;
+            $patchBadges = [];
+            if ($patchStatus !== null) {
+                $patchBadges[] = match (true) {
+                    $patchStatus['error'] !== null => ['label' => 'Patch check failed', 'type' => 'error'],
+                    $patchStatus['security'] > 0 => ['label' => $patchStatus['security'].' security '.str('update')->plural($patchStatus['security']), 'type' => 'error'],
+                    $patchStatus['updates'] > 0 => ['label' => $patchStatus['updates'].' '.str('update')->plural($patchStatus['updates']), 'type' => 'warning'],
+                    default => ['label' => 'Up to date', 'type' => 'success'],
+                };
+                if ($patchStatus['error'] === null && $patchStatus['reboot_required']) {
+                    $patchBadges[] = ['label' => 'Reboot required', 'type' => 'warning'];
+                }
+            }
+
             return [
                 'uuid' => $server->uuid,
                 'name' => $server->name,
@@ -61,25 +64,36 @@
                 'status' => $status,
                 'statusType' => $statusType,
                 'resourceCount' => $server->definedResources()->count(),
+                'patchStatus' => $patchStatus === null ? null : [
+                    'failed' => $patchStatus['error'] !== null,
+                    'updates' => $patchStatus['error'] === null ? $patchStatus['updates'] : 0,
+                    'security' => $patchStatus['error'] === null ? $patchStatus['security'] : 0,
+                    'rebootRequired' => $patchStatus['error'] === null && $patchStatus['reboot_required'],
+                ],
+                'patchBadges' => $patchBadges,
+                'patchCheckedAt' => $patchStatus === null ? null : 'Patches checked '.$patchStatus['checked_at']->diffForHumans(),
             ];
         })->values();
+
+        $patchStatuses = $serverRows->pluck('patchStatus')->filter();
+        $showPatches = $patchStatuses->isNotEmpty();
     @endphp
 
     <div x-data="{
         search: '',
-        viewMode: localStorage.getItem('coolify-servers-view') || 'table',
+        viewMode: @js($this->listView('servers', 'table')),
         servers: @js($serverRows),
         get filteredServers() {
             const query = this.search.trim().toLowerCase();
             if (!query) return this.servers;
             return this.servers.filter(server =>
-                [server.name, server.description, server.status]
+                [server.name, server.description, server.status, ...server.patchBadges.map(badge => badge.label)]
                     .some(value => String(value || '').toLowerCase().includes(query))
             );
         },
         setViewMode(mode) {
             this.viewMode = mode;
-            localStorage.setItem('coolify-servers-view', mode);
+            this.$wire.saveListView('servers', mode);
         }
     }">
         @if ($servers->isEmpty())
@@ -100,30 +114,9 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
-                        <span x-text="filteredServers.length"></span>
-                        <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
-                    </span>
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                <div class="flex flex-wrap items-center gap-3 sm:justify-end">
+                    <x-canvas-view-toggle :list-url="route('server.index')"
+                        :canvas-url="route('server.canvas.index')" />
                 </div>
             </div>
 
@@ -144,7 +137,7 @@
 
                         <div class="relative z-10 flex items-start gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0 flex-1 self-center">
@@ -169,24 +162,44 @@
                                 </span>
                             @endif
                         </div>
+
+                        @php
+                            $cardPatchBadges = array_filter($serverRow['patchBadges'], fn ($badge) => $badge['type'] !== 'success');
+                        @endphp
+                        @if ($cardPatchBadges !== [])
+                            <div class="relative z-10 mt-auto flex flex-wrap gap-1.5 pt-3"
+                                data-tooltip="{{ $serverRow['patchCheckedAt'] }}">
+                                @foreach ($cardPatchBadges as $badge)
+                                    <x-status-badge :status="$badge['label']" :type="$badge['type']" />
+                                @endforeach
+                            </div>
+                        @endif
                     </a>
                 @endforeach
             </div>
 
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
-                <div
-                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                <div @class([
+                    'grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint',
+                    'lg:min-w-[760px] lg:grid-cols-[minmax(0,1fr)_6rem_12rem_9.5rem]' => $showPatches,
+                ])>
                     <div>Server</div>
                     <div class="hidden md:block">Resources</div>
+                    @if ($showPatches)
+                        <div class="hidden lg:block">Patches</div>
+                    @endif
                     <div>Status</div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
                     <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        @class([
+                            'grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]',
+                            'lg:min-w-[760px] lg:grid-cols-[minmax(0,1fr)_6rem_12rem_9.5rem]' => $showPatches,
+                        ])>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0">
@@ -208,6 +221,21 @@
                                 <span x-text="server.resourceCount"></span>
                             </span>
                         </div>
+                        @if ($showPatches)
+                            <div class="hidden flex-wrap gap-1 lg:flex" :data-tooltip="server.patchCheckedAt">
+                                <template x-for="badge in server.patchBadges" :key="badge.label">
+                                    <x-status-badge :dynamic="true">
+                                        <span class="relative inline-flex size-1.5 shrink-0 rounded-full"
+                                            :class="{
+                                                'bg-emerald-500': badge.type === 'success',
+                                                'bg-warning': badge.type === 'warning',
+                                                'bg-red-500': badge.type === 'error',
+                                            }"></span>
+                                        <span class="truncate" x-text="badge.label"></span>
+                                    </x-status-badge>
+                                </template>
+                            </div>
+                        @endif
                         <div class="flex items-center gap-2 text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                             <span x-show="server.statusType !== 'success'"
                                 class="hidden size-2 shrink-0 rounded-full md:inline-block"

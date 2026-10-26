@@ -143,7 +143,7 @@ class Change extends Component
             })->whereUuid($gitlab_app_uuid)->firstOrFail();
 
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
-            $this->applications = $this->gitlab_app->applications;
+            $this->applications = $this->gitlab_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
 
             $settings = instanceSettings();
 

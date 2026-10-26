@@ -932,18 +932,23 @@ describe('Manual Webhook Repository Matching', function () {
         'scp-style with custom user and port' => 'custom-user@git.example.com:2222/test-org/test-repo.git',
         'ssh scheme with custom port' => 'ssh://git@10.0.0.80:2222/test-org/test-repo.git',
         'https with different case' => 'https://github.com/Test-Org/Test-Repo.git',
+        'https under a sub-path' => 'https://git.example.com/gitea/test-org/test-repo.git',
+        'ssh scheme under a sub-path' => 'ssh://gitea@git.example.com:12345/gitea/test-org/test-repo.git',
     ]);
 
-    test('signed pushes do not deploy applications for another repository', function (string $provider) {
+    test('signed pushes do not deploy applications for another repository', function (string $provider, string $gitRepository) {
         Queue::fake();
         $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: [
-            'git_repository' => 'git@10.0.0.80:2222/other-org/test-repo.git',
+            'git_repository' => $gitRepository,
         ]));
 
         sendManualWebhookPush($this, $provider, $application)->assertOk();
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
-    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea'])->with([
+        'other owner' => 'git@10.0.0.80:2222/other-org/test-repo.git',
+        'owner that ends with the pushed owner' => 'https://git.example.com/other-test-org/test-repo.git',
+    ]);
 });
 
 describe('Webhook Secret Auto-Generation', function () {
