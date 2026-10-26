@@ -1,12 +1,14 @@
 <?php
 
 use App\Actions\Application\GetRollbackImages;
+use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
 use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\RefreshCandidatesJob;
 use App\Jobs\ScanResourceImagesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -21,6 +23,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ImageScan\ResourceScans;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
@@ -817,4 +820,158 @@ it('gates a build server image with the rules of the main destination server', f
     $job = deployGateJob(['use_build_server' => true, 'build_server' => $buildServer, 'server' => $buildServer]);
 
     expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 high vulnerability with a fix.');
+});
+
+/**
+ * A stored scan of nginx:1.27, an image that the team does not build, with a critical package fix.
+ */
+function deployGateOfficialImageScan(?array $candidates = null): ImageScan
+{
+    return deployGateStoredScan([deployGateFindingRow()], [
+        'image_ref' => 'nginx:1.27',
+        'builds_image' => false,
+        'candidates' => $candidates,
+        'deployment_queue_id' => test()->queue->id,
+    ]);
+}
+
+function deployGateOfficialImageJob(): DeploymentGateTestJob
+{
+    test()->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => '1.27']);
+    $job = deployGateJob(['production_image_name' => 'nginx:1.27']);
+    $job->outputs = ['docker image inspect' => GATE_IMAGE_ID.' nginx@'.GATE_REPO_DIGEST.' '];
+
+    return $job;
+}
+
+/**
+ * @param  array<string, mixed>  $candidates
+ */
+function deployGateStoreCandidates(ImageScan $scan, array $candidates): void
+{
+    $row = ImageScan::query()->findOrFail($scan->id);
+    $row->candidates = ['checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => [], ...$candidates];
+    $row->save();
+}
+
+it('checks newer versions before the gate on the first deploy of an official image and blocks a fix', function () {
+    deployGatePolicy();
+    $job = deployGateOfficialImageJob();
+    ScanImage::shouldRun()->once()
+        ->withArgs(fn ($server, $resource, $ref, $deployment, $wait, $baseImageRef, $queueCandidateCheck) => $queueCandidateCheck === false)
+        ->andReturnUsing(fn () => deployGateOfficialImageScan());
+    RefreshCandidates::shouldRun()->once()
+        ->withArgs(fn ($checked, $wait) => $checked->image_ref === 'nginx:1.27' && $wait === ScanImage::GATE_LOCK_WAIT_SECONDS)
+        ->andReturnUsing(fn ($checked) => deployGateStoreCandidates($checked, ['status' => 'ok', 'entries' => [
+            ['ref' => 'nginx:1.28', 'digest' => GATE_REPO_DIGEST, 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+        ]]));
+
+    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.')
+        ->and(test()->queue->fresh()->scan_gate_result['repo_digest'])->toBe('nginx@'.GATE_REPO_DIGEST)
+        ->and(deployGateLogs())->not->toContain('Coolify could not check newer versions');
+});
+
+it('deploys an official image when the check of newer versions fails and says why', function () {
+    deployGatePolicy();
+    $job = deployGateOfficialImageJob();
+    ScanImage::shouldRun()->once()->andReturnUsing(fn () => deployGateOfficialImageScan());
+    RefreshCandidates::shouldRun()->once()
+        ->andReturnUsing(fn ($checked) => deployGateStoreCandidates($checked, ['status' => 'failed', 'error' => 'daily_limit']));
+
+    expect(deployGateReachesStart($job))->toBeTrue()
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'scan_ran' => true])
+        ->and(deployGateLogs())->toContain('Coolify could not check newer versions of nginx:1.27: the daily limit of version checks on main-server is reached.');
+});
+
+it('does not check newer versions again before the gate within 20 hours', function () {
+    deployGatePolicy();
+    Queue::fake();
+    $job = deployGateOfficialImageJob();
+    deployGateOfficialImageScan(['status' => 'failed', 'error' => 'registry', 'checked_at' => now()->subHours(2)->toIso8601String(), 'entries' => []]);
+    ScanImage::shouldRun()->never();
+    RefreshCandidates::shouldRun()->never();
+
+    expect(deployGateReachesStart($job))->toBeTrue();
+});
+
+it('queues the check of newer versions for an image the team builds', function () {
+    deployGatePolicy();
+    Queue::fake();
+    $job = deployGateJob();
+    ScanImage::shouldRun()->once()->andReturnUsing(fn () => deployGateStoredScan([deployGateFindingRow()], ['base_image_ref' => 'node:20.11-alpine', 'deployment_queue_id' => test()->queue->id]));
+    RefreshCandidates::shouldRun()->never();
+
+    deployGateBlocked($job);
+
+    Queue::assertPushed(RefreshCandidatesJob::class, fn (RefreshCandidatesJob $refresh) => $refresh->scan->base_image_ref === 'node:20.11-alpine');
+});
+
+it('links a reused scan to the deployment that passed the gate so unchanged images stay current', function () {
+    deployGatePolicy();
+    $this->application->update(['build_pack' => 'dockercompose']);
+    $previous = deployGatePreviousDeployment('gate-previous', ApplicationDeploymentStatus::FINISHED);
+    $idOf = fn (string $char) => 'sha256:'.str_repeat($char, 64);
+    deployGateStoredScan([], ['image_ref' => 'web:1', 'image_id' => $idOf('1'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
+    deployGateStoredScan([], ['image_ref' => 'cache:1', 'image_id' => $idOf('2'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
+    deployGateStoredScan([], ['image_ref' => 'worker:1', 'image_id' => $idOf('3'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
+    ScanImage::shouldRun()->once()
+        ->withArgs(fn ($server, $resource, $ref) => $ref === 'web:2')
+        ->andReturnUsing(fn () => deployGateStoredScan([], ['image_ref' => 'web:2', 'image_id' => $idOf('4'), 'deployment_queue_id' => test()->queue->id, 'scanned_at' => now()]));
+    $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => [
+        'web' => ['image' => 'web:2'],
+        'cache' => ['image' => 'cache:1'],
+        'worker' => ['image' => 'worker:1'],
+    ]], 10)]);
+    $job->outputs = ["'web:2'" => $idOf('4').' ', "'cache:1'" => $idOf('2').' ', "'worker:1'" => $idOf('3').' '];
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+
+    expect(ResourceScans::currentFor($this->application->fresh())->pluck('image_ref')->sort()->values()->all())
+        ->toBe(['cache:1', 'web:2', 'worker:1']);
+});
+
+it('keeps the link of a reused scan for a preview deployment', function () {
+    deployGatePolicy();
+    $previous = deployGatePreviousDeployment('gate-previous', ApplicationDeploymentStatus::FINISHED);
+    $scan = deployGateStoredScan([], ['deployment_queue_id' => $previous->id]);
+    ScanImage::shouldRun()->never();
+    test()->queue->update(['pull_request_id' => 3]);
+
+    expect(deployGateReachesStart(deployGateJob(['pull_request_id' => 3])))->toBeTrue()
+        ->and($scan->fresh()->deployment_queue_id)->toBe($previous->id);
+});
+
+it('scans a Compose image after the start when its gate scan could not run', function () {
+    deployGatePolicy(onScanError: 'deploy');
+    Queue::fake();
+    $this->application->update(['build_pack' => 'dockercompose']);
+    ScanImage::shouldRun()->twice()->andReturn(
+        deployGateReturnedScan([]),
+        (new ImageScan)->forceFill(['status' => ImageScanStatus::Failed, 'error_code' => ImageScanErrorCode::Timeout, 'error_context' => []]),
+    );
+    $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => [
+        'web' => ['image' => 'nginx:1.27'],
+        'cache' => ['image' => 'redis:7'],
+    ]], 10)]);
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateCall($job, 'post_deployment');
+
+    Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->imageRefs === ['redis:7']);
+});
+
+it('starts the blocked image by its digest when a user deployed a Docker image anyway', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->never();
+    $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => 'latest']);
+    $user = User::factory()->create(['name' => 'Ada Admin']);
+    test()->queue->update(['scan_gate_bypassed_by' => $user->id, 'scan_gate_result' => ['repo_digest' => 'nginx@'.GATE_REPO_DIGEST]]);
+    $job = deployGateJob(['production_image_name' => 'nginx:latest']);
+
+    expect(deployGateReachesStart($job))->toBeTrue();
+
+    $compose = (new ReflectionProperty(ApplicationDeploymentJob::class, 'docker_compose'))->getValue($job);
+    expect(Yaml::parse($compose)['services']['gate-app']['image'])->toBe('nginx@'.GATE_REPO_DIGEST)
+        ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, 'docker pull') || preg_match('/docker compose .* pull/', $command) === 1))->toBeFalse()
+        ->and(deployGateLogs())->toContain('Deploy anyway by Ada Admin.');
 });
