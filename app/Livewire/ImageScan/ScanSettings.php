@@ -181,8 +181,31 @@ class ScanSettings extends Component
         $value = $this->{$property} === '' || $this->{$property} === null ? null : $this->{$property};
         $policy->{$column} = $column === 'gate_enabled' ? self::optionToBool($value) : $value;
         $policy->save();
+        if ($column === 'alert_level') {
+            $this->refreshCounts($scope);
+        }
         $this->audit($scope, $column);
         $this->dispatch('success', 'Saved.');
+    }
+
+    /**
+     * The stored counts depend on the alert level: write them again for every resource the level applies to.
+     */
+    private function refreshCounts(?Model $scope): void
+    {
+        $teamIds = match (true) {
+            $scope instanceof Application => [],
+            $scope instanceof Server => [(int) $scope->team_id],
+            $scope instanceof Team => [(int) $scope->id],
+            default => Server::query()->whereHas('imageScans')->distinct()->pluck('team_id')->map(fn ($id): int => (int) $id)->all(),
+        };
+
+        if ($scope instanceof Application) {
+            ResourceScans::refreshSummaries(ResourceScans::currentFor($scope));
+        }
+        foreach (array_unique($teamIds) as $teamId) {
+            RefreshImageScanSummariesJob::dispatch($teamId);
+        }
     }
 
     /**

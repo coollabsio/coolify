@@ -11,8 +11,10 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
+use App\Models\ImageScanIgnore;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Bus\Queueable;
@@ -189,10 +191,43 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         }
         self::recordRescanResult($server, $progress['completed'] > 0 || ($progress['scanned'] === 0 && $progress['errors'] === 0));
         $this->forgetProgress();
+        $this->refreshCountsAfterEndedIgnores($server);
 
         // A cut list would make running images look stopped.
         if (! $listing['truncated']) {
             $this->cleanUp($server, $commands, $targets, $runningRefs);
+        }
+    }
+
+    /**
+     * An ignore that ended counts its findings again: the stored counts of the resources it covered are written again,
+     * also for images that no longer run. Once per team and day, for ignores that ended in the last two days.
+     */
+    private function refreshCountsAfterEndedIgnores(Server $server): void
+    {
+        try {
+            $ended = ImageScanIgnore::query()
+                ->where('team_id', $server->team_id)
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', now())
+                ->where('expires_at', '>', now()->subDays(2))
+                ->get();
+            if ($ended->isEmpty() || ! Cache::add("image-scan:ended-ignores:{$server->team_id}:".now()->toDateString(), true, now()->addDay())) {
+                return;
+            }
+
+            if ($ended->contains(fn (ImageScanIgnore $ignore): bool => $ignore->resource_id === null)) {
+                RefreshImageScanSummariesJob::dispatch((int) $server->team_id);
+
+                return;
+            }
+
+            $ended->map(fn (ImageScanIgnore $ignore) => $ignore->resource)
+                ->filter(fn ($resource): bool => $resource instanceof Model)
+                ->unique(fn (Model $resource): string => $resource->getMorphClass().':'.$resource->getKey())
+                ->each(fn (Model $resource) => ResourceScans::refreshSummaries(ResourceScans::currentFor($resource)));
+        } catch (Throwable $e) {
+            report($e);
         }
     }
 

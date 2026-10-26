@@ -436,3 +436,62 @@ describe('ignore list', function () {
         expect(ImageScanIgnore::query()->whereKey($this->appIgnore->id)->exists())->toBeTrue();
     });
 });
+
+describe('alert level counts', function () {
+    function scanSettingsHighScan(): ImageScan
+    {
+        return ImageScan::factory()->create([
+            'server_id' => test()->server->id,
+            'resource_type' => test()->application->getMorphClass(),
+            'resource_id' => test()->application->id,
+            'builds_image' => true,
+            'findings' => [[
+                'id' => 'CVE-2024-33333', 'aliases' => [], 'severity' => 'high', 'package' => 'openssl', 'version' => '1',
+                'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
+                'risk' => 1.0, 'summary' => '', 'layer' => 'app',
+            ]],
+            'summary' => ['fixable_now_at_level' => 0],
+        ]);
+    }
+
+    it('writes the stored counts of the app again when its alert level changes', function () {
+        Queue::fake();
+        $scan = scanSettingsHighScan();
+
+        scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
+            ->set('alertLevel', 'high')
+            ->assertDispatched('success');
+
+        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(1);
+        Queue::assertNotPushed(RefreshImageScanSummariesJob::class);
+    });
+
+    it('queues a refresh of the team counts when the server or team alert level changes', function (string $scope) {
+        Queue::fake();
+        $uuid = $scope === 'server' ? $this->server->uuid : (string) $this->team->id;
+
+        scanSettingsAs($this->admin, $this->team, $scope, $uuid)->set('alertLevel', 'high')->assertDispatched('success');
+
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
+    })->with(['server', 'team']);
+
+    it('queues one refresh per team with scans when the instance alert level changes', function () {
+        Queue::fake();
+        scanSettingsHighScan();
+        Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+        scanSettingsAs(scanSettingsInstanceAdmin(), $this->team, 'instance')->set('alertLevel', 'high')->assertDispatched('success');
+
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
+    });
+
+    it('does not refresh the counts when another rule changes', function () {
+        Queue::fake();
+
+        scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)->set('onScanError', 'block')->assertDispatched('success');
+
+        Queue::assertNotPushed(RefreshImageScanSummariesJob::class);
+    });
+});

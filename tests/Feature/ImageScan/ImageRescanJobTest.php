@@ -6,6 +6,7 @@ use App\Enums\ImageScanStatus;
 use App\Jobs\ImageRescanJob;
 use App\Jobs\PrepareImageScannerJob;
 use App\Jobs\RefreshCandidatesJob;
+use App\Jobs\RefreshImageScanSummariesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -36,6 +37,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -535,6 +537,40 @@ describe('failed rescans', function () {
         rescanTestRun();
 
         expect(ImageRescanJob::failedDays($this->server))->toBe(1);
+    });
+});
+
+describe('ended ignores', function () {
+    it('writes the stored counts again for a resource whose ignore ended, also when its image no longer runs', function () {
+        rescanTestFake();
+        $finding = [
+            'id' => 'CVE-2024-44444', 'aliases' => [], 'severity' => 'critical', 'package' => 'openssl', 'version' => '1',
+            'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
+            'risk' => 1.0, 'summary' => '', 'layer' => 'app',
+        ];
+        $scan = rescanTestScan($this->otherApplication, ['status' => ImageScanStatus::Completed, 'builds_image' => true, 'findings' => [$finding], 'summary' => ['fixable_now_at_level' => 0]]);
+        ImageScanIgnore::factory()->create([
+            'team_id' => $this->team->id,
+            'resource_type' => $this->otherApplication->getMorphClass(),
+            'resource_id' => $this->otherApplication->id,
+            'vulnerability_id' => 'CVE-2024-44444',
+            'expires_at' => now()->subHour(),
+        ]);
+
+        rescanTestRun();
+
+        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(1);
+    });
+
+    it('queues a refresh of the team counts when a team-wide ignore ended', function () {
+        rescanTestFake();
+        Queue::fake();
+        ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => null, 'resource_id' => null, 'expires_at' => now()->subHour()]);
+
+        rescanTestRun();
+        rescanTestRun();
+
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
     });
 });
 

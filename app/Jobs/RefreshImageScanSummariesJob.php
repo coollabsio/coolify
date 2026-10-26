@@ -10,8 +10,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Writes the summaries of the current scans of every resource of a team again, after a team-wide ignore changed,
- * so the counts in sidebars and lists match the findings.
+ * Writes the summaries of the current scans of every resource of a team again, after a team-wide ignore or an alert
+ * level changed, or an ignore ended, so the counts in sidebars and lists match the findings.
  */
 class RefreshImageScanSummariesJob implements ShouldQueue
 {
