@@ -34,6 +34,7 @@ class DeploymentsIndicator extends Component
         return ApplicationDeploymentQueue::with(['application.environment.project'])
             ->whereIn('status', ['in_progress', 'queued'])
             ->whereIn('server_id', $servers->pluck('id'))
+            ->visibleToCurrentActor()
             ->orderBy('id')
             ->get([
                 'id',

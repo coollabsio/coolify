@@ -20,7 +20,7 @@ class ManageS3Storage extends RestActionTool
             'get' => ['method' => 'GET', 'path' => 's3-storages/{uuid}', 'ability' => 'read', 'description' => 'one S3 storage'],
             'create' => ['method' => 'POST', 'path' => 's3-storages', 'ability' => 'write', 'description' => 'add an S3 storage (data: name, endpoint, bucket, region, key, secret, description, is_usable)'],
             'update' => ['method' => 'PATCH', 'path' => 's3-storages/{uuid}', 'ability' => 'write', 'description' => 'update an S3 storage (data: same fields as create, all optional)'],
-            'delete' => ['method' => 'DELETE', 'path' => 's3-storages/{uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete an S3 storage'],
+            'delete' => ['method' => 'DELETE', 'path' => 's3-storages/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete an S3 storage'],
             'validate' => ['method' => 'POST', 'path' => 's3-storages/{uuid}/validate', 'ability' => 'write', 'description' => 'test the connection and save the result'],
         ];
     }

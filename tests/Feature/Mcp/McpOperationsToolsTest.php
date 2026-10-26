@@ -116,7 +116,7 @@ function mcpOpsSeedTeam(Team $team): array
     return compact('server', 'destination', 'project', 'environment', 'application', 'database', 'service', 'serviceApplication', 'serviceDatabase', 'volume', 's3');
 }
 
-function mcpOpsToken(User $user, array $abilities = ['read', 'write']): string
+function mcpOpsToken(User $user, array $abilities = ['read', 'write', 'delete']): string
 {
     return $user->createToken('mcp-ops', $abilities)->plainTextToken;
 }

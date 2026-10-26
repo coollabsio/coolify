@@ -2,6 +2,8 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
@@ -20,17 +22,19 @@ class DatabasePolicy
      */
     public function view(User $user, $database): bool
     {
-        $teamId = $this->getTeamId($database);
+        if ($this->isInstanceDatabase($database)) {
+            return $user->teams->contains('id', 0);
+        }
 
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        return $user->canAccess(AccessLevel::Read, $database);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models, in the environment when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        return $user->isAdmin();
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /**
@@ -38,13 +42,7 @@ class DatabasePolicy
      */
     public function update(User $user, $database): Response
     {
-        $teamId = $this->getTeamId($database);
-
-        if ($teamId === null) {
-            return Response::deny('Database team not found.');
-        }
-
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($this->allows($user, AccessLevel::Write, $database)) {
             return Response::allow();
         }
 
@@ -56,9 +54,7 @@ class DatabasePolicy
      */
     public function delete(User $user, $database): bool
     {
-        $teamId = $this->getTeamId($database);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allows($user, AccessLevel::Delete, $database);
     }
 
     /**
@@ -78,13 +74,12 @@ class DatabasePolicy
     }
 
     /**
-     * Determine whether the user can start/stop the database.
+     * Determine whether the user can start, stop, restart, and flush the database.
+     * Needs write access because flushing deletes the data.
      */
     public function manage(User $user, $database): bool
     {
-        $teamId = $this->getTeamId($database);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allows($user, AccessLevel::Write, $database);
     }
 
     /**
@@ -92,13 +87,7 @@ class DatabasePolicy
      */
     public function uploadBackup(User $user, $database): Response
     {
-        $teamId = $this->getTeamId($database);
-
-        if ($teamId === null) {
-            return Response::deny('Database team not found.');
-        }
-
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($this->allows($user, AccessLevel::Write, $database)) {
             return Response::allow();
         }
 
@@ -110,9 +99,15 @@ class DatabasePolicy
      */
     public function manageBackups(User $user, $database): bool
     {
-        $teamId = $this->getTeamId($database);
+        return $this->allows($user, AccessLevel::Write, $database);
+    }
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    /**
+     * Determine whether the user can read secret values, such as environment variable values.
+     */
+    public function viewSensitive(User $user, $database): bool
+    {
+        return $this->allows($user, AccessLevel::ReadSensitive, $database);
     }
 
     /**
@@ -120,22 +115,23 @@ class DatabasePolicy
      */
     public function manageEnvironment(User $user, $database): bool
     {
-        $teamId = $this->getTeamId($database);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allows($user, AccessLevel::Write, $database);
     }
 
-    private function getTeamId($database): ?int
+    /**
+     * The instance database (coolify-db) belongs to the root team; only its owners and admins can change it.
+     */
+    private function allows(User $user, AccessLevel $level, $database): bool
     {
-        // Instance-level databases (e.g., coolify-db) belong to root team
-        if (isset($database->id) && $database->id === 0) {
-            return 0;
+        if ($this->isInstanceDatabase($database)) {
+            return $user->isAdminOfTeam(0);
         }
 
-        if (method_exists($database, 'team')) {
-            return $database->team()?->id;
-        }
+        return $user->canAccess($level, $database);
+    }
 
-        return null;
+    private function isInstanceDatabase($database): bool
+    {
+        return isset($database->id) && $database->id === 0;
     }
 }

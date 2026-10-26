@@ -169,7 +169,7 @@ class Show extends Component
      */
     public function loadValues(): void
     {
-        $this->authorize('update', $this->env);
+        $this->authorize('viewSensitive', $this->env);
 
         if ($this->valuesLoaded) {
             return;
@@ -291,7 +291,7 @@ class Show extends Component
 
     private function valuesHiddenForUser(): bool
     {
-        return auth()->user()?->cannot('update', $this->env) ?? true;
+        return auth()->user()?->cannot('viewSensitive', $this->env) ?? true;
     }
 
     public function checkEnvs()

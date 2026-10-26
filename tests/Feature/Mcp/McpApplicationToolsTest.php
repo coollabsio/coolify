@@ -72,7 +72,7 @@ function mcpAppCreateApplication(Environment $environment, StandaloneDocker $des
     return $application;
 }
 
-function mcpAppToken(User $user, array $abilities = ['write']): string
+function mcpAppToken(User $user, array $abilities = ['write', 'delete']): string
 {
     return $user->createToken('mcp-app', $abilities)->plainTextToken;
 }
@@ -406,7 +406,7 @@ test('manage_application rejects read-only and member tokens', function () {
 // manage_preview and get_application_preview
 
 test('manage_preview creates, updates and deletes a preview of the token team', function () {
-    $writeToken = mcpAppToken($this->user, ['write']);
+    $writeToken = mcpAppToken($this->user, ['write', 'delete']);
     $deployToken = mcpAppToken($this->user, ['deploy']);
 
     $writeOnly = mcpAppCall($writeToken, 'manage_preview', ['action' => 'create', 'uuid' => $this->application->uuid, 'data' => ['pull_request_id' => 7, 'git_type' => 'github', 'instant_deploy' => false]]);

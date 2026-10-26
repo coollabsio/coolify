@@ -32,8 +32,6 @@ class DockerCompose extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Service::class);
-
             $this->validate([
                 'dockerComposeRaw' => 'required',
             ]);
@@ -44,6 +42,7 @@ class DockerCompose extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', [Service::class, $environment]);
 
             $destination_uuid = $this->query['destination'] ?? null;
             $destination = find_resource_destination_for_current_team($destination_uuid);

@@ -276,8 +276,6 @@ class PublicGitRepository extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Application::class);
-
             $this->validate();
 
             // Additional validation for git repository and branch
@@ -312,6 +310,7 @@ class PublicGitRepository extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
             $environment = $project->environments()->where('uuid', $environment_uuid)->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
 
             if ($this->git_source === 'other') {
                 $application_init = [

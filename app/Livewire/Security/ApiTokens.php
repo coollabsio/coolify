@@ -2,9 +2,17 @@
 
 namespace App\Livewire\Security;
 
+use App\Enums\AccessLevel;
+use App\Enums\AccessScope;
+use App\Models\Environment;
+use App\Models\Project;
+use App\Services\Access\AccessResolver;
+use App\Services\Access\Grant;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -26,6 +34,18 @@ class ApiTokens extends Component
 
     public array $permissions = ['read'];
 
+    /**
+     * 'team' = every project and resource of the team (scopes null), 'selected' = only $selectedScopes.
+     */
+    public string $scopeMode = 'team';
+
+    /**
+     * Picked scopes as "project:<uuid>", "environment:<uuid>", or "resource:<uuid>".
+     *
+     * @var list<string>
+     */
+    public array $selectedScopes = [];
+
     public array $expirationOptions = [
         7 => '7 days',
         30 => '30 days',
@@ -46,9 +66,49 @@ class ApiTokens extends Component
     #[Locked]
     public bool $canUseSensitivePermissions = false;
 
+    #[Locked]
+    public bool $canUseDeletePermissions = false;
+
+    #[Locked]
+    public bool $canUseTeamScope = false;
+
     public function render()
     {
-        return view('livewire.security.api-tokens');
+        return view('livewire.security.api-tokens', [
+            'scopeLabels' => collect($this->scopeOptions)->reject(fn (array $option) => $option['header'] ?? false)->pluck('label', 'value'),
+        ]);
+    }
+
+    /**
+     * Projects, environments, and resources of the current team that the user can see, for the scope picker.
+     *
+     * @return list<array{value: string, label: string, header?: bool}>
+     */
+    #[Computed]
+    public function scopeOptions(): array
+    {
+        $projects = Project::query()->where('team_id', currentTeam()->id)->orderBy('name')->get(['id', 'uuid', 'name']);
+        $environments = Environment::query()->whereIn('project_id', $projects->pluck('id'))->get(['id', 'uuid', 'name', 'project_id']);
+        $projectNames = $projects->pluck('name', 'id');
+        $environmentPaths = $environments->mapWithKeys(fn (Environment $environment) => [
+            $environment->id => $projectNames[$environment->project_id].' / '.$environment->name,
+        ]);
+
+        $resources = collect(AccessResolver::RESOURCE_MODELS)
+            ->flatMap(fn (string $model) => $model::query()->whereIn('environment_id', $environments->pluck('id'))->get(['uuid', 'name', 'environment_id']))
+            ->map(fn ($resource) => ['value' => "resource:{$resource->uuid}", 'label' => $environmentPaths[$resource->environment_id].' / '.$resource->name])
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return [
+            ...($projects->isEmpty() ? [] : [['value' => '__projects', 'label' => 'Projects', 'header' => true]]),
+            ...$projects->map(fn (Project $project) => ['value' => "project:{$project->uuid}", 'label' => $project->name])->all(),
+            ...($environments->isEmpty() ? [] : [['value' => '__environments', 'label' => 'Environments', 'header' => true]]),
+            ...$environments->map(fn (Environment $environment) => ['value' => "environment:{$environment->uuid}", 'label' => $environmentPaths[$environment->id]])
+                ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)->values()->all(),
+            ...($resources->isEmpty() ? [] : [['value' => '__resources', 'label' => 'Resources', 'header' => true]]),
+            ...$resources->all(),
+        ];
     }
 
     public function mount()
@@ -57,6 +117,9 @@ class ApiTokens extends Component
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
         $this->canUseSensitivePermissions = auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class);
+        $this->canUseDeletePermissions = auth()->user()->can('useDeletePermissions', PersonalAccessToken::class);
+        $this->canUseTeamScope = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
+        $this->scopeMode = $this->canUseTeamScope ? 'team' : 'selected';
         $this->getTokens();
     }
 
@@ -99,6 +162,13 @@ class ApiTokens extends Component
             return;
         }
 
+        if ($permissionToUpdate == 'delete' && ! auth()->user()->can('useDeletePermissions', PersonalAccessToken::class)) {
+            $this->dispatch('error', 'You do not have permission to use delete permissions.');
+            $this->permissions = array_diff($this->permissions, ['delete']);
+
+            return;
+        }
+
         if ($permissionToUpdate == 'root' && in_array('root', $this->permissions, true)) {
             $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
@@ -122,35 +192,45 @@ class ApiTokens extends Component
                 'description' => 'required|min:3|max:255',
                 'expiresInDays' => 'nullable|integer|in:7,30,60,90,365',
                 'permissions' => 'required|array|min:1',
-                'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'root'])],
+                'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root'])],
+                'scopeMode' => ['required', Rule::in(['team', 'selected'])],
+                'selectedScopes' => ['exclude_unless:scopeMode,selected', 'required', 'array', 'min:1'],
+                'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource):[A-Za-z0-9_-]+$/'],
+            ], [
+                'selectedScopes.required' => 'Select at least one project, environment, or resource.',
             ]);
             $permissions = array_values($validated['permissions']);
+            $teamId = currentTeam()->id;
+            $scopes = $this->scopeMode === 'selected' ? $this->parseSelectedScopes($teamId) : null;
 
-            // Re-evaluate policies fresh against the current authenticated user.
-            // Never trust $this->canUse* booleans — they come from the Livewire
-            // snapshot which can be replayed from another user's session.
-            if (in_array('root', $permissions, true) && ! auth()->user()->can('useRootPermissions', PersonalAccessToken::class)) {
-                throw new \Exception('You do not have permission to create tokens with root permissions.');
+            // Never trust the $this->canUse* booleans: check the current user's access in the team again.
+            $resolver = app(AccessResolver::class);
+            $isAdmin = auth()->user()->isAdminOfTeam($teamId);
+            if (in_array('write:sensitive', $permissions, true) && ! $isAdmin) {
+                throw new \Exception('You do not have permission to create tokens with write:sensitive permissions.');
             }
-
-            if (array_intersect(['write', 'write:sensitive'], $permissions) && ! auth()->user()->can('useWritePermissions', PersonalAccessToken::class)) {
-                throw new \Exception('You do not have permission to create tokens with write permissions.');
-            }
-
-            if (in_array('deploy', $permissions, true) && ! auth()->user()->can('useDeployPermissions', PersonalAccessToken::class)) {
-                throw new \Exception('You do not have permission to create tokens with deploy permissions.');
-            }
-
-            if (in_array('read:sensitive', $permissions, true) && ! auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class)) {
-                throw new \Exception('You do not have permission to create tokens with read:sensitive permissions.');
+            $levels = AccessLevel::parseMany($permissions);
+            $grants = $scopes === null
+                ? [Grant::team($levels)]
+                : array_map(fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels), $scopes);
+            if (! $resolver->userHolds(auth()->user(), $teamId, $grants)) {
+                throw new \Exception('A token cannot have more access than you have. Choose fewer permissions or narrower projects, environments, or resources.');
             }
 
             $expiresAt = filled($validated['expiresInDays'] ?? null) ? now()->addDays((int) $validated['expiresInDays']) : null;
-            $token = auth()->user()->createToken($this->description, $permissions, $expiresAt);
+            $storedScopes = $scopes === null ? null : array_map(fn (Grant $scope) => ['scope' => $scope->scope->value, 'uuid' => $scope->uuid], $scopes);
+            // One transaction, so a token never exists team-wide when saving its scopes fails.
+            $token = DB::transaction(function () use ($permissions, $expiresAt, $teamId, $storedScopes) {
+                $token = auth()->user()->createToken($this->description, $permissions, $expiresAt, $teamId);
+                $token->accessToken->forceFill(['scopes' => $storedScopes])->save();
+
+                return $token;
+            });
             auditLog('ui.api_token.created', [
-                'team_id' => currentTeam()->id,
+                'team_id' => $teamId,
                 'api_token_name' => $this->description,
                 'abilities' => $permissions,
+                'scopes' => $storedScopes,
                 'expires_at' => $expiresAt?->toIso8601String(),
             ]);
             $this->getTokens();
@@ -159,6 +239,31 @@ class ApiTokens extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * @return list<Grant> scopes without levels; a token's levels are its abilities
+     */
+    private function parseSelectedScopes(int $teamId): array
+    {
+        $resolver = app(AccessResolver::class);
+        $scopes = [];
+        foreach (array_unique($this->selectedScopes) as $selected) {
+            [$scope, $uuid] = explode(':', $selected, 2);
+            $grant = new Grant(AccessScope::from($scope), $uuid, []);
+            $layer = $resolver->resolve($teamId, [new Grant($grant->scope, $uuid, [AccessLevel::Read])]);
+            $existsInTeam = match ($grant->scope) {
+                AccessScope::Project => $layer->visibleProjectIds() !== [],
+                AccessScope::Environment => $layer->fullEnvironmentIds() !== [],
+                default => $layer->resourceUuids() !== [],
+            };
+            if (! $existsInTeam) {
+                throw new \Exception('A selected project, environment, or resource does not exist in this team.');
+            }
+            $scopes[] = $grant;
+        }
+
+        return $scopes;
     }
 
     public function revoke(int $id)
