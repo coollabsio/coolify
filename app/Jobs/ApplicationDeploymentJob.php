@@ -857,6 +857,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->generated_docker_compose = $yaml;
         $this->execute_remote_command([
+            "docker exec {$this->deployment_uuid} rm -f {$this->workdir}{$this->docker_compose_location}",
+            'hidden' => true,
+        ], [
             "docker exec -i {$this->deployment_uuid} tee {$this->workdir}{$this->docker_compose_location} > /dev/null",
             'input' => $yaml,
             'hidden' => true,
@@ -1330,9 +1333,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $composeFileName = "$mainDir/".addPreviewDeploymentSuffix('docker-compose', $this->pull_request_id).'.yaml';
                 $this->docker_compose_location = '/'.addPreviewDeploymentSuffix('docker-compose', $this->pull_request_id).'.yaml';
             }
+            // `docker cp` above can copy symlinks from the repository to these names. Remove them first, so that
+            // Coolify writes regular files.
             $this->execute_remote_command(
                 [
                     "mkdir -p $mainDir",
+                ],
+                [
+                    "rm -f $composeFileName $mainDir/README.md",
+                    'hidden' => true,
                 ],
                 [
                     "tee $composeFileName > /dev/null",
@@ -1952,6 +1961,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Generate runtime environment variables locally
         $environment_variables = $this->generate_runtime_environment_variables();
 
+        // Each .env write first removes the file: with "Preserve repository", `docker cp` can copy a symlink
+        // from the repository to this name. Coolify writes a regular file instead of the link target.
+
         // Handle empty environment variables
         if ($environment_variables->isEmpty()) {
             // For Docker Compose and Docker Image, we need to create an empty .env file
@@ -1962,7 +1974,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 // Create empty .env file
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "touch $this->workdir/.env"),
+                        executeInDocker($this->deployment_uuid, "rm -f $this->workdir/.env && touch $this->workdir/.env"),
                     ]
                 );
 
@@ -1971,12 +1983,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->server = $this->mainServer;
                     $this->execute_remote_command(
                         [
+                            "rm -f $this->configuration_dir/.env",
+                            'hidden' => true,
+                        ],
+                        [
                             "touch $this->configuration_dir/.env",
                         ]
                     );
                     $this->server = $this->build_server;
                 } else {
                     $this->execute_remote_command(
+                        [
+                            "rm -f $this->configuration_dir/.env",
+                            'hidden' => true,
+                        ],
                         [
                             "touch $this->configuration_dir/.env",
                         ]
@@ -2022,7 +2042,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for container.', hidden: true);
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
+                executeInDocker($this->deployment_uuid, "rm -f $this->workdir/.env && echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
                 'skip_command_log' => true,
             ]
         );
@@ -2036,6 +2056,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->mainServer;
             $this->execute_remote_command(
                 [
+                    "rm -f $this->configuration_dir/.env",
+                    'hidden' => true,
+                ],
+                [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                     'skip_command_log' => true,
                 ]
@@ -2043,6 +2067,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->build_server;
         } else {
             $this->execute_remote_command(
+                [
+                    "rm -f $this->configuration_dir/.env",
+                    'hidden' => true,
+                ],
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                     'skip_command_log' => true,
@@ -4440,6 +4468,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->generated_docker_compose = $this->docker_compose;
         $this->execute_remote_command([
+            "docker exec {$this->deployment_uuid} rm -f {$this->workdir}/docker-compose.yaml",
+            'hidden' => true,
+        ], [
             "docker exec -i {$this->deployment_uuid} tee {$this->workdir}/docker-compose.yaml > /dev/null",
             'input' => $this->docker_compose,
             'hidden' => true,
