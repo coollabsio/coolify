@@ -21,6 +21,11 @@
                 'label' => 'Restart limit reached',
                 'helper' => 'Notify when a resource is stopped after reaching its restart limit.',
             ],
+            [
+                'key' => 'imageVulnerabilities',
+                'label' => 'Image vulnerabilities',
+                'helper' => 'A daily summary of new vulnerabilities with a fix, and an alert for known exploited ones.',
+            ],
         ],
         'Backups' => [
             ['key' => 'backupSuccess', 'label' => 'Backup success'],

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -51,6 +52,9 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
     private const TIMEOUT_DEFAULT = 120;
 
+    /** The failed-day count of a server is kept this long after the last failure. */
+    private const FAILURE_STATE_DAYS = 7;
+
     /** Retention and SBOM deletion wait at most this long for the scan lock of the server, else they skip a day. */
     public int $retentionLockWaitSeconds = 120;
 
@@ -82,6 +86,58 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             && $server->isFunctional();
     }
 
+    /**
+     * Counts the days in a row on which the rescan of the server failed, for the digest (spec 8). A failed day is
+     * one on which the running containers could not be listed or no image could be scanned. Success resets it.
+     */
+    public static function recordRescanResult(Server $server, bool $succeeded): void
+    {
+        $key = self::failuresCacheKey($server);
+        if ($succeeded) {
+            Cache::forget($key);
+
+            return;
+        }
+
+        $state = Cache::get($key);
+        $today = now()->toDateString();
+        $state = match (true) {
+            ! is_array($state) => ['days' => 1, 'last' => $today, 'notified' => false],
+            ($state['last'] ?? null) === $today => $state,
+            ($state['last'] ?? null) === now()->subDay()->toDateString() => [...$state, 'days' => (int) ($state['days'] ?? 0) + 1, 'last' => $today],
+            default => ['days' => 1, 'last' => $today, 'notified' => false],
+        };
+        Cache::put($key, $state, now()->addDays(self::FAILURE_STATE_DAYS));
+    }
+
+    /**
+     * Days in a row on which the rescan of the server failed, 0 after a success.
+     */
+    public static function failedDays(Server $server): int
+    {
+        $state = Cache::get(self::failuresCacheKey($server));
+
+        return is_array($state) ? (int) ($state['days'] ?? 0) : 0;
+    }
+
+    public static function isFailureNotified(Server $server): bool
+    {
+        return (bool) data_get(Cache::get(self::failuresCacheKey($server)), 'notified', false);
+    }
+
+    public static function markFailureNotified(Server $server): void
+    {
+        $state = Cache::get(self::failuresCacheKey($server));
+        if (is_array($state)) {
+            Cache::put(self::failuresCacheKey($server), [...$state, 'notified' => true], now()->addDays(self::FAILURE_STATE_DAYS));
+        }
+    }
+
+    private static function failuresCacheKey(Server $server): string
+    {
+        return "image-rescan:failures:{$server->id}";
+    }
+
     public function handle(): void
     {
         $server = $this->server->fresh(['settings']);
@@ -94,17 +150,27 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
         $listing = $this->runningContainers($server, $commands);
         if ($listing === null) {
+            self::recordRescanResult($server, false);
+
             return;
         }
 
         [$targets, $runningRefs] = $this->targets($server, $listing['containers']);
+        $scanned = 0;
+        $completed = 0;
+        $errors = 0;
         foreach ($targets as $imageId => $imageTargets) {
             try {
-                $this->refreshCandidates(ScanImage::make()->rescan($server, $imageId, $imageTargets, self::LOCK_WAIT_SECONDS));
+                $scans = ScanImage::make()->rescan($server, $imageId, $imageTargets, self::LOCK_WAIT_SECONDS);
+                $scanned += count($scans);
+                $completed += count(array_filter($scans, fn (ImageScan $scan): bool => $scan->status === ImageScanStatus::Completed));
+                $this->refreshCandidates($scans);
             } catch (Throwable $e) {
+                $errors++;
                 report($e);
             }
         }
+        self::recordRescanResult($server, $completed > 0 || ($scanned === 0 && $errors === 0));
 
         // A cut list would make running images look stopped.
         if (! $listing['truncated']) {

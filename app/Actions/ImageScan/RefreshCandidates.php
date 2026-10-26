@@ -20,6 +20,7 @@ use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScannerCommands;
+use App\Services\ImageScan\ScanNotifications;
 use App\Services\ImageScan\SyftPackageParser;
 use App\Services\ImageScan\TagSelector;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -749,6 +750,7 @@ class RefreshCandidates
         }
 
         $checkedAt = now()->toIso8601String();
+        $notified = data_get($fresh->candidates, 'notified');
         $fresh->candidates = [
             'status' => $result['status'],
             'checked_at' => $checkedAt,
@@ -766,9 +768,17 @@ class RefreshCandidates
                 'current_digest' => $base['current_digest'],
                 'entries' => $base['entries'],
             ]]),
+            ...(is_array($notified) ? ['notified' => $notified] : []),
         ];
         $fresh->setRelation('resource', $scan->resource);
         ResourceScans::refreshSummaries(collect([$fresh]));
+
+        // A newer image can make a known exploited finding fixable now.
+        try {
+            ScanNotifications::afterScan($fresh);
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         $teamId = method_exists($scan->resource, 'team') ? $scan->resource->team()?->id : null;
         ImageScanUpdated::dispatch($teamId, (string) $scan->resource->getAttribute('uuid'), (string) $fresh->uuid);

@@ -22,6 +22,7 @@ use App\Services\ImageScan\Package;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
 use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScannerCommands;
+use App\Services\ImageScan\ScanNotifications;
 use App\Services\ImageScan\ScanSummary;
 use App\Services\ImageScan\SyftPackageParser;
 use Carbon\CarbonImmutable;
@@ -109,8 +110,22 @@ class ScanImage
         }
 
         $this->queueCandidateCheck($scan);
+        $this->notifyAfterScan($scan);
 
         return $scan;
+    }
+
+    /**
+     * Records what the notifications covered and alerts for a new known exploited finding (spec 8). The alert is a
+     * queued notification, so a deploy never waits for it.
+     */
+    private function notifyAfterScan(ImageScan $scan): void
+    {
+        try {
+            ScanNotifications::afterScan($scan);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -163,10 +178,16 @@ class ScanImage
         }
 
         try {
-            return $this->scanShared($server, $imageId, $targets, $context);
+            $scans = $this->scanShared($server, $imageId, $targets, $context);
         } finally {
             $lock->release();
         }
+
+        foreach ($scans as $scan) {
+            $this->notifyAfterScan($scan);
+        }
+
+        return $scans;
     }
 
     /**

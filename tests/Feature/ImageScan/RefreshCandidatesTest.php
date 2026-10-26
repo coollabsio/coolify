@@ -710,3 +710,13 @@ it('cannot compare a base image without a version tag', function () {
     expect($scan->fresh()->candidates['base'])->toMatchArray(['image' => 'postgres:latest', 'status' => 'cannot_compare', 'entries' => [], 'attributable' => null]);
     Process::assertNothingRan();
 });
+
+it('keeps the candidates the digest named when it checks again', function () {
+    candidatesFake();
+    $scan = candidatesScan();
+    $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->subDays(2)->toIso8601String(), 'entries' => [], 'notified' => ['postgres:15.15-alpine@'.CANDIDATES_LINE]]]);
+
+    RefreshCandidates::run($scan->fresh());
+
+    expect($scan->fresh()->candidates['notified'])->toBe(['postgres:15.15-alpine@'.CANDIDATES_LINE]);
+});

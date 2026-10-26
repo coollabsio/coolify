@@ -19,6 +19,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Notifications\ImageScan\KnownExploitedFound;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
@@ -27,6 +28,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -693,5 +695,32 @@ describe('candidate check', function () {
         scanImageTestRun($this->application->fresh());
 
         Queue::assertNotPushed(RefreshCandidatesJob::class);
+    });
+});
+
+describe('notifications', function () {
+    it('alerts once for a new known exploited finding after the baseline scan', function () {
+        Notification::fake();
+        $this->team->discordNotificationSettings->update([
+            'discord_enabled' => true,
+            'discord_webhook_url' => 'https://discord.com/api/webhooks/1/abc',
+            'image_vulnerabilities_discord_notifications' => true,
+        ]);
+        $grype = file_get_contents(base_path('tests/Fixtures/image-scan/grype.ndjson'));
+        $known = json_encode(['art' => '0bbf5c9dd36d4a50', 'desc' => '', 'epss' => 0.9, 'fix' => 'fixed', 'fixv' => ['15.11'], 'id' => 'CVE-2026-7777',
+            'kev' => true, 'pkg' => 'postgresql', 'rel' => [], 'risk' => 90.0, 'sev' => 'Critical', 'sugg' => '15.11', 'type' => 'binary', 'ver' => '15.0']);
+        $withKnown = scanImageTestPayload('grype', rtrim($grype)."\n".$known);
+
+        scanImageTestFake();
+        $baseline = scanImageTestRun();
+        scanImageTestFake(['grype' => $withKnown]);
+        $rescan = scanImageTestRun();
+        scanImageTestRun();
+
+        expect($baseline->is_baseline)->toBeTrue()
+            ->and($rescan->is_baseline)->toBeFalse()
+            ->and($rescan->fresh()->notified_ids)->toContain('CVE-2026-7777');
+        Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
+        Notification::assertSentTo($this->team, KnownExploitedFound::class, fn (KnownExploitedFound $notification) => $notification->count === 1);
     });
 });

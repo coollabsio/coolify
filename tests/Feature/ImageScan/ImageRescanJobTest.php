@@ -29,6 +29,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -450,6 +451,34 @@ describe('rescan', function () {
 
         expect($scan->fresh()->candidateStatus())->not->toBeNull()
             ->and((new UniqueLock(Cache::store()))->acquire(new RefreshCandidatesJob($scan)))->toBeTrue();
+    });
+});
+
+describe('failed rescans', function () {
+    it('counts days in a row on which the rescan of a server failed and resets after a success', function () {
+        Carbon::setTestNow('2026-10-20 03:00:00');
+        rescanTestFake(['containers' => '']);
+        rescanTestRun();
+        Carbon::setTestNow('2026-10-21 03:00:00');
+        rescanTestRun();
+
+        expect(ImageRescanJob::failedDays($this->server))->toBe(2);
+
+        rescanTestFake();
+        rescanTestApplicationContainer($this->application);
+        rescanTestRun();
+
+        expect(ImageRescanJob::failedDays($this->server))->toBe(0);
+        Carbon::setTestNow();
+    });
+
+    it('counts a day on which no running image could be scanned as failed', function () {
+        rescanTestFake(['grype' => 'coolify-scan-exit grype 1']);
+        rescanTestApplicationContainer($this->application);
+
+        rescanTestRun();
+
+        expect(ImageRescanJob::failedDays($this->server))->toBe(1);
     });
 });
 
