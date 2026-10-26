@@ -4,12 +4,14 @@ namespace App\Livewire\ImageScan;
 
 use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanOnError;
+use App\Jobs\RefreshImageScanSummariesJob;
 use App\Models\Application;
 use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\Server;
 use App\Models\Team;
 use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\ResourceScans;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -142,6 +144,11 @@ class ScanSettings extends Component
         $this->authorizeEdit($scope);
 
         $ignore->delete();
+        if ($ignore->resource_id === null) {
+            RefreshImageScanSummariesJob::dispatch((int) $ignore->team_id);
+        } elseif ($scope instanceof Application) {
+            ResourceScans::refreshSummaries(ResourceScans::currentFor($scope));
+        }
         auditLog('ui.image_scan.ignore_removed', [
             'team_id' => $ignore->team_id,
             'scope' => $this->scopeType,

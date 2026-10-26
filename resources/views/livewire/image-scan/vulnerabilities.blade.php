@@ -22,7 +22,7 @@
             :description="$serverUrl === null ? 'Ask a team admin to turn it on.' : null" icon-name="shield-alert">
             @if ($serverUrl !== null)
                 <x-slot:actions>
-                    <a class="button" href="{{ $serverUrl }}" {{ wireNavigate() }}>Turn on</a>
+                    <a class="button normal-case!" href="{{ $serverUrl }}" {{ wireNavigate() }}>Turn on</a>
                 </x-slot:actions>
             @endif
         </x-empty>
@@ -32,15 +32,6 @@
     @else
         @php
             $isScanning = $progress !== null;
-            $stage = $progress['stage'] ?? null;
-            $stageOrder = ['database' => 1, 'inspect' => 2, 'sbom' => 3];
-            $stageIndex = $stageOrder[$stage] ?? 0;
-            $checkpoints = [
-                ['title' => 'Get scanner', 'index' => 0],
-                ['title' => 'Update database', 'index' => 1],
-                ['title' => 'Read image', 'index' => 2],
-                ['title' => 'Find vulnerabilities', 'index' => 3],
-            ];
             $hasCallouts = $errorMessages !== [] || $runsOtherImage || $eolDistro !== null || $truncated;
         @endphp
 
@@ -61,7 +52,7 @@
                     </span>
                 @endif
                 @if ($canUpdate)
-                    <x-forms.button wire:click="scanNow" :disabled="$isScanning">
+                    <x-forms.button class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
                         <x-reicon name="refresh" class="size-3.5" />
                         Scan now
                     </x-forms.button>
@@ -92,7 +83,7 @@
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <span>The running image is not the scanned image.</span>
                                 @if ($canUpdate)
-                                    <x-forms.button wire:click="scanNow" :disabled="$isScanning">Scan now</x-forms.button>
+                                    <x-forms.button class="normal-case!" wire:click="scanNow" :disabled="$isScanning">Scan now</x-forms.button>
                                 @endif
                             </div>
                         </x-callout>
@@ -112,11 +103,7 @@
                 <div class="flex flex-col divide-y divide-neutral-200 border-b border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
                     role="status" aria-live="polite">
                     @foreach ($checkpoints as $checkpoint)
-                        <x-checkpoint-item :title="$checkpoint['title']" :status="match (true) {
-                            $checkpoint['index'] < $stageIndex => 'success',
-                            $checkpoint['index'] === $stageIndex => 'running',
-                            default => 'pending',
-                        }" />
+                        <x-checkpoint-item :title="$checkpoint['title']" :status="$checkpoint['status']" />
                     @endforeach
                 </div>
             @endif
@@ -126,7 +113,7 @@
                     <x-empty size="sm" title="Not scanned yet. The next deploy scans the image.">
                         @if ($canUpdate)
                             <x-slot:actions>
-                                <x-forms.button wire:click="scanNow">Scan now</x-forms.button>
+                                <x-forms.button class="normal-case!" wire:click="scanNow">Scan now</x-forms.button>
                             </x-slot:actions>
                         @endif
                     </x-empty>
@@ -219,10 +206,10 @@
                         @if (! $showIgnored && ! $hasFilters && $fixState === 'fixable_now')
                             <x-empty size="sm" title="Nothing to fix now.">
                                 <x-slot:actions>
-                                    <button type="button" class="button" wire:click="setFixState('not_released')">
+                                    <button type="button" class="button normal-case!" wire:click="setFixState('not_released')">
                                         Fix not released yet ({{ $stateCounts['not_released'] }})
                                     </button>
-                                    <button type="button" class="button" wire:click="setFixState('no_fix')">
+                                    <button type="button" class="button normal-case!" wire:click="setFixState('no_fix')">
                                         No fix ({{ $stateCounts['no_fix'] }})
                                     </button>
                                 </x-slot:actions>
@@ -277,7 +264,7 @@
                                         <span class="image-scan-secondary text-[12px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $group['count'] }}</span>
                                         <span class="flex justify-end">
                                             @if ($canUpdate)
-                                                <button type="button" class="button"
+                                                <button type="button" class="button normal-case!"
                                                     x-on:click="$dispatch('open-ignore-modal', {
                                                         target: {{ \Illuminate\Support\Js::from($group['package']) }},
                                                         kind: 'package',

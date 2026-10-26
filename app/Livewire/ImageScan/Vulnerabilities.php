@@ -5,6 +5,7 @@ namespace App\Livewire\ImageScan;
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanFixState;
+use App\Jobs\RefreshImageScanSummariesJob;
 use App\Jobs\ScanResourceImagesJob;
 use App\Models\Application;
 use App\Models\ImageScan;
@@ -26,6 +27,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -46,6 +48,11 @@ class Vulnerabilities extends Component
     private const VIEWS = ['package', 'cve'];
 
     private const EXPIRES = ['30', '90', 'never'];
+
+    private const CHECKPOINTS = ['Get scanner', 'Update database', 'Read image', 'Find vulnerabilities'];
+
+    /** Progress stage of ScanImage => index in CHECKPOINTS. */
+    private const STAGE_CHECKPOINT = ['database' => 1, 'inspect' => 2, 'sbom' => 2, 'vulnerabilities' => 3];
 
     /** Results older than this get a warning. */
     private const OLD_RESULTS_DAYS = 2;
@@ -76,6 +83,15 @@ class Vulnerabilities extends Component
 
     /** @var Collection<int, Model>|null */
     private ?Collection $loadedOwners = null;
+
+    /** @var Collection<int, ImageScan>|null */
+    private ?Collection $scans = null;
+
+    /** @var list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>|null */
+    private ?array $rows = null;
+
+    /** @var array<string, IgnoreMatcher> */
+    private array $matchers = [];
 
     public function getListeners(): array
     {
@@ -224,12 +240,12 @@ class Vulnerabilities extends Component
             'package' => $package,
             'reason' => trim($reason),
         ];
-        Validator::make($data, [
+        $this->validateOrToast(Validator::make($data, [
             ...ImageScanIgnore::validationRules(),
             'kind' => ['required', 'in:vulnerability,package'],
             'scope' => ['required', 'in:resource,team'],
             'expires' => ['required', 'in:'.implode(',', self::EXPIRES)],
-        ])->validate();
+        ]));
 
         $owner = $resource instanceof Service
             ? $this->owners()->first(fn (Model $owner): bool => $ownerUuid !== null && $owner->getAttribute('uuid') === $ownerUuid)
@@ -237,8 +253,8 @@ class Vulnerabilities extends Component
         abort_unless($owner instanceof Model, 404);
 
         if (! $this->ownerHasFinding($owner, $kind, $kind === 'package' ? (string) $package : $target)) {
-            Validator::make([], [])->after(fn ($validator) => $validator->errors()
-                ->add($kind === 'package' ? 'package' : 'vulnerability_id', 'This is not in the scan results.'))->validate();
+            $this->validateOrToast(Validator::make([], [])->after(fn ($validator) => $validator->errors()
+                ->add($kind === 'package' ? 'package' : 'vulnerability_id', 'This is not in the scan results.')));
         }
 
         $ignore = ImageScanIgnore::query()->create([
@@ -252,7 +268,12 @@ class Vulnerabilities extends Component
             'created_by' => auth()->id(),
         ]);
 
-        ResourceScans::refreshSummaries(ResourceScans::current($resource, $this->owners()));
+        $this->rows = null;
+        $this->matchers = [];
+        ResourceScans::refreshSummaries($this->currentScans());
+        if ($scope === 'team') {
+            RefreshImageScanSummariesJob::dispatch($teamId);
+        }
 
         auditLog('ui.image_scan.ignore_added', [
             'team_id' => $teamId,
@@ -265,6 +286,35 @@ class Vulnerabilities extends Component
         $this->dispatch('success', 'Ignored');
 
         return true;
+    }
+
+    /**
+     * Validates, and shows the first error as a toast too, because the ignore modal does not render server errors.
+     */
+    private function validateOrToast(\Illuminate\Validation\Validator $validator): void
+    {
+        try {
+            $validator->validate();
+        } catch (ValidationException $e) {
+            $this->dispatch('error', $e->validator->errors()->first());
+
+            throw $e;
+        }
+    }
+
+    /**
+     * The current scans of the page, loaded once per request.
+     *
+     * @return Collection<int, ImageScan>
+     */
+    private function currentScans(): Collection
+    {
+        return $this->scans ??= ResourceScans::current($this->resource(), $this->owners());
+    }
+
+    private function matcherFor(Model $owner): IgnoreMatcher
+    {
+        return $this->matchers[$owner->getMorphClass().':'.$owner->getKey()] ??= IgnoreMatcher::forResource($owner);
     }
 
     /**
@@ -315,10 +365,10 @@ class Vulnerabilities extends Component
     private function ownerHasFinding(Model $owner, string $kind, string $target): bool
     {
         $target = $kind === 'package' ? $target : mb_strtolower($target);
+        $scans = $this->currentScans()->filter(fn (ImageScan $scan): bool => $scan->resource->is($owner));
 
-        foreach (ResourceScans::currentFor($owner) as $scan) {
-            foreach ((array) $scan->findings as $row) {
-                $finding = Finding::fromArray((array) $row);
+        foreach ($scans as $scan) {
+            foreach (ResourceScans::findings($scan) as $finding) {
                 $matches = $kind === 'package'
                     ? $finding->package === $target
                     : in_array($target, array_map('mb_strtolower', [$finding->id, ...$finding->aliases]), true);
@@ -351,6 +401,31 @@ class Vulnerabilities extends Component
     }
 
     /**
+     * The checkpoint list of a running scan. ScanImage reports the stages database, inspect, sbom (Syft reads the
+     * image), and vulnerabilities (Grype). The scanner images are ready before the first stage.
+     *
+     * @param  array<string, mixed>|null  $progress
+     * @return list<array{title: string, status: string}>
+     */
+    private function checkpoints(?array $progress): array
+    {
+        if ($progress === null) {
+            return [];
+        }
+
+        $current = self::STAGE_CHECKPOINT[(string) ($progress['stage'] ?? '')] ?? 0;
+
+        return array_map(fn (string $title, int $index): array => [
+            'title' => $title,
+            'status' => match (true) {
+                $index < $current => 'success',
+                $index === $current => 'running',
+                default => 'pending',
+            },
+        ], self::CHECKPOINTS, array_keys(self::CHECKPOINTS));
+    }
+
+    /**
      * The last scan errors of the owners, as their fixed messages.
      *
      * @param  Collection<int, Model>  $owners
@@ -371,36 +446,36 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * One row per finding of the current scans, with its fix state and the ignore that matches it.
+     * One row per finding of the current scans, with its fix state and the ignore that matches it. Built once per
+     * request.
      *
-     * @param  Collection<int, ImageScan>  $scans
      * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>
      */
-    private function findingRows(Collection $scans): array
+    private function findingRows(): array
     {
-        $rows = [];
-        $matchers = [];
+        if ($this->rows !== null) {
+            return $this->rows;
+        }
 
-        foreach ($scans as $scan) {
+        $rows = [];
+        foreach ($this->currentScans() as $scan) {
             $owner = $scan->resource;
-            $ownerKey = $owner->getMorphClass().':'.$owner->getKey();
-            $matchers[$ownerKey] ??= IgnoreMatcher::forResource($owner);
+            $matcher = $this->matcherFor($owner);
             $classify = ImageScanGate::classifierFor($scan);
 
-            foreach ((array) $scan->findings as $index => $row) {
-                $finding = Finding::fromArray((array) $row);
+            foreach (ResourceScans::findings($scan) as $index => $finding) {
                 $rows[] = [
                     'key' => $scan->uuid.'-'.$index,
                     'finding' => $finding,
                     'state' => $classify($finding)->value,
-                    'ignore' => $matchers[$ownerKey]->matches($finding),
+                    'ignore' => $matcher->matches($finding),
                     'image' => (string) $scan->image_ref,
                     'owner' => (string) $owner->getAttribute('uuid'),
                 ];
             }
         }
 
-        return $rows;
+        return $this->rows = $rows;
     }
 
     /**
@@ -578,8 +653,8 @@ class Vulnerabilities extends Component
         $this->fixState = ImageScanFixState::tryFrom($this->fixState)?->value ?? ImageScanFixState::FixableNow->value;
         $this->view = in_array($this->view, self::VIEWS, true) ? $this->view : 'package';
 
-        $scans = ResourceScans::current($resource, $owners);
-        $allRows = $this->findingRows($scans);
+        $scans = $this->currentScans();
+        $allRows = $this->findingRows();
         $activeRows = array_values(array_filter($allRows, fn (array $row): bool => $row['ignore'] === null));
         $ignoredRows = array_values(array_filter($allRows, fn (array $row): bool => $row['ignore'] !== null));
 
@@ -604,6 +679,7 @@ class Vulnerabilities extends Component
             $items = $this->paginate($this->view === 'package' ? $this->packageGroups($listRows) : $this->sortRows($listRows));
         }
 
+        $progress = $this->progress($owners);
         $scannedAt = $scans->max('scanned_at');
         $scannedAt = $scannedAt instanceof Carbon ? $scannedAt : null;
         $imageOptions = $scans->pluck('image_ref')->map(fn ($ref) => (string) $ref)->unique()->values()->all();
@@ -611,7 +687,8 @@ class Vulnerabilities extends Component
         return view('livewire.image-scan.vulnerabilities', [
             ...$base,
             'scans' => $scans,
-            'progress' => $this->progress($owners),
+            'progress' => $progress,
+            'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
             'runsOtherImage' => $scans->contains(fn (ImageScan $scan): bool => ResourceScans::runsOtherImage($scan, $scan->resource)),
             'scannedAt' => $scannedAt,

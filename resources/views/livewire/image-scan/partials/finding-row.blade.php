@@ -54,7 +54,7 @@
                     Ignored{{ $ignore->expires_at ? ' until '.$ignore->expires_at->toFormattedDateString() : '' }}
                 </span>
             @elseif ($canUpdate)
-                <button type="button" class="button"
+                <button type="button" class="button normal-case!"
                     x-on:click="$dispatch('open-ignore-modal', {
                         target: {{ \Illuminate\Support\Js::from($finding->id) }},
                         kind: 'vulnerability',

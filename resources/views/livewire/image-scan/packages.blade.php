@@ -12,7 +12,7 @@
             <x-slot:actions>
                 <x-table.dropdown role="menu" panel-class="min-w-56! p-1!">
                     <x-slot:trigger>
-                        <button type="button" class="button" aria-haspopup="menu" :aria-expanded="open">
+                        <button type="button" class="button normal-case!" aria-haspopup="menu" :aria-expanded="open">
                             <x-reicon name="download" class="size-3.5" />
                             Download SBOM
                             <x-reicon name="chevron-down" class="size-3.5" />

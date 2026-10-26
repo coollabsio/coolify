@@ -2,11 +2,13 @@
 
 use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanOnError;
+use App\Jobs\RefreshImageScanSummariesJob;
 use App\Livewire\ImageScan\InstanceImageScanning;
 use App\Livewire\ImageScan\ScanSettings;
 use App\Livewire\ImageScan\TeamImageScanning;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
@@ -18,6 +20,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -390,6 +393,35 @@ describe('ignore list', function () {
             ->assertDispatched('success');
 
         expect(ImageScanIgnore::query()->whereKey($this->appIgnore->id)->exists())->toBeFalse();
+    });
+
+    it('queues a refresh of the team counts after a team-wide ignore is removed', function () {
+        Queue::fake();
+
+        scanSettingsAs($this->admin, $this->team, 'team', (string) $this->team->id)
+            ->call('removeIgnore', $this->teamIgnore->uuid);
+
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
+    });
+
+    it('refreshes the stored count of the app after an app ignore is removed', function () {
+        $scan = ImageScan::factory()->create([
+            'server_id' => $this->server->id,
+            'resource_type' => $this->application->getMorphClass(),
+            'resource_id' => $this->application->id,
+            'builds_image' => true,
+            'findings' => [[
+                'id' => 'CVE-2024-22222', 'aliases' => [], 'severity' => 'critical', 'package' => 'openssl', 'version' => '1',
+                'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
+                'risk' => 1.0, 'summary' => '', 'layer' => 'app',
+            ]],
+            'summary' => ['fixable_now_at_level' => 0, 'ignored' => 1],
+        ]);
+
+        scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
+            ->call('removeIgnore', $this->appIgnore->uuid);
+
+        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(1);
     });
 
     it('does not let a deploy-only user remove an app ignore', function () {

@@ -2,6 +2,7 @@
 
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\RefreshImageScanSummariesJob;
 use App\Jobs\ScanResourceImagesJob;
 use App\Livewire\ImageScan\Packages;
 use App\Livewire\ImageScan\Vulnerabilities;
@@ -195,6 +196,29 @@ describe('scan now', function () {
     });
 });
 
+describe('scan progress', function () {
+    it('shows each checkpoint in order for the stage of the scan', function (?string $stage, array $statuses) {
+        Cache::put(ScanImage::progressCacheKey($this->application), array_filter([
+            'run_id' => 'x',
+            'stage' => $stage,
+            'started_at' => now()->toIso8601String(),
+        ]));
+
+        $checkpoints = vulnerabilitiesPage($this->admin, $this->application)->viewData('checkpoints');
+
+        expect(array_column($checkpoints, 'status', 'title'))->toBe(array_combine(
+            ['Get scanner', 'Update database', 'Read image', 'Find vulnerabilities'],
+            $statuses,
+        ));
+    })->with([
+        'before the first stage' => [null, ['running', 'pending', 'pending', 'pending']],
+        'database' => ['database', ['success', 'running', 'pending', 'pending']],
+        'inspect' => ['inspect', ['success', 'success', 'running', 'pending']],
+        'sbom' => ['sbom', ['success', 'success', 'running', 'pending']],
+        'vulnerabilities' => ['vulnerabilities', ['success', 'success', 'success', 'running']],
+    ]);
+});
+
 describe('ignore', function () {
     it('rejects an invalid vulnerability ID', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
@@ -204,6 +228,46 @@ describe('ignore', function () {
             ->assertHasErrors('vulnerability_id');
 
         expect(ImageScanIgnore::query()->count())->toBe(0);
+    });
+
+    it('shows a validation error as a toast', function () {
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('ignore', 'CVE-2024-0001', 'vulnerability', 'resource', '90', '')
+            ->assertHasErrors('reason')
+            ->assertDispatched('error');
+    });
+
+    it('refreshes the counts of the other team resources after a team-wide ignore', function () {
+        $other = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'build_pack' => 'dockerimage',
+            'docker_registry_image_name' => 'nginx',
+            'docker_registry_image_tag' => '1.27',
+        ]);
+        $critical = vulnerabilitiesFinding(['severity' => 'critical']);
+        vulnerabilitiesScan($this->application, [$critical]);
+        $otherScan = vulnerabilitiesScan($other, [$critical], ['summary' => ['fixable_now_at_level' => 1]]);
+        $otherTeamApp = Application::factory()->create([
+            'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => Team::factory()->create()->id])->id])->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $foreignScan = vulnerabilitiesScan($otherTeamApp, [$critical], ['summary' => ['fixable_now_at_level' => 7]]);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('ignore', 'CVE-2024-0001', 'vulnerability', 'team', '90', 'Not reachable');
+
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
+        expect($otherScan->fresh()->summary['fixable_now_at_level'])->toBe(1);
+
+        (new RefreshImageScanSummariesJob($this->team->id))->handle();
+
+        expect($otherScan->fresh()->summary['fixable_now_at_level'])->toBe(0)
+            ->and($foreignScan->fresh()->summary['fixable_now_at_level'])->toBe(7);
     });
 
     it('rejects an ID that is not in the results', function () {
@@ -447,6 +511,21 @@ describe('service page', function () {
             ->and($ignore->team_id)->toBe($this->team->id);
     });
 
+    it('rejects an owner from another service', function () {
+        $service = vulnerabilitiesService();
+        $web = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:1.27']);
+        vulnerabilitiesScan($web, [vulnerabilitiesFinding()]);
+        $otherService = vulnerabilitiesService();
+        $foreign = ServiceDatabase::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $otherService->id, 'name' => 'db', 'image' => 'postgres:16']);
+        vulnerabilitiesScan($foreign, [vulnerabilitiesFinding()], ['image_ref' => 'postgres:16']);
+
+        vulnerabilitiesPage($this->admin, $service, 'service')
+            ->call('ignore', 'CVE-2024-0001', 'vulnerability', 'resource', '30', 'Internal only', $foreign->uuid)
+            ->assertNotFound();
+
+        expect(ImageScanIgnore::query()->count())->toBe(0);
+    });
+
     it('filters by image', function () {
         $service = vulnerabilitiesService();
         $web = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:1.27']);
@@ -458,6 +537,42 @@ describe('service page', function () {
             ->call('toggleImage', 'postgres:16')
             ->assertSee('libpq')
             ->assertDontSee('nginx-module');
+    });
+});
+
+describe('database page', function () {
+    it('shows the findings and the sidebar count of a standalone database', function () {
+        $database = create_standalone_postgresql($this->environment->id, $this->destination);
+        vulnerabilitiesScan($database, [vulnerabilitiesFinding(['package' => 'libpq'])], [
+            'image_ref' => 'postgres:16-alpine',
+            'builds_image' => false,
+            'candidates' => [['better' => true, 'fixed_ids' => ['CVE-2024-0001']]],
+            'summary' => ['fixable_now_at_level' => 4],
+        ]);
+
+        vulnerabilitiesPage($this->admin, $database, 'database')
+            ->assertSee('libpq')
+            ->assertDontSee('The running image is not the scanned image.');
+
+        $this->blade('<x-database.configuration-sidebar :database="$database" current-route="project.database.configuration" />', [
+            'database' => $database->fresh(),
+        ])->assertSee('4 fixable now');
+    });
+});
+
+describe('routes', function () {
+    it('opens the Vulnerabilities page of an application, a service, and a database', function () {
+        $service = vulnerabilitiesService();
+        $database = create_standalone_postgresql($this->environment->id, $this->destination);
+        $parameters = ['project_uuid' => $this->environment->project->uuid, 'environment_uuid' => $this->environment->uuid];
+        $this->actingAs($this->admin)->withSession(['currentTeam' => $this->team]);
+
+        $this->get(route('project.application.vulnerabilities', [...$parameters, 'application_uuid' => $this->application->uuid]))
+            ->assertOk()->assertSee('Not scanned yet. The next deploy scans the image.');
+        $this->get(route('project.service.vulnerabilities', [...$parameters, 'service_uuid' => $service->uuid]))
+            ->assertOk()->assertSee('Not scanned yet. The next deploy scans the image.');
+        $this->get(route('project.database.vulnerabilities', [...$parameters, 'database_uuid' => $database->uuid]))
+            ->assertOk()->assertSee('Not scanned yet. The next deploy scans the image.');
     });
 });
 

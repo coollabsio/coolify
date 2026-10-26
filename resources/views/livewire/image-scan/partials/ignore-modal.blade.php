@@ -19,8 +19,11 @@
         if (this.saving || this.reason.trim() === '') return;
         this.saving = true;
         try {
+            {{-- Validation errors arrive as an error toast; the modal stays open so the input can be fixed. --}}
             const saved = await $wire.ignore(this.target, this.kind, this.scope, this.expires, this.reason, this.owner);
             if (saved === true) $dispatch('close-modal');
+        } catch (error) {
+            window.toast?.('Could not ignore', { type: 'danger', description: 'You may not have permission to do this. Reload the page and try again.' });
         } finally {
             this.saving = false;
         }
@@ -57,8 +60,8 @@
             </div>
         </form>
         <x-slot:footer>
-            <x-forms.button type="button" x-on:click="$dispatch('close-modal')">Cancel</x-forms.button>
-            <x-forms.button type="button" isHighlighted x-on:click="submit()"
+            <x-forms.button class="normal-case!" type="button" x-on:click="$dispatch('close-modal')">Cancel</x-forms.button>
+            <x-forms.button class="normal-case!" type="button" isHighlighted x-on:click="submit()"
                 x-bind:disabled="saving || reason.trim() === ''">Ignore</x-forms.button>
         </x-slot:footer>
     </x-modal-input>

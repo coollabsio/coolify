@@ -39,7 +39,9 @@ beforeEach(function () {
     $this->sbom = ImageSbom::factory()->create([
         'server_id' => $this->server->id,
         'packages' => [
-            ['id' => 'p1', 'name' => 'openssl', 'version' => '3.0.1', 'type' => 'apk', 'licenses' => ['Apache-2.0'], 'purl' => 'pkg:apk/alpine/openssl@3.0.1', 'layerId' => 'sha256:aa'],
+            // A row with extra keys, as a leak of image config into the stored list would look: they must not be copied.
+            ['id' => 'p1', 'name' => 'openssl', 'version' => '3.0.1', 'type' => 'apk', 'licenses' => ['Apache-2.0'], 'purl' => 'pkg:apk/alpine/openssl@3.0.1', 'layerId' => 'sha256:aa',
+                'Env' => ['SECRET_TOKEN=leaked'], 'history' => [['created_by' => 'RUN echo leaked']]],
             ['id' => 'p2', 'name' => 'left-pad', 'version' => '1.3.0', 'type' => 'npm', 'licenses' => ['MIT or something'], 'purl' => '', 'layerId' => 'sha256:bb'],
         ],
     ]);
@@ -77,8 +79,15 @@ it('downloads a CycloneDX SBOM made from the package list only', function () {
         ->assertJsonPath('components.0.name', 'openssl')
         ->assertJsonPath('components.0.purl', 'pkg:apk/alpine/openssl@3.0.1');
 
-    expect($response->getContent())->not->toContain('Env')
-        ->and($response->getContent())->not->toContain('history');
+    $document = $response->json();
+    expect(array_keys($document))->toEqualCanonicalizing(['bomFormat', 'specVersion', 'serialNumber', 'version', 'metadata', 'components'])
+        ->and(array_keys($document['metadata']))->toEqualCanonicalizing(['timestamp', 'tools', 'component'])
+        ->and($response->getContent())->not->toContain('Env')
+        ->and($response->getContent())->not->toContain('history')
+        ->and($response->getContent())->not->toContain('leaked');
+    foreach ($document['components'] as $component) {
+        expect(array_diff(array_keys($component), ['type', 'bom-ref', 'name', 'version', 'purl', 'licenses']))->toBe([]);
+    }
 });
 
 it('downloads an SPDX SBOM with license expressions only for plain identifiers', function () {
@@ -91,6 +100,8 @@ it('downloads an SPDX SBOM with license expressions only for plain identifiers',
         ->assertJsonPath('packages.0.licenseDeclared', 'Apache-2.0')
         ->assertJsonPath('packages.1.licenseDeclared', 'NOASSERTION')
         ->assertJsonCount(2, 'relationships');
+
+    expect($response->getContent())->not->toContain('leaked');
 });
 
 it('returns not found for the resource of another team', function () {

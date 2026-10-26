@@ -7,11 +7,13 @@ use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageScan;
+use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
+use WeakMap;
 
 /**
  * The current scan results of a resource page: what the Vulnerabilities page, the sidebar count, and the SBOM
@@ -22,6 +24,9 @@ final class ResourceScans
     private const ADVISORY_ID_PATTERN = '/\A[A-Za-z0-9][A-Za-z0-9._:-]{0,63}\z/';
 
     public const RESOURCE_TYPES = ['application', 'service', 'database'];
+
+    /** @var WeakMap<ImageScan, list<Finding>>|null */
+    private static ?WeakMap $findings = null;
 
     /**
      * Finds a resource page's resource by type and uuid, only in the given teams.
@@ -128,7 +133,7 @@ final class ResourceScans
 
             $summary = (array) $scan->summary;
             $scan->summary = ScanSummary::build(
-                array_map(fn ($row): Finding => Finding::fromArray((array) $row), (array) $scan->findings),
+                self::findings($scan),
                 ImageScanGate::classifierFor($scan),
                 IgnoreMatcher::forResource($owner),
                 ImageScanPolicyResolver::for($owner)->alertLevel,
@@ -137,6 +142,39 @@ final class ResourceScans
             );
             $scan->save();
         }
+    }
+
+    /**
+     * The current scans of every resource of a team, for example to refresh the counts after a team-wide ignore.
+     *
+     * @return Collection<int, ImageScan>
+     */
+    public static function currentForTeam(int $teamId): Collection
+    {
+        return ImageScan::query()
+            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))
+            ->select(['resource_type', 'resource_id'])
+            ->distinct()
+            ->get()
+            ->map(fn (ImageScan $row): ?Model => $row->resource)
+            ->filter(fn (?Model $owner): bool => $owner !== null && method_exists($owner, 'team') && $owner->team()?->id === $teamId)
+            ->flatMap(fn (Model $owner): Collection => self::currentFor($owner))
+            ->values();
+    }
+
+    /**
+     * The findings of a scan, decoded once per loaded scan.
+     *
+     * @return list<Finding>
+     */
+    public static function findings(ImageScan $scan): array
+    {
+        self::$findings ??= new WeakMap;
+
+        return self::$findings[$scan] ??= array_map(
+            fn ($row): Finding => Finding::fromArray((array) $row),
+            array_values((array) $scan->findings),
+        );
     }
 
     /**
