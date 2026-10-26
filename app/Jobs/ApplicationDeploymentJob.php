@@ -3341,6 +3341,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+        $this->resolve_bitbucket_pull_request_commit();
         $this->generate_git_import_commands();
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
@@ -3421,6 +3422,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Restarting helper container with actual SOURCE_COMMIT value.');
             $this->restart_builder_container_with_actual_commit();
         }
+    }
+
+    /**
+     * Bitbucket Cloud has no pull request refs over git, so a preview deployment without a webhook
+     * commit (a manual redeploy) builds the commit of the latest earlier deployment of the pull request.
+     * Without such a commit the clone checks out the base branch, so the deployment fails instead.
+     */
+    private function resolve_bitbucket_pull_request_commit(): void
+    {
+        if ($this->pull_request_id === 0 || $this->git_type !== 'bitbucket' || ! $this->shouldResolveBranchHeadCommit()) {
+            return;
+        }
+
+        $commit = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', $this->pull_request_id)
+            ->whereKeyNot($this->application_deployment_queue->id)
+            ->whereNotIn('commit', ['HEAD', ''])
+            ->latest('id')
+            ->value('commit');
+
+        if (blank($commit)) {
+            throw new DeploymentException("Coolify cannot find the commit of Bitbucket pull request #{$this->pull_request_id}, because Bitbucket Cloud has no pull request refs over git. Push a commit to the pull request to deploy it with the webhook, or deploy the preview with a commit SHA through the API.");
+        }
+
+        $this->commit = $commit;
+        $this->application_deployment_queue->commit = $commit;
+        $this->application_deployment_queue->save();
+        $this->application_deployment_queue->addLogEntry("Using commit {$commit} of the latest deployment of Bitbucket pull request #{$this->pull_request_id}.");
     }
 
     /**
