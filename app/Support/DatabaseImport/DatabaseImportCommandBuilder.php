@@ -113,15 +113,24 @@ SH;
         // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
         $sep = '([[:space:]]|/\\*[^*]*\\*/)';
 
-        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
-        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
+        // A TO/FROM PROGRAM token pair anywhere (so it is also found inside DO blocks,
+        // EXECUTE strings and function bodies), a server-side large-object import or
+        // export, or ALTER SYSTEM. The pair is matched without the former (^|;) anchor
+        // and [^;]* limit, which a ';' inside a string literal or dynamic SQL bypassed.
+        $sqlPattern = "(from|to){$sep}+program|lo_(import|export){$sep}*\\(|alter{$sep}+system{$sep}+(set|reset)";
+        // psql meta-commands that spawn a shell: \!, \copy ... program, and \o/\g/\w
+        // piped to a command. Matched at a statement boundary (line start or after ';').
+        $psqlPattern = "(^|;){$sep}*\\\\(!|copy{$sep}+[^;]*{$sep}+program|(o|g|w){$sep}*\\|)";
         $escapedSqlPattern = escapeshellarg($sqlPattern);
         $escapedPsqlPattern = escapeshellarg($psqlPattern);
         $contents = "{ gunzip -cf {$escapedPath} 2>/dev/null || cat {$escapedPath}; }";
-        $scan = static fn (string $source): string => "{$source} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$source} | sed 's/--.*//' | tr '\\n\\r\\t' '   ' | grep -Eiq {$escapedSqlPattern}";
+        // Comments are no longer stripped: deleting the rest of a line on "--" also cut
+        // inside string literals, which let "SELECT '--'; COPY ... PROGRAM" slip through.
+        // A commented-out PROGRAM statement is now blocked too, which is the safer default.
+        $scan = static fn (string $source): string => "{$source} | LC_ALL=C grep -Eiq {$escapedPsqlPattern} || {$source} | tr '\\n\\r\\t' '   ' | LC_ALL=C grep -Eiq {$escapedSqlPattern}";
         $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
         $sqlScan = $scan($contents);
-        $blockedProgram = 'echo \'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.\'; exit 1';
+        $blockedProgram = 'echo \'Blocked PostgreSQL restore: the backup contains a COPY ... PROGRAM, psql shell command, lo_import/lo_export, or ALTER SYSTEM pattern. If you trust this dump, restore it from the database container terminal.\'; exit 1';
         $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
 
         return <<<SH
@@ -271,9 +280,9 @@ psql -U "$pg_user" -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_sta
 psql -U "$pg_user" -d template1 -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U "$pg_user" --maintenance-db=template1 --if-exists {} || exit 1
 createdb -U "$pg_user" "$db" || exit 1
 if [ "$kind" = archive ]; then
-  stream | pg_restore -U "$pg_user" -d "$db"
+  stream | pg_restore --exit-on-error -U "$pg_user" -d "$db"
 else
-  stream | psql -U "$pg_user" -d "$db"
+  stream | psql -v ON_ERROR_STOP=1 -U "$pg_user" -d "$db"
 fi
 SH;
     }

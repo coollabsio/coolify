@@ -100,13 +100,19 @@ class DatabaseBackupFileValidator
             return false;
         }
 
-        $withoutComments = self::stripSqlComments($sql);
+        // Token separator PostgreSQL treats as whitespace: real whitespace or a block comment.
+        $sep = '(?:\s|/\*[^*]*\*/)';
 
-        if (preg_match('/^\s*\\\\(?:!|copy\b[^\r\n]*\bprogram\b|(?:o|g)\s*\|)/mi', $withoutComments) === 1) {
+        // psql meta-commands that spawn a shell, matched at a statement boundary.
+        if (preg_match('~(?:^|;)'.$sep.'*\\\\(?:!|copy'.$sep.'+[^;]*'.$sep.'+program|(?:o|g|w)\s*\|)~mi', $sql) === 1) {
             return true;
         }
 
-        return preg_match('/(?:^|;)\s*copy\b[^;]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
+        // A TO/FROM PROGRAM token pair anywhere (dynamic SQL, DO blocks, function bodies),
+        // a server-side large-object import or export, or ALTER SYSTEM. Comments are no
+        // longer stripped first, because that cut inside string literals; a commented-out
+        // PROGRAM statement is now blocked too, which is the safer default.
+        return preg_match('~(?:from|to)'.$sep.'+program|lo_(?:import|export)\s*\(|alter'.$sep.'+system'.$sep.'+(?:set|reset)~i', $sql) === 1;
     }
 
     private static function extensionFor(string $name): ?string
@@ -209,12 +215,5 @@ class DatabaseBackupFileValidator
         $fileSize = filesize($path) ?: 0;
 
         return $documentLength >= 5 && $documentLength <= $fileSize;
-    }
-
-    private static function stripSqlComments(string $sql): string
-    {
-        $sql = preg_replace('/\/\*[\s\S]*?\*\//', ' ', $sql) ?? $sql;
-
-        return preg_replace('/--[^\r\n]*/', ' ', $sql) ?? $sql;
     }
 }
