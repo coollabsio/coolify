@@ -2,7 +2,8 @@
     One breakdown dimension rendered as a sortable, paginated settings-section. Handles the
     per-dimension presentation: referrers get a DuckDuckGo favicon + an openable
     external link (rel="noopener noreferrer nofollow", new tab), devices are mapped
-    to friendly capitalized labels, and Sentinel's `__other__` overflow bucket reads
+    to friendly capitalized labels, container tooling user agents (Docker, BuildKit,
+    …) are hidden behind a toggle, and Sentinel's `__other__` overflow bucket reads
     as "Other". Expects `$dimension`, `$label`, `$rows` in scope; optional `$helper`.
 
     @param string   $dimension  Sentinel dimension key (referer, device, agent, …)
@@ -32,6 +33,7 @@
                 @php
                     $value = (string) ($row['value'] ?? '');
                     $isOther = $value === '__other__';
+                    $isHidable = $dimension === 'useragent' && isContainerToolingUserAgent($value);
                     $host = ! $isOther && $dimension === 'referer' ? refererHost($value) : null;
                     $display = $isOther
                         ? 'Other'
@@ -46,7 +48,7 @@
                     $width = min(100, round(($requests / $maxRequests) * 100, 1));
                 @endphp
                 <div wire:key="analytics-{{ $dimension }}-{{ md5($value) }}"
-                    data-row="{{ json_encode(['name' => $display, 'requests' => $requests, 'bytesOut' => $bytesOut]) }}" @if ($isOther) data-pinned @endif
+                    data-row="{{ json_encode(['name' => $display, 'requests' => $requests, 'bytesOut' => $bytesOut]) }}" @if ($isOther) data-pinned @endif @if ($isHidable) data-hidable @endif
                     x-show="shown($el)"
                     class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
                     @if ($dimension === 'referer' && $host)
@@ -65,6 +67,12 @@
                     <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($bytesOut) }}</span>
                 </div>
             @endforeach
+            </div>
+            <div x-show="hiddenCount > 0" x-cloak
+                class="flex items-center border-t border-neutral-200 px-4 py-2 dark:border-white/[0.07]">
+                <button type="button" @click="toggleHidden()"
+                    class="text-[11px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-faint dark:hover:text-fg"
+                    x-text="showHidden ? 'Hide container tooling' : `Show ${hiddenCount} container tooling ${hiddenCount === 1 ? 'agent' : 'agents'} (Docker, BuildKit, …)`"></button>
             </div>
             @include('livewire.traffic._pager')
         </div>
