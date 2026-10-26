@@ -165,7 +165,9 @@ class SharedEnvironmentVariablesController extends Controller
             return $validated;
         }
 
-        $this->authorize('create', SharedEnvironmentVariable::class);
+        if (in_array($type, ['team', 'server'], true)) {
+            $this->authorize('create', SharedEnvironmentVariable::class);
+        }
 
         $scope = array_filter([
             'project_id' => $attributes['project_id'] ?? null,
@@ -496,7 +498,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $project;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('update', $project);
 
         return $this->createEnv($request, $teamId, 'project', ['project_id' => $project->id]);
     }
@@ -658,7 +660,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $environment);
+        $this->authorize('update', $environment);
 
         return $this->createEnv($request, $teamId, 'environment', ['environment_id' => $environment->id]);
     }

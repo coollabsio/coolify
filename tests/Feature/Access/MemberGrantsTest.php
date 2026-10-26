@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -216,6 +217,8 @@ it('shows no servers on the dashboard for a scoped member', function () {
 
     expect($dashboard->get('servers')->all())->toBe([])
         ->and($dashboard->get('projects')->pluck('uuid')->all())->toBe([$this->shop->uuid]);
+
+    expect(fn () => $dashboard->set('showsTeamSections', true))->toThrow(CannotUpdateLockedPropertyException::class);
 });
 
 it('renders the members page and the editor with every scope of the team for an owner', function () {

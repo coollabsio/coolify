@@ -10,6 +10,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -231,6 +232,30 @@ describe('member tokens', function () {
 
         scopedTokenTestApi(scopedTokenTestToken($member, $this->team, ['read', 'write'], null), 'GET', '/api/v1/applications')->assertForbidden();
         scopedTokenTestApi(scopedTokenTestToken($member, $this->team, ['delete'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]), 'GET', '/api/v1/applications')->assertForbidden();
+    });
+
+    test('a member with a write grant can create project and environment shared variables', function () {
+        $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['write']]]);
+        $token = scopedTokenTestToken($member, $this->team, ['read', 'write'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+
+        scopedTokenTestApi($token, 'POST', "/api/v1/projects/{$this->shop->uuid}/envs", ['key' => 'PROJECT_KEY', 'value' => 'v'])->assertCreated();
+        scopedTokenTestApi($token, 'POST', "/api/v1/projects/{$this->shop->uuid}/environments/{$this->shopProduction->uuid}/envs", ['key' => 'ENVIRONMENT_KEY', 'value' => 'v'])->assertCreated();
+        scopedTokenTestApi($token, 'POST', "/api/v1/projects/{$this->blog->uuid}/envs", ['key' => 'OTHER_KEY', 'value' => 'v'])->assertNotFound();
+
+        expect(SharedEnvironmentVariable::query()->whereIn('key', ['PROJECT_KEY', 'ENVIRONMENT_KEY', 'OTHER_KEY'])->pluck('key')->all())->toEqualCanonicalizing(['PROJECT_KEY', 'ENVIRONMENT_KEY']);
+    });
+
+    test('a member with a read grant cannot create project or environment shared variables', function () {
+        $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['read']]]);
+        $token = scopedTokenTestToken($member, $this->team, ['read'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+        $writeToken = scopedTokenTestToken($member, $this->team, ['read', 'write'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+
+        foreach ([$token, $writeToken] as $candidate) {
+            scopedTokenTestApi($candidate, 'POST', "/api/v1/projects/{$this->shop->uuid}/envs", ['key' => 'PROJECT_KEY', 'value' => 'v'])->assertForbidden();
+            scopedTokenTestApi($candidate, 'POST', "/api/v1/projects/{$this->shop->uuid}/environments/{$this->shopProduction->uuid}/envs", ['key' => 'ENVIRONMENT_KEY', 'value' => 'v'])->assertForbidden();
+        }
+
+        expect(SharedEnvironmentVariable::query()->whereIn('key', ['PROJECT_KEY', 'ENVIRONMENT_KEY'])->exists())->toBeFalse();
     });
 });
 

@@ -44,8 +44,6 @@ it('denies viewing application preview with null application', function () {
     $preview = Mockery::mock(ApplicationPreview::class)->makePartial();
     $preview->shouldReceive('getAttribute')->with('application')->andReturn(null);
 
-    $user->shouldReceive('canAccess')->with(AccessLevel::Read, $application)->andReturn(false);
-
     $policy = new ApplicationPreviewPolicy;
     expect($policy->view($user, $preview))->toBeFalse();
 });

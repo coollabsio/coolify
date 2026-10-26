@@ -52,7 +52,8 @@
                     <div class="flex items-start gap-2">
                         <div class="min-w-0 flex-1">
                             <x-forms.listbox id="grants.{{ $index }}.target" :options="$this->scopeOptions"
-                                placeholder="Choose a scope" searchable portal />
+                                placeholder="Choose a scope" searchable portal canGate="manageMembers"
+                                :canResource="$team" />
                         </div>
                         <button type="button" class="icon-button mt-1 shrink-0" title="Remove"
                             aria-label="Remove this grant" wire:click="removeGrant('{{ $grant['key'] }}')">
@@ -62,7 +63,7 @@
                     <div class="flex flex-wrap gap-x-1">
                         @foreach ($levels as $level)
                             <x-forms.checkbox id="grants.{{ $index }}.levels.{{ $level->name }}"
-                                :label="$level->label()" />
+                                :label="$level->label()" canGate="manageMembers" :canResource="$team" />
                         @endforeach
                     </div>
                     @error("grants.{$index}.levels")
@@ -81,7 +82,8 @@
 
         <x-slot:footer>
             <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
-            <x-forms.button isHighlighted wire:click="save">Save</x-forms.button>
+            <x-forms.button isHighlighted wire:click="save" canGate="manageMembers"
+                :canResource="$team">Save</x-forms.button>
         </x-slot:footer>
     </x-modal-input>
     @endif

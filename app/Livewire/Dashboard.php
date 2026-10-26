@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\TeamInvitation;
 use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -24,6 +25,7 @@ class Dashboard extends Component
     /**
      * Members limited to some projects do not see team-level sections such as servers.
      */
+    #[Locked]
     public bool $showsTeamSections = true;
 
     public function mount()

@@ -92,7 +92,7 @@ class Access extends Component
         $this->authorize('manageMembers', Team::findOrFail($this->teamId));
         $member = $this->member();
 
-        $validTargets = collect($this->scopeOptions())->reject(fn (array $option) => $option['header'] ?? false)->pluck('value')->all();
+        $validTargets = collect($this->scopeOptions)->reject(fn (array $option) => $option['header'] ?? false)->pluck('value')->all();
         $grants = [];
         $errors = [];
         foreach ($this->grants as $index => $row) {
@@ -213,9 +213,10 @@ class Access extends Component
 
         return view('livewire.team.member.access', [
             'member' => $member,
+            'team' => Team::findOrFail($this->teamId),
             'currentSummary' => self::summary($member->pivot->access),
             'levels' => AccessLevel::cases(),
-            'projectOptions' => collect($this->scopeOptions())->filter(fn (array $option) => str_starts_with($option['value'], 'project:'))->values(),
+            'projectOptions' => collect($this->scopeOptions)->filter(fn (array $option) => str_starts_with($option['value'], 'project:'))->values(),
         ]);
     }
 

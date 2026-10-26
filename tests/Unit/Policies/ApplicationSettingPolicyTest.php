@@ -44,8 +44,6 @@ it('denies viewing application setting with null application', function () {
     $setting = Mockery::mock(ApplicationSetting::class)->makePartial();
     $setting->shouldReceive('getAttribute')->with('application')->andReturn(null);
 
-    $user->shouldReceive('canAccess')->with(AccessLevel::Read, $application)->andReturn(false);
-
     $policy = new ApplicationSettingPolicy;
     expect($policy->view($user, $setting))->toBeFalse();
 });
