@@ -966,12 +966,16 @@ update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_BACKEND_PORT" "6001"
 
-# Add default root user credentials from environment variables
-if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+# Add default root user credentials from environment variables (ROOT_USERNAME is optional)
+if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
     echo " - Setting predefined root user credentials from environment"
-    update_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+    if [ -n "$ROOT_USERNAME" ]; then
+        update_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+    fi
     update_env_var "ROOT_USER_EMAIL" "$(quote_env_value "$ROOT_USER_EMAIL")"
     update_env_var "ROOT_USER_PASSWORD" "$(quote_env_value "$ROOT_USER_PASSWORD")"
+elif [ -n "$ROOT_USERNAME" ] || [ -n "$ROOT_USER_EMAIL" ] || [ -n "$ROOT_USER_PASSWORD" ]; then
+    warn "Predefined root user skipped: set both ROOT_USER_EMAIL and ROOT_USER_PASSWORD."
 fi
 
 if [ -n "${REGISTRY_URL+x}" ]; then
@@ -1163,6 +1167,9 @@ for IP in $PRIVATE_IPS; do
     fi
 done
 
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ]; }; then
+    printf '\n  %s! Create the root account within 10 minutes. If the time ends, run %sdocker restart coolify%s%s and try again.%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
+fi
 printf '\n  %s! Back up %s/data/coolify/source/.env%s%s to a safe place outside this server (e.g. a password manager).%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
 printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
 

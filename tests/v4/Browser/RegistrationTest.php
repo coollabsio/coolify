@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
 
@@ -16,6 +17,17 @@ it('shows registration page when no users exist', function () {
         ->assertSee('Full instance access')
         ->assertSee('Create account')
         ->screenshot(filename: 'registration-root-setup');
+});
+
+it('shows how to open the setup window again when it is closed', function () {
+    Cache::flush();
+
+    $page = visit('/register');
+
+    $page->assertSee('Setup window closed')
+        ->assertSee('docker restart coolify')
+        ->assertDontSee('Create account')
+        ->screenshot(filename: 'registration-root-setup-window-closed');
 });
 
 it('can register a new root user', function () {

@@ -5,11 +5,13 @@ namespace App\Actions\Fortify;
 use App\Jobs\SendVerificationEmailJob;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\RootSetupWindow;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -32,6 +34,12 @@ class CreateNewUser implements CreatesNewUsers
         $settings = instanceSettings();
         if (! $settings->isPasswordRegistrationAllowed()) {
             abort(403);
+        }
+
+        if (! User::query()->exists() && ! RootSetupWindow::isOpen()) {
+            throw ValidationException::withMessages([
+                'email' => 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
+            ]);
         }
 
         $this->ensureRegistrationIsNotRateLimited($input);
